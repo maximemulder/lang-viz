@@ -34,7 +34,8 @@ The plan is a **solid core of four views**, plus **optional extensions** added a
 | **WALS** (downloaded) | Grammatical features | 192 features × 2,662 languages; only 11% filled |
 | **DiACL** (downloaded) | Vocabulary and word histories, incl. historical and proto-languages | 422 varieties, 60k word forms, 47k word-history links; mostly Eurasia and Pacific |
 | **Glottography** (3 repositories downloaded) | Language territory polygons | Downloaded sets cover 54% of Glottolog languages, ~75% of WALS and DiACL languages, but only 37% in Eurasia; contemporary and traditional layers |
-| Grambank, PHOIBLE, WOLD, Lexibank, Wikidata (candidates) | Denser grammar data, sounds, loanwords, word lists, speaker counts | — |
+| **Wikidata** (downloaded) | Speaker estimates, official status, writing systems | 2,600 usable speaker statements for 2,140 Glottocodes; 525 current country/territory official-language pairs |
+| Grambank, PHOIBLE, WOLD, Lexibank (candidates) | Denser grammar data, sounds, loanwords, word lists | — |
 
 All datasets link via the **Glottocode** (Glottolog's language ID), and all except Wikidata use the same **CLDF** format. Format conversion is easy; the real work is deciding what counts as the same thing across datasets (see [ARCHITECTURE.md](ARCHITECTURE.md#2-integration-rules)).
 

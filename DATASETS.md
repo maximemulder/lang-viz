@@ -10,13 +10,16 @@ datasets/
 ├── glottolog-cldf/     Glottolog, CLDF export (CSV tables): easier to use
 ├── wals/
 ├── diacl/
+├── wikidata/           Wikidata Query Service extracts (CSV tables)
 └── glottography/
     ├── asher2007world/
     ├── carling2025diacl/
     └── bouckaert2012indoeuropean/
 ```
 
-Figures in sections 1–4 were measured on the downloaded copies (September 2026). Figures in section 6 come from the projects' own documentation and still need checking.
+Figures in sections 1–4 were measured on the downloaded copies (September 2026),
+and Wikidata was measured on 13 October 2026. Figures in section 7 come from the
+projects' own documentation and still need checking.
 
 **About CLDF.** Most of these datasets use CLDF (Cross-Linguistic Data Formats, https://cldf.clld.org): a set of CSV tables plus a JSON metadata file describing them. The main tables are always the same:
 
@@ -431,9 +434,54 @@ The decisions needed to actually combine the datasets (level mismatches, disagre
 
 ---
 
-## 6. Candidates (not downloaded; figures to verify)
+## 6. Wikidata language metadata
 
-All use the Glottocode as language identifier, and all except Wikidata are in CLDF.
+### 6.1 Description
+
+Wikidata adds speaker estimates, official-language status and writing systems.
+The local extract is linked through the Glottocode property (`P1394`) and keeps
+statement qualifiers, ranks and references rather than flattening them.
+
+- 11,780 Wikidata items with 11,840 valid Glottocodes; 8,167 match current
+  Glottolog language-level rows (94.8%).
+- Speaker counts: 2,600 non-deprecated statements for 2,140 Glottocodes; 20.7%
+  coverage of Glottolog languages. Only 68.0% are dated and 51.1% have a source
+  item or reference URL.
+- Current country/territory official status: 525 language–jurisdiction pairs,
+  covering 259 Glottocodes and 250 jurisdiction items (249 distinct ISO 3166-1
+  codes).
+- Writing systems: 2,747 pairs for 2,021 Glottocodes.
+
+See [WIKIDATA_ANALYSIS.md](WIKIDATA_ANALYSIS.md) for detailed findings and
+integration recommendations. Wikidata structured data is CC0.
+
+### 6.2 Getting and checking the data
+
+```sh
+./pipeline/wikidata/download.sh
+python3 pipeline/wikidata/analyze.py
+```
+
+The four CSV files are written to `datasets/wikidata/`. The exact SPARQL queries
+are versioned in `pipeline/wikidata/queries/`.
+
+**Caveats**
+
+- Speaker values are estimates with different dates, scopes and places; they
+  are not one canonical count per language.
+- The Glottocode relation is not perfectly one-to-one, and 138 extracted codes
+  are absent from the downloaded Glottolog version.
+- Official status is deliberately limited to entities with ISO 3166-1 codes.
+  An unrestricted `P37` query mixes countries with municipalities,
+  organizations, schools and historical entities.
+- Coverage is strongly uneven across macroareas and missingness must remain
+  visible in the visualization.
+
+---
+
+## 7. Candidates (not downloaded; figures to verify)
+
+All use the Glottocode as language identifier and are available in CLDF.
 
 | Dataset | Adds | Would feed | Links |
 |---|---|---|---|
@@ -442,11 +490,11 @@ All use the Glottocode as language identifier, and all except Wikidata are in CL
 | **WOLD** | Loanwords by meaning in 41 languages | Borrowing view, next to DiACL | https://wold.clld.org, https://github.com/lexibank/wold |
 | **Lexibank** | Collection of ~100 standardised word-list datasets | Cross-language word comparison | https://lexibank.clld.org |
 | **NorthEuraLex** | ~1,000 concepts for ~100 languages of northern Eurasia | Same, denser for Eurasia | https://github.com/lexibank/northeuralex |
-| **Wikidata** | Speaker counts, official status, writing systems (Glottocode property P1394) | Map sizing and filters: Glottolog has no speaker counts | https://www.wikidata.org |
 
 ---
 
-## 7. Licences
+## 8. Licences
 
-- CC-BY-4.0 for everything planned, except **wurm1981pacific (CC-BY-NC-4.0)**, which is acceptable for a course project.
+- Most planned datasets are CC-BY-4.0. Wikidata structured data is CC0;
+  **wurm1981pacific** is CC-BY-NC-4.0, which is acceptable for a course project.
 - Every dataset used must be credited in the app and the report, using each project's citation instructions (README or `.zenodo.json`).

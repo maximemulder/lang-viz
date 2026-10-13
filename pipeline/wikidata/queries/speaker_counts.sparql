@@ -1,0 +1,81 @@
+PREFIX p: <http://www.wikidata.org/prop/>
+PREFIX ps: <http://www.wikidata.org/prop/statement/>
+PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
+PREFIX pr: <http://www.wikidata.org/prop/reference/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT
+  ?wikidata_id
+  ?glottocode
+  ?statement_id
+  ?speaker_count
+  ?point_in_time
+  ?applies_to_part_id
+  ?applies_to_part_name
+  ?valid_in_place_id
+  ?valid_in_place_name
+  ?determination_method_id
+  ?determination_method_name
+  ?rank
+  ?stated_in_id
+  ?stated_in_name
+  ?reference_url
+  ?retrieved
+WHERE {
+  ?language wdt:P1394 ?glottocode ;
+            p:P1098 ?statement .
+  FILTER(REGEX(STR(?glottocode), "^[a-z]{4}[0-9]{4}$"))
+  ?statement ps:P1098 ?speaker_count ;
+             wikibase:rank ?rank_uri .
+
+  BIND(REPLACE(STR(?language), "^.*/", "") AS ?wikidata_id)
+  BIND(REPLACE(STR(?statement), "^.*/", "") AS ?statement_id)
+  BIND(
+    IF(?rank_uri = wikibase:PreferredRank, "preferred",
+      IF(?rank_uri = wikibase:DeprecatedRank, "deprecated", "normal"))
+    AS ?rank
+  )
+
+  OPTIONAL { ?statement pq:P585 ?point_in_time . }
+  OPTIONAL {
+    ?statement pq:P518 ?applies_to_part .
+    BIND(REPLACE(STR(?applies_to_part), "^.*/", "") AS ?applies_to_part_id)
+    OPTIONAL {
+      ?applies_to_part rdfs:label ?applies_to_part_name .
+      FILTER(LANG(?applies_to_part_name) = "en")
+    }
+  }
+  OPTIONAL {
+    ?statement pq:P3005 ?valid_in_place .
+    BIND(REPLACE(STR(?valid_in_place), "^.*/", "") AS ?valid_in_place_id)
+    OPTIONAL {
+      ?valid_in_place rdfs:label ?valid_in_place_name .
+      FILTER(LANG(?valid_in_place_name) = "en")
+    }
+  }
+  OPTIONAL {
+    ?statement pq:P459 ?determination_method .
+    BIND(REPLACE(STR(?determination_method), "^.*/", "") AS ?determination_method_id)
+    OPTIONAL {
+      ?determination_method rdfs:label ?determination_method_name .
+      FILTER(LANG(?determination_method_name) = "en")
+    }
+  }
+  OPTIONAL {
+    ?statement prov:wasDerivedFrom ?reference .
+    OPTIONAL {
+      ?reference pr:P248 ?stated_in .
+      BIND(REPLACE(STR(?stated_in), "^.*/", "") AS ?stated_in_id)
+      OPTIONAL {
+        ?stated_in rdfs:label ?stated_in_name .
+        FILTER(LANG(?stated_in_name) = "en")
+      }
+    }
+    OPTIONAL { ?reference pr:P854 ?reference_url . }
+    OPTIONAL { ?reference pr:P813 ?retrieved . }
+  }
+}
+ORDER BY ?glottocode ?statement_id

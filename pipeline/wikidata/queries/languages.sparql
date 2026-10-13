@@ -1,0 +1,30 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT
+  ?wikidata_id
+  ?wikidata_url
+  ?glottocode
+  ?language_name
+  ?description
+  ?iso639_1
+  ?iso639_2
+  ?iso639_3
+WHERE {
+  ?wikidata_url wdt:P1394 ?glottocode .
+  FILTER(REGEX(STR(?glottocode), "^[a-z]{4}[0-9]{4}$"))
+  BIND(REPLACE(STR(?wikidata_url), "^.*/", "") AS ?wikidata_id)
+
+  OPTIONAL {
+    ?wikidata_url rdfs:label ?language_name .
+    FILTER(LANG(?language_name) = "en")
+  }
+  OPTIONAL {
+    ?wikidata_url <http://schema.org/description> ?description .
+    FILTER(LANG(?description) = "en")
+  }
+  OPTIONAL { ?wikidata_url wdt:P218 ?iso639_1 . }
+  OPTIONAL { ?wikidata_url wdt:P219 ?iso639_2 . }
+  OPTIONAL { ?wikidata_url wdt:P220 ?iso639_3 . }
+}
+ORDER BY ?glottocode ?wikidata_id

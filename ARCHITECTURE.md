@@ -49,6 +49,9 @@ Everything keyed by Glottocode (or internal ID, rule 4). Tables:
 | `concepts` | Concept ID (Concepticon), gloss |
 | `forms` | Word forms: language, concept, form, source |
 | `word_links` | Parent form → child form, link type (inherited, borrowed, …) |
+| `speaker_estimates` | Language, count, date, speaker scope, place, rank, provenance |
+| `official_status` | Language, jurisdiction, subnational scope, time range, rank, provenance |
+| `writing_systems` | Language × writing system |
 | `geometries` | Polygon, level (feature / language / family), layer (contemporary / traditional / historical), year, source |
 | `availability` | Per-language summary: number of features, forms, polygons, sources, … (computed) |
 
@@ -60,6 +63,8 @@ One script per dataset:
 - **WALS / Grambank:** CLDF → `features`, `values`.
 - **DiACL:** CLDF + raw XML / JSON → `forms`, `word_links`, date ranges. The word-history links exist only in the raw files.
 - **Glottography:** `pyglottography` for merged polygons at the three levels → `geometries`.
+- **Wikidata:** normalized SPARQL extracts → speaker estimates, official status
+  and writing systems; preserve statement dates, scope, rank and provenance.
 - **Proto-language mapping:** hand-made CSV.
 
 Tools: `pycldf` (reading CLDF; `cldf createdb` for SQLite if useful), `pyglottography`, `mapshaper`.

@@ -1,0 +1,21 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT
+  ?wikidata_id
+  ?glottocode
+  ?writing_system_id
+  ?writing_system_name
+WHERE {
+  ?language wdt:P1394 ?glottocode ;
+            wdt:P282 ?writing_system .
+  FILTER(REGEX(STR(?glottocode), "^[a-z]{4}[0-9]{4}$"))
+
+  BIND(REPLACE(STR(?language), "^.*/", "") AS ?wikidata_id)
+  BIND(REPLACE(STR(?writing_system), "^.*/", "") AS ?writing_system_id)
+  OPTIONAL {
+    ?writing_system rdfs:label ?writing_system_name .
+    FILTER(LANG(?writing_system_name) = "en")
+  }
+}
+ORDER BY ?glottocode ?writing_system_id
