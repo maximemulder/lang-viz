@@ -139,6 +139,7 @@ h2 {
 
 .search-field input,
 .finder-filters select,
+.source-filter__trigger,
 .language-row__variant {
   width: 100%;
   border: 1px solid rgb(29 43 39 / 16%);
@@ -155,6 +156,7 @@ h2 {
 
 .search-field input:focus,
 .finder-filters select:focus,
+.source-filter__trigger:focus-visible,
 .language-row__variant:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgb(203 93 62 / 14%);
@@ -167,7 +169,8 @@ h2 {
   margin-top: 0.65rem;
 }
 
-.finder-filters label {
+.finder-filters label,
+.source-filter {
   display: grid;
   gap: 0.22rem;
   color: var(--muted-ink);
@@ -175,6 +178,111 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+}
+
+.source-filter {
+  position: relative;
+}
+
+.source-filter__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+}
+
+.source-filter__chevron {
+  transition: transform 120ms ease;
+}
+
+.source-filter__trigger[aria-expanded="true"] .source-filter__chevron {
+  transform: rotate(180deg);
+}
+
+.source-filter__popover {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  z-index: 5;
+  width: max(100%, 15rem);
+  padding: 0.45rem;
+  border: 1px solid rgb(29 43 39 / 16%);
+  border-radius: 0.6rem;
+  background: #fffdf7;
+  box-shadow: 0 0.75rem 2rem rgb(31 46 40 / 18%);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.source-filter__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  padding: 0 0 0.35rem;
+  border-bottom: 1px solid rgb(29 43 39 / 9%);
+}
+
+.source-filter__actions button {
+  padding: 0.25rem 0.4rem;
+  border: 0;
+  border-radius: 0.35rem;
+  color: var(--muted-ink);
+  background: #e9e9df;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.source-filter__options {
+  display: grid;
+  gap: 0.12rem;
+  padding-top: 0.3rem;
+}
+
+.source-filter__option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border-radius: 0.4rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.source-filter__option:hover {
+  background: #f0eee5;
+}
+
+.source-filter__option input {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0.1rem 0 0;
+  accent-color: var(--accent);
+}
+
+.source-filter__option strong,
+.source-filter__option small {
+  display: block;
+}
+
+.source-filter__option strong {
+  font-size: 0.68rem;
+}
+
+.source-filter__option small {
+  margin-top: 0.05rem;
+  color: var(--muted-ink);
+  font-size: 0.58rem;
+  font-weight: 400;
+}
+
+.source-filter__option--unavailable {
+  opacity: 0.55;
 }
 
 .finder-filters select {

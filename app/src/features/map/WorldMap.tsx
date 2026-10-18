@@ -7,9 +7,11 @@ import { memo, Suspense, useEffect, useRef, useState } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
-import { temporalVariantsForLanguage, temporalView } from '../../domain/temporal'
+import { geographyVariantsForLanguage } from '../../domain/geography'
+import { temporalView } from '../../domain/temporal'
 import {
   atlasDataAtom,
+  geographyDatasetFilterAtom,
   geometryOverridesAtom,
   temporalViewAtom,
   viewportLanguageIdsAtom,
@@ -74,10 +76,16 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
   const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
+  const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const variantIds = visibleLanguageIds.flatMap((languageId) => {
     const language = data.languageById.get(languageId)
     if (!language || language.geometryVariantIds.length === 0) return []
-    const variants = temporalVariantsForLanguage(data, language, temporalSelection)
+    const variants = geographyVariantsForLanguage(
+      data,
+      language,
+      temporalSelection,
+      datasetSelection,
+    )
     const override = overrides[languageId]
     const variant = variants.find(({ id }) => id === override) ?? variants[0]
     return variant ? [variant.id] : []
@@ -87,6 +95,11 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
     temporalSelection === 'all'
       ? ['has', 'variant_id']
       : ['==', ['get', 'temporal_view'], temporalSelection]
+  const datasetFilter: FilterSpecification =
+    datasetSelection === 'all'
+      ? ['has', 'dataset_id']
+      : ['in', ['get', 'dataset_id'], ['literal', datasetSelection]]
+  const availableGeometryFilter: FilterSpecification = ['all', temporalFilter, datasetFilter]
 
   return (
     <Source
@@ -100,7 +113,7 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
         source={LANGUAGE_SOURCE_ID}
         source-layer={data.manifest.vectorLayer}
         type="fill"
-        filter={temporalFilter}
+        filter={availableGeometryFilter}
         paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
       />
       <Layer
@@ -135,9 +148,13 @@ const MapHint = () => {
   const data = useAtomValue(atlasDataAtom)
   const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
+  const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const visibleInPeriodCount = visibleLanguageIds.filter((languageId) => {
     const language = data.languageById.get(languageId)
-    return language && temporalVariantsForLanguage(data, language, temporalSelection).length > 0
+    return (
+      language &&
+      geographyVariantsForLanguage(data, language, temporalSelection, datasetSelection).length > 0
+    )
   }).length
 
   return (
@@ -153,7 +170,10 @@ const MapHint = () => {
 export const WorldMap = () => {
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
   const [inspection, setInspection] = useState<MapInspection | null>(null)
+  const temporalSelection = useAtomValue(temporalViewAtom)
+  const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const inspectionRef = useRef<MapInspection | null>(null)
+  const inspectionFilterRef = useRef({ datasetSelection, temporalSelection })
   const pendingHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
   const hoverQueryTimerRef = useRef<number | null>(null)
   const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
@@ -162,6 +182,17 @@ export const WorldMap = () => {
     inspectionRef.current = nextInspection
     setInspection(nextInspection)
   }
+
+  useEffect(() => {
+    const previousFilters = inspectionFilterRef.current
+    if (
+      previousFilters.datasetSelection !== datasetSelection ||
+      previousFilters.temporalSelection !== temporalSelection
+    ) {
+      inspectionFilterRef.current = { datasetSelection, temporalSelection }
+      updateInspection(null)
+    }
+  })
 
   const cancelPendingHoverQuery = () => {
     pendingHoverEventRef.current = null

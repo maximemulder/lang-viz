@@ -1,6 +1,7 @@
 export type LanguageId = string
 export type GeometryVariantId = string
 export type GeographyDatasetId = string
+export type GeographyDatasetSelection = 'all' | readonly GeographyDatasetId[]
 export type TemporalViewId = 'contemporary' | 'time-of-contact' | 'year-1750' | 'mixed-periods'
 export type TemporalViewSelection = 'all' | TemporalViewId
 export type TemporalQuality = 'direct' | 'approximate' | 'proxy' | 'mixed'

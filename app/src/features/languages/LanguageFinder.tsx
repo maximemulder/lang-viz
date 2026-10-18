@@ -1,13 +1,18 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { normalizeLanguageQuery } from '../../data/atlasRepository'
-import type { Language } from '../../domain/atlas'
+import type {
+  AtlasData,
+  GeographyDatasetSelection,
+  Language,
+  TemporalViewSelection,
+} from '../../domain/atlas'
+import { geographyVariantsForLanguage } from '../../domain/geography'
 import {
   isTemporalViewSelection,
   TEMPORAL_VIEWS,
   temporalQualityLabel,
-  temporalVariantsForLanguage,
   temporalView,
 } from '../../domain/temporal'
 import {
@@ -33,9 +38,10 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
   const visibleIds = useAtomValue(visibleLanguageIdsAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
+  const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
-  const variants = temporalVariantsForLanguage(data, language, temporalSelection)
+  const variants = geographyVariantsForLanguage(data, language, temporalSelection, datasetSelection)
   const hasGeometry = variants.length > 0
   const isVisible = visibleIds.includes(language.id)
   const activeVariant =
@@ -98,6 +104,120 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
   )
 }
 
+interface GeographySourceFilterProps {
+  readonly data: AtlasData
+  readonly selection: GeographyDatasetSelection
+  readonly temporalSelection: TemporalViewSelection
+  readonly onChange: (selection: GeographyDatasetSelection) => void
+}
+
+const GeographySourceFilter = ({
+  data,
+  selection,
+  temporalSelection,
+  onChange,
+}: GeographySourceFilterProps) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const selectedIds = selection === 'all' ? data.datasets.map((dataset) => dataset.id) : selection
+  const selectedIdSet = new Set(selectedIds)
+  const availableDatasetIds = new Set(
+    data.variants
+      .filter(
+        (variant) =>
+          temporalSelection === 'all' || variant.temporalCoverage.viewId === temporalSelection,
+      )
+      .map((variant) => variant.datasetId),
+  )
+  const summary =
+    selection === 'all'
+      ? 'All sources'
+      : selection.length === 0
+        ? 'No sources'
+        : selection.length === 1
+          ? (data.datasets.find((dataset) => dataset.id === selection[0])?.shortName ?? '1 source')
+          : `${selection.length} sources`
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isOpen])
+
+  const toggleDataset = (datasetId: string) => {
+    const nextIds = selectedIdSet.has(datasetId)
+      ? selectedIds.filter((id) => id !== datasetId)
+      : [...selectedIds, datasetId]
+    onChange(nextIds.length === data.datasets.length ? 'all' : nextIds)
+  }
+
+  return (
+    <div className="source-filter" ref={rootRef}>
+      <span>Geographic sources</span>
+      <button
+        type="button"
+        className="source-filter__trigger"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span>{summary}</span>
+        <span className="source-filter__chevron" aria-hidden="true">
+          ▾
+        </span>
+      </button>
+      {isOpen && (
+        <div className="source-filter__popover" role="dialog" aria-label="Geographic sources">
+          <div className="source-filter__actions">
+            <button type="button" onClick={() => onChange('all')}>
+              Select all
+            </button>
+            <button type="button" onClick={() => onChange([])}>
+              Clear
+            </button>
+          </div>
+          <div className="source-filter__options">
+            {data.datasets.map((dataset) => {
+              const availableInPeriod = availableDatasetIds.has(dataset.id)
+              return (
+                <label
+                  className={`source-filter__option${
+                    availableInPeriod ? '' : ' source-filter__option--unavailable'
+                  }`}
+                  key={dataset.id}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIdSet.has(dataset.id)}
+                    onChange={() => toggleDataset(dataset.id)}
+                  />
+                  <span>
+                    <strong>{dataset.shortName}</strong>
+                    <small>
+                      {availableInPeriod ? dataset.citation : 'Not available in this period'}
+                    </small>
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export const LanguageFinder = () => {
   const data = useAtomValue(atlasDataAtom)
   const viewportIds = useAtomValue(viewportLanguageIdsAtom)
@@ -112,7 +232,7 @@ export const LanguageFinder = () => {
   const normalizedQuery = normalizeLanguageQuery(query.trim())
   const viewportIdSet = new Set(viewportIds)
   const languages = data.languages.filter((language) => {
-    const temporalVariants = temporalVariantsForLanguage(data, language, temporalSelection)
+    const variants = geographyVariantsForLanguage(data, language, temporalSelection, datasetFilter)
     if (
       normalizedQuery &&
       !data.searchTextByLanguageId.get(language.id)?.includes(normalizedQuery)
@@ -122,10 +242,7 @@ export const LanguageFinder = () => {
     if (scope === 'viewport' && !viewportIdSet.has(language.id)) {
       return false
     }
-    if (datasetFilter === 'all') {
-      return true
-    }
-    return temporalVariants.some((variant) => variant.datasetId === datasetFilter)
+    return variants.length > 0
   })
   const virtualizer = useVirtualizer({
     count: languages.length,
@@ -134,10 +251,15 @@ export const LanguageFinder = () => {
     overscan: 8,
     getItemKey: (index) => languages[index]?.id ?? index,
   })
-  const showableIds = languages
-    .filter((language) => temporalVariantsForLanguage(data, language, temporalSelection).length > 0)
-    .map((language) => language.id)
+  const showableIds = languages.map((language) => language.id)
   const visibleIdSet = new Set(visibleIds)
+  const shownCount = visibleIds.filter((languageId) => {
+    const language = data.languageById.get(languageId)
+    return (
+      language &&
+      geographyVariantsForLanguage(data, language, temporalSelection, datasetFilter).length > 0
+    )
+  }).length
   const areAllFilteredSelected =
     showableIds.length > 0 && showableIds.every((languageId) => visibleIdSet.has(languageId))
 
@@ -157,7 +279,11 @@ export const LanguageFinder = () => {
           <p className="eyebrow">Language layers</p>
           <h2>Find a language</h2>
         </div>
-        <span className="selection-count">{visibleIds.length} shown</span>
+        <span className="selection-count">
+          {shownCount === visibleIds.length
+            ? `${shownCount} shown`
+            : `${shownCount} of ${visibleIds.length} shown`}
+        </span>
       </header>
 
       <label className="search-field">
@@ -188,20 +314,12 @@ export const LanguageFinder = () => {
           </select>
         </label>
 
-        <label>
-          <span>Geography</span>
-          <select
-            value={datasetFilter}
-            onChange={(event) => setDatasetFilter(event.currentTarget.value)}
-          >
-            <option value="all">All languages</option>
-            {data.datasets.map((dataset) => (
-              <option key={dataset.id} value={dataset.id}>
-                In {dataset.shortName}
-              </option>
-            ))}
-          </select>
-        </label>
+        <GeographySourceFilter
+          data={data}
+          selection={datasetFilter}
+          temporalSelection={temporalSelection}
+          onChange={setDatasetFilter}
+        />
 
         <label>
           <span>Area</span>
