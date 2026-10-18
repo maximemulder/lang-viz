@@ -38,13 +38,13 @@ jobs:
           version: '0.12.15'
 
       - name: Fetch pinned atlas sources
-        run: ./pipeline/atlas/fetch-sources.sh
+        run: bash ./pipeline/atlas/fetch-sources.sh
 
       - name: Install Python dependencies
         run: uv sync --frozen --no-dev
 
       - name: Build Tippecanoe
-        run: ./pipeline/atlas/bootstrap-tippecanoe.sh
+        run: bash ./pipeline/atlas/bootstrap-tippecanoe.sh
 
       - name: Generate atlas data
         run: uv run --frozen python -m pipeline.atlas.build

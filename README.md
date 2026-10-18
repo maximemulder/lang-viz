@@ -6,9 +6,9 @@ downloaded Glottolog and Glottography datasets by the offline Python pipeline.
 ## Build the proof of concept
 
 ```sh
-./pipeline/atlas/fetch-sources.sh
+bash ./pipeline/atlas/fetch-sources.sh
 uv sync
-./pipeline/atlas/bootstrap-tippecanoe.sh
+bash ./pipeline/atlas/bootstrap-tippecanoe.sh
 uv run python -m pipeline.atlas.build
 cd app
 npm install
