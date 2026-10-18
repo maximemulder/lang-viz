@@ -19,7 +19,8 @@ committed. The normalized intermediate geometry is written to `data/processed/`.
 
 The generated geometry catalog preserves four temporal source views:
 
-- Asher contemporary areas;
+- contemporary areas from Asher, Wurm and Hattori's Pacific atlas, and Matsumae's
+  Northeast Asian dataset;
 - Asher time-of-contact areas, with contemporary proxies explicitly marked;
 - the DiACL polygon archive's approximate 1750 snapshot;
 - Bouckaert's mixed modern-and-ancient Indo-European source view.

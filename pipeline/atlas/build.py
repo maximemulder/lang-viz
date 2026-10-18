@@ -58,6 +58,20 @@ DATASETS = (
         "citation": "Bouckaert et al. (2012)",
         "license": "CC-BY-4.0",
     },
+    {
+        "id": "wurm1981pacific",
+        "name": "Language Atlas of the Pacific Area",
+        "shortName": "Wurm–Hattori",
+        "citation": "Wurm and Hattori (1981–1983)",
+        "license": "CC-BY-NC-4.0",
+    },
+    {
+        "id": "matsumae2021exploring",
+        "name": "Northeast Asian language areas",
+        "shortName": "Matsumae",
+        "citation": "Matsumae et al. (2021)",
+        "license": "CC-BY-4.0",
+    },
 )
 
 SOURCES = (
@@ -115,6 +129,34 @@ SOURCES = (
         focal_year=None,
         path=PROJECT_ROOT
         / "datasets/glottography/bouckaert2012indoeuropean/cldf/languages.geojson",
+    ),
+    GeographySource(
+        variant_prefix="wurm1981pacific:contemporary",
+        dataset_id="wurm1981pacific",
+        layer="contemporary",
+        label="Wurm & Hattori — contemporary",
+        temporal_kind="named-period",
+        temporal_view="contemporary",
+        temporal_label="Contemporary",
+        temporal_quality="approximate",
+        source_year=1981,
+        focal_year=None,
+        path=PROJECT_ROOT
+        / "datasets/glottography/wurm1981pacific/cldf/languages.geojson",
+    ),
+    GeographySource(
+        variant_prefix="matsumae2021exploring:contemporary",
+        dataset_id="matsumae2021exploring",
+        layer="contemporary",
+        label="Matsumae — contemporary",
+        temporal_kind="named-period",
+        temporal_view="contemporary",
+        temporal_label="Contemporary",
+        temporal_quality="approximate",
+        source_year=2021,
+        focal_year=None,
+        path=PROJECT_ROOT
+        / "datasets/glottography/matsumae2021exploring/cldf/languages.geojson",
     ),
 )
 
