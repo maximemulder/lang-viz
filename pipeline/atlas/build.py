@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -205,6 +206,34 @@ def temporal_coverage(
     return coverage
 
 
+def language_color(language_id: str) -> str:
+    """Return a stable, varied map color independent of language family."""
+    digest = hashlib.blake2b(language_id.encode("utf-8"), digest_size=3).digest()
+    hue = int.from_bytes(digest[:2]) % 360
+    saturation = 58 + digest[2] % 15
+    lightness = 42 + digest[0] % 13
+
+    chroma = (1 - abs(2 * lightness / 100 - 1)) * saturation / 100
+    sector = hue / 60
+    secondary = chroma * (1 - abs(sector % 2 - 1))
+    red, green, blue = (
+        (chroma, secondary, 0)
+        if sector < 1
+        else (secondary, chroma, 0)
+        if sector < 2
+        else (0, chroma, secondary)
+        if sector < 3
+        else (0, secondary, chroma)
+        if sector < 4
+        else (secondary, 0, chroma)
+        if sector < 5
+        else (chroma, 0, secondary)
+    )
+    offset = lightness / 100 - chroma / 2
+    channels = tuple(round((channel + offset) * 255) for channel in (red, green, blue))
+    return "#{:02x}{:02x}{:02x}".format(*channels)
+
+
 def normalize_geometries(
     known_languages: set[str], family_by_language: dict[str, str | None]
 ) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
@@ -229,7 +258,7 @@ def normalize_geometries(
                     raise ValueError(f"Duplicate geometry variant: {variant_id}")
                 seen_variant_ids.add(variant_id)
 
-                color = str(properties.get("fill") or "#cb5d3e")
+                color = language_color(language_id)
                 coverage = temporal_coverage(source, language_id, asher_quality)
                 quality = str(coverage["quality"])
                 normalized = {

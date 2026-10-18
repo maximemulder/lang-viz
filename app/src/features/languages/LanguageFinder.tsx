@@ -38,8 +38,8 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
   const variants = temporalVariantsForLanguage(data, language, temporalSelection)
   const hasGeometry = variants.length > 0
   const isVisible = visibleIds.includes(language.id)
-  const activeVariantId =
-    variants.find((variant) => variant.id === overrides[language.id])?.id ?? variants[0]?.id
+  const activeVariant =
+    variants.find((variant) => variant.id === overrides[language.id]) ?? variants[0]
 
   return (
     <article className={`language-row${hasGeometry ? '' : ' language-row--unavailable'}`}>
@@ -49,6 +49,11 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
           checked={isVisible}
           disabled={!hasGeometry && !isVisible}
           onChange={() => toggleVisible(language.id)}
+        />
+        <span
+          className="language-row__swatch"
+          style={{ backgroundColor: activeVariant?.color ?? '#b8c0bc' }}
+          aria-hidden="true"
         />
         <span>
           <strong>{language.name}</strong>
@@ -62,7 +67,7 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
         <select
           className="language-row__variant"
           aria-label={`Geographic source for ${language.name}`}
-          value={activeVariantId}
+          value={activeVariant?.id}
           onChange={(event) =>
             setGeometryOverride({ languageId: language.id, variantId: event.currentTarget.value })
           }
@@ -125,13 +130,25 @@ export const LanguageFinder = () => {
   const virtualizer = useVirtualizer({
     count: languages.length,
     getScrollElement: () => listRef.current,
-    estimateSize: () => 104,
-    overscan: 6,
+    estimateSize: () => 70,
+    overscan: 8,
     getItemKey: (index) => languages[index]?.id ?? index,
   })
   const showableIds = languages
     .filter((language) => temporalVariantsForLanguage(data, language, temporalSelection).length > 0)
     .map((language) => language.id)
+  const visibleIdSet = new Set(visibleIds)
+  const areAllFilteredSelected =
+    showableIds.length > 0 && showableIds.every((languageId) => visibleIdSet.has(languageId))
+
+  const toggleFilteredLanguages = () => {
+    if (areAllFilteredSelected) {
+      const filteredIdSet = new Set(showableIds)
+      setVisibleIds(visibleIds.filter((languageId) => !filteredIdSet.has(languageId)))
+      return
+    }
+    showLanguages(showableIds)
+  }
 
   return (
     <aside className="language-finder" aria-label="Language finder">
@@ -148,7 +165,7 @@ export const LanguageFinder = () => {
         <input
           type="search"
           value={query}
-          placeholder="Name, ISO or Glottocode…"
+          placeholder="Name, family, ISO or Glottocode…"
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
       </label>
@@ -208,15 +225,11 @@ export const LanguageFinder = () => {
           {showableIds.length.toLocaleString()} mappable
         </p>
         <div>
-          <button
-            type="button"
-            onClick={() => showLanguages(showableIds)}
-            disabled={!showableIds.length}
-          >
-            Show filtered
+          <button type="button" onClick={toggleFilteredLanguages} disabled={!showableIds.length}>
+            {areAllFilteredSelected ? 'Deselect all' : 'Select all'}
           </button>
           <button type="button" className="button-secondary" onClick={() => setVisibleIds([])}>
-            Clear
+            Clear all
           </button>
         </div>
       </div>

@@ -28,6 +28,14 @@ Publication years are stored separately from represented geographic periods.
 The frontend period selector never substitutes geometry from another period
 when the selected view has no area for a language.
 
+Language-area polygons and their catalog are served locally from `app/public/data/`.
+The physical basemap is currently the only map layer fetched from the network:
+it uses EOX's global raster tile service. A self-hosted raster pyramid is practical
+at low zooms, but grows by roughly four times for every additional zoom level;
+production deployments should either package only the required zooms/regions or
+use a dedicated local vector-basemap archive. The Google Fonts import is also
+remote and can be replaced with self-hosted font files for a fully offline build.
+
 The frontend can then be checked with:
 
 ```sh
