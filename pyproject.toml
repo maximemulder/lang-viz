@@ -1,0 +1,21 @@
+[project]
+name = "language-atlas-pipeline"
+version = "0.1.0"
+description = "Offline data preparation for the interactive language atlas"
+requires-python = ">=3.12"
+dependencies = [
+  "polars>=1.35.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4.0",
+  "ruff>=0.14.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["pipeline/tests"]

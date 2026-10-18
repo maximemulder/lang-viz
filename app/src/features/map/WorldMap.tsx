@@ -1,11 +1,23 @@
-import { setWorkerUrl } from 'maplibre-gl'
+import { useAtomValue, useSetAtom } from 'jotai'
+import type { FilterSpecification } from 'maplibre-gl'
+import { addProtocol, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import { useState } from 'react'
-import MapView, { NavigationControl, ScaleControl } from 'react-map-gl/maplibre'
+import { Protocol } from 'pmtiles'
+import { Suspense, useState } from 'react'
+import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { languageArchiveUrl } from '../../data/atlasRepository'
+import {
+  atlasDataAtom,
+  geometryOverridesAtom,
+  viewportLanguageIdsAtom,
+  visibleLanguageIdsAtom,
+} from '../../state/atlasState'
 import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 
 setWorkerUrl(maplibreWorkerUrl)
+const pmtilesProtocol = new Protocol()
+addProtocol('pmtiles', pmtilesProtocol.tile)
 
 const INITIAL_VIEW = {
   longitude: 12,
@@ -20,8 +32,59 @@ const PROJECTIONS = {
 
 type ProjectionMode = keyof typeof PROJECTIONS
 
+const LANGUAGE_SOURCE_ID = 'language-areas'
+const LANGUAGE_HIT_LAYER_ID = 'language-area-hit-targets'
+
+const LanguageLayers = () => {
+  const data = useAtomValue(atlasDataAtom)
+  const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
+  const overrides = useAtomValue(geometryOverridesAtom)
+  const variantIds = visibleLanguageIds.flatMap((languageId) => {
+    const language = data.languageById.get(languageId)
+    if (!language || language.geometryVariantIds.length === 0) return []
+    const override = overrides[languageId]
+    return [
+      override && language.geometryVariantIds.includes(override)
+        ? override
+        : language.geometryVariantIds[0],
+    ]
+  })
+  const filter: FilterSpecification = ['in', ['get', 'variant_id'], ['literal', variantIds]]
+
+  return (
+    <Source
+      id={LANGUAGE_SOURCE_ID}
+      type="vector"
+      url={languageArchiveUrl()}
+      attribution="Language areas: Asher & Moseley (2007), Bouckaert et al. (2012), Carling et al. (2025)"
+    >
+      <Layer
+        id={LANGUAGE_HIT_LAYER_ID}
+        source={LANGUAGE_SOURCE_ID}
+        source-layer={data.manifest.vectorLayer}
+        type="fill"
+        paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
+      />
+      <Layer
+        id="selected-language-areas"
+        source={LANGUAGE_SOURCE_ID}
+        source-layer={data.manifest.vectorLayer}
+        type="fill"
+        filter={filter}
+        paint={{
+          'fill-color': ['get', 'color'],
+          'fill-opacity': 0.58,
+          'fill-outline-color': '#fff8e8',
+        }}
+      />
+    </Source>
+  )
+}
+
 export const WorldMap = () => {
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
+  const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
+  const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
 
   return (
     <MapView
@@ -32,7 +95,20 @@ export const WorldMap = () => {
       maxZoom={12}
       renderWorldCopies={false}
       reuseMaps
+      onIdle={(event) => {
+        if (!event.target.getLayer(LANGUAGE_HIT_LAYER_ID)) return
+        const languageIds = event.target
+          .queryRenderedFeatures({ layers: [LANGUAGE_HIT_LAYER_ID] })
+          .flatMap((feature) => {
+            const languageId = feature.properties.language_id
+            return typeof languageId === 'string' ? [languageId] : []
+          })
+        setViewportLanguageIds([...new Set(languageIds)])
+      }}
     >
+      <Suspense fallback={null}>
+        <LanguageLayers />
+      </Suspense>
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
 
@@ -53,9 +129,14 @@ export const WorldMap = () => {
         </select>
       </label>
 
-      <div className="map-hint" role="status">
+      <div
+        className={`map-hint${visibleLanguageIds.length ? ' map-hint--active' : ''}`}
+        role="status"
+      >
         <span className="map-hint__marker" aria-hidden="true" />
-        Language layers will appear here
+        {visibleLanguageIds.length
+          ? `${visibleLanguageIds.length.toLocaleString()} language${visibleLanguageIds.length === 1 ? '' : 's'} shown`
+          : 'Choose languages from the finder'}
       </div>
     </MapView>
   )
