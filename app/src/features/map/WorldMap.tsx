@@ -1,9 +1,9 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import type { FilterSpecification } from 'maplibre-gl'
+import type { FilterSpecification, MapGeoJSONFeature, MapLayerMouseEvent } from 'maplibre-gl'
 import { addProtocol, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { Protocol } from 'pmtiles'
-import { Suspense, useState } from 'react'
+import { memo, Suspense, useEffect, useRef, useState } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
@@ -16,6 +16,7 @@ import {
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
 import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
+import { LanguageInspector, type MapInspection } from './LanguageInspector'
 
 setWorkerUrl(maplibreWorkerUrl)
 const pmtilesProtocol = new Protocol()
@@ -36,8 +37,39 @@ type ProjectionMode = keyof typeof PROJECTIONS
 
 const LANGUAGE_SOURCE_ID = 'language-areas'
 const LANGUAGE_HIT_LAYER_ID = 'language-area-hit-targets'
+const SELECTED_LANGUAGE_LAYER_ID = 'selected-language-areas'
+const HOVER_QUERY_INTERVAL_MS = 40
+const NO_VARIANT_IDS: readonly string[] = []
 
-const LanguageLayers = () => {
+const inspectionFromFeatures = (
+  features: readonly MapGeoJSONFeature[],
+  longitude: number,
+  latitude: number,
+  pinned: boolean,
+): MapInspection | null => {
+  const variantIds = [
+    ...new Set(
+      features.flatMap((feature) => {
+        const variantId = feature.properties.variant_id
+        return typeof variantId === 'string' ? [variantId] : []
+      }),
+    ),
+  ].sort()
+
+  return variantIds.length > 0 ? { longitude, latitude, variantIds, pinned } : null
+}
+
+const hasSameVariants = (left: MapInspection | null, right: MapInspection | null) => {
+  if (left === right) return true
+  if (!left || !right || left.variantIds.length !== right.variantIds.length) return false
+  return left.variantIds.every((variantId, index) => variantId === right.variantIds[index])
+}
+
+interface LanguageLayersProps {
+  readonly inspectedVariantIds: readonly string[]
+}
+
+const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
   const data = useAtomValue(atlasDataAtom)
   const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
@@ -72,7 +104,7 @@ const LanguageLayers = () => {
         paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
       />
       <Layer
-        id="selected-language-areas"
+        id={SELECTED_LANGUAGE_LAYER_ID}
         source={LANGUAGE_SOURCE_ID}
         source-layer={data.manifest.vectorLayer}
         type="fill"
@@ -83,9 +115,21 @@ const LanguageLayers = () => {
           'fill-outline-color': '#fff8e8',
         }}
       />
+      <Layer
+        id="inspected-language-areas"
+        source={LANGUAGE_SOURCE_ID}
+        source-layer={data.manifest.vectorLayer}
+        type="line"
+        filter={['in', ['get', 'variant_id'], ['literal', inspectedVariantIds]]}
+        paint={{
+          'line-color': '#fffdf7',
+          'line-opacity': 0.95,
+          'line-width': 3,
+        }}
+      />
     </Source>
   )
-}
+})
 
 const MapHint = () => {
   const data = useAtomValue(atlasDataAtom)
@@ -108,7 +152,34 @@ const MapHint = () => {
 
 export const WorldMap = () => {
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
+  const [inspection, setInspection] = useState<MapInspection | null>(null)
+  const inspectionRef = useRef<MapInspection | null>(null)
+  const pendingHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
+  const hoverQueryTimerRef = useRef<number | null>(null)
   const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
+
+  const updateInspection = (nextInspection: MapInspection | null) => {
+    inspectionRef.current = nextInspection
+    setInspection(nextInspection)
+  }
+
+  const cancelPendingHoverQuery = () => {
+    pendingHoverEventRef.current = null
+    if (hoverQueryTimerRef.current !== null) {
+      window.clearTimeout(hoverQueryTimerRef.current)
+      hoverQueryTimerRef.current = null
+    }
+  }
+
+  useEffect(
+    () => () => {
+      pendingHoverEventRef.current = null
+      if (hoverQueryTimerRef.current !== null) {
+        window.clearTimeout(hoverQueryTimerRef.current)
+      }
+    },
+    [],
+  )
 
   return (
     <MapView
@@ -119,6 +190,50 @@ export const WorldMap = () => {
       maxZoom={12}
       renderWorldCopies={false}
       reuseMaps
+      onMouseMove={(event) => {
+        if (inspectionRef.current?.pinned) return
+
+        pendingHoverEventRef.current = event
+        if (hoverQueryTimerRef.current !== null) return
+
+        hoverQueryTimerRef.current = window.setTimeout(() => {
+          hoverQueryTimerRef.current = null
+          const latestEvent = pendingHoverEventRef.current
+          pendingHoverEventRef.current = null
+          if (!latestEvent || inspectionRef.current?.pinned) return
+
+          const features = latestEvent.target.getLayer(SELECTED_LANGUAGE_LAYER_ID)
+            ? latestEvent.target.queryRenderedFeatures(latestEvent.point, {
+                layers: [SELECTED_LANGUAGE_LAYER_ID],
+              })
+            : []
+          const nextInspection = inspectionFromFeatures(
+            features,
+            latestEvent.lngLat.lng,
+            latestEvent.lngLat.lat,
+            false,
+          )
+          latestEvent.target.getCanvas().style.cursor = nextInspection ? 'pointer' : ''
+
+          if (nextInspection || !hasSameVariants(inspectionRef.current, nextInspection)) {
+            updateInspection(nextInspection)
+          }
+        }, HOVER_QUERY_INTERVAL_MS)
+      }}
+      onMouseLeave={(event) => {
+        cancelPendingHoverQuery()
+        event.target.getCanvas().style.cursor = ''
+        if (!inspectionRef.current?.pinned) updateInspection(null)
+      }}
+      onClick={(event) => {
+        cancelPendingHoverQuery()
+        const features = event.target.getLayer(SELECTED_LANGUAGE_LAYER_ID)
+          ? event.target.queryRenderedFeatures(event.point, {
+              layers: [SELECTED_LANGUAGE_LAYER_ID],
+            })
+          : []
+        updateInspection(inspectionFromFeatures(features, event.lngLat.lng, event.lngLat.lat, true))
+      }}
       onIdle={(event) => {
         if (!event.target.getLayer(LANGUAGE_HIT_LAYER_ID)) return
         const languageIds = event.target
@@ -131,7 +246,9 @@ export const WorldMap = () => {
       }}
     >
       <Suspense fallback={null}>
-        <LanguageLayers />
+        <LanguageLayers
+          inspectedVariantIds={inspection?.pinned ? inspection.variantIds : NO_VARIANT_IDS}
+        />
       </Suspense>
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
@@ -155,6 +272,9 @@ export const WorldMap = () => {
 
       <Suspense fallback={null}>
         <MapHint />
+        {inspection && (
+          <LanguageInspector inspection={inspection} onClose={() => updateInspection(null)} />
+        )}
       </Suspense>
     </MapView>
   )

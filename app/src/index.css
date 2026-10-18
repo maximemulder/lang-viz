@@ -444,6 +444,117 @@ h2 {
   box-shadow: 0 0 0 1px #4f9d69;
 }
 
+.language-inspector.maplibregl-popup {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.language-inspector--pinned.maplibregl-popup {
+  pointer-events: auto;
+}
+
+.language-inspector .maplibregl-popup-content {
+  max-height: min(24rem, 55vh);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgb(29 43 39 / 15%);
+  border-radius: 0.7rem;
+  color: var(--ink);
+  background: rgb(248 246 238 / 96%);
+  box-shadow: 0 0.75rem 2rem rgb(22 36 31 / 24%);
+  backdrop-filter: blur(10px);
+}
+
+.language-inspector .maplibregl-popup-tip {
+  border-top-color: rgb(248 246 238 / 96%);
+}
+
+.language-inspector .maplibregl-popup-close-button {
+  top: 0.25rem;
+  right: 0.3rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  color: var(--muted-ink);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.language-inspector__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgb(29 43 39 / 10%);
+}
+
+.language-inspector__header strong {
+  padding-right: 1.1rem;
+  font-family: "Newsreader", serif;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.language-inspector__header small {
+  color: var(--muted-ink);
+  font-size: 0.6rem;
+  white-space: nowrap;
+}
+
+.language-inspector__entries {
+  max-height: min(20rem, 46vh);
+  overflow-y: auto;
+}
+
+.language-inspector__entry {
+  display: grid;
+  grid-template-columns: 0.55rem minmax(0, 1fr);
+  gap: 0.55rem;
+  padding: 0.6rem 0.8rem;
+}
+
+.language-inspector__entry + .language-inspector__entry {
+  border-top: 1px solid rgb(29 43 39 / 8%);
+}
+
+.language-inspector__swatch {
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-top: 0.2rem;
+  border: 1px solid rgb(29 43 39 / 20%);
+  border-radius: 50%;
+}
+
+.language-inspector__entry strong,
+.language-inspector__entry p,
+.language-inspector__entry small {
+  display: block;
+  margin: 0;
+}
+
+.language-inspector__entry strong {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.language-inspector__entry p {
+  color: var(--muted-ink);
+  font-size: 0.68rem;
+}
+
+.language-inspector__entry small {
+  margin-top: 0.14rem;
+  color: var(--muted-ink);
+  font-size: 0.6rem;
+  line-height: 1.3;
+}
+
+.language-inspector:not(.language-inspector--pinned) *,
+.language-inspector:not(.language-inspector--pinned) .maplibregl-popup-content {
+  pointer-events: none;
+}
+
 @media (max-width: 800px) {
   .app-shell {
     padding: 0.5rem;
