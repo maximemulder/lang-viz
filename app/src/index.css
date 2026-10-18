@@ -31,7 +31,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -100,6 +101,46 @@ h1 {
   border: 1px solid rgb(29 43 39 / 12%);
   border-radius: 0.6rem;
   box-shadow: 0 0.4rem 1.2rem rgb(31 46 40 / 12%);
+}
+
+.map-projection-control {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  display: grid;
+  gap: 0.2rem;
+  min-width: 9rem;
+  padding: 0.5rem 0.6rem 0.6rem;
+  border: 1px solid rgb(29 43 39 / 12%);
+  border-radius: 0.65rem;
+  color: var(--muted-ink);
+  background: rgb(248 246 238 / 92%);
+  box-shadow: 0 0.4rem 1.2rem rgb(31 46 40 / 12%);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.map-projection-control select {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 0.35rem;
+  outline: 1px solid rgb(29 43 39 / 16%);
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.map-projection-control select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .map-hint {
