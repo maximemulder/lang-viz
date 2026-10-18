@@ -26,6 +26,12 @@ class GeographySource:
     dataset_id: str
     layer: str
     label: str
+    temporal_kind: str
+    temporal_view: str
+    temporal_label: str
+    temporal_quality: str
+    source_year: int
+    focal_year: int | None
     path: Path
 
 
@@ -59,6 +65,12 @@ SOURCES = (
         dataset_id="asher2007world",
         layer="contemporary",
         label="Asher — contemporary",
+        temporal_kind="named-period",
+        temporal_view="contemporary",
+        temporal_label="Contemporary",
+        temporal_quality="approximate",
+        source_year=2007,
+        focal_year=None,
         path=PROJECT_ROOT
         / "datasets/glottography/asher2007world/cldf/contemporary/languages.geojson",
     ),
@@ -66,25 +78,50 @@ SOURCES = (
         variant_prefix="asher2007world:traditional",
         dataset_id="asher2007world",
         layer="traditional",
-        label="Asher — traditional",
+        label="Asher — time of contact",
+        temporal_kind="named-period",
+        temporal_view="time-of-contact",
+        temporal_label="Time of contact",
+        temporal_quality="direct",
+        source_year=2007,
+        focal_year=None,
         path=PROJECT_ROOT
         / "datasets/glottography/asher2007world/cldf/traditional/languages.geojson",
     ),
     GeographySource(
-        variant_prefix="carling2025diacl:mixed",
+        variant_prefix="carling2025diacl:1750",
         dataset_id="carling2025diacl",
-        layer="mixed",
-        label="DiACL — mixed periods",
+        layer="snapshot",
+        label="DiACL — approximately 1750",
+        temporal_kind="snapshot",
+        temporal_view="year-1750",
+        temporal_label="Approximately 1750",
+        temporal_quality="approximate",
+        source_year=2025,
+        focal_year=1750,
         path=PROJECT_ROOT / "datasets/glottography/carling2025diacl/cldf/languages.geojson",
     ),
     GeographySource(
-        variant_prefix="bouckaert2012indoeuropean:historical",
+        variant_prefix="bouckaert2012indoeuropean:mixed-periods",
         dataset_id="bouckaert2012indoeuropean",
-        layer="historical",
-        label="Bouckaert — historical",
+        layer="mixed-periods",
+        label="Bouckaert — modern and ancient",
+        temporal_kind="named-period",
+        temporal_view="mixed-periods",
+        temporal_label="Modern and ancient source view",
+        temporal_quality="mixed",
+        source_year=2012,
+        focal_year=None,
         path=PROJECT_ROOT
         / "datasets/glottography/bouckaert2012indoeuropean/cldf/languages.geojson",
     ),
+)
+
+ASHER_TRADITIONAL_LANGUAGES = (
+    PROJECT_ROOT / "datasets/glottography/asher2007world/cldf/traditional/languages.csv"
+)
+ASHER_TRADITIONAL_CONTRIBUTIONS = (
+    PROJECT_ROOT / "datasets/glottography/asher2007world/cldf/traditional/contributions.csv"
 )
 
 
@@ -117,6 +154,57 @@ def read_glottolog() -> tuple[list[dict[str, Any]], dict[str, str]]:
     return rows, names
 
 
+def read_asher_traditional_quality() -> dict[str, str]:
+    """Classify merged Asher areas as contact data, a modern proxy, or a mixture."""
+    contributions = pl.read_csv(
+        ASHER_TRADITIONAL_CONTRIBUTIONS,
+        schema_overrides={"ID": pl.String, "Year": pl.String},
+    )
+    year_by_feature_id = {
+        str(row["ID"]): str(row["Year"])
+        for row in contributions.filter(pl.col("Type") == "feature").select("ID", "Year").to_dicts()
+    }
+    languages = pl.read_csv(
+        ASHER_TRADITIONAL_LANGUAGES,
+        schema_overrides={"Glottocode": pl.String, "Feature_IDs": pl.String},
+    )
+    quality_by_language: dict[str, str] = {}
+    for row in languages.select("Glottocode", "Feature_IDs", "Speaker_Area").to_dicts():
+        if row["Speaker_Area"] != "languages":
+            continue
+        feature_ids = str(row["Feature_IDs"] or "").split()
+        years = {year_by_feature_id.get(feature_id) for feature_id in feature_ids}
+        has_contact_data = "traditional" in years
+        has_proxy_data = any(year not in {None, "traditional"} for year in years)
+        quality_by_language[str(row["Glottocode"])] = (
+            "mixed"
+            if has_contact_data and has_proxy_data
+            else "direct"
+            if has_contact_data
+            else "proxy"
+        )
+    return quality_by_language
+
+
+def temporal_coverage(
+    source: GeographySource, language_id: str, asher_quality: dict[str, str]
+) -> dict[str, Any]:
+    quality = (
+        asher_quality.get(language_id, "proxy")
+        if source.temporal_view == "time-of-contact"
+        else source.temporal_quality
+    )
+    coverage: dict[str, Any] = {
+        "kind": source.temporal_kind,
+        "viewId": source.temporal_view,
+        "label": source.temporal_label,
+        "quality": quality,
+    }
+    if source.focal_year is not None:
+        coverage["year"] = source.focal_year
+    return coverage
+
+
 def normalize_geometries(
     known_languages: set[str], family_by_language: dict[str, str | None]
 ) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
@@ -124,6 +212,7 @@ def normalize_geometries(
     variants_by_language: dict[str, list[str]] = defaultdict(list)
     seen_variant_ids: set[str] = set()
     feature_id = 1
+    asher_quality = read_asher_traditional_quality()
 
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     with NORMALIZED_GEOMETRIES.open("w", encoding="utf-8") as output:
@@ -141,6 +230,8 @@ def normalize_geometries(
                 seen_variant_ids.add(variant_id)
 
                 color = str(properties.get("fill") or "#cb5d3e")
+                coverage = temporal_coverage(source, language_id, asher_quality)
+                quality = str(coverage["quality"])
                 normalized = {
                     "type": "Feature",
                     "id": feature_id,
@@ -149,6 +240,10 @@ def normalize_geometries(
                         "language_id": language_id,
                         "dataset_id": source.dataset_id,
                         "layer": source.layer,
+                        "temporal_view": source.temporal_view,
+                        "temporal_quality": quality,
+                        "source_year": source.source_year,
+                        "focal_year": source.focal_year,
                         "color": color,
                         "family": family_by_language.get(language_id),
                     },
@@ -166,6 +261,8 @@ def normalize_geometries(
                         "label": source.label,
                         "featureId": feature_id,
                         "color": color,
+                        "temporalCoverage": coverage,
+                        "sourceYear": source.source_year,
                     }
                 )
                 variants_by_language[language_id].append(variant_id)
@@ -206,6 +303,10 @@ def build_tiles() -> None:
             "--include=language_id",
             "--include=dataset_id",
             "--include=layer",
+            "--include=temporal_view",
+            "--include=temporal_quality",
+            "--include=source_year",
+            "--include=focal_year",
             "--include=color",
             "--include=family",
             str(NORMALIZED_GEOMETRIES),
@@ -252,7 +353,7 @@ def build(skip_tiles: bool) -> None:
     write_json(
         PUBLIC_DATA_DIR / "manifest.json",
         {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "languageCount": len(languages),
             "languageWithGeometryCount": sum(
                 bool(language["geometryVariantIds"]) for language in languages

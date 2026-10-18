@@ -7,9 +7,11 @@ import { Suspense, useState } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
+import { temporalVariantsForLanguage, temporalView } from '../../domain/temporal'
 import {
   atlasDataAtom,
   geometryOverridesAtom,
+  temporalViewAtom,
   viewportLanguageIdsAtom,
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
@@ -39,17 +41,20 @@ const LanguageLayers = () => {
   const data = useAtomValue(atlasDataAtom)
   const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
+  const temporalSelection = useAtomValue(temporalViewAtom)
   const variantIds = visibleLanguageIds.flatMap((languageId) => {
     const language = data.languageById.get(languageId)
     if (!language || language.geometryVariantIds.length === 0) return []
+    const variants = temporalVariantsForLanguage(data, language, temporalSelection)
     const override = overrides[languageId]
-    return [
-      override && language.geometryVariantIds.includes(override)
-        ? override
-        : language.geometryVariantIds[0],
-    ]
+    const variant = variants.find(({ id }) => id === override) ?? variants[0]
+    return variant ? [variant.id] : []
   })
   const filter: FilterSpecification = ['in', ['get', 'variant_id'], ['literal', variantIds]]
+  const temporalFilter: FilterSpecification =
+    temporalSelection === 'all'
+      ? ['has', 'variant_id']
+      : ['==', ['get', 'temporal_view'], temporalSelection]
 
   return (
     <Source
@@ -63,6 +68,7 @@ const LanguageLayers = () => {
         source={LANGUAGE_SOURCE_ID}
         source-layer={data.manifest.vectorLayer}
         type="fill"
+        filter={temporalFilter}
         paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
       />
       <Layer
@@ -81,9 +87,27 @@ const LanguageLayers = () => {
   )
 }
 
+const MapHint = () => {
+  const data = useAtomValue(atlasDataAtom)
+  const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
+  const temporalSelection = useAtomValue(temporalViewAtom)
+  const visibleInPeriodCount = visibleLanguageIds.filter((languageId) => {
+    const language = data.languageById.get(languageId)
+    return language && temporalVariantsForLanguage(data, language, temporalSelection).length > 0
+  }).length
+
+  return (
+    <div className={`map-hint${visibleInPeriodCount ? ' map-hint--active' : ''}`} role="status">
+      <span className="map-hint__marker" aria-hidden="true" />
+      {visibleLanguageIds.length
+        ? `${visibleInPeriodCount.toLocaleString()} of ${visibleLanguageIds.length.toLocaleString()} shown · ${temporalView(temporalSelection).shortLabel}`
+        : 'Choose languages from the finder'}
+    </div>
+  )
+}
+
 export const WorldMap = () => {
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
-  const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
   const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
 
   return (
@@ -129,15 +153,9 @@ export const WorldMap = () => {
         </select>
       </label>
 
-      <div
-        className={`map-hint${visibleLanguageIds.length ? ' map-hint--active' : ''}`}
-        role="status"
-      >
-        <span className="map-hint__marker" aria-hidden="true" />
-        {visibleLanguageIds.length
-          ? `${visibleLanguageIds.length.toLocaleString()} language${visibleLanguageIds.length === 1 ? '' : 's'} shown`
-          : 'Choose languages from the finder'}
-      </div>
+      <Suspense fallback={null}>
+        <MapHint />
+      </Suspense>
     </MapView>
   )
 }

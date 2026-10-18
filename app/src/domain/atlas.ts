@@ -1,6 +1,24 @@
 export type LanguageId = string
 export type GeometryVariantId = string
 export type GeographyDatasetId = string
+export type TemporalViewId = 'contemporary' | 'time-of-contact' | 'year-1750' | 'mixed-periods'
+export type TemporalViewSelection = 'all' | TemporalViewId
+export type TemporalQuality = 'direct' | 'approximate' | 'proxy' | 'mixed'
+
+export type TemporalCoverage =
+  | {
+      readonly kind: 'named-period'
+      readonly viewId: Exclude<TemporalViewId, 'year-1750'>
+      readonly label: string
+      readonly quality: TemporalQuality
+    }
+  | {
+      readonly kind: 'snapshot'
+      readonly viewId: 'year-1750'
+      readonly label: string
+      readonly quality: TemporalQuality
+      readonly year: number
+    }
 
 export interface Language {
   readonly id: LanguageId
@@ -19,10 +37,12 @@ export interface GeometryVariant {
   readonly id: GeometryVariantId
   readonly languageId: LanguageId
   readonly datasetId: GeographyDatasetId
-  readonly layer: 'contemporary' | 'traditional' | 'historical' | 'mixed'
+  readonly layer: 'contemporary' | 'traditional' | 'snapshot' | 'mixed-periods'
   readonly label: string
   readonly featureId: number
   readonly color: string
+  readonly temporalCoverage: TemporalCoverage
+  readonly sourceYear: number
 }
 
 export interface GeographyDataset {

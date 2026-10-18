@@ -31,7 +31,7 @@ export const loadAtlasData = (): Promise<AtlasData> => {
     fetchJson<readonly GeometryVariant[]>('geometry-variants.json'),
     fetchJson<readonly GeographyDataset[]>('geography-datasets.json'),
   ]).then(([manifest, languages, variants, datasets]) => {
-    if (manifest.schemaVersion !== 1) {
+    if (manifest.schemaVersion !== 2) {
       throw new Error(`Unsupported atlas schema version: ${manifest.schemaVersion}`)
     }
     if (languages.length !== manifest.languageCount) {

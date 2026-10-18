@@ -4,6 +4,13 @@ import { useRef } from 'react'
 import { normalizeLanguageQuery } from '../../data/atlasRepository'
 import type { Language } from '../../domain/atlas'
 import {
+  isTemporalViewSelection,
+  TEMPORAL_VIEWS,
+  temporalQualityLabel,
+  temporalVariantsForLanguage,
+  temporalView,
+} from '../../domain/temporal'
+import {
   atlasDataAtom,
   finderScopeAtom,
   geographyDatasetFilterAtom,
@@ -11,6 +18,7 @@ import {
   languageQueryAtom,
   setGeometryOverrideAtom,
   showLanguagesAtom,
+  temporalViewAtom,
   toggleVisibleLanguageAtom,
   viewportLanguageIdsAtom,
   visibleLanguageIdsAtom,
@@ -24,15 +32,14 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
   const data = useAtomValue(atlasDataAtom)
   const visibleIds = useAtomValue(visibleLanguageIdsAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
+  const temporalSelection = useAtomValue(temporalViewAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
-  const variants = language.geometryVariantIds.flatMap((id) => {
-    const variant = data.variantById.get(id)
-    return variant ? [variant] : []
-  })
+  const variants = temporalVariantsForLanguage(data, language, temporalSelection)
   const hasGeometry = variants.length > 0
   const isVisible = visibleIds.includes(language.id)
-  const activeVariantId = overrides[language.id] ?? variants[0]?.id
+  const activeVariantId =
+    variants.find((variant) => variant.id === overrides[language.id])?.id ?? variants[0]?.id
 
   return (
     <article className={`language-row${hasGeometry ? '' : ' language-row--unavailable'}`}>
@@ -40,7 +47,7 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
         <input
           type="checkbox"
           checked={isVisible}
-          disabled={!hasGeometry}
+          disabled={!hasGeometry && !isVisible}
           onChange={() => toggleVisible(language.id)}
         />
         <span>
@@ -63,12 +70,23 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
           {variants.map((variant) => (
             <option key={variant.id} value={variant.id}>
               {variant.label}
+              {variant.temporalCoverage.quality === 'proxy' ||
+              variant.temporalCoverage.quality === 'mixed'
+                ? ` · ${temporalQualityLabel(variant.temporalCoverage.quality)}`
+                : ''}
             </option>
           ))}
         </select>
       ) : (
         <small className="language-row__availability">
-          {variants[0]?.label ?? 'No polygon available'}
+          {variants[0]
+            ? `${variants[0].label}${
+                variants[0].temporalCoverage.quality === 'proxy' ||
+                variants[0].temporalCoverage.quality === 'mixed'
+                  ? ` · ${temporalQualityLabel(variants[0].temporalCoverage.quality)}`
+                  : ''
+              }`
+            : `No polygon in ${temporalView(temporalSelection).shortLabel.toLocaleLowerCase()}`}
         </small>
       )}
     </article>
@@ -82,12 +100,14 @@ export const LanguageFinder = () => {
   const [query, setQuery] = useAtom(languageQueryAtom)
   const [datasetFilter, setDatasetFilter] = useAtom(geographyDatasetFilterAtom)
   const [scope, setScope] = useAtom(finderScopeAtom)
+  const [temporalSelection, setTemporalSelection] = useAtom(temporalViewAtom)
   const showLanguages = useSetAtom(showLanguagesAtom)
   const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
   const listRef = useRef<HTMLDivElement>(null)
   const normalizedQuery = normalizeLanguageQuery(query.trim())
   const viewportIdSet = new Set(viewportIds)
   const languages = data.languages.filter((language) => {
+    const temporalVariants = temporalVariantsForLanguage(data, language, temporalSelection)
     if (
       normalizedQuery &&
       !data.searchTextByLanguageId.get(language.id)?.includes(normalizedQuery)
@@ -100,9 +120,7 @@ export const LanguageFinder = () => {
     if (datasetFilter === 'all') {
       return true
     }
-    return language.geometryVariantIds.some(
-      (variantId) => data.variantById.get(variantId)?.datasetId === datasetFilter,
-    )
+    return temporalVariants.some((variant) => variant.datasetId === datasetFilter)
   })
   const virtualizer = useVirtualizer({
     count: languages.length,
@@ -112,7 +130,7 @@ export const LanguageFinder = () => {
     getItemKey: (index) => languages[index]?.id ?? index,
   })
   const showableIds = languages
-    .filter((language) => language.geometryVariantIds.length > 0)
+    .filter((language) => temporalVariantsForLanguage(data, language, temporalSelection).length > 0)
     .map((language) => language.id)
 
   return (
@@ -136,6 +154,23 @@ export const LanguageFinder = () => {
       </label>
 
       <div className="finder-filters">
+        <label className="finder-filters__period">
+          <span>Geographic period</span>
+          <select
+            value={temporalSelection}
+            onChange={(event) => {
+              const value = event.currentTarget.value
+              if (isTemporalViewSelection(value)) setTemporalSelection(value)
+            }}
+          >
+            {TEMPORAL_VIEWS.map((view) => (
+              <option key={view.id} value={view.id}>
+                {view.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <label>
           <span>Geography</span>
           <select
@@ -164,6 +199,8 @@ export const LanguageFinder = () => {
           </select>
         </label>
       </div>
+
+      <p className="temporal-note">{temporalView(temporalSelection).description}</p>
 
       <div className="finder-actions">
         <p>

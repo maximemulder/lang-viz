@@ -17,6 +17,17 @@ npm run dev
 Generated browser artifacts are written to `app/public/data/` and are not
 committed. The normalized intermediate geometry is written to `data/processed/`.
 
+The generated geometry catalog preserves four temporal source views:
+
+- Asher contemporary areas;
+- Asher time-of-contact areas, with contemporary proxies explicitly marked;
+- the DiACL polygon archive's approximate 1750 snapshot;
+- Bouckaert's mixed modern-and-ancient Indo-European source view.
+
+Publication years are stored separately from represented geographic periods.
+The frontend period selector never substitutes geometry from another period
+when the selected view has no area for a language.
+
 The frontend can then be checked with:
 
 ```sh
