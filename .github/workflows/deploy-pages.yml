@@ -1,0 +1,81 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out application
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential libsqlite3-dev zlib1g-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+          python-version: '3.13'
+          version: '0.12.15'
+
+      - name: Fetch pinned atlas sources
+        run: ./pipeline/atlas/fetch-sources.sh
+
+      - name: Install Python dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Build Tippecanoe
+        run: ./pipeline/atlas/bootstrap-tippecanoe.sh
+
+      - name: Generate atlas data
+        run: uv run --frozen python -m pipeline.atlas.build
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Check frontend
+        working-directory: app
+        run: npm run check
+
+      - name: Build frontend
+        working-directory: app
+        env:
+          GITHUB_PAGES: 'true'
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: app/dist
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.0

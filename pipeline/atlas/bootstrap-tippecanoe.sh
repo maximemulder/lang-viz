@@ -6,8 +6,8 @@ source_dir="$project_root/.tools/tippecanoe-src"
 dependency_dir="$project_root/.tools/native-deps"
 
 if [[ ! -d "$source_dir/.git" ]]; then
-  mkdir -p "$project_root/.tools"
-  git clone --depth 1 https://github.com/felt/tippecanoe.git "$source_dir"
+  echo "Tippecanoe source is missing. Run pipeline/atlas/fetch-sources.sh first." >&2
+  exit 1
 fi
 
 make_arguments=()
@@ -29,5 +29,5 @@ if [[ ! -f /usr/include/sqlite3.h && ! -f /usr/local/include/sqlite3.h ]]; then
   )
 fi
 
-make -C "$source_dir" -j"$(getconf _NPROCESSORS_ONLN)" "${make_arguments[@]}"
+make -C "$source_dir" -j"$(getconf _NPROCESSORS_ONLN)" "${make_arguments[@]}" tippecanoe
 "$source_dir/tippecanoe" --version
