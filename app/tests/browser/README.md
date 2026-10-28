@@ -55,8 +55,11 @@ zoom-out reaches a limit, retained stripes and loaded solid fallback outside
 their coverage must remain available. Per-render checks detect frames with all
 language coverage layers disabled. These checks are structural; they are not
 pixel-level proofs of seamless coverage or correct stripe colors. Screenshots
-remain available for visual inspection. Failure injection, rapid selection
-supersession, and pixel-level spatial coverage checks remain future cases.
+remain available for visual inspection. The all-language Britain case also starts
+world computation and supersedes it with the four-language Britain selection;
+active source memberships must match the new selection. Each result checks cache
+limits and at most two receiver snapshots; clearing must release receiver snapshots.
+Failure injection and pixel-level spatial coverage checks remain future cases.
 
 The terrain basemap is disabled by default to avoid external network variability.
 `--terrain` includes it for an end-to-end check; failures to load it are reported
@@ -106,13 +109,30 @@ milliseconds:
   that every visible language or geographic location has stripes yet.
 - `publications`: snapshot swaps in this request. `deliveredTiles`: tile messages
   received; normal pans exclude receiver-retained tiles.
+- `workerRestarts`: cumulative cancellation/deadline restarts in this component.
+- `metrics.cache`: decoded bytes/entries and indexed feature count, plus native
+  partition entries/coordinate positions. Byte counts exclude JS object overhead.
+- `tileServices.receiver`: current snapshot count, unique encoded tile count/bytes,
+  and peak encoded bytes across registered snapshots. Clearing releases references.
+- `tileServices.delivery`: cumulative parent requests/cache hits/assembly time and
+  current worker native bytes, parent cache bytes/entries, snapshots, and tile count.
+  Native/empty requests stay on the main thread; parent assembly uses a lazy worker.
+- `tileServices.fallback`: cumulative requests, clipped-cache hits, raw-cache hits,
+  fetch time, clip time (including initial GEOS loading), and raw/result cache
+  payload bytes/entries. Feature counts distinguish covered, untouched, and GEOS
+  candidates; `decodeMs`, `initializeMs`, `overlayMs`, and `encodeMs` split the
+  uncached clipping path. Overlay includes native import/Boolean/export together.
+  Safe bounds shortcuts preserve original source order and tile-buffer clipping.
+  Counters span requests within the page; take differences
+  between snapshots for a phase. Awaited stages can overlap across tile requests,
+  so their sums are not end-to-end latency or pure CPU time.
 - `totalMs`: dispatch until publication readiness, or an explicit failure.
   `firstRenderMs`: dispatch until a render event with the final buffer enabled.
   Neither includes the 120 ms navigation debounce nor proves GPU completion.
 
 Raw render-event intervals include idle gaps and must **not** be interpreted as
-FPS. This harness does not yet measure total browser/WASM/GPU memory or attribute
-the fallback worker's internal stages. Use repeated runs on the same machine and
+FPS. This harness does not yet measure total browser/WASM/GPU memory or
+attribute time inside MapLibre tile preparation, GPU drawing, or individual fallback Boolean operations. Use repeated runs on the same machine and
 backend to evaluate changes; a single timing is not a performance guarantee.
 
 ## Explicit test interface
@@ -122,7 +142,7 @@ sets `&overlap-basemap=off` unless `--terrain` is requested. Normal visits expos
 no test controls and collect no request reports or browser observers.
 
 The interface provides `configure({languageIds, center, zoom})`,
-`camera(center, zoom, duration?)`, `recompute()`, and `snapshot()`. Selection uses
+`camera(center, zoom, duration?)`, `recompute()`, `unexpectedMemberships()`, and `snapshot()`. Selection uses
 the application's state setters, and map observations use public MapLibre APIs.
 No React internals or worker monkey-patching is involved. History is bounded to
 100 request reports, 200 console messages, and 600 render intervals per document.

@@ -27,6 +27,8 @@ SUPPORTED_LIMITS = {
     "output-vertices",
     "intermediate-regions",
     "tile-deadline",
+    "request-deadline",
+    "publication-deadline",
     "shared-patterns",
     "pattern-memory",
     "pattern-contributors",
@@ -162,6 +164,22 @@ def check_state(state, require_stripes=False):
     assert not errors, f"Browser errors: {errors}"
     assert state["blankLayerFrames"] == 0, "A rendered frame disabled all language coverage layers"
     report = state["reports"][-1]
+    services = state.get("tileServices", {})
+    receiver = services.get("receiver", {})
+    assert receiver.get("snapshots", 0) <= 2, "Unused coverage snapshots accumulated"
+    assert receiver.get("tiles", 0) <= 96, "Snapshot tile retention exceeded two buffers"
+    delivery = services.get("delivery", {})
+    assert delivery.get("parentBytes", 0) <= 8 * 1024**2
+    assert delivery.get("parentEntries", 0) <= 48
+    fallback = services.get("fallback", {})
+    assert fallback.get("rawBytes", 0) <= 16 * 1024**2
+    assert fallback.get("resultBytes", 0) <= 16 * 1024**2
+    assert fallback.get("rawEntries", 0) <= 48
+    assert fallback.get("resultEntries", 0) <= 96
+    cache = report.get("metrics", {}).get("cache", {})
+    assert cache.get("decodedEntries", 0) <= 48
+    assert cache.get("decodedBytes", 0) <= 16 * 1024**2
+    assert cache.get("partitionVertices", 0) <= 150_000
     if report["outcome"] == "error":
         assert not require_stripes, f"Required stripes unavailable: {report}"
         assert report["failure"] in SUPPORTED_LIMITS, f"Unexpected failure: {report}"
@@ -364,6 +382,25 @@ def main():
                             "selection clearing",
                         )
                         case["cleared"] = browser.snapshot()
+                        assert case["cleared"]["tileServices"]["receiver"]["snapshots"] == 0
+                        if scenario["name"] == "britain-all":
+                            # Supersede real cold dense work while it is running,
+                            # then ensure late tiles cannot restore its memberships.
+                            after = len(browser.snapshot()["reports"])
+                            browser.js("window.overlapTest.configure({languageIds:'all',center:[12,18],zoom:1.35})")
+                            wait_for(
+                                lambda after=after: len(browser.snapshot()["reports"]) > after,
+                                args.timeout,
+                                "dense request dispatch",
+                            )
+                            after = len(browser.snapshot()["reports"])
+                            browser.js("window.overlapTest.configure({languageIds:['stan1293','wels1247','scot1245','iris1253'],center:[-4.5,54.2],zoom:4.4})")
+                            state = browser.terminal(after, args.timeout)
+                            check_state(state, require_stripes=True)
+                            assert state["selectedCount"] == 4
+                            assert state["reports"][-1]["selectedCount"] == 4
+                            assert not browser.js("return window.overlapTest.unexpectedMemberships()"), "Superseded selection memberships became visible"
+                            case["superseded"] = {"snapshot": state}
                     case["passed"] = True
                 except Exception as error:  # noqa: BLE001 -- persist any scenario failure before continuing
                     failed = True

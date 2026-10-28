@@ -1,6 +1,5 @@
 import { PMTiles } from 'pmtiles'
-import { clipFallbackTile } from './fallback.ts'
-import { coverageRectangles } from './tiles.ts'
+import { FallbackCache } from './fallbackCache.ts'
 import type { TileCoordinate } from './types.ts'
 
 export interface FallbackRequest {
@@ -13,6 +12,7 @@ export interface FallbackRequest {
 let archiveUrl = ''
 let archive: PMTiles
 const controllers = new Map<number, AbortController>()
+const cache = new FallbackCache()
 
 self.onmessage = async ({ data }: MessageEvent<FallbackRequest | { cancel: number }>) => {
   if ('cancel' in data) {
@@ -26,20 +26,15 @@ self.onmessage = async ({ data }: MessageEvent<FallbackRequest | { cancel: numbe
       archiveUrl = data.archiveUrl
       archive = new PMTiles(archiveUrl)
     }
-    // Whole covered tiles need neither a fetch nor geometry initialization.
-    const rects = coverageRectangles(data.tile, data.coverage, 1)
-    const covered = rects.some(([l, t, r, b]) => l === 0 && t === 0 && r === 1 && b === 1)
-    const response = covered
-      ? undefined
-      : await archive.getZxy(data.tile.z, data.tile.x, data.tile.y, controller.signal)
-    controller.signal.throwIfAborted()
-    const result = await clipFallbackTile(
-      response ? new Uint8Array(response.data) : new Uint8Array(),
+    const result = await cache.get(
+      archive,
+      data.archiveUrl,
       data.tile,
       data.coverage,
+      controller.signal,
     )
     controller.signal.throwIfAborted()
-    self.postMessage({ id: data.id, data: result })
+    self.postMessage({ id: data.id, data: result, metrics: cache.stats() })
   } catch (error) {
     if (!controller.signal.aborted)
       self.postMessage({

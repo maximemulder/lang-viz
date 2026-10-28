@@ -1,6 +1,8 @@
 import type { ErrorEvent, Map as MapLibreMap } from 'maplibre-gl'
 import { browserMessages, type OverlapTestApi, overlapDiagnostics } from './diagnostics'
 
+import { serviceDiagnostics } from './serviceDiagnostics'
+
 const BUFFERS = [0, 1] as const
 const OVERLAP_LAYER = 'language-overlap-hatching'
 const FALLBACK_SOURCE = 'language-overlap-fallback'
@@ -66,6 +68,26 @@ export const installOverlapTestApi = (
     camera: (center: [number, number], zoom: number, duration = 0) =>
       map.easeTo({ center, zoom, duration }),
     recompute,
+    unexpectedMemberships: () => {
+      const selected = new Set<string>(JSON.parse(selectionKey()))
+      return [
+        ...new Set(
+          BUFFERS.flatMap((buffer) => {
+            const layer = `${OVERLAP_LAYER}-${buffer}`
+            if (!map.getLayer(layer) || !Number(map.getPaintProperty(layer, 'fill-layer-opacity')))
+              return []
+            return map
+              .querySourceFeatures(`language-overlap-regions-${buffer}`, {
+                sourceLayer: 'overlap_coverage',
+              })
+              .flatMap(({ properties }) =>
+                String(properties.pattern).slice('overlap:'.length).split('|'),
+              )
+              .filter((id) => !selected.has(id))
+          }),
+        ),
+      ]
+    },
     snapshot: () => {
       const status = document.querySelector('[data-overlap-status]')
       const gl = map.getCanvas().getContext('webgl2')
@@ -80,6 +102,8 @@ export const installOverlapTestApi = (
         viewport: { width: innerWidth, height: innerHeight, pixelRatio: devicePixelRatio },
         projection: map.getProjection(),
         reports: overlapDiagnostics.reports,
+        tileServices: serviceDiagnostics,
+        patternImages: map.listImages().filter((id) => id.startsWith('overlap:')).length,
         errors,
         browserMessages,
         renderedFrames,

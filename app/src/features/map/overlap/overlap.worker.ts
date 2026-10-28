@@ -2,16 +2,30 @@ import { PMTiles } from 'pmtiles'
 import { OverlapComputer } from './compute.ts'
 import { type DeliveryTile, encodeCoverageTile, tileKey } from './delivery.ts'
 import { OverlapBudgetError } from './geometry.ts'
-import type { OverlapMetrics, OverlapRequest, OverlapResponse } from './types.ts'
+import type { OverlapMetrics, OverlapResponse } from './types.ts'
+import type { WorkerInput, WorkerOutput } from './workerClient.ts'
 
 let latestRequestId = 0
 let archiveUrl = ''
 let archive: PMTiles
 let computer = new OverlapComputer()
 const encoded = new WeakMap<object, DeliveryTile>()
+let controller: AbortController | undefined
 
-self.onmessage = async ({ data: request }: MessageEvent<OverlapRequest>) => {
+self.onmessage = async ({ data: request }: MessageEvent<WorkerInput>) => {
+  if ('cancel' in request) {
+    if (latestRequestId === request.cancel) {
+      latestRequestId = 0
+      controller?.abort()
+    }
+    self.postMessage({ requestId: request.cancel, cancelled: true } satisfies WorkerOutput)
+    return
+  }
+  controller?.abort()
+  controller = new AbortController()
+  const signal = controller.signal
   latestRequestId = request.requestId
+  self.postMessage({ requestId: request.requestId, started: true } satisfies WorkerOutput)
   const started = performance.now()
   const isCurrent = () => latestRequestId === request.requestId
   const metrics: OverlapMetrics | undefined = request.profile
@@ -41,6 +55,7 @@ self.onmessage = async ({ data: request }: MessageEvent<OverlapRequest>) => {
       { ...request, tiles: missing },
       isCurrent,
       metrics,
+      signal,
     )) {
       if (!isCurrent()) return
       let delivery = encoded.get(tile.features)
@@ -58,6 +73,7 @@ self.onmessage = async ({ data: request }: MessageEvent<OverlapRequest>) => {
       self.postMessage(response)
     }
     if (!isCurrent()) return
+    if (metrics) metrics.cache = computer.stats()
     const response: OverlapResponse = {
       requestId: request.requestId,
       complete: true,
@@ -68,6 +84,7 @@ self.onmessage = async ({ data: request }: MessageEvent<OverlapRequest>) => {
     self.postMessage(response)
   } catch (error) {
     if (!isCurrent()) return
+    if (metrics) metrics.cache = computer.stats()
     if (import.meta.env.DEV) console.warn('Overlap calculation failed', error)
     const response: OverlapResponse = {
       requestId: request.requestId,

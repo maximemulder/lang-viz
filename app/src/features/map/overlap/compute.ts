@@ -113,6 +113,19 @@ export class OverlapComputer {
   private cachedBytes = 0
   private cachedResultVertices = 0
 
+  stats() {
+    return {
+      decodedEntries: this.tiles.size,
+      decodedBytes: this.cachedBytes,
+      partitionEntries: this.results.size,
+      partitionVertices: this.cachedResultVertices,
+      indexedFeatures: [...this.tiles.values()].reduce(
+        (sum, tile) => sum + (tile.layer?.length ?? 0),
+        0,
+      ),
+    }
+  }
+
   async compute(
     archive: Pick<PMTiles, 'getZxy'>,
     request: OverlapRequest,
@@ -148,6 +161,7 @@ export class OverlapComputer {
     request: OverlapRequest,
     isCurrent: () => boolean,
     metrics?: OverlapMetrics,
+    signal?: AbortSignal,
   ): AsyncGenerator<CoverageTile> {
     const selected = new Set(request.variantIds)
     let outputVertices = 0
@@ -155,10 +169,14 @@ export class OverlapComputer {
       if (!isCurrent()) return
       const key = JSON.stringify([request.archiveUrl, request.sourceLayer, tile.z, tile.x, tile.y])
       let cached = this.tiles.get(key)
-      if (cached && metrics) metrics.decodedCacheHits++
+      if (cached) {
+        if (metrics) metrics.decodedCacheHits++
+        this.tiles.delete(key)
+        this.tiles.set(key, cached)
+      }
       if (!cached) {
         const fetchStart = performance.now()
-        const response = await archive.getZxy(tile.z, tile.x, tile.y)
+        const response = await archive.getZxy(tile.z, tile.x, tile.y, signal)
         if (metrics) metrics.fetchMs += performance.now() - fetchStart
         if (!isCurrent()) return
         const decodeStart = performance.now()
@@ -209,7 +227,11 @@ export class OverlapComputer {
       }
       const resultKey = `${key}:${localIds.join('|')}`
       let result = this.results.get(resultKey)
-      if (result && metrics) metrics.partitionCacheHits++
+      if (result) {
+        if (metrics) metrics.partitionCacheHits++
+        this.results.delete(resultKey)
+        this.results.set(resultKey, result)
+      }
       if (!result) {
         const initializeStart = performance.now()
         const partitionCoverage = await loadCoveragePartition()

@@ -31,6 +31,13 @@ export interface OverlapRequest {
 }
 
 export interface OverlapMetrics {
+  cache?: {
+    decodedEntries: number
+    decodedBytes: number
+    partitionEntries: number
+    partitionVertices: number
+    indexedFeatures: number
+  }
   fetchMs: number
   decodeMs: number
   initializeMs: number

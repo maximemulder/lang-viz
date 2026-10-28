@@ -26,6 +26,7 @@ import {
 import { installOverlapTestApi } from './testBridge'
 import { coverageTilesKey, retainCoverageTiles, tilesForBounds } from './tiles'
 import type { OverlapProperties, OverlapRequest, OverlapResponse, TileCoordinate } from './types'
+import { OverlapWorkerClient, PUBLICATION_TIMEOUT_MS } from './workerClient'
 
 const OVERLAP_SOURCE = 'language-overlap-regions'
 const OVERLAP_LAYER = 'language-overlap-hatching'
@@ -157,12 +158,15 @@ export const OverlapHatching = ({
 
   useEffect(() => {
     if (!map) return
-    const worker = new Worker(new URL('./overlap.worker.ts', import.meta.url), { type: 'module' })
+    const worker = new OverlapWorkerClient(
+      () => new Worker(new URL('./overlap.worker.ts', import.meta.url), { type: 'module' }),
+    )
     const colors = new Map(data.variants.map(({ id, color }) => [id, color]))
     let requestId = 0
     let previousKey = ''
     let timer: ReturnType<typeof setTimeout> | undefined
     let publicationTimer: ReturnType<typeof setTimeout> | undefined
+    let deadline: ReturnType<typeof setTimeout> | undefined
     let activePatterns = new Set<string>()
     const ownedPatterns = new Set<string>()
     let requestHasTiles = false
@@ -239,6 +243,8 @@ export const OverlapHatching = ({
           message: failure || 'Updating overlap stripes…',
         }))
       } catch (error) {
+        clearTimeout(deadline)
+        worker.cancel()
         failure = error instanceof Error ? error.message : 'Could not draw overlap stripes.'
         overlapDiagnostics.update(requestId, {
           outcome: 'error',
@@ -276,6 +282,7 @@ export const OverlapHatching = ({
       activePatterns = result.patterns
       pendingResult = null
       const finished = complete && publishedVersion === version
+      if (finished) clearTimeout(deadline)
       overlapDiagnostics.update(requestId, {
         ...(failure ? {} : { outcome: finished ? 'ready' : 'pending' }),
         firstCoverageMs:
@@ -304,6 +311,8 @@ export const OverlapHatching = ({
     }
 
     const suspendCoverage = () => {
+      worker.cancel()
+      clearTimeout(deadline)
       if (report()?.outcome === 'pending')
         overlapDiagnostics.update(requestId, { outcome: 'superseded' })
       requestId++
@@ -347,6 +356,7 @@ export const OverlapHatching = ({
       if (report()?.outcome === 'pending')
         overlapDiagnostics.update(requestId, { outcome: 'superseded' })
       previousKey = key
+      clearTimeout(deadline)
       clearTimeout(publicationTimer)
       publicationTimer = undefined
       pendingResult = null
@@ -372,6 +382,19 @@ export const OverlapHatching = ({
       if (tiles.length > 0)
         overlapDiagnostics.start(request.requestId, tiles.length, variantIds.length)
       worker.postMessage(request)
+      if (tiles.length > 0)
+        deadline = setTimeout(() => {
+          worker.cancel()
+          requestHasTiles = false
+          complete = true
+          failure =
+            'Overlap display exceeded its time budget. Keeping available coverage; try another view.'
+          overlapDiagnostics.update(requestId, {
+            outcome: 'error',
+            failure: 'publication-deadline',
+          })
+          setState((previous) => ({ ...previous, status: 'error', message: failure }))
+        }, PUBLICATION_TIMEOUT_MS)
       if (tiles.length === 0) {
         activePatterns.clear()
         setState({ snapshots: [null, null], activeBuffer: null, status: 'idle', message: '' })
@@ -400,6 +423,8 @@ export const OverlapHatching = ({
           response.tile.vertices
         if (vertices > 200_000 || failure) {
           if (!failure) {
+            clearTimeout(deadline)
+            worker.cancel()
             failure =
               'Overlap geometry exceeds the preview budget. Zoom in or select fewer languages.'
             overlapDiagnostics.update(requestId, { outcome: 'error', failure: 'output-vertices' })
@@ -422,8 +447,10 @@ export const OverlapHatching = ({
         return
       }
       overlapDiagnostics.response(response)
+      overlapDiagnostics.update(requestId, { workerRestarts: worker.restarts })
       complete = true
       if ('error' in response) {
+        clearTimeout(deadline)
         failure = response.error
         overlapDiagnostics.update(requestId, { outcome: 'error', failure: response.failure })
         setState((previous) => ({
@@ -437,6 +464,7 @@ export const OverlapHatching = ({
       // A request containing only retained tiles, or whose last batch already
       // published, has no additional source work to wait for.
       if (!pendingResult && publishedVersion === version && !failure) {
+        clearTimeout(deadline)
         const currentReport = report()
         overlapDiagnostics.update(requestId, {
           outcome: 'ready',
@@ -451,6 +479,7 @@ export const OverlapHatching = ({
       }
     }
     worker.onerror = () => {
+      clearTimeout(deadline)
       failure = 'Could not calculate overlap stripes. Try reloading the map.'
       overlapDiagnostics.update(requestId, { outcome: 'error', failure: 'worker-error' })
       setState((previous) => ({ ...previous, status: 'error', message: failure }))
@@ -484,6 +513,7 @@ export const OverlapHatching = ({
     return () => {
       clearTimeout(timer)
       clearTimeout(publicationTimer)
+      clearTimeout(deadline)
       refreshRef.current = null
       worker.terminate()
       releaseUnused([])

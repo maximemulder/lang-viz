@@ -1,5 +1,8 @@
 import { addProtocol } from 'maplibre-gl'
+import { diagnosticsEnabled } from './diagnostics.ts'
 import type { FallbackRequest } from './fallback.worker.ts'
+import type { FallbackMetrics } from './fallbackCache.ts'
+import { serviceDiagnostics } from './serviceDiagnostics.ts'
 import type { TileCoordinate } from './types.ts'
 
 export const fallbackTilesUrl = (archiveUrl: string, coverage: readonly TileCoordinate[]) =>
@@ -15,15 +18,24 @@ const pending = new Map<
 addProtocol('language-fallback', async ({ url }, controller) => {
   if (!worker) {
     worker = new Worker(new URL('./fallback.worker.ts', import.meta.url), { type: 'module' })
+    const currentWorker = worker
     worker.onmessage = ({
       data,
-    }: MessageEvent<{ id: number; data: Uint8Array; error?: string }>) => {
+    }: MessageEvent<{
+      id: number
+      data: Uint8Array
+      error?: string
+      metrics?: FallbackMetrics
+    }>) => {
+      if (worker !== currentWorker) return
+      if (diagnosticsEnabled && data.metrics) serviceDiagnostics.fallback = data.metrics
       const request = pending.get(data.id)
       pending.delete(data.id)
       if (data.error) request?.reject(new Error(data.error))
       else request?.resolve(data.data)
     }
     worker.onerror = () => {
+      if (worker !== currentWorker) return
       for (const request of pending.values())
         request.reject(new Error('Could not load fallback language colors.'))
       pending.clear()

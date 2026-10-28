@@ -72,7 +72,10 @@ different IDs and colors.
   without copying geometry. At native zoom the protocol serves existing bytes;
   during zoom-out retention it transforms/combines descendant MVTs into requested
   parent tiles. The source maxzoom matches computation zoom, so MapLibre handles
-  zoom-in overzooming. Parent assembly currently runs on the main thread.
+  zoom-in overzooming. A lazy delivery worker assembles parents, with a 48-entry/
+  8 MiB LRU payload cache keyed by the relevant descendant identities. Only new
+  encoded tiles are copied into that worker across snapshots; release drops
+  unused native references. Native and empty requests do not start that worker.
 - Completed tiles accumulate during a 250 ms initial grace period; completion
   flushes immediately, so fast requests publish once. Longer requests publish
   progressively, batching arrivals for 32 ms and coalescing results while a
@@ -87,21 +90,36 @@ different IDs and colors.
   uncovered tiles pass through; whole covered tiles return empty. For boundary
   tiles, a separate worker uses GEOS to clip each feature against the uncovered
   tile area and `@maplibre/vt-pbf` to encode the result. No language-to-language
-  overlay is needed. IDs, colors, holes, and selection properties are preserved.
+  overlay is needed. Bounds tests discard features wholly covered by one mask
+  rectangle, and preserve original MVT rings for features wholly outside the mask
+  and inside the tile. Boundary features, including tile buffers, still use GEOS.
+  Source order, IDs, colors, holes, and selection properties are preserved.
+  A 48-entry/16 MiB raw-byte LRU avoids repeated archive reads, and a separate
+  96-entry/16 MiB LRU caches clipped bytes by archive, tile, and sorted local mask.
+  Changes outside that tile do not invalidate it; a changed local mask still clips.
+  Covered tiles require neither a fetch nor a cache entry.
   Fallback colors never draw underneath retained stripes. Overlaps in fallback
   areas use ordinary solid fills in source order until stripes become available;
   these areas do not yet communicate every contributor. Normal tile loading can
   still delay appearance, but an overlap budget/pattern failure cannot stop it.
 - Selection/mode changes immediately clear coverage and invalidate pending results.
   Superseded responses cannot publish. The worker yields between tiles and abandons
-  superseded work. Opacity changes require neither computation nor source updates.
+  superseded work. Archive fetches receive an abort signal. `OverlapWorkerClient`
+  gives superseded work 150 ms to acknowledge cancellation or start the replacement;
+  otherwise it terminates the blocked worker and dispatches only the latest request
+  to a fresh worker. Responsive cancellation preserves caches. Computation has an
+  8-second dispatch deadline, including fetch/initialization; final display has a
+  12-second deadline including staging. Both report explicit errors and preserve
+  available coverage. These UI-thread watchdogs are subject to browser timer
+  scheduling/throttling; an individual WASM call itself is still synchronous.
+  Opacity changes require neither computation nor source updates.
 - At most 48 decoded tiles and 16 MiB of decompressed tile bytes are cached.
   Native-result caching is bounded by 48 entries and 150,000 coordinate positions.
   Encoded cache entries share those lifetimes through weak keys. The receiver
   retains at most 48 desired tiles/200,000 positions plus active/staging snapshot
   references; old snapshots can retain different encoded tiles during transitions.
   These are not total browser/WASM/GPU memory limits.
-  These are FIFO caches; the byte limit does not include decoded object overhead.
+  These are LRU caches; the byte limit does not include decoded object overhead.
   Cached feature metadata adds JS object overhead. Archive URL and source layer
   are part of cache identity, along with tile coordinates and local selection.
 - A tile accepts at most 100,000 selected input vertices, 12,000 intermediate
@@ -158,7 +176,7 @@ cache limits and tile budgets remain in place.
 
 `npm run test:browser` runs the production app in installed Firefox and records
 cold/warm measurements, screenshots, explicit limit outcomes, zoom-out retention,
-pan/return reuse, and selection clearing. See [browser harness usage](../../../../tests/browser/README.md)
+pan/return reuse, selection clearing, resource counters, and superseding dense work with a smaller selection. See [browser harness usage](../../../../tests/browser/README.md)
 for setup, scenario definitions, and timing semantics.
 
 `npm test` covers three-way memberships and disjointness, holes, touching edges,
@@ -170,5 +188,11 @@ on success, failure, and budget rejection. The optional dense archive regression
 requires success or an explicit documented budget error; topology errors fail.
 If `public/data/language-areas.pmtiles` exists, it also computes real English/Welsh overlaps and verifies that removing
 the other languages removes shared regions while retaining English-only coverage.
-Fallback tests check masks across detail levels, untouched/covered tile fast
+Fallback tests check safe bounds shortcuts, source order, local-mask cache invalidation, masks across detail levels, untouched/covered tile fast
 paths, clipping, holes, IDs/properties, and adjacent masks across repeated requests.
+
+Opt-in browser snapshots expose `tileServices`: cumulative parent assembly and
+fallback decode/initialize/overlay/encode counters, cache payload bytes/entries, and current receiver
+snapshot references. Partition reports include decoded cache bytes/entries,
+indexed feature count, and retained partition positions. These are payload and
+ownership diagnostics, not total JS, WASM, or GPU memory measurements.

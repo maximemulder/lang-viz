@@ -17,6 +17,15 @@ export interface DeliveryTile {
 
 export const tileKey = ({ z, x, y }: TileCoordinate) => `${z}/${x}/${y}`
 
+export const isTileDescendant = (source: TileCoordinate, target: TileCoordinate) => {
+  const scale = 2 ** (source.z - target.z)
+  return (
+    scale > 1 &&
+    Math.floor(source.x / scale) === target.x &&
+    Math.floor(source.y / scale) === target.y
+  )
+}
+
 const encode = (features: Feature[]) => {
   if (!features.length) return new Uint8Array()
   const layer = new GeoJSONWrapper(features, { extent: EXTENT, version: 2 })

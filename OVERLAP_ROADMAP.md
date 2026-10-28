@@ -95,8 +95,9 @@ The committed production-browser harness now checks cold/warm source publication
 animated zoom-out, selection clearing, and retained coverage plus loaded fallback
 when a world-view update reaches a limit.
 
-**Remaining:** Broaden automated navigation checks to pans/return navigation,
-rapid selection supersession, injected failures, and spatial/pixel assertions.
+**Remaining:** Broaden automated navigation checks to injected failures and
+spatial/pixel assertions. Pans/return and dense-to-small selection supersession
+now run in the production-browser harness.
 Incremental tile delivery and batched partial publication are implemented (OVL-04).
 Prefetching and selective in-place render-tile replacement remain possible improvements.
 
@@ -126,93 +127,106 @@ This item does not require implementing the full query language or query UI.
 
 ### OVL-04 — Measured performance, cancellation, and resource budgets
 
-**Status:** Open. **Priority:** Optimize from evidence.
+**Status:** Open; incremental delivery, cancellation supervision, bounded LRU
+caches, and measured fallback shortcuts implemented. Remaining work is ordered below.
 
-**Current limitation:** A focused [production-browser harness](app/tests/browser/README.md)
-now records cold/warm stage timings and explicit geometry/pattern-limit outcomes
-for small/all-language selections in Britain, a dense region, and the world.
-There are no agreed latency/memory targets or total request deadline.
-The worker yields between tiles, but a Boolean operation cannot
-be interrupted in the chosen WASM build. Native allocation cleanup is tested;
-full memory accounting is not. Encoded MVT tiles cross worker boundaries; MapLibre
-still prepares visible tiles in each staged snapshot, but no longer re-tiles GeoJSON.
-Pattern creation runs on the main thread. Cache limits do not bound all decoded-object
-or texture memory, and caches are FIFO.
+**Current architecture:** Workers stream encoded, native tile-space MVT results.
+The receiver retains up to 48 same-detail tiles and sends a known-tile manifest,
+so pans compute/transfer only additions. Two immutable vector snapshots pair
+computed coverage with matching fallback masks; a 250 ms initial grace period
+and 32 ms batching limit intermediate publication. Completed prefixes can survive
+later failures, without claiming full completion. MapLibre still prepares visible
+render tiles on each snapshot swap; there is no full GeoJSON transfer/re-tiling.
 
-**Work:** Measure cold/warm requests, dense intersections, selection changes,
-and repeated navigation. Separate fetching, decoding, partitioning, transfer,
-source preparation, pattern allocation, and drawing costs. Define supported
-latency and memory targets from those measurements, then improve scheduling,
-cancellation, caching, and resource accounting where needed.
+A lazy delivery worker assembles retained descendants into zoom-out parent tiles.
+Its 48-entry/8 MiB LRU payload cache is keyed by relevant descendant identities.
+Native/empty requests remain direct. Only newly referenced encoded tiles are copied
+into the worker across snapshots, and release drops unused native references.
+Fallback has separate raw/clipped byte caches; clipped identity uses archive,
+tile, and sorted local mask, so unrelated coverage changes do not invalidate it.
+Decoded/partition caches now refresh on use too.
+
+Fallback bounds tests omit features wholly inside one covered rectangle and pass
+through features wholly outside the mask and inside the tile. Boundary cases,
+including source tile buffers, still use GEOS. Source order, IDs, properties, holes,
+and visible geometry are preserved. No simplification or dataset change was made.
+
+**Cancellation and deadlines:** Abort superseded fetches cooperatively. After
+150 ms without a cancellation acknowledgement or replacement-start message,
+terminate a blocked worker and restart only the latest request. Responsive
+cancellation preserves caches. An 8-second computation deadline includes fetching
+and initialization; a 12-second publication deadline also covers source staging.
+Errors preserve available coverage and give feedback. These UI-thread watchdogs
+are subject to browser timer scheduling/throttling; individual GEOS operations
+remain synchronous. Termination releases the worker's WASM context and caches.
+
+**Evidence (2026-10-28):** Firefox 156, headless, 1440×1000 requested window,
+basemap off; software rendering requested (actual backend not independently
+verified). Local archive SHA-256 starts `0f55734c095a4e56`. Fresh baseline: two
+runs; final: three. Full dispatch-to-ready medians, in milliseconds:
+
+| Scenario | Cold before → after | Warm before → after |
+| --- | --- | --- |
+| Britain, all languages | 306 → 322 | 66 → 68 |
+| Dense region, all languages | 1,516 → 1,524 | 298 → 326 |
+| World, all languages | 3,026 → 2,941 | 348 → 357 |
+
+These small differences are not evidence of a general speedup. Cold world worker
+time remains about 2.47 seconds. During Britain-all's animated zoom-out, the bounds
+shortcut reduced GEOS candidates to 2,926 of 12,137 features (76% avoided).
+Cumulative fallback clipping time fell from a 1,282 ms median to 826 ms across
+three runs before/after the shortcut. This includes initialization/awaiting and
+is not pure CPU or end-to-end latency; concurrent tile timings can overlap.
+Final decode/overlay/encode medians were 49/321/38 ms, and accumulated initialization
+wait was 282 ms. Parent assembly was comparatively inexpensive (15–27 ms total
+before the shortcut) and is now off the main thread. Clipped-cache hits were zero
+on the first traversal; changing local masks still require work. Raw-byte reuse
+occurred. A repeated-navigation clipping speedup is not claimed.
+
+Earlier optimization milestones: grouped tile memberships and smaller textures
+made dense regional/world stripes render within the pattern budget (world: 4,166
+shared patterns). Incremental MVT delivery reduced measured world warm readiness
+from 916 to 339 ms, cold from 3,309 to 2,969 ms, with first partial render at 722 ms.
+Those are separate baseline runs, not directly comparable to the table above.
+
+Thirty-two unit tests and all eighteen browser cases pass. Coverage includes
+byte/entry budgets, local-mask invalidation, source order/holes/buffer clipping,
+snapshot release, cooperative cancellation, blocked supersession, deadline failure,
+and recovery. The browser harness checks resource limits, navigation/return reuse,
+selection clearing, and dense-to-small selection supersession with membership
+inspection. Cleared receivers retain zero registered snapshots.
+
+**Proposed engineering targets:** On this reference setup, Britain cold readiness
+under 500 ms and warm under 100 ms; dense/world first useful coverage under 1 second,
+full cold readiness under 4 seconds and warm under 500 ms. Measured medians fit.
+These are provisional development targets, not product SLAs or machine-independent
+CI gates. Confirm them on representative devices. A total memory target requires
+heap/GPU measurements rather than adding payload byte counts together.
+
+**Remaining, in order:**
+
+1. Further reduce fallback work during changing masks. Stage counters now separate
+   decoding, initialization, GEOS import/Boolean/export, and encoding; isolate the
+   remaining GEOS cost before retaining native geometry or changing clipping strategy.
+2. Measure MapLibre preparation/atlas/drawing costs within snapshot swaps before
+   replacing the two-buffer lifecycle with selective in-place GPU tile updates.
+3. Improve cold GEOS partitioning. Complexity-aware preprocessing/detail reduction
+   needs an explicit accuracy policy and tile-boundary regressions (OVL-05).
+4. Account for JS objects/backing buffers, GEOS heap capacity, MapLibre tile atlases,
+   and GPU allocations under repeated navigation. Current counters and bounded caches
+   do not establish a total memory bound or prove absence of every leak.
+5. Broaden injected failure and pixel coverage under OVL-08, and confirm provisional
+   latency/resource targets. No worker pool or dataset format change was introduced.
 
 **Complete when:** Reproducible benchmarks and agreed targets are recorded;
-superseded work is abandoned within a defined bound; total request work and
-resource use are controlled; and repeated use does not accumulate unused
-resources. Any remaining limits have a documented reason and clear user feedback.
+superseded work is abandoned within a defined bound; request work and resources
+are controlled; repeated use does not accumulate unused resources; and remaining
+limits have a documented reason and clear feedback. Full memory accounting and
+representative-device targets remain necessary to close this item.
 
-**Measured optimization (2026-10-28):** Cache converted delivery features under
-the existing 48-entry/150,000-position bound, index tile metadata once, and group
-identical memberships per tile without dropping coordinates. Stripe textures
-use one quarter of their previous pixels at the same displayed period; solids
-use one texel. A padded-image-area budget replaces the 128-combination cap.
-Firefox 156, headless, 1440×1000 requested window, basemap off; software rendering
-requested (actual backend not independently verified). Local archive SHA-256
-starts `0f55734c095a4e56`. Baseline medians are from two runs, optimized from three;
-these observations are not latency guarantees.
-
-| Scenario | Warm worker before → after | Delivery features before → after | Rendering before → after |
-| --- | --- | --- | --- |
-| Britain, all languages | 7.5 → 5 ms | 726 → 111 | Stripes → stripes |
-| Dense region, all languages | 32 → 11 ms | 7,589 → 4,720 | Pattern-limit failure → 2,981 shared patterns |
-| World, all languages | 68 → 5 ms | 13,898 → 7,649 | Pattern-limit failure → 4,166 shared patterns |
-
-World cold worker time remains about 2.4 seconds. Full dispatch-to-ready time is
-about 3.4 seconds cold and 1.0 second on forced warm republish, so worker-cache
-speed is not the same as display latency. Source preparation, fallback readiness,
-and image registration remain substantial. Incremental delivery results follow below.
-The two dense browser scenarios now require stripes rather than accepting a limit.
-Reproduce with `npm run test:browser -- --runs 3 --output test-results/performance-optimized`;
-raw local reports/screenshots remain ignored under `app/test-results/`.
-
-**Incremental delivery (2026-10-28):** The worker now yields native tile-space
-partitions and caches their encoded MVT delivery form. The browser retains up to
-48 tiles and sends a known-tile manifest, so same-detail navigation computes and
-transfers only additions. Immutable vector-source snapshots share encoded buffers;
-there is no complete GeoJSON transfer, coordinate reprojection, or GeoJSON tile
-index in the rendering path. A 250 ms grace period avoids intermediate work for
-fast requests; completion flushes immediately. Longer requests batch arrivals for
-32 ms and publish matching coverage/fallback masks as each staging buffer loads.
-Completed prefixes survive later tile failures. Superseded responses and snapshots
-are invalidated; the 200,000-position limit includes receiver-retained tiles.
-
-Same Firefox/archive setup as above. Fresh pre-change baseline: two runs;
-final implementation: three. Dispatch-to-ready medians (not latency guarantees):
-
-| Scenario | Full cold before → after | Full warm before → after | First partial render, cold after |
-| --- | --- | --- | --- |
-| Britain, all languages | 275 → 289 ms | 111 → 67 ms | 306 ms (usually one publication) |
-| Dense region, all languages | 1,653 → 1,644 ms | 678 → 284 ms | 566 ms |
-| World, all languages | 3,309 → 2,969 ms | 916 → 339 ms | 722 ms |
-
-Cold GEOS is not faster: world worker time is about 2.46 seconds. The gain comes
-from earlier useful coverage and less publication work. Dense regional cold total
-is essentially unchanged; publication/geometry contention and repeated fallback
-clipping remain costs. Small Britain cold time stays around 200 ms. Both Britain
-pan tests transfer 4 additions for 10 retained tiles; return navigation dispatches
-no new request. All six cold/warm cases, pans/return, zoom-out, and clearing pass.
-MVT tests preserve winding/holes/membership and parent-tile coverage; stream tests
-cover empty tiles, early delivery, cancellation, and failure after a valid prefix.
-
-**Remaining:** Snapshot swaps still prepare visible render tiles in the new buffer;
-they do not selectively replace only changed GPU tiles. Partial masks can repeat
-fallback clipping, and retained descendant-to-parent MVT assembly during zoom-out
-runs on the main thread. Measure those costs before another architecture change.
-Cold GEOS/detail reduction, complexity-aware preprocessing, broader failure/pixel
-coverage, and total memory accounting remain open. No dataset format/dependency
-changes or worker pool were introduced.
-
-Reproduce with `npm run test:browser -- --runs 3 --output test-results/incremental-final`.
-Raw reports/screenshots are ignored local artifacts; useful timings live here.
+Reproduce with `npm run test:browser -- --runs 3 --output test-results/resource-bounds`.
+Reports/screenshots are ignored local artifacts; useful results live here. See
+[measurement semantics](app/tests/browser/README.md) and [implementation details](app/src/features/map/overlap/README.md).
 
 Current POC limits, to revisit rather than simply remove:
 
@@ -220,14 +234,17 @@ Current POC limits, to revisit rather than simply remove:
 | --- | --- |
 | Computation tiles | 48, at zoom 0–8; reduce zoom to fit |
 | Decoded tile cache | 48 entries and 16 MiB of decompressed tile bytes |
-| Native partition cache | 48 entries and 150,000 coordinate positions; encoded tiles cached weakly |
-| Receiver tile retention | 48 desired tiles and 200,000 positions, plus immutable active/staging encoded snapshots |
-| Selected input per tile | 100,000 coordinate positions |
+| Native partition cache | 48 entries and 150,000 positions; encoded tiles cached weakly |
+| Receiver tile retention | 48 desired tiles/200,000 positions, plus active/staging encoded snapshots |
+| Fallback byte caches | Raw: 48 entries/16 MiB; clipped: 96 entries/16 MiB (local mask keys) |
+| Parent delivery cache | 48 entries/8 MiB; native references follow active/staging snapshots |
+| Request deadlines | 8 seconds computation; 12 seconds publication; 150 ms supersession grace, subject to UI timer scheduling |
+| Selected input per tile | 100,000 positions |
 | Intermediate regions per tile | 12,000 |
-| Overlay time per tile | Approximately 1.5 seconds, checked between operations |
-| Complete output | 200,000 coordinate positions |
+| Overlay time per tile | About 1.5 seconds, checked between operations |
+| Complete output | 200,000 positions |
 | Padded pattern texels | 4,194,304 per result; twice that across owned images during swaps (16/32 MiB RGBA, excluding atlas copies/overhead) |
-| Pattern image size | 256 × 256 pixels; up to 42 contributors at unchanged displayed spacing; solids use one texel |
+| Pattern image size | 256 × 256 pixels; up to 42 contributors at unchanged spacing; solids use one texel |
 
 ### OVL-05 — Consistent tile boundaries, detail, and inspection
 
@@ -278,8 +295,9 @@ behavior is explicit without silently dropping contributors.
 
 **Current limitation:** `OverlapHatching` combines worker scheduling, map events,
 source readiness, pattern lifetime, layer ordering, and UI controls. Readiness
-uses a collection revision and an object-identity comparison with serialized
-source data, which is sensitive to integration behavior.
+now matches immutable coverage protocol URLs and fallback mask URLs, and checks
+both sources loaded before swapping. This lifecycle is still concentrated in
+the component; the worker supervisor and delivery/cache services are separate.
 
 **Work:** Separate the computation controller, versioned coverage state,
 MapLibre resource management, and controls. Make loading, ready, superseded, and
@@ -296,7 +314,7 @@ selection identity, and resource ownership without console errors.
 **Current limitation:** Existing tests cover focused geometry cases, stripe
 pixels, tile selection, budgets, and a real Britain example. A focused browser
 harness covers six production-build scenarios, cache reuse, incremental pans/return,
-zoom-out/failure retention, and selection clearing. GEOS regressions cover the captured failures, invalid and
+zoom-out/failure retention, dense selection supersession, resource limits, and selection clearing. GEOS regressions cover the captured failures, invalid and
 mixed-dimension inputs, and native ownership on success/failure/budget rejection.
 There is no broad randomized geometry corpus, automated visual suite, or full
 application performance regression suite.
@@ -329,8 +347,11 @@ OVL-01 is complete for the known cases. OVL-02 retention and focused browser
 coverage are implemented; broader navigation and spatial assertions remain.
 The current focus is OVL-04 measured performance and OVL-06 dense-selection
 scaling. The reference dense regional/world views now render and receive incremental
-vector-tile results. Warm publication is substantially faster; next measure remaining
-snapshot preparation/fallback clipping and cold geometry/detail costs. Cold GEOS
+vector-tile results. Warm publication is substantially faster. Cancellation/deadline supervision,
+bounded LRU delivery/fallback caches, and parent assembly off the main thread
+are implemented. Fallback bounds shortcuts now avoid most unnecessary overlays during changing
+masks. Next isolate remaining GEOS import/Boolean/export costs, snapshot
+preparation, cold partitioning/detail costs, and total memory use. Cold GEOS
 time remains substantial, and geometry success still
 does not guarantee fitting the texture budget on every selection.
 The generic area contract remains separate OVL-03 work.

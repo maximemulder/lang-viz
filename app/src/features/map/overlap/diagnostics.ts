@@ -42,6 +42,7 @@ interface RequestReport {
   firstCoverageRenderMs?: number
   publications?: number
   deliveredTiles?: number
+  workerRestarts?: number
   buffer?: number
   totalMs?: number
   features?: number
@@ -95,6 +96,7 @@ export interface OverlapTestApi {
   }): void
   camera(center: [number, number], zoom: number, duration?: number): void
   recompute(): void
+  unexpectedMemberships(): string[]
   snapshot(): unknown
 }
 
