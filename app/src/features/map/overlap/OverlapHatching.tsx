@@ -12,8 +12,10 @@ import {
   temporalViewAtom,
   visibleLanguageIdsAtom,
 } from '../../../state/atlasState'
+import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
 import { fallbackTilesUrl } from './fallbackProtocol'
-import { stripeImage } from './patterns'
+import { OverlapPatternError, stripeImage } from './patterns'
+import { installOverlapTestApi } from './testBridge'
 import { coverageTilesKey, retainCoverageTiles, tilesForBounds } from './tiles'
 import type { OverlapCollection, OverlapRequest, OverlapResponse, TileCoordinate } from './types'
 import { EMPTY_OVERLAPS } from './types'
@@ -42,7 +44,8 @@ const installPatterns = (
     collection.features.map(({ properties }) => [properties.pattern, properties]),
   )
   if ([...uniquePatterns.values()].filter(({ variantIds }) => variantIds.length > 1).length > 128) {
-    throw new Error(
+    throw new OverlapPatternError(
+      'shared-patterns',
       'Too many overlap combinations for this preview. Zoom in or select fewer languages.',
     )
   }
@@ -88,6 +91,32 @@ export const OverlapHatching = ({
   })
   const configRef = useRef({ selectionKey, mode })
   const refreshRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    if (!diagnosticsEnabled || !map) return
+    return installOverlapTestApi(
+      map,
+      (options) => {
+        setPeriod('contemporary')
+        setDatasetFilter(['asher2007world'])
+        setMode('hatching')
+        setVisibleIds(
+          options.languageIds === 'all'
+            ? [
+                ...new Set(
+                  data.variants
+                    .filter((v) => v.datasetId === 'asher2007world')
+                    .map((v) => v.languageId),
+                ),
+              ]
+            : options.languageIds,
+        )
+        map.jumpTo({ center: options.center, zoom: options.zoom })
+      },
+      () => refreshRef.current?.(),
+      () => configRef.current.selectionKey,
+    )
+  }, [map, data, setPeriod, setDatasetFilter, setMode, setVisibleIds])
 
   useEffect(() => {
     if (!map) return
@@ -139,16 +168,46 @@ export const OverlapHatching = ({
       const fallback = map.getSource(fallbackId)?.serialize() as
         | VectorSourceSpecification
         | undefined
-      if (
+      const coverageLoaded = Boolean(
         result &&
-        result.requestId === requestId &&
-        source &&
-        source.serialize().data === result.collection &&
-        map.isSourceLoaded(sourceId) &&
-        fallback?.tiles?.[0] ===
-          fallbackTilesUrl(languageArchiveUrl(), result.collection.coverageTiles ?? []) &&
-        map.isSourceLoaded(fallbackId)
-      ) {
+          source &&
+          source.serialize().data === result.collection &&
+          map.isSourceLoaded(sourceId),
+      )
+      const fallbackLoaded = Boolean(
+        result &&
+          fallback?.tiles?.[0] ===
+            fallbackTilesUrl(languageArchiveUrl(), result.collection.coverageTiles ?? []) &&
+          map.isSourceLoaded(fallbackId),
+      )
+      if (diagnosticsEnabled && result && result.requestId === requestId) {
+        const report = overlapDiagnostics.reports.findLast((entry) => entry.requestId === requestId)
+        if (report) {
+          const elapsed =
+            performance.now() -
+            report.startedAt -
+            (report.dispatchToResponseMs ?? 0) -
+            (report.patternsMs ?? 0)
+          if (coverageLoaded && report.coverageSourceMs === undefined)
+            overlapDiagnostics.update(requestId, { coverageSourceMs: elapsed })
+          if (fallbackLoaded && report.fallbackSourceMs === undefined)
+            overlapDiagnostics.update(requestId, { fallbackSourceMs: elapsed })
+        }
+      }
+      if (result && result.requestId === requestId && coverageLoaded && fallbackLoaded) {
+        const report = overlapDiagnostics.reports.findLast((entry) => entry.requestId === requestId)
+        if (diagnosticsEnabled)
+          overlapDiagnostics.update(requestId, {
+            outcome: 'ready',
+            sourceReadyMs: report
+              ? performance.now() -
+                report.startedAt -
+                (report.dispatchToResponseMs ?? 0) -
+                (report.patternsMs ?? 0)
+              : 0,
+            totalMs: report ? performance.now() - report.startedAt : 0,
+            buffer: result.buffer,
+          })
         activeBuffer = result.buffer
         activePatterns = new Set(
           result.collection.features.map(({ properties }) => properties.pattern),
@@ -168,6 +227,11 @@ export const OverlapHatching = ({
     }
 
     const suspendCoverage = () => {
+      if (
+        overlapDiagnostics.reports.findLast((entry) => entry.requestId === requestId)?.outcome ===
+        'pending'
+      )
+        overlapDiagnostics.update(requestId, { outcome: 'superseded' })
       requestId++
       previousKey = ''
       pendingResult = null
@@ -202,12 +266,15 @@ export const OverlapHatching = ({
       pendingResult = null
       requestHasTiles = tiles.length > 0
       const request: OverlapRequest = {
+        ...(diagnosticsEnabled ? { profile: true } : {}),
         requestId: ++requestId,
         archiveUrl: languageArchiveUrl().replace(/^pmtiles:\/\//, ''),
         sourceLayer: data.manifest.vectorLayer,
         variantIds,
         tiles,
       }
+      if (tiles.length > 0)
+        overlapDiagnostics.start(request.requestId, tiles.length, variantIds.length)
       worker.postMessage(request)
       if (tiles.length === 0) {
         activePatterns.clear()
@@ -242,7 +309,12 @@ export const OverlapHatching = ({
     }
     worker.onmessage = ({ data: response }: MessageEvent<OverlapResponse>) => {
       if (response.requestId !== requestId || !requestHasTiles) return
+      overlapDiagnostics.response(response)
       if ('error' in response) {
+        overlapDiagnostics.update(response.requestId, {
+          outcome: 'error',
+          failure: response.failure,
+        })
         setState((previous) => ({
           ...previous,
           status: 'error',
@@ -250,8 +322,21 @@ export const OverlapHatching = ({
         }))
         return
       }
+      const patternsStart = performance.now()
+      if (diagnosticsEnabled)
+        overlapDiagnostics.update(response.requestId, {
+          features: response.collection.features.length,
+          sharedPatterns: new Set(
+            response.collection.features
+              .filter((feature) => feature.properties.variantIds.length > 1)
+              .map((feature) => feature.properties.pattern),
+          ).size,
+        })
       try {
         const nextPatterns = installPatterns(map, response.collection, colors, ownedPatterns)
+        overlapDiagnostics.update(response.requestId, {
+          patternsMs: performance.now() - patternsStart,
+        })
         // Protect images used by either buffer until the source swap completes.
         activePatterns = new Set([...activePatterns, ...nextPatterns])
         const buffer = activeBuffer === 0 ? 1 : 0
@@ -275,6 +360,11 @@ export const OverlapHatching = ({
             : 'No overlaps in this view',
         }))
       } catch (error) {
+        overlapDiagnostics.update(response.requestId, {
+          outcome: 'error',
+          failure: error instanceof OverlapPatternError ? error.reason : 'render-error',
+          patternsMs: performance.now() - patternsStart,
+        })
         setState((previous) => ({
           ...previous,
           status: 'error',
@@ -282,12 +372,14 @@ export const OverlapHatching = ({
         }))
       }
     }
-    worker.onerror = () =>
+    worker.onerror = () => {
+      overlapDiagnostics.update(requestId, { outcome: 'error', failure: 'worker-error' })
       setState((previous) => ({
         ...previous,
         status: 'error',
         message: 'Could not calculate overlap stripes. Try reloading the map.',
       }))
+    }
     const prunePatterns = () => {
       const sources = BUFFERS.map((buffer) => `${OVERLAP_SOURCE}-${buffer}`)
       if (sources.some((id) => !map.getSource(id) || !map.isSourceLoaded(id))) return

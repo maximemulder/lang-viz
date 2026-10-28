@@ -17,6 +17,7 @@ import {
   tilePositionToLngLat,
   tilesForBounds,
 } from '../src/features/map/overlap/tiles.ts'
+import type { OverlapMetrics } from '../src/features/map/overlap/types.ts'
 
 const partitionCoverage = await loadCoveragePartition()
 
@@ -176,7 +177,8 @@ test('geometry budgets stop expensive jobs explicitly', () => {
         16,
         { maxRegions: 1 },
       ),
-    OverlapBudgetError,
+    (error: unknown) =>
+      error instanceof OverlapBudgetError && error.reason === 'intermediate-regions',
   )
 })
 
@@ -244,8 +246,30 @@ test('real archive: Britain overlap colors retain members and removing a languag
     variantIds,
     tiles: tilesForBounds({ west: -11, east: 3, south: 49, north: 60 }, 4),
   }
-  const collection = await computer.compute(archive, request, () => true)
+  const freshMetrics = (): OverlapMetrics => ({
+    fetchMs: 0,
+    decodeMs: 0,
+    initializeMs: 0,
+    partitionMs: 0,
+    outputMs: 0,
+    decodedCacheHits: 0,
+    partitionCacheHits: 0,
+    inputVertices: 0,
+    outputVertices: 0,
+    completedTiles: 0,
+  })
+  const cold = freshMetrics()
+  const collection = await computer.compute(archive, request, () => true, cold)
   assert.ok(collection && collection.features.length > 0)
+  assert.ok(cold.inputVertices > 0 && cold.outputVertices > 0 && cold.partitionMs > 0)
+  const warm = freshMetrics()
+  const cached = await computer.compute(archive, request, () => true, warm)
+  assert.deepEqual(cached, collection)
+  assert.ok(warm.partitionCacheHits > 0)
+  assert.equal(warm.inputVertices, 0)
+  assert.equal(warm.partitionMs, 0)
+  assert.equal(warm.fetchMs, 0)
+  assert.equal(warm.outputVertices, cold.outputVertices)
   assert.ok(
     collection.features.some(
       ({ properties }) =>

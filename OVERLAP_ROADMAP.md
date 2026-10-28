@@ -64,7 +64,7 @@ and reopen this item if needed.
 
 ### OVL-02 — Continuous coverage during navigation and updates
 
-**Status:** Implemented; automated browser regression coverage remains open.
+**Status:** Implemented; focused automated browser coverage added.
 
 Movement no longer hides coverage. Two buffers pair computed coverage with a
 vector fallback clipped to its complement. One buffer contributes opacity at a
@@ -90,8 +90,13 @@ Britain partition, and forces a world-view update failure: newly visible languag
 colors load through the fallback without map errors. Clipping tests preserve
 holes/properties and exclude computed tile interiors across detail levels.
 
-**Remaining:** Automate browser checks for navigation, source swaps, failure
-retention, and selection changes. Incremental per-tile publication and prefetching
+The committed production-browser harness now checks cold/warm source publication,
+animated zoom-out, selection clearing, and retained coverage plus loaded fallback
+when a world-view update reaches a limit.
+
+**Remaining:** Broaden automated navigation checks to pans/return navigation,
+rapid selection supersession, injected failures, and spatial/pixel assertions.
+Incremental per-tile publication and prefetching
 remain possible performance improvements, rather than prerequisites for retention.
 
 **Complete when:** Cached, valid coverage remains visible during navigation;
@@ -122,8 +127,11 @@ This item does not require implementing the full query language or query UI.
 
 **Status:** Open. **Priority:** Optimize from evidence.
 
-**Current limitation:** There is no full application benchmark suite or total
-request deadline. The worker yields between tiles, but a Boolean operation cannot
+**Current limitation:** A focused [production-browser harness](app/tests/browser/README.md)
+now records cold/warm stage timings and explicit geometry/pattern-limit outcomes
+for small/all-language selections in Britain, a dense region, and the world.
+There are no agreed latency/memory targets or total request deadline.
+The worker yields between tiles, but a Boolean operation cannot
 be interrupted in the chosen WASM build. Native allocation cleanup is tested;
 full memory accounting is not. Geometry crosses worker boundaries and is
 processed again by MapLibre. Pattern creation runs on the main thread. Cache
@@ -218,8 +226,9 @@ selection identity, and resource ownership without console errors.
 **Status:** Open. **Priority:** Begin with OVL-01 and extend with each work item.
 
 **Current limitation:** Existing tests cover focused geometry cases, stripe
-pixels, tile selection, budgets, and a real Britain example. Browser verification
-has been manual. GEOS regressions now cover the captured failures, invalid and
+pixels, tile selection, budgets, and a real Britain example. A focused browser
+harness covers six production-build scenarios, cache reuse, zoom-out/failure
+retention, and selection clearing. GEOS regressions cover the captured failures, invalid and
 mixed-dimension inputs, and native ownership on success/failure/budget rejection.
 There is no broad randomized geometry corpus, automated visual suite, or full
 application performance regression suite.
@@ -248,10 +257,11 @@ compared across implementations. Extend coverage as new failure modes appear.
 
 ## Session handoff
 
-OVL-01 is complete for the known cases. OVL-02 retention is implemented; automated
-browser regression coverage remains before closing it. The generic area contract
-is the next architectural item. Keep dense-selection pattern limits as
-separate OVL-06 work; geometry success does not guarantee a renderable result.
+OVL-01 is complete for the known cases. OVL-02 retention and focused browser
+coverage are implemented; broader navigation and spatial assertions remain.
+The current focus is OVL-04 measured performance and OVL-06 dense-selection
+pattern limits: geometry success does not guarantee a renderable result.
+The generic area contract remains separate OVL-03 work.
 Extend performance measurements and regression coverage with each change.
 
 Start with [geometry.ts](app/src/features/map/overlap/geometry.ts),
@@ -267,6 +277,7 @@ npm test
 npm run check
 npm run typecheck
 npm run build
+npm run test:browser
 ```
 
 The real-archive tests require generated `app/public/data/language-areas.pmtiles`

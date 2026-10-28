@@ -31,8 +31,11 @@ export type CoveragePartition = (
 ) => CoverageRegion[]
 
 export class OverlapBudgetError extends Error {
-  constructor() {
+  readonly reason: string
+
+  constructor(reason = 'geometry-budget') {
     super('This area is too complex for live hatching. Zoom in or select fewer languages.')
+    this.reason = reason
   }
 }
 

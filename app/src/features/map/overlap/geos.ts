@@ -196,7 +196,8 @@ export const createGeosPartition = async (): Promise<CoveragePartition> => {
     const deadline = options.deadline ?? Number.POSITIVE_INFINITY
     let regionCount = 0
     const budget = () => {
-      if (regionCount > maxRegions || performance.now() > deadline) throw new OverlapBudgetError()
+      if (regionCount > maxRegions) throw new OverlapBudgetError('intermediate-regions')
+      if (performance.now() > deadline) throw new OverlapBudgetError('tile-deadline')
     }
     try {
       if (!(extent > 0 && Number.isFinite(extent))) {

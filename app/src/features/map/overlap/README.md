@@ -123,6 +123,11 @@ cache limits and tile budgets remain in place.
 
 ## Checks
 
+`npm run test:browser` runs the production app in installed Firefox and records
+cold/warm measurements, screenshots, explicit limit outcomes, zoom-out retention,
+and selection clearing. See [browser harness usage](../../../../tests/browser/README.md)
+for setup, scenario definitions, and timing semantics.
+
 `npm test` covers three-way memberships and disjointness, holes, touching edges,
 duplicate fragments, tile clipping, geometry budgets, date-line tile selection,
 stripe color/opacity, and cancellation. GEOS regressions require valid, disjoint

@@ -21,11 +21,21 @@ import {
 } from '../../state/atlasState'
 import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
+import { diagnosticsEnabled } from './overlap/diagnostics'
 import { OverlapHatching } from './overlap/OverlapHatching'
 
 setWorkerUrl(maplibreWorkerUrl)
 const pmtilesProtocol = new Protocol()
 addProtocol('pmtiles', pmtilesProtocol.tile)
+
+const MAP_STYLE =
+  diagnosticsEnabled && new URLSearchParams(location.search).get('overlap-basemap') === 'off'
+    ? {
+        ...GEOGRAPHIC_BASEMAP,
+        sources: {},
+        layers: GEOGRAPHIC_BASEMAP.layers.filter((layer) => layer.type === 'background'),
+      }
+    : GEOGRAPHIC_BASEMAP
 
 const INITIAL_VIEW = {
   longitude: 12,
@@ -238,7 +248,7 @@ export const WorldMap = () => {
   return (
     <MapView
       initialViewState={INITIAL_VIEW}
-      mapStyle={GEOGRAPHIC_BASEMAP}
+      mapStyle={MAP_STYLE}
       projection={PROJECTIONS[projectionMode]}
       minZoom={0.5}
       maxZoom={12}

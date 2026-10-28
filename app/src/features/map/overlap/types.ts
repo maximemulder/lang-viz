@@ -19,11 +19,25 @@ export type OverlapCollection = FeatureCollection<MultiPolygon, OverlapPropertie
 }
 
 export interface OverlapRequest {
+  readonly profile?: boolean
   readonly requestId: number
   readonly archiveUrl: string
   readonly sourceLayer: string
   readonly variantIds: readonly string[]
   readonly tiles: readonly TileCoordinate[]
+}
+
+export interface OverlapMetrics {
+  fetchMs: number
+  decodeMs: number
+  initializeMs: number
+  partitionMs: number
+  outputMs: number
+  decodedCacheHits: number
+  partitionCacheHits: number
+  inputVertices: number
+  outputVertices: number
+  completedTiles: number
 }
 
 export type OverlapResponse =
@@ -32,8 +46,15 @@ export type OverlapResponse =
       readonly collection: OverlapCollection
       readonly durationMs: number
       readonly tileCount: number
+      readonly metrics?: OverlapMetrics
     }
-  | { readonly requestId: number; readonly error: string }
+  | {
+      readonly requestId: number
+      readonly error: string
+      readonly failure: string
+      readonly durationMs: number
+      readonly metrics?: OverlapMetrics
+    }
 
 export const EMPTY_OVERLAPS: OverlapCollection = { type: 'FeatureCollection', features: [] }
 

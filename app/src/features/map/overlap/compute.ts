@@ -10,7 +10,7 @@ import {
   OverlapBudgetError,
 } from './geometry.ts'
 import { tilePositionToLngLat } from './tiles.ts'
-import type { OverlapCollection, OverlapRequest } from './types.ts'
+import type { OverlapCollection, OverlapMetrics, OverlapRequest } from './types.ts'
 import { patternId } from './types.ts'
 
 const MAX_CACHED_TILES = 48
@@ -19,7 +19,10 @@ const MAX_CACHED_RESULT_VERTICES = 150_000
 const MAX_TILE_VERTICES = 100_000
 const MAX_OUTPUT_VERTICES = 200_000
 
-const inputsFromFeatures = (features: readonly VectorTileFeature[]): CoverageInput[] => {
+const inputsFromFeatures = (
+  features: readonly VectorTileFeature[],
+  metrics?: OverlapMetrics,
+): CoverageInput[] => {
   const inputs: CoverageInput[] = []
   let vertexCount = 0
   for (const feature of features) {
@@ -30,7 +33,8 @@ const inputsFromFeatures = (features: readonly VectorTileFeature[]): CoverageInp
       polygon.map((ring) =>
         ring.map(({ x, y }) => {
           vertexCount++
-          if (vertexCount > MAX_TILE_VERTICES) throw new OverlapBudgetError()
+          if (metrics) metrics.inputVertices++
+          if (vertexCount > MAX_TILE_VERTICES) throw new OverlapBudgetError('input-vertices')
           return [x, y]
         }),
       ),
@@ -57,6 +61,7 @@ export class OverlapComputer {
     archive: PMTiles,
     request: OverlapRequest,
     isCurrent: () => boolean,
+    metrics?: OverlapMetrics,
   ): Promise<OverlapCollection | null> {
     const collection: OverlapCollection = {
       type: 'FeatureCollection',
@@ -70,15 +75,20 @@ export class OverlapComputer {
       if (!isCurrent()) return null
       const key = `${tile.z}/${tile.x}/${tile.y}`
       let cached = this.tiles.get(key)
+      if (cached && metrics) metrics.decodedCacheHits++
       if (!cached) {
+        const fetchStart = performance.now()
         const response = await archive.getZxy(tile.z, tile.x, tile.y)
+        if (metrics) metrics.fetchMs += performance.now() - fetchStart
         if (!isCurrent()) return null
+        const decodeStart = performance.now()
         cached = {
           layer: response
             ? new VectorTile(new PbfReader(response.data)).layers[request.sourceLayer]
             : undefined,
           bytes: response?.data.byteLength ?? 0,
         }
+        if (metrics) metrics.decodeMs += performance.now() - decodeStart
         this.tiles.set(key, cached)
         this.cachedBytes += cached.bytes
         while (this.tiles.size > MAX_CACHED_TILES || this.cachedBytes > MAX_CACHED_BYTES) {
@@ -94,6 +104,7 @@ export class OverlapComputer {
       // memberships need no geometry decoding or Boolean operations.
       const features: VectorTileFeature[] = []
       const localIdSet = new Set<string>()
+      const metadataStart = performance.now()
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i)
         const id = feature.properties.variant_id
@@ -101,18 +112,33 @@ export class OverlapComputer {
         features.push(feature)
         localIdSet.add(id)
       }
+      if (metrics) metrics.decodeMs += performance.now() - metadataStart
       const localIds = [...localIdSet].sort()
       if (localIds.length === 0) continue
       const resultKey = `${key}:${localIds.join('|')}`
       let regions = this.results.get(resultKey)?.regions
+      if (regions && metrics) metrics.partitionCacheHits++
       if (!regions) {
+        const initializeStart = performance.now()
         const partitionCoverage = await loadCoveragePartition()
+        if (metrics) metrics.initializeMs += performance.now() - initializeStart
         if (!isCurrent()) return null
-        const inputs = inputsFromFeatures(features)
-        regions = partitionCoverage(inputs, layer.extent, {
-          deadline: performance.now() + 1_500,
-          includeSingles: true,
-        })
+        const decodeStart = performance.now()
+        let inputs: CoverageInput[]
+        try {
+          inputs = inputsFromFeatures(features, metrics)
+        } finally {
+          if (metrics) metrics.decodeMs += performance.now() - decodeStart
+        }
+        const partitionStart = performance.now()
+        try {
+          regions = partitionCoverage(inputs, layer.extent, {
+            deadline: performance.now() + 1_500,
+            includeSingles: true,
+          })
+        } finally {
+          if (metrics) metrics.partitionMs += performance.now() - partitionStart
+        }
         const vertices = regions.reduce(
           (sum, region) =>
             sum +
@@ -135,21 +161,30 @@ export class OverlapComputer {
           this.results.delete(oldestKey)
         }
       }
+      const outputStart = performance.now()
       for (const region of regions) {
         const coordinates = region.geometry.map((polygon) =>
           polygon.map((ring) =>
             ring.map((point) => {
               outputVertices++
+              if (metrics) metrics.outputVertices++
               return tilePositionToLngLat(point, tile, layer.extent)
             }),
           ),
         )
-        if (outputVertices > MAX_OUTPUT_VERTICES) throw new OverlapBudgetError()
+        if (outputVertices > MAX_OUTPUT_VERTICES) {
+          if (metrics) metrics.outputMs += performance.now() - outputStart
+          throw new OverlapBudgetError('output-vertices')
+        }
         collection.features.push({
           type: 'Feature',
           properties: { pattern: patternId(region.members), variantIds: region.members },
           geometry: { type: 'MultiPolygon', coordinates },
         })
+      }
+      if (metrics) {
+        metrics.outputMs += performance.now() - outputStart
+        metrics.completedTiles++
       }
       // Allow newer selections to cancel between tiles instead of queueing jobs.
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
