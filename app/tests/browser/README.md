@@ -40,7 +40,8 @@ window size are explicit. Each view runs twice:
   worker and its caches. This intentionally bypasses the normal unchanged-view
   optimization so result publication is measured too.
 
-Britain with the small selection must successfully render shared-area stripes.
+Britain with the small selection and both dense all-language regional/world views
+must successfully render shared-area stripes (including cold and warm passes).
 Other scenarios report `stripes`, `solid-coverage` (no shared patterns), or
 `unsupported` with a specific geometry/pattern limit. An unsupported view is
 **not a successful stripe-rendering measurement**. Unexpected geometry/render
@@ -74,19 +75,22 @@ console warnings/errors, map errors, and request reports. Request timings are in
 milliseconds:
 
 - `metrics.fetchMs`: awaited PMTiles retrieval, including its own caches.
-- `metrics.decodeMs`: tile construction, feature metadata scans, and selected
-  coordinate decoding. Geometry-cache hits avoid coordinate decoding.
+- `metrics.decodeMs`: tile construction, cached feature-index construction/lookups, and selected
+  coordinate decoding. Delivery-cache hits avoid coordinate decoding.
 - `metrics.initializeMs`: loading/initializing the partition module.
 - `metrics.partitionMs`: GEOS partitioning, including failed operations.
-- `metrics.outputMs`: coordinate conversion and GeoJSON feature construction.
+- `metrics.outputMs`: coordinate conversion, feature grouping, and collection assembly.
+  Delivery-cache hits only assemble references; no coordinate conversion is repeated.
 - `workerMs`: overall worker duration, including yields and work outside those
   stages. Cache hit counts, decoded input vertices, output vertices, and completed
-  nonempty tiles accompany it. Vertex counts describe work in that request, not
-  a cache memory estimate.
+  nonempty tiles accompany it. Input vertices count decoding work; output vertices count delivered positions,
+  including cache hits. Neither is a cache memory estimate.
 - `dispatchToResponseMs`: main-thread dispatch to response handling.
   `responseOverheadMs` subtracts worker duration; it includes message scheduling
   and serialization, and is not a pure transfer measurement.
 - `patternsMs`: pattern lookup, generation, and registration on the main thread.
+- `patternPixels`: distinct padded image texels required by the result; multiply
+  by four for RGBA bytes. This excludes per-tile atlas copies and packing overhead.
 - `coverageSourceMs` and `fallbackSourceMs`: first observed readiness of each
   matching staging source, measured after response handling/pattern creation.
   `sourceReadyMs` measures readiness of both sources together. These include

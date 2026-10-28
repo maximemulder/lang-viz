@@ -18,7 +18,24 @@
     "center": [12, 18],
     "zoom": 1.35
   },
-  { "name": "britain-all", "languageIds": "all", "center": [-4.5, 54.2], "zoom": 4.4 },
-  { "name": "regional-all", "languageIds": "all", "center": [25, 8], "zoom": 3.5 },
-  { "name": "world-all", "languageIds": "all", "center": [12, 18], "zoom": 1.35 }
+  {
+    "name": "britain-all",
+    "languageIds": "all",
+    "center": [-4.5, 54.2],
+    "zoom": 4.4
+  },
+  {
+    "name": "regional-all",
+    "languageIds": "all",
+    "center": [25, 8],
+    "zoom": 3.5,
+    "requireStripes": true
+  },
+  {
+    "name": "world-all",
+    "languageIds": "all",
+    "center": [12, 18],
+    "zoom": 1.35,
+    "requireStripes": true
+  }
 ]

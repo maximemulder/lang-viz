@@ -14,7 +14,13 @@ import {
 } from '../../../state/atlasState'
 import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
 import { fallbackTilesUrl } from './fallbackProtocol'
-import { OverlapPatternError, stripeImage } from './patterns'
+import {
+  checkPatternBudget,
+  MAX_PATTERN_PIXELS,
+  OverlapPatternError,
+  patternPixels,
+  stripeImage,
+} from './patterns'
 import { installOverlapTestApi } from './testBridge'
 import { coverageTilesKey, retainCoverageTiles, tilesForBounds } from './tiles'
 import type { OverlapCollection, OverlapRequest, OverlapResponse, TileCoordinate } from './types'
@@ -43,12 +49,21 @@ const installPatterns = (
   const uniquePatterns = new Map(
     collection.features.map(({ properties }) => [properties.pattern, properties]),
   )
-  if ([...uniquePatterns.values()].filter(({ variantIds }) => variantIds.length > 1).length > 128) {
-    throw new OverlapPatternError(
-      'shared-patterns',
-      'Too many overlap combinations for this preview. Zoom in or select fewer languages.',
-    )
+  const pixels = [...uniquePatterns.values()].reduce(
+    (sum, { variantIds }) => sum + patternPixels(variantIds.length),
+    0,
+  )
+  checkPatternBudget(pixels)
+  let residentPixels = 0
+  for (const id of ownedPatterns) {
+    const image = map.getImage(id)?.data
+    if (image) residentPixels += (image.width + 2) * (image.height + 2)
   }
+  for (const properties of uniquePatterns.values())
+    if (!map.hasImage(properties.pattern))
+      residentPixels += patternPixels(properties.variantIds.length)
+  // Both old and new buffers may be live during publication.
+  checkPatternBudget(residentPixels, 2 * MAX_PATTERN_PIXELS)
   const patterns = new Set<string>()
   for (const properties of uniquePatterns.values()) {
     patterns.add(properties.pattern)
@@ -58,10 +73,10 @@ const installPatterns = (
       if (!color) throw new Error(`Missing language color for ${id}`)
       return color
     })
-    map.addImage(properties.pattern, stripeImage(memberColors), { pixelRatio: 2 })
+    map.addImage(properties.pattern, stripeImage(memberColors), { pixelRatio: 1 })
     ownedPatterns.add(properties.pattern)
   }
-  return patterns
+  return { patterns, pixels }
 }
 
 export const OverlapHatching = ({
@@ -333,9 +348,15 @@ export const OverlapHatching = ({
           ).size,
         })
       try {
-        const nextPatterns = installPatterns(map, response.collection, colors, ownedPatterns)
+        const { patterns: nextPatterns, pixels } = installPatterns(
+          map,
+          response.collection,
+          colors,
+          ownedPatterns,
+        )
         overlapDiagnostics.update(response.requestId, {
           patternsMs: performance.now() - patternsStart,
+          patternPixels: pixels,
         })
         // Protect images used by either buffer until the source swap completes.
         activePatterns = new Set([...activePatterns, ...nextPatterns])

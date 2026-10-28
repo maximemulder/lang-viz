@@ -28,6 +28,7 @@ SUPPORTED_LIMITS = {
     "intermediate-regions",
     "tile-deadline",
     "shared-patterns",
+    "pattern-memory",
     "pattern-contributors",
 }
 

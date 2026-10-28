@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
+import { type Feature, fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
 import { FileSource, PMTiles } from 'pmtiles'
 import { OverlapComputer } from '../src/features/map/overlap/compute.ts'
 import {
@@ -10,7 +11,14 @@ import {
   OverlapBudgetError,
   type Polygon,
 } from '../src/features/map/overlap/geometry.ts'
-import { stripeImage } from '../src/features/map/overlap/patterns.ts'
+import {
+  checkPatternBudget,
+  MAX_PATTERN_PIXELS,
+  OverlapPatternError,
+  patternPixels,
+  patternSize,
+  stripeImage,
+} from '../src/features/map/overlap/patterns.ts'
 import {
   coverageTilesKey,
   retainCoverageTiles,
@@ -219,13 +227,115 @@ test('stripe images use all contributor colors, opaque alpha, and seamless power
   }
   assert.deepEqual([...counts.keys()].sort(), ['0,0,255', '0,255,0', '255,0,0'])
   assert.ok(Math.max(...counts.values()) - Math.min(...counts.values()) <= image.width)
+  const palette = [
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+  ]
+  for (let y = 0; y < image.height; y++)
+    for (let x = 0; x < image.width; x++)
+      assert.deepEqual(
+        [...image.data.slice((y * image.width + x) * 4, (y * image.width + x) * 4 + 3)],
+        palette[Math.floor((((x + y) % image.width) * palette.length) / image.width)],
+      )
 })
 
 test('single-language coverage uses a solid, opaque pattern before layer compositing', () => {
   const image = stripeImage(['#3bce87'])
+  assert.equal(image.data.length, 4)
   for (let offset = 0; offset < image.data.length; offset += 4) {
     assert.deepEqual([...image.data.slice(offset, offset + 4)], [59, 206, 135, 255])
   }
+})
+
+test('pattern budgets count padded texels rather than rejecting many small combinations', () => {
+  checkPatternBudget(2_000 * patternPixels(3) + 2_166 * patternPixels(2))
+  checkPatternBudget(MAX_PATTERN_PIXELS)
+  assert.throws(
+    () => checkPatternBudget(MAX_PATTERN_PIXELS + 1),
+    (error: unknown) => error instanceof OverlapPatternError && error.reason === 'pattern-memory',
+  )
+  assert.equal(patternSize(42), 256)
+  assert.throws(
+    () => patternSize(43),
+    (error: unknown) =>
+      error instanceof OverlapPatternError && error.reason === 'pattern-contributors',
+  )
+  // Same logical period as the former image at pixelRatio 2.
+  for (const count of [2, 3, 4, 8, 16, 42])
+    assert.equal(patternSize(count), 2 ** Math.ceil(Math.log2(Math.max(32, count * 12))) / 2)
+})
+
+test('tile delivery groups disconnected faces without losing holes or reusing stale selections', async () => {
+  const first = box(0, 0, 6, 6)[0]?.[0]
+  const second = box(10, 10, 16, 16)[0]?.[0]
+  const hole = box(1, 1, 2, 2)[0]?.[0]
+  assert.ok(first && second && hole)
+  const features: Feature[] = ['A', 'B'].map((id) => ({
+    type: 3,
+    tags: { variant_id: id },
+    geometry: [first, [...hole].reverse(), second],
+  }))
+  const layer = new GeoJSONWrapper(features, { extent: 16, version: 2 })
+  layer.name = 'areas'
+  const bytes = fromVectorTileJs({ layers: { areas: layer } })
+  let fetches = 0
+  const archive = {
+    getZxy: async () => {
+      fetches++
+      return { data: Uint8Array.from(bytes).buffer }
+    },
+  }
+  const request = {
+    requestId: 1,
+    archiveUrl: 'fixture',
+    sourceLayer: 'areas',
+    variantIds: ['A', 'B'],
+    tiles: [{ z: 0, x: 0, y: 0 }],
+  }
+  const computer = new OverlapComputer()
+  const result = await computer.compute(archive, request, () => true)
+  assert.equal(result?.features.length, 1)
+  const face = result?.features[0]
+  assert.deepEqual(face?.properties.variantIds, ['A', 'B'])
+  assert.equal(face?.geometry.coordinates.length, 2)
+  assert.deepEqual(face?.geometry.coordinates.map((polygon) => polygon.length).sort(), [1, 2])
+  const reused = await computer.compute(archive, { ...request, requestId: 2 }, () => true)
+  assert.equal(reused?.features[0], face, 'Cache retains the converted delivery feature')
+  assert.equal(reused?.revision, 2, 'Publication revision remains request-specific')
+  const single = await computer.compute(archive, { ...request, variantIds: ['B'] }, () => true)
+  assert.deepEqual(single?.features[0]?.properties.variantIds, ['B'])
+  const coordinateSet = (geometry: number[][][][] | undefined) =>
+    geometry
+      ?.map((polygon) =>
+        polygon
+          .map((ring) =>
+            ring
+              .slice(0, -1)
+              .map((point) => JSON.stringify(point))
+              .sort(),
+          )
+          .sort(),
+      )
+      .sort()
+  assert.deepEqual(
+    coordinateSet(single?.features[0]?.geometry.coordinates),
+    coordinateSet(face?.geometry.coordinates),
+  )
+  assert.equal(fetches, 1, 'Selection changes reuse indexed metadata, not stale partitions')
+  const otherLayer = await computer.compute(
+    archive,
+    { ...request, sourceLayer: 'missing' },
+    () => true,
+  )
+  assert.equal(otherLayer?.features.length, 0)
+  const otherArchive = { getZxy: async () => undefined }
+  const empty = await computer.compute(
+    otherArchive,
+    { ...request, archiveUrl: 'empty' },
+    () => true,
+  )
+  assert.equal(empty?.features.length, 0)
 })
 
 const archivePath = new URL('../public/data/language-areas.pmtiles', import.meta.url)

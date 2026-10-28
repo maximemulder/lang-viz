@@ -33,6 +33,7 @@ interface RequestReport {
   dispatchToResponseMs?: number
   responseOverheadMs?: number
   patternsMs?: number
+  patternPixels?: number
   sourceReadyMs?: number
   coverageSourceMs?: number
   fallbackSourceMs?: number

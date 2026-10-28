@@ -14,8 +14,8 @@ proposed priorities, and completion criteria across sessions.
    if more than 48 tiles would be required. Date-line viewports wrap tile X
    coordinates without requesting duplicate world copies.
 2. A persistent module worker reads those tiles directly from the existing
-   PMTiles archive. Decode only selected variant geometries; retain integer tile
-   coordinates for Boolean operations.
+   PMTiles archive. Index variant metadata once per decoded tile, then decode only
+   selected variant geometries; retain integer tile coordinates for Boolean operations.
 3. Lazily load and initialize GEOS once in the persistent worker. Union duplicate
    fragments per variant and clip away the tile buffer. Insert coverage into an
    RBush spatial index, splitting intersected regions with GEOS 3.13.0 through
@@ -24,7 +24,10 @@ proposed priorities, and completion criteria across sessions.
 4. Return all coverage regions as GeoJSON with variant IDs and a pattern key,
    including regions covered by a single language.
    Convert coordinates from tile Mercator space to longitude/latitude only
-   after the overlay is complete.
+   after the overlay is complete. Group disconnected polygons with identical
+   membership within each computation tile. Cache this converted delivery form
+   instead of the intermediate tile-space partition, avoiding conversion and
+   regrouping on cache hits without retaining two copies of the coordinates.
 5. Register an opaque, power-of-two pattern for each encountered membership:
    a solid image for a single language, alternating stripes for shared regions.
    Every contributor receives an equal band; patterns align across computation
@@ -41,6 +44,9 @@ blending mode retains its original 0.58 per-feature opacity. Map zoom fades
 remain disabled: MapLibre otherwise cross-fades between differently scaled
 copies of the stripe pattern, introducing mixed category colors during zooming.
 Texture filtering and outer boundary antialiasing soften narrow edges.
+Patterns use one texture pixel per logical pixel, preserving the previous displayed
+period at one quarter of its stripe image storage. Solids use a single opaque texel.
+Diagonal rows reuse one cyclic color band rather than computing every pixel separately.
 
 Hover/click continue to query the original selected-language layer, rather than
 trying to reconstruct identities from a visible stripe pixel. Changes to period,
@@ -75,15 +81,20 @@ different IDs and colors.
   Superseded responses cannot publish. The worker yields between tiles and abandons
   superseded work. Opacity changes require neither computation nor source updates.
 - At most 48 decoded tiles and 16 MiB of decompressed tile bytes are cached.
-  Result caching is bounded by 48 entries and 150,000 coordinate positions.
+  Delivery-result caching is bounded by 48 entries and 150,000 coordinate positions.
   These are FIFO caches; the byte limit does not include decoded object overhead.
+  Cached feature metadata adds JS object overhead. Archive URL and source layer
+  are part of cache identity, along with tile coordinates and local selection.
 - A tile accepts at most 100,000 selected input vertices, 12,000 intermediate
   regions, and approximately 1.5 seconds of overlay work. A complete result is
   limited to 200,000 vertices. Deadline checks occur between Boolean operations;
   a single operation cannot be interrupted.
-- At most 128 distinct shared-membership patterns are installed per result;
-  single-language solid patterns do not count toward that limit. Pattern images are
-  capped at 512×512 pixels (up to 42 contributors with the current spacing).
+- Pattern allocation is limited by padded image area instead of a 128-combination
+  cap: at most 4,194,304 texels per result (16 MiB RGBA), and twice that across
+  owned images while buffers coexist. This includes MapLibre's one-pixel wrap
+  padding, but not atlas packing waste, per-tile atlas copies, JS metadata, or
+  GPU overhead. It is not a total memory bound. Images are capped at 256×256
+  pixels (still up to 42 contributors at the same displayed spacing).
   Unused images are removed after the GeoJSON source has updated.
 - A limit or computation failure retains the last valid coverage for the same
   selection; solid fallback colors continue outside it. Before any coverage is

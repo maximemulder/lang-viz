@@ -148,19 +148,44 @@ superseded work is abandoned within a defined bound; total request work and
 resource use are controlled; and repeated use does not accumulate unused
 resources. Any remaining limits have a documented reason and clear user feedback.
 
+**Measured optimization (2026-10-28):** Cache converted delivery features under
+the existing 48-entry/150,000-position bound, index tile metadata once, and group
+identical memberships per tile without dropping coordinates. Stripe textures
+use one quarter of their previous pixels at the same displayed period; solids
+use one texel. A padded-image-area budget replaces the 128-combination cap.
+Firefox 156, headless, 1440×1000 requested window, basemap off; software rendering
+requested (actual backend not independently verified). Local archive SHA-256
+starts `0f55734c095a4e56`. Baseline medians are from two runs, optimized from three;
+these observations are not latency guarantees.
+
+| Scenario | Warm worker before → after | Delivery features before → after | Rendering before → after |
+| --- | --- | --- | --- |
+| Britain, all languages | 7.5 → 5 ms | 726 → 111 | Stripes → stripes |
+| Dense region, all languages | 32 → 11 ms | 7,589 → 4,720 | Pattern-limit failure → 2,981 shared patterns |
+| World, all languages | 68 → 5 ms | 13,898 → 7,649 | Pattern-limit failure → 4,166 shared patterns |
+
+World cold worker time remains about 2.4 seconds. Full dispatch-to-ready time is
+about 3.4 seconds cold and 1.0 second on forced warm republish, so worker-cache
+speed is not the same as display latency. Source preparation, fallback readiness,
+and image registration remain substantial. Next measure incremental tile delivery
+and publication before considering parallel GEOS workers or a custom shader.
+The two dense browser scenarios now require stripes rather than accepting a limit.
+Reproduce with `npm run test:browser -- --runs 3 --output test-results/performance-optimized`;
+raw local reports/screenshots remain ignored under `app/test-results/`.
+
 Current POC limits, to revisit rather than simply remove:
 
 | Resource | Current limit |
 | --- | --- |
 | Computation tiles | 48, at zoom 0–8; reduce zoom to fit |
 | Decoded tile cache | 48 entries and 16 MiB of decompressed tile bytes |
-| Partition cache | 48 entries and 150,000 coordinate positions |
+| Converted delivery cache | 48 entries and 150,000 coordinate positions |
 | Selected input per tile | 100,000 coordinate positions |
 | Intermediate regions per tile | 12,000 |
 | Overlay time per tile | Approximately 1.5 seconds, checked between operations |
 | Complete output | 200,000 coordinate positions |
-| Shared-membership patterns per result | 128 |
-| Pattern image size | 512 × 512 pixels; currently up to 42 contributors |
+| Padded pattern texels | 4,194,304 per result; twice that across owned images during swaps (16/32 MiB RGBA, excluding atlas copies/overhead) |
+| Pattern image size | 256 × 256 pixels; up to 42 contributors at unchanged displayed spacing; solids use one texel |
 
 ### OVL-05 — Consistent tile boundaries, detail, and inspection
 
@@ -189,10 +214,11 @@ implicitly promised by this roadmap.
 **Current limitation:** Pattern spacing scales with the map rather than staying
 fixed on screen. Pattern zoom fades are disabled to avoid mixed colors, and
 texture filtering softens stripe edges. Distinct memberships allocate separate
-images, including solid images for single contributors. The 128-pattern and
-42-contributor limits are implementation limits, not established usability limits.
-Dense selections can require hundreds or thousands of shared patterns, exceeding
-the current limit even when geometry computation succeeds.
+images, including one-texel solids for single contributors. The previous 128-pattern
+cap has been replaced by a padded-image-area budget; stripe images use one quarter
+of their previous pixels at the same displayed spacing. Dense regional/world
+scenarios now render thousands of combinations. The 42-contributor limit and
+texture budget remain implementation limits, not established usability limits.
 
 **Work:** Define stripe spacing and zoom behavior, assess legibility with many
 contributors and similar colors, and review pattern allocation costs. Decide how
@@ -260,7 +286,10 @@ compared across implementations. Extend coverage as new failure modes appear.
 OVL-01 is complete for the known cases. OVL-02 retention and focused browser
 coverage are implemented; broader navigation and spatial assertions remain.
 The current focus is OVL-04 measured performance and OVL-06 dense-selection
-pattern limits: geometry success does not guarantee a renderable result.
+scaling. The reference dense regional/world views now render; next measure
+incremental delivery/publication to reduce full source preparation and fallback
+readiness costs. Cold GEOS time remains substantial, and geometry success still
+does not guarantee fitting the texture budget on every selection.
 The generic area contract remains separate OVL-03 work.
 Extend performance measurements and regression coverage with each change.
 
