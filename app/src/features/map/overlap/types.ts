@@ -1,4 +1,5 @@
 import type { FeatureCollection, MultiPolygon } from 'geojson'
+import type { DeliveryTile } from './delivery.ts'
 
 export interface TileCoordinate {
   readonly z: number
@@ -12,7 +13,7 @@ export interface OverlapProperties {
 }
 
 export type OverlapCollection = FeatureCollection<MultiPolygon, OverlapProperties> & {
-  /** Force a fresh source update even when a cached result has identical geometry. */
+  /** Request identity for the GeoJSON diagnostic/test adapter. */
   readonly revision?: number
   /** Tile interiors replaced by this complete partition, including empty tiles. */
   readonly coverageTiles?: readonly TileCoordinate[]
@@ -25,6 +26,8 @@ export interface OverlapRequest {
   readonly sourceLayer: string
   readonly variantIds: readonly string[]
   readonly tiles: readonly TileCoordinate[]
+  /** Tiles retained by the receiver for this same selection; send only additions. */
+  readonly knownTiles?: readonly string[]
 }
 
 export interface OverlapMetrics {
@@ -43,7 +46,12 @@ export interface OverlapMetrics {
 export type OverlapResponse =
   | {
       readonly requestId: number
-      readonly collection: OverlapCollection
+      readonly tile: DeliveryTile
+      readonly durationMs: number
+    }
+  | {
+      readonly requestId: number
+      readonly complete: true
       readonly durationMs: number
       readonly tileCount: number
       readonly metrics?: OverlapMetrics
@@ -55,7 +63,5 @@ export type OverlapResponse =
       readonly durationMs: number
       readonly metrics?: OverlapMetrics
     }
-
-export const EMPTY_OVERLAPS: OverlapCollection = { type: 'FeatureCollection', features: [] }
 
 export const patternId = (variantIds: readonly string[]) => `overlap:${variantIds.join('|')}`

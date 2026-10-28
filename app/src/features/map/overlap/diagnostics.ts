@@ -1,4 +1,4 @@
-import type { OverlapResponse } from './types'
+import type { OverlapMetrics, OverlapResponse } from './types'
 
 /** Explicit opt-in in production too, so tests measure the shipped bundle. */
 export const diagnosticsEnabled = new URLSearchParams(location.search).has('overlap-test')
@@ -38,11 +38,15 @@ interface RequestReport {
   coverageSourceMs?: number
   fallbackSourceMs?: number
   firstRenderMs?: number
+  firstCoverageMs?: number
+  firstCoverageRenderMs?: number
+  publications?: number
+  deliveredTiles?: number
   buffer?: number
   totalMs?: number
   features?: number
   sharedPatterns?: number
-  metrics?: Extract<OverlapResponse, { collection: unknown }>['metrics']
+  metrics?: OverlapMetrics
 }
 
 const reports: RequestReport[] = []
@@ -78,7 +82,7 @@ export const overlapDiagnostics = {
       dispatchToResponseMs,
       // Includes message scheduling/serialization; not a pure transfer benchmark.
       responseOverheadMs: Math.max(0, dispatchToResponseMs - response.durationMs),
-      ...(response.metrics ? { metrics: response.metrics } : {}),
+      ...('metrics' in response && response.metrics ? { metrics: response.metrics } : {}),
     })
   },
 }

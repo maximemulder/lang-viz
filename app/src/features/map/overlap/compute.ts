@@ -10,7 +10,13 @@ import {
   OverlapBudgetError,
 } from './geometry.ts'
 import { tilePositionToLngLat } from './tiles.ts'
-import type { OverlapCollection, OverlapMetrics, OverlapRequest, TileCoordinate } from './types.ts'
+import type {
+  OverlapCollection,
+  OverlapMetrics,
+  OverlapProperties,
+  OverlapRequest,
+  TileCoordinate,
+} from './types.ts'
 import { patternId } from './types.ts'
 
 const MAX_CACHED_TILES = 48
@@ -19,17 +25,11 @@ const MAX_CACHED_RESULT_VERTICES = 150_000
 const MAX_TILE_VERTICES = 100_000
 const MAX_OUTPUT_VERTICES = 200_000
 
-const deliveryFeatures = (
-  regions: readonly CoverageRegion[],
-  tile: TileCoordinate,
-  extent: number,
-) => {
+const deliveryFeatures = (regions: readonly CoverageRegion[]) => {
   // Keep bounds local to a computation tile, but share properties across islands.
-  const features = new Map<string, OverlapCollection['features'][number]>()
+  const features = new Map<string, NativeCoverageFeature>()
   for (const region of regions) {
-    const coordinates = region.geometry.map((polygon) =>
-      polygon.map((ring) => ring.map((point) => tilePositionToLngLat(point, tile, extent))),
-    )
+    const coordinates = region.geometry
     const pattern = patternId(region.members)
     const feature = features.get(pattern)
     if (feature) feature.geometry.coordinates.push(...coordinates)
@@ -41,6 +41,20 @@ const deliveryFeatures = (
       })
   }
   return [...features.values()]
+}
+
+/** Complete, disjoint coverage in native tile coordinates, including empty tiles. */
+export interface CoverageTile {
+  readonly tile: TileCoordinate
+  readonly extent: number
+  readonly features: NativeCoverageFeature[]
+  readonly vertices: number
+}
+
+interface NativeCoverageFeature {
+  readonly type: 'Feature'
+  readonly properties: OverlapProperties
+  readonly geometry: { readonly type: 'MultiPolygon'; readonly coordinates: MultiPolygon }
 }
 
 const indexFeatures = (layer: VectorTileLayer | undefined) => {
@@ -94,7 +108,7 @@ export class OverlapComputer {
   >()
   private readonly results = new Map<
     string,
-    { readonly features: OverlapCollection['features']; readonly vertices: number }
+    { readonly features: NativeCoverageFeature[]; readonly vertices: number }
   >()
   private cachedBytes = 0
   private cachedResultVertices = 0
@@ -111,10 +125,34 @@ export class OverlapComputer {
       revision: request.requestId,
       coverageTiles: request.tiles,
     }
+    for await (const result of this.computeTiles(archive, request, isCurrent, metrics)) {
+      collection.features.push(
+        ...result.features.map((feature) => ({
+          ...feature,
+          geometry: {
+            type: 'MultiPolygon' as const,
+            coordinates: feature.geometry.coordinates.map((polygon) =>
+              polygon.map((ring) =>
+                ring.map((point) => tilePositionToLngLat(point, result.tile, result.extent)),
+              ),
+            ),
+          },
+        })),
+      )
+    }
+    return isCurrent() ? collection : null
+  }
+
+  async *computeTiles(
+    archive: Pick<PMTiles, 'getZxy'>,
+    request: OverlapRequest,
+    isCurrent: () => boolean,
+    metrics?: OverlapMetrics,
+  ): AsyncGenerator<CoverageTile> {
     const selected = new Set(request.variantIds)
     let outputVertices = 0
     for (const tile of request.tiles) {
-      if (!isCurrent()) return null
+      if (!isCurrent()) return
       const key = JSON.stringify([request.archiveUrl, request.sourceLayer, tile.z, tile.x, tile.y])
       let cached = this.tiles.get(key)
       if (cached && metrics) metrics.decodedCacheHits++
@@ -122,7 +160,7 @@ export class OverlapComputer {
         const fetchStart = performance.now()
         const response = await archive.getZxy(tile.z, tile.x, tile.y)
         if (metrics) metrics.fetchMs += performance.now() - fetchStart
-        if (!isCurrent()) return null
+        if (!isCurrent()) return
         const decodeStart = performance.now()
         const layer = response
           ? new VectorTile(new PbfReader(response.data)).layers[request.sourceLayer]
@@ -143,7 +181,11 @@ export class OverlapComputer {
         }
       }
       const layer = cached.layer
-      if (!layer) continue
+      if (!layer) {
+        if (metrics) metrics.completedTiles++
+        yield { tile, extent: 4096, features: [], vertices: 0 }
+        continue
+      }
       // Inspect inexpensive metadata first. Unselected tiles and cached
       // memberships need no geometry decoding or Boolean operations.
       const features: VectorTileFeature[] = []
@@ -160,7 +202,11 @@ export class OverlapComputer {
       }
       if (metrics) metrics.decodeMs += performance.now() - metadataStart
       localIds.sort()
-      if (localIds.length === 0) continue
+      if (localIds.length === 0) {
+        if (metrics) metrics.completedTiles++
+        yield { tile, extent: layer.extent, features: [], vertices: 0 }
+        continue
+      }
       const resultKey = `${key}:${localIds.join('|')}`
       let result = this.results.get(resultKey)
       if (result && metrics) metrics.partitionCacheHits++
@@ -168,7 +214,7 @@ export class OverlapComputer {
         const initializeStart = performance.now()
         const partitionCoverage = await loadCoveragePartition()
         if (metrics) metrics.initializeMs += performance.now() - initializeStart
-        if (!isCurrent()) return null
+        if (!isCurrent()) return
         const decodeStart = performance.now()
         let inputs: CoverageInput[]
         try {
@@ -199,9 +245,9 @@ export class OverlapComputer {
         if (outputVertices + vertices > MAX_OUTPUT_VERTICES)
           throw new OverlapBudgetError('output-vertices')
         const outputStart = performance.now()
-        // Cache the delivery representation instead of tile-space coordinates.
-        // Cache hits need neither projection conversion nor feature regrouping.
-        result = { features: deliveryFeatures(regions, tile, layer.extent), vertices }
+        // Keep tile coordinates: delivery can encode MVT without reprojection
+        // or asking MapLibre to construct another GeoJSON tile index.
+        result = { features: deliveryFeatures(regions), vertices }
         if (metrics) metrics.outputMs += performance.now() - outputStart
         this.results.set(resultKey, result)
         this.cachedResultVertices += vertices
@@ -219,14 +265,13 @@ export class OverlapComputer {
       outputVertices += result.vertices
       if (metrics) metrics.outputVertices += result.vertices
       if (outputVertices > MAX_OUTPUT_VERTICES) throw new OverlapBudgetError('output-vertices')
-      collection.features.push(...result.features)
       if (metrics) {
         metrics.outputMs += performance.now() - outputStart
         metrics.completedTiles++
       }
+      yield { tile, extent: layer.extent, ...result }
       // Allow newer selections to cancel between tiles instead of queueing jobs.
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
     }
-    return isCurrent() ? collection : null
   }
 }

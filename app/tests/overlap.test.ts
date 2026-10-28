@@ -2,9 +2,17 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
+import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { type Feature, fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
+import { PbfReader } from 'pbf'
 import { FileSource, PMTiles } from 'pmtiles'
 import { OverlapComputer } from '../src/features/map/overlap/compute.ts'
+import {
+  COVERAGE_LAYER,
+  deliveryTile,
+  encodeCoverageTile,
+  tileKey,
+} from '../src/features/map/overlap/delivery.ts'
 import {
   loadCoveragePartition,
   type MultiPolygon,
@@ -301,7 +309,14 @@ test('tile delivery groups disconnected faces without losing holes or reusing st
   assert.equal(face?.geometry.coordinates.length, 2)
   assert.deepEqual(face?.geometry.coordinates.map((polygon) => polygon.length).sort(), [1, 2])
   const reused = await computer.compute(archive, { ...request, requestId: 2 }, () => true)
-  assert.equal(reused?.features[0], face, 'Cache retains the converted delivery feature')
+  assert.deepEqual(reused?.features[0], face)
+  const native = await Array.fromAsync(computer.computeTiles(archive, request, () => true))
+  const nativeAgain = await Array.fromAsync(computer.computeTiles(archive, request, () => true))
+  assert.equal(
+    native[0]?.features,
+    nativeAgain[0]?.features,
+    'Cache reuses native delivery geometry',
+  )
   assert.equal(reused?.revision, 2, 'Publication revision remains request-specific')
   const single = await computer.compute(archive, { ...request, variantIds: ['B'] }, () => true)
   assert.deepEqual(single?.features[0]?.properties.variantIds, ['B'])
@@ -336,6 +351,94 @@ test('tile delivery groups disconnected faces without losing holes or reusing st
     () => true,
   )
   assert.equal(empty?.features.length, 0)
+})
+
+test('direct MVT delivery preserves membership, winding, holes, and retained parent coverage', () => {
+  const shell = box(0, 0, 12, 12)[0]?.[0]
+  const hole = box(4, 4, 8, 8)[0]?.[0]
+  assert.ok(shell && hole)
+  const tile = { z: 2, x: 1, y: 0 }
+  const result = encodeCoverageTile({
+    tile,
+    extent: 16,
+    vertices: 10,
+    features: [
+      {
+        type: 'Feature',
+        properties: { pattern: 'overlap:A|B', variantIds: ['A', 'B'] },
+        geometry: { type: 'MultiPolygon', coordinates: [[shell, [...hole].reverse()]] },
+      },
+    ],
+  })
+  const tiles = new Map([[tileKey(tile), result]])
+  assert.equal(
+    deliveryTile(tiles, tile),
+    result.data,
+    'Native delivery does not decode or re-encode',
+  )
+  for (const target of [tile, { z: 1, x: 0, y: 0 }, { z: 0, x: 0, y: 0 }]) {
+    const layer = new VectorTile(new PbfReader(deliveryTile(tiles, target))).layers[COVERAGE_LAYER]
+    assert.equal(layer?.length, 1)
+    const feature = layer?.feature(0)
+    assert.equal(feature?.properties.pattern, 'overlap:A|B')
+    assert.ok(feature)
+    const polygons = classifyRings(feature.loadGeometry())
+    assert.equal(polygons.length, 1)
+    assert.equal(polygons[0]?.length, 2, 'Hole remains a hole after zoom-out transformation')
+    const scale = 2 ** (tile.z - target.z)
+    assert.equal(
+      area(polygons.map((p) => p.map((r) => r.map(({ x, y }) => [x, y])))),
+      (144 - 16) * (8192 / 16 / scale) ** 2,
+    )
+  }
+  assert.equal(deliveryTile(tiles, { z: 1, x: 1, y: 0 }).length, 0)
+  const emptyTile = { z: 2, x: 0, y: 0 }
+  const empty = encodeCoverageTile({ tile: emptyTile, extent: 16, features: [], vertices: 0 })
+  assert.equal(empty.data.length, 0)
+  assert.deepEqual(empty.tile, emptyTile, 'Empty tiles still participate in the fallback mask')
+})
+
+test('incremental computation delivers a completed prefix, empty tiles, and cancels between tiles', async () => {
+  let fetches = 0
+  let current = true
+  const archive = {
+    getZxy: async () => {
+      fetches++
+      return undefined
+    },
+  }
+  const request = {
+    requestId: 1,
+    archiveUrl: 'empty-fixture',
+    sourceLayer: 'areas',
+    variantIds: ['A', 'B'],
+    tiles: [
+      { z: 1, x: 0, y: 0 },
+      { z: 1, x: 1, y: 0 },
+    ],
+  }
+  const computer = new OverlapComputer()
+  const stream = computer.computeTiles(archive, request, () => current)
+  const first = await stream.next()
+  assert.deepEqual(first.value?.tile, request.tiles[0])
+  assert.equal(first.value?.features.length, 0)
+  assert.equal(fetches, 1, 'First tile is delivered before the next tile is fetched')
+  current = false
+  assert.equal((await stream.next()).done, true)
+  assert.equal(fetches, 1, 'Cancellation prevents remaining work')
+  const failing = {
+    getZxy: async (z: number, x: number) => {
+      if (x === 1) throw new Error(`Failed ${z}/${x}`)
+      return undefined
+    },
+  }
+  const prefix = computer.computeTiles(
+    failing,
+    { ...request, archiveUrl: 'failing-fixture' },
+    () => true,
+  )
+  assert.equal((await prefix.next()).done, false)
+  await assert.rejects(prefix.next(), /Failed 1\/1/)
 })
 
 const archivePath = new URL('../public/data/language-areas.pmtiles', import.meta.url)

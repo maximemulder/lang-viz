@@ -39,9 +39,20 @@ export const installOverlapTestApi = (
     if (JSON.parse(selectionKey()).length > 1 && !original && !active) blankLayerFrames++
     for (const report of overlapDiagnostics.reports) {
       if (
+        (report.outcome === 'pending' || report.outcome === 'ready') &&
+        report.firstCoverageRenderMs === undefined &&
+        report.buffer !== undefined &&
+        map.getLayer(`${OVERLAP_LAYER}-${report.buffer}`) &&
+        Number(map.getPaintProperty(`${OVERLAP_LAYER}-${report.buffer}`, 'fill-layer-opacity')) > 0
+      )
+        overlapDiagnostics.update(report.requestId, {
+          firstCoverageRenderMs: now - report.startedAt,
+        })
+      if (
         report.outcome === 'ready' &&
         report.firstRenderMs === undefined &&
         report.buffer !== undefined &&
+        map.getLayer(`${OVERLAP_LAYER}-${report.buffer}`) &&
         Number(map.getPaintProperty(`${OVERLAP_LAYER}-${report.buffer}`, 'fill-layer-opacity')) > 0
       ) {
         overlapDiagnostics.update(report.requestId, { firstRenderMs: now - report.startedAt })
@@ -81,8 +92,13 @@ export const installOverlapTestApi = (
             : gl?.getParameter(gl.RENDERER),
         activeBuffers: BUFFERS.filter(
           (buffer) =>
+            map.getLayer(`${OVERLAP_LAYER}-${buffer}`) &&
             Number(map.getPaintProperty(`${OVERLAP_LAYER}-${buffer}`, 'fill-layer-opacity')) > 0,
         ),
+        coverageSourceTypes: BUFFERS.flatMap((buffer) => {
+          const source = map.getSource(`language-overlap-regions-${buffer}`)
+          return source ? [source.type] : []
+        }),
         fallbackFeatures: BUFFERS.reduce<number>(
           (count, buffer) =>
             count +

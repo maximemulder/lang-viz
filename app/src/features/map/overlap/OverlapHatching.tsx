@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import type { GeoJSONSource, Map as MapLibreMap, VectorSourceSpecification } from 'maplibre-gl'
+import type { Map as MapLibreMap, VectorSourceSpecification } from 'maplibre-gl'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Layer, Source, useMap } from 'react-map-gl/maplibre'
 import { languageArchiveUrl } from '../../../data/atlasRepository'
@@ -12,6 +12,8 @@ import {
   temporalViewAtom,
   visibleLanguageIdsAtom,
 } from '../../../state/atlasState'
+import { COVERAGE_LAYER, type DeliveryTile, tileKey } from './delivery'
+import { type CoverageSnapshot, registerCoverage, releaseCoverage } from './deliveryProtocol'
 import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
 import { fallbackTilesUrl } from './fallbackProtocol'
 import {
@@ -23,8 +25,7 @@ import {
 } from './patterns'
 import { installOverlapTestApi } from './testBridge'
 import { coverageTilesKey, retainCoverageTiles, tilesForBounds } from './tiles'
-import type { OverlapCollection, OverlapRequest, OverlapResponse, TileCoordinate } from './types'
-import { EMPTY_OVERLAPS } from './types'
+import type { OverlapProperties, OverlapRequest, OverlapResponse, TileCoordinate } from './types'
 
 const OVERLAP_SOURCE = 'language-overlap-regions'
 const OVERLAP_LAYER = 'language-overlap-hatching'
@@ -34,7 +35,7 @@ const INSPECTION_LAYER = 'inspected-language-areas'
 const EXAMPLE_LANGUAGE_IDS = ['stan1293', 'wels1247', 'scot1245', 'iris1253']
 
 interface HatchingState {
-  readonly collections: readonly [OverlapCollection, OverlapCollection]
+  readonly snapshots: readonly [CoverageSnapshot | null, CoverageSnapshot | null]
   readonly activeBuffer: number | null
   readonly status: 'idle' | 'loading' | 'ready' | 'error'
   readonly message: string
@@ -42,13 +43,11 @@ interface HatchingState {
 
 const installPatterns = (
   map: MapLibreMap,
-  collection: OverlapCollection,
+  properties: readonly OverlapProperties[],
   colors: ReadonlyMap<string, string>,
   ownedPatterns: Set<string>,
 ) => {
-  const uniquePatterns = new Map(
-    collection.features.map(({ properties }) => [properties.pattern, properties]),
-  )
+  const uniquePatterns = new Map(properties.map((properties) => [properties.pattern, properties]))
   const pixels = [...uniquePatterns.values()].reduce(
     (sum, { variantIds }) => sum + patternPixels(variantIds.length),
     0,
@@ -99,7 +98,7 @@ export const OverlapHatching = ({
   const setPeriod = useSetAtom(temporalViewAtom)
   const setDatasetFilter = useSetAtom(geographyDatasetFilterAtom)
   const [state, setState] = useState<HatchingState>({
-    collections: [EMPTY_OVERLAPS, EMPTY_OVERLAPS],
+    snapshots: [null, null],
     activeBuffer: null,
     status: 'idle',
     message: '',
@@ -163,96 +162,164 @@ export const OverlapHatching = ({
     let requestId = 0
     let previousKey = ''
     let timer: ReturnType<typeof setTimeout> | undefined
+    let publicationTimer: ReturnType<typeof setTimeout> | undefined
     let activePatterns = new Set<string>()
     const ownedPatterns = new Set<string>()
     let requestHasTiles = false
     let retainedTiles: TileCoordinate[] = []
     let activeBuffer: number | null = null
+    let activeSnapshot: CoverageSnapshot | null = null
+    const snapshots = new Map<number, CoverageSnapshot>()
+    const results = new Map<string, DeliveryTile>()
+    let version = 0
+    let publishedVersion = 0
+    let complete = false
+    let failure = ''
+    let requestStartedAt = 0
     let pendingResult: {
       readonly requestId: number
       readonly selectionKey: string
-      readonly collection: OverlapCollection
+      readonly snapshot: CoverageSnapshot
+      readonly patterns: Set<string>
+      readonly version: number
       readonly buffer: 0 | 1
+      readonly stagedAt: number
     } | null = null
 
-    const publishCoverage = () => {
-      const result = pendingResult
-      const sourceId = `${OVERLAP_SOURCE}-${result?.buffer}`
-      const source = map.getSource(sourceId) as GeoJSONSource | undefined
-      const fallbackId = `${FALLBACK_SOURCE}-${result?.buffer}`
-      const fallback = map.getSource(fallbackId)?.serialize() as
-        | VectorSourceSpecification
-        | undefined
-      const coverageLoaded = Boolean(
-        result &&
-          source &&
-          source.serialize().data === result.collection &&
-          map.isSourceLoaded(sourceId),
-      )
-      const fallbackLoaded = Boolean(
-        result &&
-          fallback?.tiles?.[0] ===
-            fallbackTilesUrl(languageArchiveUrl(), result.collection.coverageTiles ?? []) &&
-          map.isSourceLoaded(fallbackId),
-      )
-      if (diagnosticsEnabled && result && result.requestId === requestId) {
-        const report = overlapDiagnostics.reports.findLast((entry) => entry.requestId === requestId)
-        if (report) {
-          const elapsed =
-            performance.now() -
-            report.startedAt -
-            (report.dispatchToResponseMs ?? 0) -
-            (report.patternsMs ?? 0)
-          if (coverageLoaded && report.coverageSourceMs === undefined)
-            overlapDiagnostics.update(requestId, { coverageSourceMs: elapsed })
-          if (fallbackLoaded && report.fallbackSourceMs === undefined)
-            overlapDiagnostics.update(requestId, { fallbackSourceMs: elapsed })
-        }
-      }
-      if (result && result.requestId === requestId && coverageLoaded && fallbackLoaded) {
-        const report = overlapDiagnostics.reports.findLast((entry) => entry.requestId === requestId)
-        if (diagnosticsEnabled)
-          overlapDiagnostics.update(requestId, {
-            outcome: 'ready',
-            sourceReadyMs: report
-              ? performance.now() -
-                report.startedAt -
-                (report.dispatchToResponseMs ?? 0) -
-                (report.patternsMs ?? 0)
-              : 0,
-            totalMs: report ? performance.now() - report.startedAt : 0,
-            buffer: result.buffer,
-          })
-        activeBuffer = result.buffer
-        activePatterns = new Set(
-          result.collection.features.map(({ properties }) => properties.pattern),
-        )
-        pendingResult = null
-        setState((previous) => ({
-          ...previous,
-          activeBuffer: result.buffer,
-          status: 'ready',
-          collections:
-            result.buffer === 0
-              ? [result.collection, EMPTY_OVERLAPS]
-              : [EMPTY_OVERLAPS, result.collection],
-        }))
-        onCoverageReady(result.selectionKey)
+    const report = () =>
+      overlapDiagnostics.reports.findLast((entry) => entry.requestId === requestId)
+    const readyMessage = () =>
+      [...results.values()].some((tile) => tile.patterns.some((p) => p.variantIds.length > 1))
+        ? 'Shared areas alternate language colors'
+        : 'No overlaps in this view'
+    const releaseUnused = (keep: readonly number[]) => {
+      for (const [id, snapshot] of snapshots) {
+        if (keep.includes(id)) continue
+        releaseCoverage(snapshot)
+        snapshots.delete(id)
       }
     }
 
+    const stageCoverage = () => {
+      clearTimeout(publicationTimer)
+      publicationTimer = undefined
+      if (pendingResult || version === publishedVersion || !results.size) return
+      if (!complete && [...results.values()].every((tile) => tile.features === 0)) return
+      const properties = [...results.values()].flatMap((tile) => tile.patterns)
+      const patternsStart = performance.now()
+      try {
+        const { patterns, pixels } = installPatterns(map, properties, colors, ownedPatterns)
+        const currentReport = report()
+        overlapDiagnostics.update(requestId, {
+          patternsMs: (currentReport?.patternsMs ?? 0) + performance.now() - patternsStart,
+          patternPixels: pixels,
+          features: [...results.values()].reduce((sum, tile) => sum + tile.features, 0),
+          sharedPatterns: new Set(
+            properties.filter((p) => p.variantIds.length > 1).map((p) => p.pattern),
+          ).size,
+        })
+        activePatterns = new Set([...activePatterns, ...patterns])
+        const snapshot = registerCoverage(results)
+        snapshots.set(snapshot.id, snapshot)
+        const buffer = activeBuffer === 0 ? 1 : 0
+        pendingResult = {
+          requestId,
+          selectionKey: configRef.current.selectionKey,
+          snapshot,
+          patterns,
+          version,
+          buffer,
+          stagedAt: performance.now(),
+        }
+        setState((previous) => ({
+          ...previous,
+          snapshots:
+            buffer === 0 ? [snapshot, previous.snapshots[1]] : [previous.snapshots[0], snapshot],
+          status: failure ? 'error' : 'loading',
+          message: failure || 'Updating overlap stripes…',
+        }))
+      } catch (error) {
+        failure = error instanceof Error ? error.message : 'Could not draw overlap stripes.'
+        overlapDiagnostics.update(requestId, {
+          outcome: 'error',
+          failure: error instanceof OverlapPatternError ? error.reason : 'render-error',
+        })
+        setState((previous) => ({ ...previous, status: 'error', message: failure }))
+      }
+    }
+
+    const publishCoverage = () => {
+      const result = pendingResult
+      if (!result || result.requestId !== requestId) return
+      const sourceId = `${OVERLAP_SOURCE}-${result.buffer}`
+      const source = map.getSource(sourceId)?.serialize() as VectorSourceSpecification | undefined
+      const fallbackId = `${FALLBACK_SOURCE}-${result.buffer}`
+      const fallback = map.getSource(fallbackId)?.serialize() as
+        | VectorSourceSpecification
+        | undefined
+      const coverageLoaded =
+        source?.tiles?.[0] === result.snapshot.url && map.isSourceLoaded(sourceId)
+      const fallbackLoaded =
+        fallback?.tiles?.[0] ===
+          fallbackTilesUrl(languageArchiveUrl(), result.snapshot.coverageTiles) &&
+        map.isSourceLoaded(fallbackId)
+      const currentReport = report()
+      const elapsed = performance.now() - result.stagedAt
+      if (coverageLoaded && currentReport?.coverageSourceMs === undefined)
+        overlapDiagnostics.update(requestId, { coverageSourceMs: elapsed })
+      if (fallbackLoaded && currentReport?.fallbackSourceMs === undefined)
+        overlapDiagnostics.update(requestId, { fallbackSourceMs: elapsed })
+      if (!coverageLoaded || !fallbackLoaded) return
+      activeBuffer = result.buffer
+      activeSnapshot = result.snapshot
+      publishedVersion = result.version
+      activePatterns = result.patterns
+      pendingResult = null
+      const finished = complete && publishedVersion === version
+      overlapDiagnostics.update(requestId, {
+        ...(failure ? {} : { outcome: finished ? 'ready' : 'pending' }),
+        firstCoverageMs:
+          currentReport?.firstCoverageMs ??
+          (currentReport ? performance.now() - currentReport.startedAt : 0),
+        publications: (currentReport?.publications ?? 0) + 1,
+        sourceReadyMs: (currentReport?.sourceReadyMs ?? 0) + elapsed,
+        ...(finished && currentReport
+          ? { totalMs: performance.now() - currentReport.startedAt }
+          : {}),
+        buffer: result.buffer,
+      })
+      setState({
+        activeBuffer: result.buffer,
+        status: failure ? 'error' : finished ? 'ready' : 'loading',
+        snapshots: result.buffer === 0 ? [result.snapshot, null] : [null, result.snapshot],
+        message: failure || (finished ? readyMessage() : 'Updating overlap stripes…'),
+      })
+      onCoverageReady(result.selectionKey)
+      // The old source becomes inactive in this React commit. Its immutable
+      // protocol snapshot can be released; in-flight requests return empty.
+      releaseUnused([result.snapshot.id])
+      // Coalesce tiles arriving during source preparation into one next batch.
+      // This avoids restarting staging for each completed computation tile.
+      if (version !== publishedVersion) publicationTimer = setTimeout(stageCoverage, 32)
+    }
+
     const suspendCoverage = () => {
-      if (
-        overlapDiagnostics.reports.findLast((entry) => entry.requestId === requestId)?.outcome ===
-        'pending'
-      )
+      if (report()?.outcome === 'pending')
         overlapDiagnostics.update(requestId, { outcome: 'superseded' })
       requestId++
+      clearTimeout(publicationTimer)
+      publicationTimer = undefined
       previousKey = ''
       pendingResult = null
       retainedTiles = []
       activeBuffer = null
+      activeSnapshot = null
       activePatterns.clear()
+      results.clear()
+      version = publishedVersion = 0
+      complete = false
+      failure = ''
+      releaseUnused([])
       onCoverageReady(null)
     }
 
@@ -277,8 +344,20 @@ export const OverlapHatching = ({
       const key = JSON.stringify([variantIds, coverageTilesKey(tiles)])
       retainedTiles = tiles
       if (key === previousKey) return
+      if (report()?.outcome === 'pending')
+        overlapDiagnostics.update(requestId, { outcome: 'superseded' })
       previousKey = key
+      clearTimeout(publicationTimer)
+      publicationTimer = undefined
       pendingResult = null
+      releaseUnused(activeSnapshot ? [activeSnapshot.id] : [])
+      // Retain immutable native tiles only at the requested detail level. Old
+      // rendered coverage remains in its snapshot until a replacement is ready.
+      const desired = new Set(tiles.map(tileKey))
+      for (const key of results.keys()) if (!desired.has(key)) results.delete(key)
+      version++
+      complete = false
+      failure = ''
       requestHasTiles = tiles.length > 0
       const request: OverlapRequest = {
         ...(diagnosticsEnabled ? { profile: true } : {}),
@@ -287,18 +366,15 @@ export const OverlapHatching = ({
         sourceLayer: data.manifest.vectorLayer,
         variantIds,
         tiles,
+        knownTiles: [...results.keys()],
       }
+      requestStartedAt = performance.now()
       if (tiles.length > 0)
         overlapDiagnostics.start(request.requestId, tiles.length, variantIds.length)
       worker.postMessage(request)
       if (tiles.length === 0) {
         activePatterns.clear()
-        setState({
-          collections: [EMPTY_OVERLAPS, EMPTY_OVERLAPS],
-          activeBuffer: null,
-          status: 'idle',
-          message: '',
-        })
+        setState({ snapshots: [null, null], activeBuffer: null, status: 'idle', message: '' })
       } else {
         setState((previous) => ({
           ...previous,
@@ -312,101 +388,83 @@ export const OverlapHatching = ({
       timer = setTimeout(refresh, 120)
     }
     refreshRef.current = () => {
-      // Remove old memberships immediately when selection/source/period changes.
       suspendCoverage()
-      setState({
-        collections: [EMPTY_OVERLAPS, EMPTY_OVERLAPS],
-        activeBuffer: null,
-        status: 'idle',
-        message: '',
-      })
+      setState({ snapshots: [null, null], activeBuffer: null, status: 'idle', message: '' })
       schedule()
     }
     worker.onmessage = ({ data: response }: MessageEvent<OverlapResponse>) => {
       if (response.requestId !== requestId || !requestHasTiles) return
-      overlapDiagnostics.response(response)
-      if ('error' in response) {
-        overlapDiagnostics.update(response.requestId, {
-          outcome: 'error',
-          failure: response.failure,
+      if ('tile' in response) {
+        const vertices =
+          [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0) +
+          response.tile.vertices
+        if (vertices > 200_000 || failure) {
+          if (!failure) {
+            failure =
+              'Overlap geometry exceeds the preview budget. Zoom in or select fewer languages.'
+            overlapDiagnostics.update(requestId, { outcome: 'error', failure: 'output-vertices' })
+            setState((previous) => ({ ...previous, status: 'error', message: failure }))
+          }
+          return
+        }
+        results.set(tileKey(response.tile.tile), response.tile)
+        version++
+        overlapDiagnostics.update(requestId, {
+          deliveredTiles: (report()?.deliveredTiles ?? 0) + 1,
         })
+        if (!pendingResult && publicationTimer === undefined)
+          // Fast requests publish once on completion. Give them a short grace
+          // period before paying for an intermediate source/fallback rebuild.
+          publicationTimer = setTimeout(
+            stageCoverage,
+            Math.max(32, 250 - (performance.now() - requestStartedAt)),
+          )
+        return
+      }
+      overlapDiagnostics.response(response)
+      complete = true
+      if ('error' in response) {
+        failure = response.error
+        overlapDiagnostics.update(requestId, { outcome: 'error', failure: response.failure })
         setState((previous) => ({
           ...previous,
           status: 'error',
-          message: `${response.error}${activeBuffer !== null ? ' Keeping previous stripes; solid colors show other areas.' : ''}`,
+          message: `${response.error} Keeping available coverage; solid colors show other areas.`,
         }))
         return
       }
-      const patternsStart = performance.now()
-      if (diagnosticsEnabled)
-        overlapDiagnostics.update(response.requestId, {
-          features: response.collection.features.length,
-          sharedPatterns: new Set(
-            response.collection.features
-              .filter((feature) => feature.properties.variantIds.length > 1)
-              .map((feature) => feature.properties.pattern),
-          ).size,
-        })
-      try {
-        const { patterns: nextPatterns, pixels } = installPatterns(
-          map,
-          response.collection,
-          colors,
-          ownedPatterns,
-        )
-        overlapDiagnostics.update(response.requestId, {
-          patternsMs: performance.now() - patternsStart,
-          patternPixels: pixels,
-        })
-        // Protect images used by either buffer until the source swap completes.
-        activePatterns = new Set([...activePatterns, ...nextPatterns])
-        const buffer = activeBuffer === 0 ? 1 : 0
-        pendingResult = {
-          requestId: response.requestId,
-          selectionKey: configRef.current.selectionKey,
-          collection: response.collection,
-          buffer,
-        }
-        setState((previous) => ({
-          ...previous,
-          collections:
-            buffer === 0
-              ? [response.collection, previous.collections[1]]
-              : [previous.collections[0], response.collection],
-          status: 'loading',
-          message: response.collection.features.some(
-            ({ properties }) => properties.variantIds.length > 1,
-          )
-            ? 'Shared areas alternate language colors'
-            : 'No overlaps in this view',
-        }))
-      } catch (error) {
-        overlapDiagnostics.update(response.requestId, {
-          outcome: 'error',
-          failure: error instanceof OverlapPatternError ? error.reason : 'render-error',
-          patternsMs: performance.now() - patternsStart,
+      stageCoverage()
+      // A request containing only retained tiles, or whose last batch already
+      // published, has no additional source work to wait for.
+      if (!pendingResult && publishedVersion === version && !failure) {
+        const currentReport = report()
+        overlapDiagnostics.update(requestId, {
+          outcome: 'ready',
+          totalMs: currentReport ? performance.now() - currentReport.startedAt : 0,
+          buffer: activeBuffer ?? 0,
         })
         setState((previous) => ({
           ...previous,
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Could not draw overlap stripes.',
+          status: 'ready',
+          message: readyMessage(),
         }))
       }
     }
     worker.onerror = () => {
+      failure = 'Could not calculate overlap stripes. Try reloading the map.'
       overlapDiagnostics.update(requestId, { outcome: 'error', failure: 'worker-error' })
-      setState((previous) => ({
-        ...previous,
-        status: 'error',
-        message: 'Could not calculate overlap stripes. Try reloading the map.',
-      }))
+      setState((previous) => ({ ...previous, status: 'error', message: failure }))
     }
     const prunePatterns = () => {
       const sources = BUFFERS.map((buffer) => `${OVERLAP_SOURCE}-${buffer}`)
-      if (sources.some((id) => !map.getSource(id) || !map.isSourceLoaded(id))) return
+      if (sources.some((id) => map.getSource(id) && !map.isSourceLoaded(id))) return
       const referencedPatterns = new Set(
         sources.flatMap((id) =>
-          map.querySourceFeatures(id).map(({ properties }) => properties.pattern),
+          map.getSource(id)
+            ? map
+                .querySourceFeatures(id, { sourceLayer: COVERAGE_LAYER })
+                .map(({ properties }) => properties.pattern)
+            : [],
         ),
       )
       for (const id of ownedPatterns) {
@@ -425,8 +483,10 @@ export const OverlapHatching = ({
     schedule()
     return () => {
       clearTimeout(timer)
+      clearTimeout(publicationTimer)
       refreshRef.current = null
       worker.terminate()
+      releaseUnused([])
       map.off('load', schedule)
       map.off('moveend', schedule)
       map.off('resize', schedule)
@@ -453,60 +513,59 @@ export const OverlapHatching = ({
 
   return (
     <>
-      {BUFFERS.map((buffer) => (
-        <Fragment key={buffer}>
-          <Source
-            key={buffer}
-            id={`${OVERLAP_SOURCE}-${buffer}`}
-            type="geojson"
-            data={state.collections[buffer]}
-            tolerance={0}
-            maxzoom={8}
-          >
-            <Layer
-              id={`${OVERLAP_LAYER}-${buffer}`}
-              type="fill"
-              paint={{
-                'fill-pattern': ['get', 'pattern'],
-                'fill-opacity': 1,
-                // Keep the staging layer enabled so MapLibre prepares its tiles.
-                'fill-layer-opacity': coverageReady && state.activeBuffer === buffer ? opacity : 0,
-                'fill-layer-opacity-transition': { duration: 0 },
-                'fill-antialias': true,
-              }}
-            />
-          </Source>
-          {state.collections[buffer].coverageTiles && (
-            <Source
-              id={`${FALLBACK_SOURCE}-${buffer}`}
-              type="vector"
-              tiles={[
-                fallbackTilesUrl(
-                  languageArchiveUrl(),
-                  state.collections[buffer].coverageTiles ?? [],
-                ),
-              ]}
-              minzoom={0}
-              maxzoom={8}
-            >
-              <Layer
+      {BUFFERS.map((buffer) => {
+        const snapshot = state.snapshots[buffer]
+        return (
+          snapshot && (
+            <Fragment key={buffer}>
+              <Source
+                key={`${buffer}-${snapshot.maxzoom}`}
+                id={`${OVERLAP_SOURCE}-${buffer}`}
+                type="vector"
+                tiles={[snapshot.url]}
+                minzoom={0}
+                maxzoom={snapshot.maxzoom}
+              >
+                <Layer
+                  id={`${OVERLAP_LAYER}-${buffer}`}
+                  source-layer={COVERAGE_LAYER}
+                  type="fill"
+                  paint={{
+                    'fill-pattern': ['get', 'pattern'],
+                    'fill-opacity': 1,
+                    'fill-layer-opacity':
+                      coverageReady && state.activeBuffer === buffer ? opacity : 0,
+                    'fill-layer-opacity-transition': { duration: 0 },
+                    'fill-antialias': true,
+                  }}
+                />
+              </Source>
+              <Source
                 id={`${FALLBACK_SOURCE}-${buffer}`}
-                source-layer={data.manifest.vectorLayer}
-                type="fill"
-                filter={['in', ['get', 'variant_id'], ['literal', variants.map(({ id }) => id)]]}
-                paint={{
-                  'fill-color': ['get', 'color'],
-                  'fill-opacity': 1,
-                  'fill-layer-opacity':
-                    coverageReady && state.activeBuffer === buffer ? opacity : 0,
-                  'fill-layer-opacity-transition': { duration: 0 },
-                  'fill-antialias': false,
-                }}
-              />
-            </Source>
-          )}
-        </Fragment>
-      ))}
+                type="vector"
+                tiles={[fallbackTilesUrl(languageArchiveUrl(), snapshot.coverageTiles)]}
+                minzoom={0}
+                maxzoom={8}
+              >
+                <Layer
+                  id={`${FALLBACK_SOURCE}-${buffer}`}
+                  source-layer={data.manifest.vectorLayer}
+                  type="fill"
+                  filter={['in', ['get', 'variant_id'], ['literal', variants.map(({ id }) => id)]]}
+                  paint={{
+                    'fill-color': ['get', 'color'],
+                    'fill-opacity': 1,
+                    'fill-layer-opacity':
+                      coverageReady && state.activeBuffer === buffer ? opacity : 0,
+                    'fill-layer-opacity-transition': { duration: 0 },
+                    'fill-antialias': false,
+                  }}
+                />
+              </Source>
+            </Fragment>
+          )
+        )
+      })}
       <div className="map-overlap-control">
         <label>
           <span>Overlapping languages</span>

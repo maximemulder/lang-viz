@@ -21,17 +21,21 @@ proposed priorities, and completion criteria across sessions.
    RBush spatial index, splitting intersected regions with GEOS 3.13.0 through
    pinned `geos-wasm@3.1.1`. Each face has its complete, sorted membership.
    Holes and disconnected polygons are preserved; edge contact is not overlap.
-4. Return all coverage regions as GeoJSON with variant IDs and a pattern key,
-   including regions covered by a single language.
-   Convert coordinates from tile Mercator space to longitude/latitude only
-   after the overlay is complete. Group disconnected polygons with identical
-   membership within each computation tile. Cache this converted delivery form
-   instead of the intermediate tile-space partition, avoiding conversion and
-   regrouping on cache hits without retaining two copies of the coordinates.
+4. Yield each completed tile, including empty tiles, without waiting for the
+   remaining viewport. Group disconnected faces with identical membership within
+   that tile. Cache native tile-space coordinates under the existing result bounds;
+   the worker encodes a separate `overlap_coverage` MVT layer at extent 8192.
+   Encoding normalizes shell/hole winding and quantizes the display coordinates;
+   GEOS itself still uses its original robust floating-point overlay. Cache encoded
+   tiles weakly against their native feature arrays. Only tiles absent from the
+   browser's retained set cross the worker boundary. No full GeoJSON collection
+   is transferred or re-tiled by MapLibre. `compute()` remains a GeoJSON adapter
+   for geometry tests; the browser uses the incremental `computeTiles()` stream.
 5. Register an opaque, power-of-two pattern for each encountered membership:
    a solid image for a single language, alternating stripes for shared regions.
    Every contributor receives an equal band; patterns align across computation
-   tiles. MapLibre draws all coverage in one active `fill-pattern` layer, then applies
+   tiles. MapLibre draws coverage from native vector tiles in one active
+   `fill-pattern` layer, then applies
    `fill-layer-opacity` once to the result. Once that source has loaded, the
    original language fills are suppressed; original geometry remains available
    for picking and pinned outlines remain above coverage.
@@ -59,13 +63,24 @@ different IDs and colors.
 - Requests are debounced by 120 ms after navigation; unchanged tile sets skip
   requests. Retain recently visited tiles at the current integer zoom, up to 48,
   prioritizing the viewport. Returning inside that coverage needs no source update.
-  The worker reuses cached tile partitions when extending coverage. Zoom changes
-  request a single new detail level, without mixing overlapping tile resolutions.
-- Two GeoJSON sources buffer updates. The current coverage remains visible while
-  the other source loads. Each buffer also has a vector fallback source; opacity
-  switches only after the matching coverage data and both sources are ready.
-  Only one buffer contributes color at a time.
-  Inactive data is cleared after the swap. A revision distinguishes repeated data.
+  The main thread retains encoded tiles and tells the worker which ones are
+  already present. Extending coverage computes/transfers only additions; forced
+  benchmark republishing still exercises worker caches. Zoom changes request a
+  single new detail level, without mixing overlapping tile resolutions.
+- Two vector sources buffer immutable coverage snapshots served through the
+  `language-overlap` protocol. Each snapshot references retained encoded tiles
+  without copying geometry. At native zoom the protocol serves existing bytes;
+  during zoom-out retention it transforms/combines descendant MVTs into requested
+  parent tiles. The source maxzoom matches computation zoom, so MapLibre handles
+  zoom-in overzooming. Parent assembly currently runs on the main thread.
+- Completed tiles accumulate during a 250 ms initial grace period; completion
+  flushes immediately, so fast requests publish once. Longer requests publish
+  progressively, batching arrivals for 32 ms and coalescing results while a
+  staging source loads. Old coverage remains visible. Each buffer has its own
+  fallback source and matching tile mask; only when both sources are ready does
+  opacity switch. Exactly one buffer contributes color. Superseded/inactive
+  snapshots are released. MapLibre still prepares visible tiles in each new
+  snapshot buffer; this is not selective in-place GPU tile replacement.
 - Each result records all computed tile interiors, including empty tiles. A
   `language-fallback` protocol streams original vector tiles outside those
   interiors as the camera moves, independently of overlap calculation. Whole
@@ -81,7 +96,11 @@ different IDs and colors.
   Superseded responses cannot publish. The worker yields between tiles and abandons
   superseded work. Opacity changes require neither computation nor source updates.
 - At most 48 decoded tiles and 16 MiB of decompressed tile bytes are cached.
-  Delivery-result caching is bounded by 48 entries and 150,000 coordinate positions.
+  Native-result caching is bounded by 48 entries and 150,000 coordinate positions.
+  Encoded cache entries share those lifetimes through weak keys. The receiver
+  retains at most 48 desired tiles/200,000 positions plus active/staging snapshot
+  references; old snapshots can retain different encoded tiles during transitions.
+  These are not total browser/WASM/GPU memory limits.
   These are FIFO caches; the byte limit does not include decoded object overhead.
   Cached feature metadata adds JS object overhead. Archive URL and source layer
   are part of cache identity, along with tile coordinates and local selection.
@@ -95,10 +114,13 @@ different IDs and colors.
   padding, but not atlas packing waste, per-tile atlas copies, JS metadata, or
   GPU overhead. It is not a total memory bound. Images are capped at 256×256
   pixels (still up to 42 contributors at the same displayed spacing).
-  Unused images are removed after the GeoJSON source has updated.
+  Unused images are removed after vector sources have updated.
 - A limit or computation failure retains the last valid coverage for the same
   selection; solid fallback colors continue outside it. Before any coverage is
-  available, ordinary language fills remain active. No partial result is published.
+  available, ordinary language fills remain active. Successfully completed tile
+  prefixes may publish even if a later tile fails; a failed tile never enters the
+  coverage mask. The 200,000-position bound is also checked against retained plus
+  newly delivered tiles on the main thread.
 
 This is display geometry. Tile simplification can remove small overlap regions,
 especially when zoomed out. Computation zoom reduction can differ from the base
@@ -136,7 +158,7 @@ cache limits and tile budgets remain in place.
 
 `npm run test:browser` runs the production app in installed Firefox and records
 cold/warm measurements, screenshots, explicit limit outcomes, zoom-out retention,
-and selection clearing. See [browser harness usage](../../../../tests/browser/README.md)
+pan/return reuse, and selection clearing. See [browser harness usage](../../../../tests/browser/README.md)
 for setup, scenario definitions, and timing semantics.
 
 `npm test` covers three-way memberships and disjointness, holes, touching edges,

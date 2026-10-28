@@ -142,6 +142,7 @@ class Browser:
                 report["outcome"] == "ready"
                 and state["status"] == "ready"
                 and report.get("firstRenderMs") is not None
+                and state["activeBuffers"] == [report["buffer"]]
             ):
                 return state
             return None
@@ -300,6 +301,32 @@ def main():
                         )
 
                     if scenario["name"] in ("britain-small", "britain-all"):
+                        # At the same detail level, only newly exposed computation
+                        # tiles cross the overlap worker boundary. Returning inside
+                        # retained coverage must not dispatch another request.
+                        after = len(browser.snapshot()["reports"])
+                        browser.js("window.overlapTest.camera([25,54.2], 4.4, 400)")
+                        state = browser.terminal(after, args.timeout)
+                        check_state(state)
+                        pan_report = state["reports"][-1]
+                        assert 0 < pan_report["deliveredTiles"] < pan_report["tileCount"], (
+                            "Pan resent retained computation tiles"
+                        )
+                        assert state["coverageSourceTypes"] and all(
+                            kind == "vector" for kind in state["coverageSourceTypes"]
+                        ), "Coverage regressed to whole-collection GeoJSON delivery"
+                        case["pan"] = {"snapshot": state}
+                        count = len(state["reports"])
+                        browser.js("window.overlapTest.camera([-4.5,54.2], 4.4, 400)")
+                        wait_for(
+                            lambda: not browser.snapshot()["moving"], args.timeout, "return pan"
+                        )
+                        # Give the 120 ms navigation debounce time to run.
+                        time.sleep(0.3)
+                        state = browser.snapshot()
+                        assert len(state["reports"]) == count, "Return pan recomputed retained coverage"
+                        check_state(state)
+                        case["returnPan"] = {"snapshot": state}
                         # Retain coverage through an animated zoom-out, then clear
                         # selection and ensure late results cannot restore it.
                         after = len(browser.snapshot()["reports"])

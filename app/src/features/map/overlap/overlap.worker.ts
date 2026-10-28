@@ -1,5 +1,6 @@
 import { PMTiles } from 'pmtiles'
 import { OverlapComputer } from './compute.ts'
+import { type DeliveryTile, encodeCoverageTile, tileKey } from './delivery.ts'
 import { OverlapBudgetError } from './geometry.ts'
 import type { OverlapMetrics, OverlapRequest, OverlapResponse } from './types.ts'
 
@@ -7,6 +8,7 @@ let latestRequestId = 0
 let archiveUrl = ''
 let archive: PMTiles
 let computer = new OverlapComputer()
+const encoded = new WeakMap<object, DeliveryTile>()
 
 self.onmessage = async ({ data: request }: MessageEvent<OverlapRequest>) => {
   latestRequestId = request.requestId
@@ -32,11 +34,33 @@ self.onmessage = async ({ data: request }: MessageEvent<OverlapRequest>) => {
       archive = new PMTiles(archiveUrl)
       computer = new OverlapComputer()
     }
-    const collection = await computer.compute(archive, request, isCurrent, metrics)
-    if (!collection || !isCurrent()) return
+    const known = new Set(request.knownTiles)
+    const missing = request.tiles.filter((tile) => !known.has(tileKey(tile)))
+    for await (const tile of computer.computeTiles(
+      archive,
+      { ...request, tiles: missing },
+      isCurrent,
+      metrics,
+    )) {
+      if (!isCurrent()) return
+      let delivery = encoded.get(tile.features)
+      if (!delivery) {
+        const outputStart = performance.now()
+        delivery = encodeCoverageTile(tile)
+        if (metrics) metrics.outputMs += performance.now() - outputStart
+        encoded.set(tile.features, delivery)
+      }
+      const response: OverlapResponse = {
+        requestId: request.requestId,
+        tile: delivery,
+        durationMs: performance.now() - started,
+      }
+      self.postMessage(response)
+    }
+    if (!isCurrent()) return
     const response: OverlapResponse = {
       requestId: request.requestId,
-      collection,
+      complete: true,
       durationMs: Math.round(performance.now() - started),
       tileCount: request.tiles.length,
       ...(metrics ? { metrics } : {}),

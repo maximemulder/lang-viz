@@ -48,7 +48,9 @@ Other scenarios report `stripes`, `solid-coverage` (no shared patterns), or
 failures, JS/map errors, missing coverage buffers, and timeouts fail the command.
 Performance timings are observations, without machine-dependent pass thresholds.
 
-Both Britain selections also animate a zoom-out and clear the selection. If the
+Both Britain selections pan to new same-zoom tiles, verify only additions arrive
+and coverage uses vector sources, then return without another request. They also
+animate a zoom-out and clear the selection. If the
 zoom-out reaches a limit, retained stripes and loaded solid fallback outside
 their coverage must remain available. Per-render checks detect frames with all
 language coverage layers disabled. These checks are structural; they are not
@@ -79,25 +81,33 @@ milliseconds:
   coordinate decoding. Delivery-cache hits avoid coordinate decoding.
 - `metrics.initializeMs`: loading/initializing the partition module.
 - `metrics.partitionMs`: GEOS partitioning, including failed operations.
-- `metrics.outputMs`: coordinate conversion, feature grouping, and collection assembly.
-  Delivery-cache hits only assemble references; no coordinate conversion is repeated.
+- `metrics.outputMs`: native feature grouping and MVT encoding. Encoded-cache hits
+  reuse tile buffers; no longitude/latitude conversion or GeoJSON tiling occurs.
 - `workerMs`: overall worker duration, including yields and work outside those
   stages. Cache hit counts, decoded input vertices, output vertices, and completed
-  nonempty tiles accompany it. Input vertices count decoding work; output vertices count delivered positions,
-  including cache hits. Neither is a cache memory estimate.
-- `dispatchToResponseMs`: main-thread dispatch to response handling.
+  tiles (including empty ones) accompany it. Input vertices count decoding work;
+  output vertices count newly delivered positions, including worker cache hits but
+  excluding receiver-retained tiles. Neither is a cache memory estimate.
+- `dispatchToResponseMs`: main-thread dispatch to the final completion/error message.
+  Tile messages arrive earlier; this is no longer the time to first geometry.
   `responseOverheadMs` subtracts worker duration; it includes message scheduling
   and serialization, and is not a pure transfer measurement.
-- `patternsMs`: pattern lookup, generation, and registration on the main thread.
+- `patternsMs`: cumulative pattern lookup, generation, and registration across batches.
 - `patternPixels`: distinct padded image texels required by the result; multiply
   by four for RGBA bytes. This excludes per-tile atlas copies and packing overhead.
 - `coverageSourceMs` and `fallbackSourceMs`: first observed readiness of each
-  matching staging source, measured after response handling/pattern creation.
-  `sourceReadyMs` measures readiness of both sources together. These include
-  React scheduling, MapLibre preparation, and fallback fetch/clip work; they are
-  overlapping elapsed times, not additive CPU costs.
+  matching staging source, measured from that snapshot's creation.
+  `sourceReadyMs` sums paired-source preparation elapsed time across publications.
+  It overlaps worker computation and includes React scheduling, MapLibre preparation,
+  and fallback fetch/clip work; do not add it to worker time to predict total time.
+- `firstCoverageMs`: dispatch until the first partial snapshot passes source readiness.
+  `firstCoverageRenderMs` observes a render with its coverage buffer enabled.
+  These snapshots include solid fallback for unfinished areas; they do not imply
+  that every visible language or geographic location has stripes yet.
+- `publications`: snapshot swaps in this request. `deliveredTiles`: tile messages
+  received; normal pans exclude receiver-retained tiles.
 - `totalMs`: dispatch until publication readiness, or an explicit failure.
-  `firstRenderMs`: dispatch until a render event with that buffer enabled.
+  `firstRenderMs`: dispatch until a render event with the final buffer enabled.
   Neither includes the 120 ms navigation debounce nor proves GPU completion.
 
 Raw render-event intervals include idle gaps and must **not** be interpreted as
