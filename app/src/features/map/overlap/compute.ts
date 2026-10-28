@@ -62,6 +62,7 @@ export class OverlapComputer {
       type: 'FeatureCollection',
       features: [],
       revision: request.requestId,
+      coverageTiles: request.tiles,
     }
     const selected = new Set(request.variantIds)
     let outputVertices = 0

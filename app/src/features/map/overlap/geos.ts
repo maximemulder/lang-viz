@@ -304,3 +304,53 @@ export const createGeosPartition = async (): Promise<CoveragePartition> => {
     }
   }
 }
+
+/** Independent feature clipping for fallback tiles; never partitions language overlaps. */
+export const createFallbackClipper = async () => {
+  let lastError = ''
+  const geos = await initGeos({
+    errorHandler: (message) => {
+      lastError = message
+    },
+    noticeHandler: () => {},
+  })
+  return (
+    inputs: readonly MultiPolygon[],
+    extent: number,
+    rectangles: readonly (readonly [number, number, number, number])[],
+  ) => {
+    lastError = ''
+    const scope = new GeometryScope(geos, () => lastError)
+    const box = (left: number, top: number, right: number, bottom: number): MultiPolygon => [
+      [
+        [
+          [left, top],
+          [right, top],
+          [right, bottom],
+          [left, bottom],
+          [left, top],
+        ],
+      ],
+    ]
+    try {
+      let uncovered = scope.read(box(0, 0, extent, extent))
+      for (const [left, top, right, bottom] of rectangles) {
+        const covered = scope.read(box(left, top, right, bottom))
+        const next = scope.difference(uncovered, covered)
+        scope.free(uncovered)
+        scope.free(covered)
+        uncovered = next
+      }
+      return inputs.map((input): MultiPolygon => {
+        const original = scope.read(input)
+        const clipped = scope.intersection(original, uncovered)
+        const polygons = scope.polygons(clipped).map((pointer) => scope.exportPolygon(pointer))
+        scope.free(original)
+        scope.free(clipped)
+        return polygons
+      })
+    } finally {
+      scope.dispose()
+    }
+  }
+}

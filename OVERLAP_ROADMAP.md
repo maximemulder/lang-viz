@@ -22,9 +22,11 @@ disjoint coverage regions in a browser worker using `geos-wasm@3.1.1`
 single-language regions are solid, and shared regions alternate every
 contributor's color. Opacity is applied once over the basemap, defaulting to 82%.
 
-Original language geometry remains available for picking. While moving or
-recomputing, and on failure, the app restores ordinary per-language fills and
-hides the computed coverage. No overlap combinations are precomputed offline.
+Original language geometry remains available for picking. Navigation and failed
+updates retain the last valid coverage; replacements load in a second source
+before swapping into view. A clipped vector fallback streams language colors
+outside computed tile interiors. Selection changes clear obsolete memberships.
+No overlap combinations are precomputed offline.
 Geometry operations run on the CPU; MapLibre drawing runs on the GPU.
 
 See the [implementation notes](app/src/features/map/overlap/README.md) for the
@@ -62,17 +64,35 @@ and reopen this item if needed.
 
 ### OVL-02 — Continuous coverage during navigation and updates
 
-**Status:** Open. **Priority:** First.
+**Status:** Implemented; automated browser regression coverage remains open.
 
-**Current limitation:** Hatching disappears on every map movement and returns
-only after recomputation and source loading, even when results are cached.
-Failures leave the ordinary fills active. This visibly changes the overlap
-representation and breaks the disjoint-rendering model during those states.
+Movement no longer hides coverage. Two buffers pair computed coverage with a
+vector fallback clipped to its complement. One buffer contributes opacity at a
+time; replacements pass coverage identity and both source readiness checks.
+Selection changes clear both buffers and reject old responses.
 
-**Work:** Retain valid coverage during navigation, load new coverage without
-replacing the entire view unnecessarily, and define explicit loading and error
-behavior. Per-tile publication is one candidate; its boundaries must remain
-consistent. Selection changes must immediately invalidate obsolete memberships.
+Up to 48 recently visited tiles at one detail level are retained, prioritizing
+the viewport. Unchanged retained tile sets skip requests and source updates;
+extensions reuse worker partition caches. Failures retain valid coverage while
+the independent fallback continues streaming solid language colors elsewhere.
+Boundary tiles are clipped per feature in a separate GEOS worker; whole covered
+tiles are omitted and untouched tiles pass through unchanged. Fallback overlaps
+use source-order solid fills until stripes are available, without claiming full
+memberships. Normal vector-tile loading latency still applies.
+Zoom changes retain the previous display until a complete new detail level loads.
+
+Verification: tile-retention regression test and Firefox checks across pans,
+return navigation, zoom changes, selection clearing, and an injected worker
+failure. All 150 sampled navigation frames kept one coverage layer active and
+the original fills suppressed; the failed update preserved its previous opacity.
+The zoom-out regression also selects all 4,062 Asher languages, retains a detailed
+Britain partition, and forces a world-view update failure: newly visible language
+colors load through the fallback without map errors. Clipping tests preserve
+holes/properties and exclude computed tile interiors across detail levels.
+
+**Remaining:** Automate browser checks for navigation, source swaps, failure
+retention, and selection changes. Incremental per-tile publication and prefetching
+remain possible performance improvements, rather than prerequisites for retention.
 
 **Complete when:** Cached, valid coverage remains visible during navigation;
 new coverage arrives without doubled opacity or stale memberships; and normal
@@ -228,8 +248,9 @@ compared across implementations. Extend coverage as new failure modes appear.
 
 ## Session handoff
 
-OVL-01 is complete for the known cases. Address navigation continuity (OVL-02)
-next, then the generic area contract. Keep dense-selection pattern limits as
+OVL-01 is complete for the known cases. OVL-02 retention is implemented; automated
+browser regression coverage remains before closing it. The generic area contract
+is the next architectural item. Keep dense-selection pattern limits as
 separate OVL-06 work; geometry success does not guarantee a renderable result.
 Extend performance measurements and regression coverage with each change.
 

@@ -28,7 +28,7 @@ proposed priorities, and completion criteria across sessions.
 5. Register an opaque, power-of-two pattern for each encountered membership:
    a solid image for a single language, alternating stripes for shared regions.
    Every contributor receives an equal band; patterns align across computation
-   tiles. MapLibre draws all coverage in one `fill-pattern` layer, then applies
+   tiles. MapLibre draws all coverage in one active `fill-pattern` layer, then applies
    `fill-layer-opacity` once to the result. Once that source has loaded, the
    original language fills are suppressed; original geometry remains available
    for picking and pinned outlines remain above coverage.
@@ -50,13 +50,30 @@ different IDs and colors.
 
 ## Responsiveness and limits
 
-- Requests are debounced by 120 ms; stale responses are rejected immediately.
-  The worker yields between tiles and abandons superseded work. Selection changes
-  clear old coverage. Navigation temporarily restores the original vector fills
-  at the same layer opacity until the new coverage source has loaded. This
-  prevents stale coverage or doubled transparency while moving between tiles.
-  A revision on each result also forces identical cached geometry through the
-  source update/readiness handshake after navigation.
+- Requests are debounced by 120 ms after navigation; unchanged tile sets skip
+  requests. Retain recently visited tiles at the current integer zoom, up to 48,
+  prioritizing the viewport. Returning inside that coverage needs no source update.
+  The worker reuses cached tile partitions when extending coverage. Zoom changes
+  request a single new detail level, without mixing overlapping tile resolutions.
+- Two GeoJSON sources buffer updates. The current coverage remains visible while
+  the other source loads. Each buffer also has a vector fallback source; opacity
+  switches only after the matching coverage data and both sources are ready.
+  Only one buffer contributes color at a time.
+  Inactive data is cleared after the swap. A revision distinguishes repeated data.
+- Each result records all computed tile interiors, including empty tiles. A
+  `language-fallback` protocol streams original vector tiles outside those
+  interiors as the camera moves, independently of overlap calculation. Whole
+  uncovered tiles pass through; whole covered tiles return empty. For boundary
+  tiles, a separate worker uses GEOS to clip each feature against the uncovered
+  tile area and `@maplibre/vt-pbf` to encode the result. No language-to-language
+  overlay is needed. IDs, colors, holes, and selection properties are preserved.
+  Fallback colors never draw underneath retained stripes. Overlaps in fallback
+  areas use ordinary solid fills in source order until stripes become available;
+  these areas do not yet communicate every contributor. Normal tile loading can
+  still delay appearance, but an overlap budget/pattern failure cannot stop it.
+- Selection/mode changes immediately clear coverage and invalidate pending results.
+  Superseded responses cannot publish. The worker yields between tiles and abandons
+  superseded work. Opacity changes require neither computation nor source updates.
 - At most 48 decoded tiles and 16 MiB of decompressed tile bytes are cached.
   Result caching is bounded by 48 entries and 150,000 coordinate positions.
   These are FIFO caches; the byte limit does not include decoded object overhead.
@@ -68,8 +85,9 @@ different IDs and colors.
   single-language solid patterns do not count toward that limit. Pattern images are
   capped at 512×512 pixels (up to 42 contributors with the current spacing).
   Unused images are removed after the GeoJSON source has updated.
-- A limit or computation failure clears hatching, retains ordinary language
-  fills, and reports the failure. It never publishes a partial overlap result.
+- A limit or computation failure retains the last valid coverage for the same
+  selection; solid fallback colors continue outside it. Before any coverage is
+  available, ordinary language fills remain active. No partial result is published.
 
 This is display geometry. Tile simplification can remove small overlap regions,
 especially when zoomed out. Computation zoom reduction can differ from the base
@@ -101,7 +119,7 @@ or rounding policy. The error callback records failures and lets C++ return
 normally before JS checks NULL/status. A per-partition scope releases native
 geometry, readers/writers, coordinate-string buffers, and bounds scratch memory
 on success or failure. Worker termination releases the module/context. Existing
-cache limits, tile budgets, and fallback behavior remain in place.
+cache limits and tile budgets remain in place.
 
 ## Checks
 
@@ -114,3 +132,5 @@ on success, failure, and budget rejection. The optional dense archive regression
 requires success or an explicit documented budget error; topology errors fail.
 If `public/data/language-areas.pmtiles` exists, it also computes real English/Welsh overlaps and verifies that removing
 the other languages removes shared regions while retaining English-only coverage.
+Fallback tests check masks across detail levels, untouched/covered tile fast
+paths, clipping, holes, IDs/properties, and adjacent masks across repeated requests.

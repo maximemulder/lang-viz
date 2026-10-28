@@ -134,8 +134,8 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
           filter={filter}
           paint={{
             'fill-color': ['get', 'color'],
-            // The computed layer replaces these fills once ready. Its opacity
-            // is applied once to the complete coverage, directly over terrain.
+            // Once ready, coverage and its spatially clipped vector fallback
+            // replace these fills. Neither draws beneath the other's interiors.
             'fill-opacity': overlapMode === 'blending' ? 0.58 : coverageReady ? 0 : 1,
             'fill-layer-opacity': overlapMode === 'hatching' ? opacity : 1,
             'fill-opacity-transition': { duration: 0 },

@@ -2,6 +2,45 @@ import type { TileCoordinate } from './types.ts'
 
 const MAX_LATITUDE = 85.0511287798066
 
+/** Covered rectangles expressed in a requested fallback tile's integer space. */
+export const coverageRectangles = (
+  tile: TileCoordinate,
+  coverage: readonly TileCoordinate[],
+  extent: number,
+): [number, number, number, number][] => {
+  const rectangles: [number, number, number, number][] = []
+  for (const covered of coverage) {
+    const scale = 2 ** (tile.z - covered.z)
+    const left = Math.max(0, (covered.x * scale - tile.x) * extent)
+    const top = Math.max(0, (covered.y * scale - tile.y) * extent)
+    const right = Math.min(extent, ((covered.x + 1) * scale - tile.x) * extent)
+    const bottom = Math.min(extent, ((covered.y + 1) * scale - tile.y) * extent)
+    if (left < right && top < bottom) rectangles.push([left, top, right, bottom])
+  }
+  return rectangles
+}
+
+/** Keep recently visited tiles at the current detail level, without duplicate coverage. */
+export const retainCoverageTiles = (
+  viewport: readonly TileCoordinate[],
+  previous: readonly TileCoordinate[],
+  limit = 48,
+): TileCoordinate[] => {
+  const tiles = new Map<string, TileCoordinate>()
+  for (const tile of [...viewport, ...previous]) {
+    if (tile.z !== viewport[0]?.z) continue
+    const key = `${tile.z}/${tile.x}/${tile.y}`
+    if (!tiles.has(key) && tiles.size < limit) tiles.set(key, tile)
+  }
+  return [...tiles.values()]
+}
+
+export const coverageTilesKey = (tiles: readonly TileCoordinate[]) =>
+  tiles
+    .map(({ z, x, y }) => `${z}/${x}/${y}`)
+    .sort()
+    .join('|')
+
 const latitudeToTile = (latitude: number, count: number) => {
   const radians = (Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude)) * Math.PI) / 180
   return ((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2) * count

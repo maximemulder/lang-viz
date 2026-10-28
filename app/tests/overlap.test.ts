@@ -11,7 +11,12 @@ import {
   type Polygon,
 } from '../src/features/map/overlap/geometry.ts'
 import { stripeImage } from '../src/features/map/overlap/patterns.ts'
-import { tilePositionToLngLat, tilesForBounds } from '../src/features/map/overlap/tiles.ts'
+import {
+  coverageTilesKey,
+  retainCoverageTiles,
+  tilePositionToLngLat,
+  tilesForBounds,
+} from '../src/features/map/overlap/tiles.ts'
 
 const partitionCoverage = await loadCoveragePartition()
 
@@ -184,6 +189,21 @@ test('viewport tiles wrap at the date line, remain unique, and respect the tile 
   const [longitude, latitude] = tilePositionToLngLat([0, 0], { z: 0, x: 0, y: 0 }, 4096)
   assert.equal(longitude, -180)
   assert.ok(Math.abs(latitude - 85.0511287798066) < 1e-12)
+})
+
+test('navigation retains unique coverage, prioritizes the viewport, and resets detail levels', () => {
+  const tile = (x: number, z = 4) => ({ z, x, y: 4 })
+  const initial = [tile(6), tile(7)]
+  const panned = retainCoverageTiles([tile(7), tile(8)], initial, 3)
+  assert.equal(panned.length, 3)
+  assert.equal(new Set(panned.map(({ x }) => x)).size, 3)
+  // Returning inside retained coverage leaves the source/request key unchanged.
+  assert.equal(coverageTilesKey(retainCoverageTiles(initial, panned, 3)), coverageTilesKey(panned))
+  const farther = retainCoverageTiles([tile(9), tile(10)], panned, 3)
+  assert.deepEqual(farther, [tile(9), tile(10), tile(7)])
+  // Never combine different simplification levels in one rendered partition.
+  assert.deepEqual(retainCoverageTiles([tile(14, 5)], panned), [tile(14, 5)])
+  assert.deepEqual(retainCoverageTiles([], panned), [])
 })
 
 test('stripe images use all contributor colors, opaque alpha, and seamless power-of-two periods', () => {

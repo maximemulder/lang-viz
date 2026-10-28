@@ -14,6 +14,8 @@ export interface OverlapProperties {
 export type OverlapCollection = FeatureCollection<MultiPolygon, OverlapProperties> & {
   /** Force a fresh source update even when a cached result has identical geometry. */
   readonly revision?: number
+  /** Tile interiors replaced by this complete partition, including empty tiles. */
+  readonly coverageTiles?: readonly TileCoordinate[]
 }
 
 export interface OverlapRequest {
