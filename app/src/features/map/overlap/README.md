@@ -1,0 +1,95 @@
+# Browser overlap hatching
+
+`OverlapHatching` receives the resolved geometry variants already selected by
+`WorldMap`. Geometry definition, source/period selection, and stripe rendering
+remain separate. No overlap combinations are precomputed offline.
+
+See the [overlap roadmap](../../../../../OVERLAP_ROADMAP.md) for open limitations,
+proposed priorities, and completion criteria across sessions.
+
+## Data flow
+
+1. After a selection change or map movement, enumerate viewport tiles at the
+   current integer zoom (0–8, matching the archive). Reduce the computation zoom
+   if more than 48 tiles would be required. Date-line viewports wrap tile X
+   coordinates without requesting duplicate world copies.
+2. A persistent module worker reads those tiles directly from the existing
+   PMTiles archive. Decode only selected variant geometries; retain integer tile
+   coordinates for Boolean operations.
+3. Union duplicate fragments per variant and clip away the tile buffer. Insert
+   coverage into an RBush spatial index, splitting intersected regions with
+   `polygon-clipping`. Each resulting face has its complete, sorted membership.
+   Holes and disconnected polygons are preserved; edge contact is not overlap.
+4. Return all coverage regions as GeoJSON with variant IDs and a pattern key,
+   including regions covered by a single language.
+   Convert coordinates from tile Mercator space to longitude/latitude only
+   after the overlay is complete.
+5. Register an opaque, power-of-two pattern for each encountered membership:
+   a solid image for a single language, alternating stripes for shared regions.
+   Every contributor receives an equal band; patterns align across computation
+   tiles. MapLibre draws all coverage in one `fill-pattern` layer, then applies
+   `fill-layer-opacity` once to the result. Once that source has loaded, the
+   original language fills are suppressed; original geometry remains available
+   for picking and pinned outlines remain above coverage.
+
+Color strength defaults to 82%, adjustable between 40% and 100% without geometry
+recomputation. Each region blends with the basemap, never with another language
+fill underneath. This keeps solid areas and their stripe colors consistent.
+At 100%, stripe interiors match their contributor's exact RGB color. Color
+blending mode retains its original 0.58 per-feature opacity. Map zoom fades
+remain disabled: MapLibre otherwise cross-fades between differently scaled
+copies of the stripe pattern, introducing mixed category colors during zooming.
+Texture filtering and outer boundary antialiasing soften narrow edges.
+
+Hover/click continue to query the original selected-language layer, rather than
+trying to reconstruct identities from a visible stripe pixel. Changes to period,
+source, or per-language override naturally change the variant IDs sent to the
+worker. Query-defined areas could later feed the same rendering layer with
+different IDs and colors.
+
+## Responsiveness and limits
+
+- Requests are debounced by 120 ms; stale responses are rejected immediately.
+  The worker yields between tiles and abandons superseded work. Selection changes
+  clear old coverage. Navigation temporarily restores the original vector fills
+  at the same layer opacity until the new coverage source has loaded. This
+  prevents stale coverage or doubled transparency while moving between tiles.
+  A revision on each result also forces identical cached geometry through the
+  source update/readiness handshake after navigation.
+- At most 48 decoded tiles and 16 MiB of decompressed tile bytes are cached.
+  Result caching is bounded by 48 entries and 150,000 coordinate positions.
+  These are FIFO caches; the byte limit does not include decoded object overhead.
+- A tile accepts at most 100,000 selected input vertices, 12,000 intermediate
+  regions, and approximately 1.5 seconds of overlay work. A complete result is
+  limited to 200,000 vertices. Deadline checks occur between Boolean operations;
+  a single operation cannot be interrupted.
+- At most 128 distinct shared-membership patterns are installed per result;
+  single-language solid patterns do not count toward that limit. Pattern images are
+  capped at 512×512 pixels (up to 42 contributors with the current spacing).
+  Unused images are removed after the GeoJSON source has updated.
+- A limit or computation failure clears hatching, retains ordinary language
+  fills, and reports the failure. It never publishes a partial overlap result.
+
+This is display geometry. Tile simplification can remove small overlap regions,
+especially when zoomed out. Computation zoom reduction can differ from the base
+layer's detail level. Geometry is clipped to tile interiors to avoid duplicate
+coverage; precision differences in the source tiles can still leave tiny seams.
+The standard fill renderer supports both globe and Mercator projection. Stripe
+spacing follows MapLibre's map-anchored pattern scaling, rather than staying at
+a fixed screen width throughout zooming.
+
+The next performance decision should follow measurements of dense selections:
+improve the worker overlay or replace it with GPU contributor coverage. Neither
+requires changing the language catalog or introducing a geometry server.
+
+A whole-world selection at zoom 1 has encountered polygon-clipping topology
+errors; such requests report an unavailable preview and retain the base fills.
+Robustness at this scale remains work for a subsequent implementation.
+
+## Checks
+
+`npm test` covers three-way memberships and disjointness, holes, touching edges,
+duplicate fragments, tile clipping, geometry budgets, date-line tile selection,
+stripe color/opacity, and cancellation. If `public/data/language-areas.pmtiles`
+exists, it also computes real English/Welsh overlaps and verifies that removing
+the other languages removes shared regions while retaining English-only coverage.

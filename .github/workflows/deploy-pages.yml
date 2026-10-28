@@ -60,7 +60,9 @@ jobs:
 
       - name: Check frontend
         working-directory: app
-        run: npm run check
+        run: |
+          npm test
+          npm run check
 
       - name: Build frontend
         working-directory: app

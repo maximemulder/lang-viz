@@ -13,12 +13,15 @@ import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
   geometryOverridesAtom,
+  languageOpacityAtom,
+  overlapModeAtom,
   temporalViewAtom,
   viewportLanguageIdsAtom,
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
 import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
+import { OverlapHatching } from './overlap/OverlapHatching'
 
 setWorkerUrl(maplibreWorkerUrl)
 const pmtilesProtocol = new Protocol()
@@ -77,7 +80,10 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
   const overrides = useAtomValue(geometryOverridesAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
-  const variantIds = visibleLanguageIds.flatMap((languageId) => {
+  const overlapMode = useAtomValue(overlapModeAtom)
+  const opacity = useAtomValue(languageOpacityAtom)
+  const [coverageKey, setCoverageKey] = useState<string | null>(null)
+  const activeVariants = visibleLanguageIds.flatMap((languageId) => {
     const language = data.languageById.get(languageId)
     if (!language || language.geometryVariantIds.length === 0) return []
     const variants = geographyVariantsForLanguage(
@@ -88,8 +94,11 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
     )
     const override = overrides[languageId]
     const variant = variants.find(({ id }) => id === override) ?? variants[0]
-    return variant ? [variant.id] : []
+    return variant ? [variant] : []
   })
+  const variantIds = activeVariants.map(({ id }) => id)
+  const selectionKey = JSON.stringify([...variantIds].sort())
+  const coverageReady = overlapMode === 'hatching' && coverageKey === selectionKey
   const filter: FilterSpecification = ['in', ['get', 'variant_id'], ['literal', variantIds]]
   const temporalFilter: FilterSpecification =
     temporalSelection === 'all'
@@ -102,45 +111,58 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
   const availableGeometryFilter: FilterSpecification = ['all', temporalFilter, datasetFilter]
 
   return (
-    <Source
-      id={LANGUAGE_SOURCE_ID}
-      type="vector"
-      url={languageArchiveUrl()}
-      attribution="Language areas: Asher & Moseley (2007), Bouckaert et al. (2012), Carling et al. (2025)"
-    >
-      <Layer
-        id={LANGUAGE_HIT_LAYER_ID}
-        source={LANGUAGE_SOURCE_ID}
-        source-layer={data.manifest.vectorLayer}
-        type="fill"
-        filter={availableGeometryFilter}
-        paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
+    <>
+      <Source
+        id={LANGUAGE_SOURCE_ID}
+        type="vector"
+        url={languageArchiveUrl()}
+        attribution="Language areas: Asher & Moseley (2007), Bouckaert et al. (2012), Carling et al. (2025)"
+      >
+        <Layer
+          id={LANGUAGE_HIT_LAYER_ID}
+          source={LANGUAGE_SOURCE_ID}
+          source-layer={data.manifest.vectorLayer}
+          type="fill"
+          filter={availableGeometryFilter}
+          paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
+        />
+        <Layer
+          id={SELECTED_LANGUAGE_LAYER_ID}
+          source={LANGUAGE_SOURCE_ID}
+          source-layer={data.manifest.vectorLayer}
+          type="fill"
+          filter={filter}
+          paint={{
+            'fill-color': ['get', 'color'],
+            // The computed layer replaces these fills once ready. Its opacity
+            // is applied once to the complete coverage, directly over terrain.
+            'fill-opacity': overlapMode === 'blending' ? 0.58 : coverageReady ? 0 : 1,
+            'fill-layer-opacity': overlapMode === 'hatching' ? opacity : 1,
+            'fill-opacity-transition': { duration: 0 },
+            'fill-layer-opacity-transition': { duration: 0 },
+            'fill-outline-color': '#fff8e8',
+          }}
+        />
+        <Layer
+          id="inspected-language-areas"
+          source={LANGUAGE_SOURCE_ID}
+          source-layer={data.manifest.vectorLayer}
+          type="line"
+          filter={['in', ['get', 'variant_id'], ['literal', inspectedVariantIds]]}
+          paint={{
+            'line-color': '#fffdf7',
+            'line-opacity': 0.95,
+            'line-width': 3,
+          }}
+        />
+      </Source>
+      <OverlapHatching
+        variants={activeVariants}
+        selectionKey={selectionKey}
+        coverageReady={coverageReady}
+        onCoverageReady={setCoverageKey}
       />
-      <Layer
-        id={SELECTED_LANGUAGE_LAYER_ID}
-        source={LANGUAGE_SOURCE_ID}
-        source-layer={data.manifest.vectorLayer}
-        type="fill"
-        filter={filter}
-        paint={{
-          'fill-color': ['get', 'color'],
-          'fill-opacity': 0.58,
-          'fill-outline-color': '#fff8e8',
-        }}
-      />
-      <Layer
-        id="inspected-language-areas"
-        source={LANGUAGE_SOURCE_ID}
-        source-layer={data.manifest.vectorLayer}
-        type="line"
-        filter={['in', ['get', 'variant_id'], ['literal', inspectedVariantIds]]}
-        paint={{
-          'line-color': '#fffdf7',
-          'line-opacity': 0.95,
-          'line-width': 3,
-        }}
-      />
-    </Source>
+    </>
   )
 })
 
@@ -212,6 +234,7 @@ export const WorldMap = () => {
     [],
   )
 
+  // Pattern zoom fades blend two stripe phases and create false category colors.
   return (
     <MapView
       initialViewState={INITIAL_VIEW}
@@ -220,6 +243,7 @@ export const WorldMap = () => {
       minZoom={0.5}
       maxZoom={12}
       renderWorldCopies={false}
+      fadeDuration={0}
       reuseMaps
       onMouseMove={(event) => {
         if (inspectionRef.current?.pinned) return

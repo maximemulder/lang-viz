@@ -16,6 +16,8 @@ export const temporalViewAtom = atom<TemporalViewSelection>('all')
 export const viewportLanguageIdsAtom = atom<readonly LanguageId[]>([])
 export const visibleLanguageIdsAtom = atom<readonly LanguageId[]>([])
 export const geometryOverridesAtom = atom<Readonly<Record<LanguageId, GeometryVariantId>>>({})
+export const overlapModeAtom = atom<'hatching' | 'blending'>('hatching')
+export const languageOpacityAtom = atom(0.82)
 
 export const toggleVisibleLanguageAtom = atom(null, (get, set, languageId: LanguageId) => {
   const current = get(visibleLanguageIdsAtom)

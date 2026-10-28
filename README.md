@@ -49,6 +49,46 @@ npm run typecheck
 npm run build
 ```
 
+## Overlap hatching proof of concept
+
+The map defaults to **Alternating stripes**: shared areas cycle through the
+colors of all selected languages covering them. Use **Try Britain example** to
+select English, Welsh, Scottish Gaelic, and Irish from the same contemporary
+Asher source and fly to their areas. The **Color blending** option provides the
+previous rendering for comparison. Hover and click still inspect the original
+language polygons, including all contributors to an overlap.
+
+**Color strength** defaults to 82% and can be adjusted between 40% and 100%.
+Solid areas and overlap stripes share the same transparency. They are composited
+once over the basemap, so transparent stripes do not reveal other language fills
+underneath. Adjusting the slider does not recompute geometry.
+
+Overlap geometry is computed in a browser worker from the existing PMTiles
+archive, using its simplified vector tiles and a spatial index. There is no
+additional geometry export or server. Computation updates after navigation;
+tile geometry and overlap results are cached. Multi-language intersections are
+partitioned into disjoint regions before drawing, so triple overlaps retain all
+three colors rather than stacking pairwise patterns.
+
+This preview uses zoom-dependent map geometry, not full-resolution boundaries
+for geographic analysis. It limits viewport work and geometry complexity;
+when a limit is reached, a message asks you to zoom in or select fewer languages,
+and the ordinary language fills remain visible. Pattern spacing follows
+MapLibre's map-anchored image fills. See the
+[implementation notes](app/src/features/map/overlap/README.md) for details.
+The [overlap roadmap](OVERLAP_ROADMAP.md) tracks limitations, priorities, and
+completion criteria for future sessions.
+
+Run the overlap checks with Node 24 or newer:
+
+```sh
+cd app
+npm test
+```
+
+The real-archive integration test runs when generated atlas data is present;
+the synthetic geometry tests run without it.
+
 ## Deploy to GitHub Pages
 
 The `Deploy to GitHub Pages` workflow rebuilds all derived atlas data from the
