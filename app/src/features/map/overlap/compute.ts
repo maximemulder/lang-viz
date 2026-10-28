@@ -2,12 +2,12 @@ import type { VectorTileFeature, VectorTileLayer } from '@mapbox/vector-tile'
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { PbfReader } from 'pbf'
 import type { PMTiles } from 'pmtiles'
-import type { MultiPolygon } from 'polygon-clipping'
 import {
   type CoverageInput,
   type CoverageRegion,
+  loadCoveragePartition,
+  type MultiPolygon,
   OverlapBudgetError,
-  partitionCoverage,
 } from './geometry.ts'
 import { tilePositionToLngLat } from './tiles.ts'
 import type { OverlapCollection, OverlapRequest } from './types.ts'
@@ -89,7 +89,7 @@ export class OverlapComputer {
       }
       const layer = cached.layer
       if (!layer) continue
-      // Inspect inexpensive metadata first. Single-language tiles and cached
+      // Inspect inexpensive metadata first. Unselected tiles and cached
       // memberships need no geometry decoding or Boolean operations.
       const features: VectorTileFeature[] = []
       const localIdSet = new Set<string>()
@@ -105,6 +105,8 @@ export class OverlapComputer {
       const resultKey = `${key}:${localIds.join('|')}`
       let regions = this.results.get(resultKey)?.regions
       if (!regions) {
+        const partitionCoverage = await loadCoveragePartition()
+        if (!isCurrent()) return null
         const inputs = inputsFromFeatures(features)
         regions = partitionCoverage(inputs, layer.extent, {
           deadline: performance.now() + 1_500,

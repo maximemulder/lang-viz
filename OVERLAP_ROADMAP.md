@@ -4,8 +4,8 @@ Last updated: 2026-10-28.
 
 This document tracks the limitations to lift after the browser overlap-hatching
 proof of concept. Item IDs are stable so future sessions can refer to them.
-Priorities and ordering below are proposed; they do not commit us to a particular
-geometry engine, GPU implementation, or server architecture.
+Priorities and ordering below are proposed. Engine decisions and supporting
+evidence are recorded as work completes; GPU and server architectures remain open.
 
 When working on an item, update its status, record the result and evidence, and
 leave a concrete next step if it remains open. Mark an item complete only when
@@ -16,8 +16,9 @@ changes.
 
 The current implementation resolves one geometry variant per selected language,
 reads simplified vector tiles from the existing PMTiles archive, and computes
-disjoint coverage regions in a browser worker using `polygon-clipping` and
-`RBush`. MapLibre renders those regions with native `fill-pattern` images:
+disjoint coverage regions in a browser worker using `geos-wasm@3.1.1`
+(GEOS 3.13.0) and `RBush`. MapLibre renders those regions with native
+`fill-pattern` images:
 single-language regions are solid, and shared regions alternate every
 contributor's color. Opacity is applied once over the basemap, defaulting to 82%.
 
@@ -47,22 +48,17 @@ Preserve these design decisions as the implementation evolves:
 
 ### OVL-01 — Robust geometry for dense selections
 
-**Status:** Open. **Priority:** First.
+**Status:** Complete for the known failures (2026-10-28).
 
-**Current limitation:** A whole-world selection at zoom 1 has encountered a
-`polygon-clipping` topology error. Catching it and showing the original fills
-prevents a crash, but does not resolve the computation failure. A minimal,
-committed reproducer is still missing.
+Replaced `polygon-clipping` with GEOS/WASM default robust overlay. The worker
+loads GEOS lazily, retains native intermediate geometry, validates source inputs,
+and releases native allocations after each partition.
 
-**Work:** Capture the exact source, period, selected variants, and offending tile
-as a reproducible fixture. Determine whether the cause is input validity,
-precision, or the Boolean implementation. Evaluate repairs or an alternative
-geometry engine against that evidence.
-
-**Complete when:** The known failing case produces a valid partition, with a
-regression test. Representative dense cases preserve union coverage and disjoint
-interiors, or explicitly exceed a documented supported budget. Catching the same
-topology error and falling back is not sufficient to close this item.
+The [regression tests](app/tests/overlap-geos.test.ts) retain the two original
+failing cases and check valid polygons, complete memberships, union preservation,
+disjoint interiors, and cleanup on failure. Geometry budgets and the renderer's
+separate pattern limit still apply. Add any new topology failure as a fixture
+and reopen this item if needed.
 
 ### OVL-02 — Continuous coverage during navigation and updates
 
@@ -104,13 +100,14 @@ This item does not require implementing the full query language or query UI.
 
 ### OVL-04 — Measured performance, cancellation, and resource budgets
 
-**Status:** Open. **Priority:** Measure alongside OVL-01; optimize from evidence.
+**Status:** Open. **Priority:** Optimize from evidence.
 
-**Current limitation:** There is no representative benchmark suite or total
-request deadline. The worker yields between tiles, but a Boolean operation
-cannot be interrupted. Geometry crosses worker boundaries and is processed again
-by MapLibre. Pattern creation runs on the main thread. Cache limits do not bound
-all decoded-object or texture memory, and caches are FIFO.
+**Current limitation:** There is no full application benchmark suite or total
+request deadline. The worker yields between tiles, but a Boolean operation cannot
+be interrupted in the chosen WASM build. Native allocation cleanup is tested;
+full memory accounting is not. Geometry crosses worker boundaries and is
+processed again by MapLibre. Pattern creation runs on the main thread. Cache
+limits do not bound all decoded-object or texture memory, and caches are FIFO.
 
 **Work:** Measure cold/warm requests, dense intersections, selection changes,
 and repeated navigation. Separate fetching, decoding, partitioning, transfer,
@@ -166,6 +163,8 @@ fixed on screen. Pattern zoom fades are disabled to avoid mixed colors, and
 texture filtering softens stripe edges. Distinct memberships allocate separate
 images, including solid images for single contributors. The 128-pattern and
 42-contributor limits are implementation limits, not established usability limits.
+Dense selections can require hundreds or thousands of shared patterns, exceeding
+the current limit even when geometry computation succeeds.
 
 **Work:** Define stripe spacing and zoom behavior, assess legibility with many
 contributors and similar colors, and review pattern allocation costs. Decide how
@@ -200,8 +199,10 @@ selection identity, and resource ownership without console errors.
 
 **Current limitation:** Existing tests cover focused geometry cases, stripe
 pixels, tile selection, budgets, and a real Britain example. Browser verification
-has been manual. There is no broad randomized geometry corpus, automated visual
-suite, or performance regression suite.
+has been manual. GEOS regressions now cover the captured failures, invalid and
+mixed-dimension inputs, and native ownership on success/failure/budget rejection.
+There is no broad randomized geometry corpus, automated visual suite, or full
+application performance regression suite.
 
 **Work:** Add invariants for complete membership, disjoint interiors, union
 preservation, and deterministic results across a broader corpus. Automate
@@ -214,9 +215,9 @@ compared across implementations. Extend coverage as new failure modes appear.
 
 ## Decisions still open
 
-- Whether geometry robustness/performance calls for a different JavaScript
-  engine, WASM, GPU coverage, or server computation. Choose from measured cases;
-  none is a committed direction yet.
+- GEOS/WASM is the current CPU geometry engine. Whether later workloads justify
+  a different partition algorithm, parallel workers, GPU coverage, or a server
+  remains open.
 - Whether display geometry remains derived from the existing simplified tiles
   or needs a separate geometry/detail pipeline.
 - Whether native image patterns meet the desired zoom behavior and resource
@@ -227,12 +228,13 @@ compared across implementations. Extend coverage as new failure modes appear.
 
 ## Session handoff
 
-Proposed next step: capture the dense-selection failure for OVL-01 as a fixture
-and automated regression case, beginning OVL-08 at the same time. Address
-navigation continuity next, then the generic area contract. Record baseline
-performance before selecting an architectural replacement.
+OVL-01 is complete for the known cases. Address navigation continuity (OVL-02)
+next, then the generic area contract. Keep dense-selection pattern limits as
+separate OVL-06 work; geometry success does not guarantee a renderable result.
+Extend performance measurements and regression coverage with each change.
 
 Start with [geometry.ts](app/src/features/map/overlap/geometry.ts),
+[geos.ts](app/src/features/map/overlap/geos.ts),
 [compute.ts](app/src/features/map/overlap/compute.ts),
 [OverlapHatching.tsx](app/src/features/map/overlap/OverlapHatching.tsx), and
 [the existing tests](app/tests/overlap.test.ts).
@@ -246,11 +248,5 @@ npm run typecheck
 npm run build
 ```
 
-The real-archive test requires generated `app/public/data/language-areas.pmtiles`;
-without it that test is skipped. See the root [README](README.md) for data setup.
-
-### Progress log
-
-- 2026-10-28: Recorded the POC baseline, eight open work items, proposed order,
-  and completion criteria. No roadmap items have been implemented as part of
-  creating this document.
+The real-archive tests require generated `app/public/data/language-areas.pmtiles`
+(and the catalog for the dense test); without those files they are skipped. See the root [README](README.md) for data setup.

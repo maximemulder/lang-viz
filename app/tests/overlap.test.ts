@@ -3,12 +3,17 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { FileSource, PMTiles } from 'pmtiles'
-import type { MultiPolygon, Polygon } from 'polygon-clipping'
-import polygonClipping from 'polygon-clipping'
 import { OverlapComputer } from '../src/features/map/overlap/compute.ts'
-import { OverlapBudgetError, partitionCoverage } from '../src/features/map/overlap/geometry.ts'
+import {
+  loadCoveragePartition,
+  type MultiPolygon,
+  OverlapBudgetError,
+  type Polygon,
+} from '../src/features/map/overlap/geometry.ts'
 import { stripeImage } from '../src/features/map/overlap/patterns.ts'
 import { tilePositionToLngLat, tilesForBounds } from '../src/features/map/overlap/tiles.ts'
+
+const partitionCoverage = await loadCoveragePartition()
 
 const box = (left: number, bottom: number, right: number, top: number): MultiPolygon => [
   [
@@ -56,7 +61,14 @@ test('three-way overlaps are partitioned once with complete memberships', () => 
       const left = regions[a]
       const right = regions[b]
       assert.ok(left && right)
-      assert.equal(area(polygonClipping.intersection(left.geometry, right.geometry)), 0)
+      // These box inputs partition into rectangles; their bounds must have
+      // disjoint interiors, independently of the Boolean geometry engine.
+      assert.ok(
+        left.maxX <= right.minX ||
+          right.maxX <= left.minX ||
+          left.maxY <= right.minY ||
+          right.maxY <= left.minY,
+      )
     }
   }
   assert.deepEqual(partitionCoverage([...inputs].reverse(), 16), regions)
@@ -233,4 +245,47 @@ test('real archive: Britain overlap colors retain members and removing a languag
     0,
   )
   assert.equal(await computer.compute(archive, request, () => false), null)
+})
+
+const catalogPath = new URL('../public/data/languages.json', import.meta.url)
+test('real archive: dense north-east world tile succeeds or explicitly exceeds the supported budget', {
+  skip:
+    (!existsSync(archivePath) || !existsSync(catalogPath)) &&
+    'Generate atlas data to run the dense archive regression',
+}, async (t) => {
+  const archive = new PMTiles(
+    new FileSource(new File([await readFile(archivePath)], 'language-areas.pmtiles')),
+  )
+  const languages: { geometryVariantIds: string[] }[] = JSON.parse(
+    await readFile(catalogPath, 'utf8'),
+  )
+  const variantIds = languages.flatMap((language) => language.geometryVariantIds.slice(0, 1))
+  try {
+    const collection = await new OverlapComputer().compute(
+      archive,
+      {
+        requestId: 1,
+        archiveUrl: 'local-dense-regression',
+        sourceLayer: 'language_areas',
+        variantIds,
+        tiles: [{ z: 1, x: 1, y: 0 }],
+      },
+      () => true,
+    )
+    assert.ok(collection && collection.features.length > 0)
+    assert.ok(collection.features.some(({ properties }) => properties.variantIds.length > 1))
+    const selected = new Set(variantIds)
+    for (const feature of collection.features) {
+      assert.ok(feature.properties.variantIds.every((id) => selected.has(id)))
+      assert.equal(
+        new Set(feature.properties.variantIds).size,
+        feature.properties.variantIds.length,
+      )
+    }
+  } catch (error) {
+    // Slower CI/devices may cross 1.5 s. A topology error is never accepted as a
+    // budget rejection; the self-contained fixtures always require valid output.
+    assert.ok(error instanceof OverlapBudgetError, String(error))
+    t.diagnostic('Dense tile explicitly exceeded the unchanged production geometry budget')
+  }
 })

@@ -5,6 +5,8 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   base: process.env.GITHUB_PAGES === 'true' ? '/lang-viz/' : '/',
+  // Preserve the worker's lazy geometry import as a separate production chunk.
+  worker: { format: 'es' },
   plugins: [
     react(),
     babel({

@@ -1,0 +1,86 @@
+{
+  "name": "east-africa",
+  "issue": "OVL-01",
+  "source": {
+    "archive": "language-areas.pmtiles",
+    "archiveSha256": "0f55734c095a4e565b75cb8348060f6eeedb04300b15bf48742e1dfc0262f6d4",
+    "vectorLayer": "language_areas",
+    "datasetId": "asher2007world",
+    "temporalView": "contemporary",
+    "tile": {
+      "z": 1,
+      "x": 1,
+      "y": 1
+    }
+  },
+  "extent": 4096,
+  "inputs": [
+    {
+      "id": "asher2007world:contemporary:poko1261",
+      "geometry": [[[[912, 15], [924, 55], [914, 60], [912, 15]]]]
+    },
+    {
+      "id": "asher2007world:contemporary:swah1253",
+      "geometry": [
+        [[[908, 174], [902, 182], [901, 181], [908, 174]]],
+        [[[895, 130], [899, 147], [891, 140], [895, 130]]],
+        [[[969, 0], [916, 61], [881, 135], [914, 51], [969, 0]]],
+        [[[903, 124], [903, 126], [901, 124], [903, 124]]],
+        [[[907, 112], [907, 120], [904, 124], [907, 112]]]
+      ]
+    },
+    {
+      "id": "asher2007world:contemporary:waat1238",
+      "geometry": [[[[901, 45], [911, 62], [879, 135], [866, 116], [901, 45]]]]
+    },
+    {
+      "id": "asher2007world:contemporary:chon1287",
+      "geometry": [[[[905, 82], [899, 85], [899, 84], [905, 82]]]]
+    },
+    {
+      "id": "asher2007world:contemporary:giry1241",
+      "geometry": [
+        [[[898, 103], [898, 105], [896, 103], [898, 103]]],
+        [[[904, 48], [912, 70], [893, 91], [904, 48]]]
+      ]
+    },
+    {
+      "id": "asher2007world:contemporary:mako1251",
+      "geometry": [[[[906, 229], [922, 240], [899, 272], [885, 238], [906, 229]]]]
+    },
+    {
+      "id": "asher2007world:contemporary:nucl1396",
+      "geometry": [
+        [
+          [
+            [773, 370],
+            [797, 390],
+            [811, 381],
+            [829, 435],
+            [793, 461],
+            [789, 399],
+            [748, 395],
+            [744, 382],
+            [773, 370]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "asher2007world:contemporary:chuw1238",
+      "geometry": [[[[861, 396], [833, 428], [819, 414], [861, 396]]]]
+    },
+    {
+      "id": "asher2007world:contemporary:mwan1247",
+      "geometry": [
+        [[[924, 297], [923, 301], [922, 297], [924, 297]]],
+        [[[922, 240], [920, 297], [913, 255], [922, 240]]]
+      ]
+    }
+  ],
+  "observedFailure": {
+    "engine": "polygon-clipping@0.15.7",
+    "operation": "difference",
+    "messagePrefix": "Unable to complete output ring starting at"
+  }
+}

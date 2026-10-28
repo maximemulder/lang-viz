@@ -16,9 +16,10 @@ proposed priorities, and completion criteria across sessions.
 2. A persistent module worker reads those tiles directly from the existing
    PMTiles archive. Decode only selected variant geometries; retain integer tile
    coordinates for Boolean operations.
-3. Union duplicate fragments per variant and clip away the tile buffer. Insert
-   coverage into an RBush spatial index, splitting intersected regions with
-   `polygon-clipping`. Each resulting face has its complete, sorted membership.
+3. Lazily load and initialize GEOS once in the persistent worker. Union duplicate
+   fragments per variant and clip away the tile buffer. Insert coverage into an
+   RBush spatial index, splitting intersected regions with GEOS 3.13.0 through
+   pinned `geos-wasm@3.1.1`. Each face has its complete, sorted membership.
    Holes and disconnected polygons are preserved; edge contact is not overlap.
 4. Return all coverage regions as GeoJSON with variant IDs and a pattern key,
    including regions covered by a single language.
@@ -78,18 +79,38 @@ The standard fill renderer supports both globe and Mercator projection. Stripe
 spacing follows MapLibre's map-anchored pattern scaling, rather than staying at
 a fixed screen width throughout zooming.
 
-The next performance decision should follow measurements of dense selections:
-improve the worker overlay or replace it with GPU contributor coverage. Neither
-requires changing the language catalog or introducing a geometry server.
+## Geometry engine and ownership
 
-A whole-world selection at zoom 1 has encountered polygon-clipping topology
-errors; such requests report an unavailable preview and retain the base fills.
-Robustness at this scale remains work for a subsequent implementation.
+`geometry.ts` defines engine-independent coordinate, membership, and partition
+contracts. `loadCoveragePartition()` lazily imports `geos.ts` and shares one
+initialization promise. The Vite worker uses ES modules so the production build
+preserves a separate GEOS chunk. The first partition's 1.5-second deadline starts
+after initialization, and superseded requests are checked again after that await.
+
+The adapter uses default robust overlay, without an application precision grid.
+Native GEOS GeoJSON readers import each source fragment; geometry stays in WASM
+through union, clipping, intersection, and difference. Borrowed polygon components
+are cloned when inserted into RBush. Every operation normalizes its result to
+polygonal area, discarding boundary-only lines/points. Final polygons are exported
+once with the native writer. Caches and worker messages contain plain JS arrays,
+never native pointers.
+
+Source rings must be finite and closed, and each input must pass `GEOSisValid`.
+Invalid source geometry fails the entire request; there is no silent `MakeValid`
+or rounding policy. The error callback records failures and lets C++ return
+normally before JS checks NULL/status. A per-partition scope releases native
+geometry, readers/writers, coordinate-string buffers, and bounds scratch memory
+on success or failure. Worker termination releases the module/context. Existing
+cache limits, tile budgets, and fallback behavior remain in place.
 
 ## Checks
 
 `npm test` covers three-way memberships and disjointness, holes, touching edges,
 duplicate fragments, tile clipping, geometry budgets, date-line tile selection,
-stripe color/opacity, and cancellation. If `public/data/language-areas.pmtiles`
-exists, it also computes real English/Welsh overlaps and verifies that removing
+stripe color/opacity, and cancellation. GEOS regressions require valid, disjoint
+coverage and complete memberships for both captured topology failures, handle
+mixed polygon/line/point results and invalid inputs, and check native ownership
+on success, failure, and budget rejection. The optional dense archive regression
+requires success or an explicit documented budget error; topology errors fail.
+If `public/data/language-areas.pmtiles` exists, it also computes real English/Welsh overlaps and verifies that removing
 the other languages removes shared regions while retaining English-only coverage.
