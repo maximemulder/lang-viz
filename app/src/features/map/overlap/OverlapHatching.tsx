@@ -9,6 +9,7 @@ import {
   geographyDatasetFilterAtom,
   languageOpacityAtom,
   overlapModeAtom,
+  overlapStatusAtom,
   temporalViewAtom,
   visibleLanguageIdsAtom,
 } from '../../../state/atlasState'
@@ -33,7 +34,6 @@ const OVERLAP_LAYER = 'language-overlap-hatching'
 const FALLBACK_SOURCE = 'language-overlap-fallback'
 const BUFFERS = [0, 1] as const
 const INSPECTION_LAYER = 'inspected-language-areas'
-const EXAMPLE_LANGUAGE_IDS = ['stan1293', 'wels1247', 'scot1245', 'iris1253']
 
 interface HatchingState {
   readonly snapshots: readonly [CoverageSnapshot | null, CoverageSnapshot | null]
@@ -94,7 +94,8 @@ export const OverlapHatching = ({
   const map = current?.getMap()
   const data = useAtomValue(atlasDataAtom)
   const [mode, setMode] = useAtom(overlapModeAtom)
-  const [opacity, setOpacity] = useAtom(languageOpacityAtom)
+  const opacity = useAtomValue(languageOpacityAtom)
+  const setOverlapStatus = useSetAtom(overlapStatusAtom)
   const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
   const setPeriod = useSetAtom(temporalViewAtom)
   const setDatasetFilter = useSetAtom(geographyDatasetFilterAtom)
@@ -106,6 +107,10 @@ export const OverlapHatching = ({
   })
   const configRef = useRef({ selectionKey, mode })
   const refreshRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    setOverlapStatus({ status: state.status, message: state.message })
+  }, [setOverlapStatus, state.status, state.message])
 
   useEffect(() => {
     if (!diagnosticsEnabled || !map) return
@@ -533,14 +538,6 @@ export const OverlapHatching = ({
     refreshRef.current?.()
   }, [selectionKey, mode])
 
-  const showExample = () => {
-    setPeriod('contemporary')
-    setDatasetFilter(['asher2007world'])
-    setVisibleIds(EXAMPLE_LANGUAGE_IDS)
-    setMode('hatching')
-    map?.flyTo({ center: [-4.5, 54.2], zoom: 4.4, duration: 900 })
-  }
-
   return (
     <>
       {BUFFERS.map((buffer) => {
@@ -596,46 +593,6 @@ export const OverlapHatching = ({
           )
         )
       })}
-      <div className="map-overlap-control">
-        <label>
-          <span>Overlapping languages</span>
-          <select
-            value={mode}
-            onChange={(event) =>
-              setMode(event.currentTarget.value === 'blending' ? 'blending' : 'hatching')
-            }
-          >
-            <option value="hatching">Alternating stripes</option>
-            <option value="blending">Color blending</option>
-          </select>
-        </label>
-        {mode === 'hatching' && (
-          <label className="map-opacity-control" htmlFor="language-opacity">
-            <span>
-              Color strength{' '}
-              <output htmlFor="language-opacity">{Math.round(opacity * 100)}%</output>
-            </span>
-            <input
-              id="language-opacity"
-              type="range"
-              min="40"
-              max="100"
-              value={Math.round(opacity * 100)}
-              onChange={(event) => setOpacity(Number(event.currentTarget.value) / 100)}
-            />
-          </label>
-        )}
-        <button type="button" onClick={showExample}>
-          Try Britain example
-        </button>
-        <p role="status" data-overlap-status={state.status}>
-          {mode === 'blending'
-            ? 'Overlapping colors are blended'
-            : variants.length < 2
-              ? 'Select two or more languages, or try the example'
-              : state.message || 'Preparing overlap stripes…'}
-        </p>
-      </div>
     </>
   )
 }

@@ -18,6 +18,10 @@ export const visibleLanguageIdsAtom = atom<readonly LanguageId[]>([])
 export const geometryOverridesAtom = atom<Readonly<Record<LanguageId, GeometryVariantId>>>({})
 export const overlapModeAtom = atom<'hatching' | 'blending'>('hatching')
 export const languageOpacityAtom = atom(0.82)
+export const overlapStatusAtom = atom<{
+  readonly status: 'idle' | 'loading' | 'ready' | 'error'
+  readonly message: string
+}>({ status: 'idle', message: '' })
 
 export const toggleVisibleLanguageAtom = atom(null, (get, set, languageId: LanguageId) => {
   const current = get(visibleLanguageIdsAtom)

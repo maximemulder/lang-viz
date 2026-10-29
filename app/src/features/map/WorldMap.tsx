@@ -21,6 +21,7 @@ import {
 } from '../../state/atlasState'
 import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
+import { MapSettings, type ProjectionMode } from './MapSettings'
 import { diagnosticsEnabled } from './overlap/diagnostics'
 import { OverlapHatching } from './overlap/OverlapHatching'
 
@@ -47,8 +48,6 @@ const PROJECTIONS = {
   globe: { type: 'vertical-perspective' },
   mercator: { type: 'mercator' },
 } as const
-
-type ProjectionMode = keyof typeof PROJECTIONS
 
 const LANGUAGE_SOURCE_ID = 'language-areas'
 const LANGUAGE_HIT_LAYER_ID = 'language-area-hit-targets'
@@ -146,11 +145,10 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
             'fill-color': ['get', 'color'],
             // Once ready, coverage and its spatially clipped vector fallback
             // replace these fills. Neither draws beneath the other's interiors.
-            'fill-opacity': overlapMode === 'blending' ? 0.58 : coverageReady ? 0 : 1,
+            'fill-opacity': overlapMode === 'blending' ? opacity : coverageReady ? 0 : 1,
             'fill-layer-opacity': overlapMode === 'hatching' ? opacity : 1,
             'fill-opacity-transition': { duration: 0 },
             'fill-layer-opacity-transition': { duration: 0 },
-            'fill-outline-color': '#fff8e8',
           }}
         />
         <Layer
@@ -318,22 +316,7 @@ export const WorldMap = () => {
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
 
-      <label className="map-projection-control">
-        <span>Projection</span>
-        <select
-          value={projectionMode}
-          onChange={(event) => {
-            const nextProjection = event.currentTarget.value
-
-            if (nextProjection === 'globe' || nextProjection === 'mercator') {
-              setProjectionMode(nextProjection)
-            }
-          }}
-        >
-          <option value="globe">Globe</option>
-          <option value="mercator">Mercator</option>
-        </select>
-      </label>
+      <MapSettings projectionMode={projectionMode} onProjectionChange={setProjectionMode} />
 
       <Suspense fallback={null}>
         <MapHint />

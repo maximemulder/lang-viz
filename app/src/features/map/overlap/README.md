@@ -40,11 +40,13 @@ proposed priorities, and completion criteria across sessions.
    original language fills are suppressed; original geometry remains available
    for picking and pinned outlines remain above coverage.
 
-Color strength defaults to 82%, adjustable between 40% and 100% without geometry
+Color intensity defaults to 82%, adjustable between 40% and 100% without geometry
 recomputation. Each region blends with the basemap, never with another language
 fill underneath. This keeps solid areas and their stripe colors consistent.
 At 100%, stripe interiors match their contributor's exact RGB color. Color
-blending mode retains its original 0.58 per-feature opacity. Map zoom fades
+blending mode applies the same intensity setting as per-feature opacity, so
+overlapping language fills blend together. Both modes share one slider in the
+collapsible Map settings panel. Map zoom fades
 remain disabled: MapLibre otherwise cross-fades between differently scaled
 copies of the stripe pattern, introducing mixed category colors during zooming.
 Texture filtering and outer boundary antialiasing soften narrow edges.
