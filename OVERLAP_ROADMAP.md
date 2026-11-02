@@ -1,6 +1,6 @@
 # Overlap roadmap
 
-Last updated: 2026-10-28.
+Last updated: 2026-11-02.
 
 This document tracks the limitations to lift after the browser overlap-hatching
 proof of concept. Item IDs are stable so future sessions can refer to them.
@@ -17,9 +17,8 @@ changes.
 The current implementation resolves one geometry variant per selected language,
 reads simplified vector tiles from the existing PMTiles archive, and computes
 disjoint coverage regions in a browser worker using `geos-wasm@3.1.1`
-(GEOS 3.13.0) and `RBush`. MapLibre renders those regions with native
-`fill-pattern` images:
-single-language regions are solid, and shared regions alternate every
+(GEOS 3.13.0) and `RBush`. MapLibre renders single-language regions with native
+solid fills; shared regions use `fill-pattern` images alternating every
 contributor's color. Opacity is applied once over the basemap, defaulting to 82%.
 
 Original language geometry remains available for picking. Navigation and failed
@@ -244,7 +243,7 @@ Current POC limits, to revisit rather than simply remove:
 | Overlay time per tile | About 1.5 seconds, checked between operations |
 | Complete output | 200,000 positions |
 | Padded pattern texels | 4,194,304 per result; twice that across owned images during swaps (16/32 MiB RGBA, excluding atlas copies/overhead) |
-| Pattern image size | 256 × 256 pixels; up to 42 contributors at unchanged spacing; solids use one texel |
+| Pattern image size | 256 × 256 pixels; up to 42 contributors at unchanged spacing; solids allocate no images |
 
 ### OVL-05 — Consistent tile boundaries, detail, and inspection
 
@@ -272,8 +271,10 @@ implicitly promised by this roadmap.
 
 **Current limitation:** Pattern spacing scales with the map rather than staying
 fixed on screen. Pattern zoom fades are disabled to avoid mixed colors, and
-texture filtering softens stripe edges. Distinct memberships allocate separate
-images, including one-texel solids for single contributors. The previous 128-pattern
+texture filtering softens stripe edges. Shared memberships allocate separate
+images; single contributors now use native solid fills. This removes the visible
+grid caused by sampling one-texel patterns. Framebuffer regressions check exact
+solid colors at 100% intensity in globe and Mercator views. The previous 128-pattern
 cap has been replaced by a padded-image-area budget; stripe images use one quarter
 of their previous pixels at the same displayed spacing. Dense regional/world
 scenarios now render thousands of combinations. The 42-contributor limit and
@@ -291,17 +292,29 @@ behavior is explicit without silently dropping contributors.
 
 ### OVL-07 — Separate orchestration from rendering and controls
 
-**Status:** Open. **Priority:** Alongside changes that touch the update lifecycle.
+**Status:** Implemented for the current lifecycle (2026-11-02); broader remount
+and style-reload checks remain.
 
-**Current limitation:** `OverlapHatching` combines worker scheduling, map events,
-source readiness, pattern lifetime, layer ordering, and UI controls. Readiness
-now matches immutable coverage protocol URLs and fallback mask URLs, and checks
-both sources loaded before swapping. This lifecycle is still concentrated in
-the component; the worker supervisor and delivery/cache services are separate.
+`controller.ts` now owns requests, retained coverage, explicit computation phases,
+publication batches/deadlines, supersession, and failure/retry transitions.
+`mapResources.ts` owns native snapshots, stripe images, layer ordering, and
+MapLibre readiness/errors. `OverlapHatching` connects those services to React
+and declares the layers; its size fell from 598 to 253 lines.
 
-**Work:** Separate the computation controller, versioned coverage state,
-MapLibre resource management, and controls. Make loading, ready, superseded, and
-failed states explicit, with a documented source-readiness mechanism.
+Readiness checks match both immutable coverage and revisioned fallback URLs.
+Source errors block staging even when MapLibre reports loaded=true. Failed
+staging releases its snapshot and preserves previous coverage; active streaming
+errors restore original fills. On-map feedback and Retry expose degraded states.
+Retry retains valid geometry instead of clearing the display.
+
+Verification: eight controller/adapter regressions cover publication readiness,
+coalescing, failures/recovery, stale selections/modes, deadlines, budgets, and
+cleanup. The browser harness injects actual coverage/fallback protocol failures
+and checks retained source identity, released staging, and Retry recovery.
+
+**Remaining:** Broaden style replacement/component remount and injected streaming
+failure checks. Keep new transitions in the controller rather than rebuilding
+an imperative lifecycle inside React.
 
 **Complete when:** Those responsibilities can be exercised independently, and
 source/layer remounts, repeated updates, and cleanup preserve correct ordering,
@@ -316,8 +329,9 @@ pixels, tile selection, budgets, and a real Britain example. A focused browser
 harness covers six production-build scenarios, cache reuse, incremental pans/return,
 zoom-out/failure retention, dense selection supersession, resource limits, and selection clearing. GEOS regressions cover the captured failures, invalid and
 mixed-dimension inputs, and native ownership on success/failure/budget rejection.
-There is no broad randomized geometry corpus, automated visual suite, or full
-application performance regression suite.
+Focused solid-color framebuffer assertions and injected source-loading failures
+with Retry now run too. There is no broad randomized geometry corpus,
+comprehensive visual suite, or full application performance regression suite.
 
 **Work:** Add invariants for complete membership, disjoint interiors, union
 preservation, and deterministic results across a broader corpus. Automate

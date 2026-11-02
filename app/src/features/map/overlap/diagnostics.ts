@@ -88,6 +88,30 @@ export const overlapDiagnostics = {
   },
 }
 
+type TileService = 'coverage' | 'fallback'
+let nextPublicationFailure: TileService | null = null
+let tileFailure: { service: TileService; snapshotId: number } | null = null
+
+/** Opt-in regressions exercise the actual protocol and MapLibre error path. */
+export const failNextPublication = (service: TileService) => {
+  if (diagnosticsEnabled) nextPublicationFailure = service
+}
+export const preparePublicationTest = (snapshotId: number) => {
+  if (!diagnosticsEnabled || !nextPublicationFailure) return
+  tileFailure = { service: nextPublicationFailure, snapshotId }
+  nextPublicationFailure = null
+}
+export const checkTileTestFailure = (service: TileService, snapshotId: number) => {
+  if (
+    !diagnosticsEnabled ||
+    tileFailure?.service !== service ||
+    tileFailure.snapshotId !== snapshotId
+  )
+    return
+  tileFailure = null
+  throw new Error(`Injected ${service} tile failure`)
+}
+
 export interface OverlapTestApi {
   configure(options: {
     languageIds: 'all' | readonly string[]
@@ -96,6 +120,8 @@ export interface OverlapTestApi {
   }): void
   camera(center: [number, number], zoom: number, duration?: number): void
   recompute(): void
+  failNextPublication(service: TileService): void
+  samplePixels(center: [number, number], radius: number): Promise<number[]>
   unexpectedMemberships(): string[]
   snapshot(): unknown
 }

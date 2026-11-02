@@ -42,7 +42,12 @@ export const encodeCoverageTile = (result: CoverageTile): DeliveryTile => ({
   data: encode(
     result.features.map((feature) => ({
       type: 3,
-      tags: { pattern: feature.properties.pattern },
+      tags: {
+        pattern: feature.properties.pattern,
+        ...(feature.properties.variantIds.length === 1
+          ? { variantId: feature.properties.variantIds[0] as string }
+          : {}),
+      },
       geometry: feature.geometry.coordinates.flatMap((polygon) =>
         polygon.map((ring, index) => {
           let area = 0

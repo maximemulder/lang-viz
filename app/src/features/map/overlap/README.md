@@ -31,14 +31,13 @@ proposed priorities, and completion criteria across sessions.
    browser's retained set cross the worker boundary. No full GeoJSON collection
    is transferred or re-tiled by MapLibre. `compute()` remains a GeoJSON adapter
    for geometry tests; the browser uses the incremental `computeTiles()` stream.
-5. Register an opaque, power-of-two pattern for each encountered membership:
-   a solid image for a single language, alternating stripes for shared regions.
-   Every contributor receives an equal band; patterns align across computation
-   tiles. MapLibre draws coverage from native vector tiles in one active
-   `fill-pattern` layer, then applies
-   `fill-layer-opacity` once to the result. Once that source has loaded, the
-   original language fills are suppressed; original geometry remains available
-   for picking and pinned outlines remain above coverage.
+5. Render single-language faces with native `fill-color`, using a `variantId`
+   tag and the selected variants' colors. Only shared faces allocate opaque,
+   power-of-two stripe images. The two layers filter disjoint faces and apply
+   the same `fill-layer-opacity`, so interiors receive opacity once. Avoiding
+   one-texel solid patterns removes atlas-sampling grid artifacts. Both sources
+   must load successfully before original fills are suppressed; original geometry
+   remains available for picking and pinned outlines stay above coverage.
 
 Color intensity defaults to 82%, adjustable between 40% and 100% without geometry
 recomputation. Each region blends with the basemap, never with another language
@@ -51,7 +50,7 @@ remain disabled: MapLibre otherwise cross-fades between differently scaled
 copies of the stripe pattern, introducing mixed category colors during zooming.
 Texture filtering and outer boundary antialiasing soften narrow edges.
 Patterns use one texture pixel per logical pixel, preserving the previous displayed
-period at one quarter of its stripe image storage. Solids use a single opaque texel.
+period at one quarter of its previous stripe image storage. Solids allocate no images.
 Diagonal rows reuse one cyclic color band rather than computing every pixel separately.
 
 Hover/click continue to query the original selected-language layer, rather than
@@ -83,7 +82,12 @@ different IDs and colors.
   progressively, batching arrivals for 32 ms and coalescing results while a
   staging source loads. Old coverage remains visible. Each buffer has its own
   fallback source and matching tile mask; only when both sources are ready does
-  opacity switch. Exactly one buffer contributes color. Superseded/inactive
+  opacity switch. Both protocol URLs include snapshot identity. Source errors are
+  matched to that identity: MapLibre's loaded flag alone also accepts errored tiles.
+  Failed staging is discarded while the previous valid buffer remains visible.
+  A streaming error in an active source restores original fills, avoiding holes
+  behind its clipped fallback mask. The visible status offers Retry, which reuses
+  completed tiles and computes only unfinished additions. Exactly one buffer contributes color. Superseded/inactive
   snapshots are released. MapLibre still prepares visible tiles in each new
   snapshot buffer; this is not selective in-place GPU tile replacement.
 - Each result records all computed tile interiors, including empty tiles. A
@@ -150,6 +154,20 @@ The standard fill renderer supports both globe and Mercator projection. Stripe
 spacing follows MapLibre's map-anchored pattern scaling, rather than staying at
 a fixed screen width throughout zooming.
 
+## Update ownership
+
+- `controller.ts` owns selection invalidation, retained tiles, worker responses,
+  computation phases, batching/deadlines, and active/staging publications. Its
+  resource and worker ports let lifecycle tests run without React or a real map.
+- `mapResources.ts` owns snapshot registration, pattern lifetimes, layer ordering,
+  and source readiness/error identity. Released or unrelated sources cannot fail
+  a current publication. Fallback cache identity remains the local mask, even
+  though source URLs include a distinct snapshot revision.
+- `OverlapHatching.tsx` connects application state and map events to the controller
+  and declares the solid, stripe, and fallback layers. Loading/error feedback and
+  Retry are visible on the map, independently of the settings panel.
+
+
 ## Geometry engine and ownership
 
 `geometry.ts` defines engine-independent coordinate, membership, and partition
@@ -178,12 +196,12 @@ cache limits and tile budgets remain in place.
 
 `npm run test:browser` runs the production app in installed Firefox and records
 cold/warm measurements, screenshots, explicit limit outcomes, zoom-out retention,
-pan/return reuse, selection clearing, resource counters, and superseding dense work with a smaller selection. See [browser harness usage](../../../../tests/browser/README.md)
+pan/return reuse, selection clearing, resource counters, and superseding dense work with a smaller selection. It also samples solid framebuffer pixels in globe/Mercator views and injects coverage/fallback protocol failures to verify retention and Retry. See [browser harness usage](../../../../tests/browser/README.md)
 for setup, scenario definitions, and timing semantics.
 
 `npm test` covers three-way memberships and disjointness, holes, touching edges,
 duplicate fragments, tile clipping, geometry budgets, date-line tile selection,
-stripe color/opacity, and cancellation. GEOS regressions require valid, disjoint
+stripe colors, native solid delivery, and cancellation. Controller regressions cover paired-source readiness, coalescing, stale responses, selection/mode changes, failures, Retry, deadlines, budgets, and cleanup. GEOS regressions require valid, disjoint
 coverage and complete memberships for both captured topology failures, handle
 mixed polygon/line/point results and invalid inputs, and check native ownership
 on success, failure, and budget rejection. The optional dense archive regression

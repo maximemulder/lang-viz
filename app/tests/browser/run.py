@@ -158,9 +158,14 @@ class Browser:
         self.call("DELETE", "")
 
 
-def check_state(state, require_stripes=False):
-    assert not state["errors"], f"Map errors: {state['errors']}"
-    errors = [m for m in state["browserMessages"] if m["level"] in ("pageerror", "error")]
+def check_state(state, require_stripes=False, expected_errors=()):
+    unexpected = [error for error in state["errors"] if error not in expected_errors]
+    assert not unexpected, f"Map errors: {unexpected}"
+    errors = [
+        m
+        for m in state["browserMessages"]
+        if m["level"] in ("pageerror", "error") and m["message"] not in expected_errors
+    ]
     assert not errors, f"Browser errors: {errors}"
     assert state["blankLayerFrames"] == 0, "A rendered frame disabled all language coverage layers"
     report = state["reports"][-1]
@@ -188,6 +193,87 @@ def check_state(state, require_stripes=False):
     if require_stripes:
         assert report["sharedPatterns"] > 0, "Expected actual shared-area stripes"
     return "stripes" if report.get("sharedPatterns", 0) else "solid-coverage"
+
+
+def check_pixels(browser):
+    """Read actual framebuffer pixels inside English-only coverage, away from edges."""
+    browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
+    element = browser.call(
+        "POST", "/element", {"using": "css selector", "value": "#language-opacity"}
+    )["element-6066-11e4-a52e-4f735466cecf"]
+    browser.call("POST", f"/element/{element}/value", {"text": "\ue010"})
+    wait_for(
+        lambda: browser.js("return document.querySelector('#language-opacity').value==='100'"),
+        10,
+        "100% color intensity",
+    )
+    samples = {}
+    for projection in ("globe", "mercator"):
+        browser.js(
+            "const select=document.querySelector('#map-settings-panel select');"
+            "select.value=arguments[0];select.dispatchEvent(new Event('change',{bubbles:true}))",
+            projection,
+        )
+        # Sampling happens in a render callback, before the drawing buffer is discarded.
+        pixels = browser.call(
+            "POST",
+            "/execute/async",
+            {
+                "script": "const done=arguments[arguments.length-1];window.overlapTest.samplePixels([-1.5,52.5],8).then(done)",
+                "args": [],
+            },
+        )
+        colors = {tuple(pixels[i : i + 4]) for i in range(0, len(pixels), 4)}
+        assert colors == {(59, 206, 135, 255)}, (
+            f"Solid-fill texture/color artifact in {projection}: {colors}"
+        )
+        samples[projection] = {"pixels": len(pixels) // 4, "rgba": list(next(iter(colors)))}
+    browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
+    return samples
+
+
+def check_failure_recovery(browser, url, args):
+    results = []
+    for service in ("coverage", "fallback"):
+        browser.call("POST", "/url", {"url": url})
+        wait_for(lambda: browser.js("return !!window.overlapTest"), args.timeout, "test interface")
+        browser.js("window.overlapTest.configure(arguments[0])", SCENARIOS[0])
+        previous = browser.terminal(0, args.timeout)
+        check_state(previous, require_stripes=True)
+        browser.js(
+            "window.overlapTest.failNextPublication(arguments[0]);window.overlapTest.camera([25,54.2],4.4)",
+            service,
+        )
+        failed = browser.terminal(len(previous["reports"]), args.timeout)
+        expected = (f"Error: Injected {service} tile failure",)
+        assert failed["status"] == "error" and failed["reports"][-1]["failure"] == "source-error"
+        assert failed["activeBuffers"] == previous["activeBuffers"], (
+            "Failed staging replaced valid coverage"
+        )
+        assert failed["coverageUrls"] == previous["coverageUrls"], (
+            "Failed staging retained its source"
+        )
+        assert failed["tileServices"]["receiver"]["snapshots"] == 1
+        assert failed["errors"] == list(expected), (
+            f"Unexpected injected failure: {failed['errors']}"
+        )
+        browser.screenshot(args.output / f"{service}-failure.png")
+        after = len(failed["reports"])
+        browser.js("document.querySelector('.overlap-feedback button').click()")
+        recovered = browser.terminal(after, args.timeout)
+        check_state(recovered, require_stripes=True, expected_errors=expected)
+        missing = (
+            recovered["reports"][-1]["tileCount"]
+            - previous["reports"][-1]["tileCount"]
+            - failed["reports"][-1].get("deliveredTiles", 0)
+        )
+        assert recovered["reports"][-1].get("deliveredTiles", 0) == missing, (
+            "Retry resent completed tiles"
+        )
+        assert recovered["tileServices"]["receiver"]["snapshots"] == 1
+        results.append({"service": service, "failed": failed, "recovered": recovered})
+        print(f"{service} failure: previous coverage retained; Retry recovered", flush=True)
+    return results
 
 
 def main():
@@ -318,6 +404,13 @@ def main():
                             flush=True,
                         )
 
+                    if scenario["name"] == "britain-small":
+                        case["solidPixels"] = check_pixels(browser)
+                        # Restore globe before the existing navigation checks.
+                        browser.js(
+                            "const select=document.querySelector('#map-settings-panel select');select.value='globe';select.dispatchEvent(new Event('change',{bubbles:true}))"
+                        )
+
                     if scenario["name"] in ("britain-small", "britain-all"):
                         # At the same detail level, only newly exposed computation
                         # tiles cross the overlap worker boundary. Returning inside
@@ -342,7 +435,9 @@ def main():
                         # Give the 120 ms navigation debounce time to run.
                         time.sleep(0.3)
                         state = browser.snapshot()
-                        assert len(state["reports"]) == count, "Return pan recomputed retained coverage"
+                        assert len(state["reports"]) == count, (
+                            "Return pan recomputed retained coverage"
+                        )
                         check_state(state)
                         case["returnPan"] = {"snapshot": state}
                         # Retain coverage through an animated zoom-out, then clear
@@ -387,19 +482,25 @@ def main():
                             # Supersede real cold dense work while it is running,
                             # then ensure late tiles cannot restore its memberships.
                             after = len(browser.snapshot()["reports"])
-                            browser.js("window.overlapTest.configure({languageIds:'all',center:[12,18],zoom:1.35})")
+                            browser.js(
+                                "window.overlapTest.configure({languageIds:'all',center:[12,18],zoom:1.35})"
+                            )
                             wait_for(
                                 lambda after=after: len(browser.snapshot()["reports"]) > after,
                                 args.timeout,
                                 "dense request dispatch",
                             )
                             after = len(browser.snapshot()["reports"])
-                            browser.js("window.overlapTest.configure({languageIds:['stan1293','wels1247','scot1245','iris1253'],center:[-4.5,54.2],zoom:4.4})")
+                            browser.js(
+                                "window.overlapTest.configure({languageIds:['stan1293','wels1247','scot1245','iris1253'],center:[-4.5,54.2],zoom:4.4})"
+                            )
                             state = browser.terminal(after, args.timeout)
                             check_state(state, require_stripes=True)
                             assert state["selectedCount"] == 4
                             assert state["reports"][-1]["selectedCount"] == 4
-                            assert not browser.js("return window.overlapTest.unexpectedMemberships()"), "Superseded selection memberships became visible"
+                            assert not browser.js(
+                                "return window.overlapTest.unexpectedMemberships()"
+                            ), "Superseded selection memberships became visible"
                             case["superseded"] = {"snapshot": state}
                     case["passed"] = True
                 except Exception as error:  # noqa: BLE001 -- persist any scenario failure before continuing
@@ -416,6 +517,14 @@ def main():
                     print(f"FAIL {scenario['name']}: {error}", flush=True)
                 finally:
                     save()
+        try:
+            result["failureRecovery"] = check_failure_recovery(browser, url, args)
+        except Exception as error:  # noqa: BLE001 -- persist failure diagnostics before browser cleanup
+            failed = True
+            result["failureRecoveryError"] = str(error)
+            result["failureRecoverySnapshot"] = browser.snapshot()
+            browser.screenshot(args.output / "failure-recovery-error.png")
+            print(f"FAIL failure recovery: {error}", flush=True)
         # Test controls must not be exposed in ordinary production visits.
         browser.call("POST", "/url", {"url": origin})
         assert not browser.js("return !!window.overlapTest"), (

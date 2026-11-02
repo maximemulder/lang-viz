@@ -59,7 +59,14 @@ remain available for visual inspection. The all-language Britain case also start
 world computation and supersedes it with the four-language Britain selection;
 active source memberships must match the new selection. Each result checks cache
 limits and at most two receiver snapshots; clearing must release receiver snapshots.
-Failure injection and pixel-level spatial coverage checks remain future cases.
+The harness also injects one actual coverage or fallback protocol failure during
+staging, verifies that the previous source remains active and failed staging is
+released, then presses Retry and checks recovery without resending completed tiles.
+Only the exact injected error is allowed; other map/browser errors still fail.
+Britain-small samples a 16×16 framebuffer patch inside English-only coverage at
+100% intensity in globe and Mercator projections; all pixels must equal the
+language's exact opaque RGB color. This catches the former one-texel grid artifact.
+Broader spatial coverage and stripe-boundary pixel checks remain future cases.
 
 The terrain basemap is disabled by default to avoid external network variability.
 `--terrain` includes it for an end-to-end check; failures to load it are reported
@@ -142,7 +149,8 @@ sets `&overlap-basemap=off` unless `--terrain` is requested. Normal visits expos
 no test controls and collect no request reports or browser observers.
 
 The interface provides `configure({languageIds, center, zoom})`,
-`camera(center, zoom, duration?)`, `recompute()`, `unexpectedMemberships()`, and `snapshot()`. Selection uses
+`camera(center, zoom, duration?)`, `recompute()`, `unexpectedMemberships()`,
+`failNextPublication(service)`, `samplePixels(center, radius)`, and `snapshot()`. Selection uses
 the application's state setters, and map observations use public MapLibre APIs.
 No React internals or worker monkey-patching is involved. History is bounded to
 100 request reports, 200 console messages, and 600 render intervals per document.

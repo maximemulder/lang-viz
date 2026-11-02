@@ -248,12 +248,25 @@ test('stripe images use all contributor colors, opaque alpha, and seamless power
       )
 })
 
-test('single-language coverage uses a solid, opaque pattern before layer compositing', () => {
-  const image = stripeImage(['#3bce87'])
-  assert.equal(image.data.length, 4)
-  for (let offset = 0; offset < image.data.length; offset += 4) {
-    assert.deepEqual([...image.data.slice(offset, offset + 4)], [59, 206, 135, 255])
+test('single-language coverage identifies native solid fills, including retained parent tiles', () => {
+  const encoded = encodeCoverageTile({
+    tile: { z: 1, x: 0, y: 0 },
+    extent: 16,
+    vertices: 5,
+    features: [
+      {
+        type: 'Feature',
+        properties: { pattern: 'overlap:A', variantIds: ['A'] },
+        geometry: { type: 'MultiPolygon', coordinates: box(0, 0, 16, 16) },
+      },
+    ],
+  })
+  const tiles = new Map([[tileKey(encoded.tile), encoded]])
+  for (const target of [encoded.tile, { z: 0, x: 0, y: 0 }]) {
+    const layer = new VectorTile(new PbfReader(deliveryTile(tiles, target))).layers[COVERAGE_LAYER]
+    assert.equal(layer?.feature(0).properties.variantId, 'A')
   }
+  assert.throws(() => stripeImage(['#3bce87']), /at least two colors/)
 })
 
 test('pattern budgets count padded texels rather than rejecting many small combinations', () => {

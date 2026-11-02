@@ -1,4 +1,4 @@
-/** Opaque solid/striped tiles. Transparency is applied once to the coverage layer. */
+/** Opaque stripe tiles. Single contributors use native solid fills. */
 export class OverlapPatternError extends Error {
   readonly reason: string
 
@@ -9,11 +9,11 @@ export class OverlapPatternError extends Error {
 }
 
 // One image pixel per logical pixel (formerly 2×), preserving the displayed
-// period while quartering stripe storage. A solid needs only one texel.
+// period while quartering stripe storage.
 export const patternSize = (contributors: number) => {
-  if (!Number.isInteger(contributors) || contributors < 1)
-    throw new Error('A coverage pattern needs at least one color')
-  const size = contributors === 1 ? 1 : 2 ** Math.ceil(Math.log2(Math.max(16, contributors * 6)))
+  if (!Number.isInteger(contributors) || contributors < 2)
+    throw new Error('A stripe pattern needs at least two colors')
+  const size = 2 ** Math.ceil(Math.log2(Math.max(16, contributors * 6)))
   if (size > 256)
     throw new OverlapPatternError(
       'pattern-contributors',

@@ -73,7 +73,9 @@ three colors rather than stacking pairwise patterns.
 This preview uses zoom-dependent map geometry, not full-resolution boundaries
 for geographic analysis. It limits viewport work and geometry complexity;
 when a limit is reached, a message asks you to zoom in or select fewer languages,
-and the ordinary language fills remain visible. Pattern spacing follows
+and available coverage remains visible. Loading and errors appear on the map;
+**Retry** reuses completed tiles. Single-language regions use native solid fills,
+and shared regions use stripe textures. Pattern spacing follows
 MapLibre's map-anchored image fills. See the
 [implementation notes](app/src/features/map/overlap/README.md) for details.
 The [overlap roadmap](OVERLAP_ROADMAP.md) tracks limitations, priorities, and

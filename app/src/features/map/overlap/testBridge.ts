@@ -1,5 +1,10 @@
 import type { ErrorEvent, Map as MapLibreMap } from 'maplibre-gl'
-import { browserMessages, type OverlapTestApi, overlapDiagnostics } from './diagnostics'
+import {
+  browserMessages,
+  failNextPublication,
+  type OverlapTestApi,
+  overlapDiagnostics,
+} from './diagnostics'
 
 import { serviceDiagnostics } from './serviceDiagnostics'
 
@@ -68,6 +73,33 @@ export const installOverlapTestApi = (
     camera: (center: [number, number], zoom: number, duration = 0) =>
       map.easeTo({ center, zoom, duration }),
     recompute,
+    failNextPublication,
+    samplePixels: (center: [number, number], radius: number): Promise<number[]> =>
+      new Promise((resolve, reject) => {
+        map.once('render', () => {
+          const canvas = map.getCanvas()
+          const gl = canvas.getContext('webgl2')
+          if (!gl) {
+            reject(new Error('WebGL2 unavailable'))
+            return
+          }
+          const point = map.project(center)
+          const ratio = canvas.width / canvas.clientWidth
+          const size = radius * 2
+          const pixels = new Uint8Array(size * size * 4)
+          gl.readPixels(
+            Math.round(point.x * ratio) - radius,
+            canvas.height - Math.round(point.y * ratio) - radius,
+            size,
+            size,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            pixels,
+          )
+          resolve([...pixels])
+        })
+        map.triggerRepaint()
+      }),
     unexpectedMemberships: () => {
       const selected = new Set<string>(JSON.parse(selectionKey()))
       return [
@@ -122,6 +154,10 @@ export const installOverlapTestApi = (
         coverageSourceTypes: BUFFERS.flatMap((buffer) => {
           const source = map.getSource(`language-overlap-regions-${buffer}`)
           return source ? [source.type] : []
+        }),
+        coverageUrls: BUFFERS.flatMap((buffer) => {
+          const source = map.getSource(`language-overlap-regions-${buffer}`)
+          return source ? [(source.serialize() as { tiles?: string[] }).tiles?.[0]] : []
         }),
         fallbackFeatures: BUFFERS.reduce<number>(
           (count, buffer) =>

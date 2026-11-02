@@ -687,6 +687,39 @@ h2 {
   font-weight: 500;
 }
 
+.overlap-feedback {
+  position: absolute;
+  z-index: 2;
+  top: 0.7rem;
+  left: 3.8rem;
+  right: 3.8rem;
+  width: fit-content;
+  max-width: calc(100% - 7.6rem);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.6rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.75rem;
+  box-shadow: 0 2px 12px rgb(29 43 39 / 12%);
+}
+
+.overlap-feedback[data-status="error"] {
+  border: 1px solid var(--accent);
+}
+
+.overlap-feedback button {
+  flex: none;
+  border: 1px solid currentColor;
+  border-radius: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
 .language-inspector__header small {
   color: var(--muted-ink);
   font-size: 0.6rem;

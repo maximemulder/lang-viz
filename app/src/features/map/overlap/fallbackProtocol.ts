@@ -1,12 +1,16 @@
 import { addProtocol } from 'maplibre-gl'
-import { diagnosticsEnabled } from './diagnostics.ts'
+import { checkTileTestFailure, diagnosticsEnabled } from './diagnostics.ts'
 import type { FallbackRequest } from './fallback.worker.ts'
 import type { FallbackMetrics } from './fallbackCache.ts'
 import { serviceDiagnostics } from './serviceDiagnostics.ts'
 import type { TileCoordinate } from './types.ts'
 
-export const fallbackTilesUrl = (archiveUrl: string, coverage: readonly TileCoordinate[]) =>
-  `language-fallback://${encodeURIComponent(archiveUrl.replace(/^pmtiles:\/\//, ''))}/${encodeURIComponent(JSON.stringify(coverage))}/{z}/{x}/{y}`
+export const fallbackTilesUrl = (
+  archiveUrl: string,
+  coverage: readonly TileCoordinate[],
+  snapshotId: number,
+) =>
+  `language-fallback://${encodeURIComponent(archiveUrl.replace(/^pmtiles:\/\//, ''))}/${encodeURIComponent(JSON.stringify(coverage))}/{z}/{x}/{y}?snapshot=${snapshotId}`
 
 let worker: Worker | undefined
 let nextId = 0
@@ -16,6 +20,8 @@ const pending = new Map<
 >()
 
 addProtocol('language-fallback', async ({ url }, controller) => {
+  const [path, query] = url.split('?')
+  checkTileTestFailure('fallback', Number(new URLSearchParams(query).get('snapshot')))
   if (!worker) {
     worker = new Worker(new URL('./fallback.worker.ts', import.meta.url), { type: 'module' })
     const currentWorker = worker
@@ -43,7 +49,7 @@ addProtocol('language-fallback', async ({ url }, controller) => {
       worker = undefined
     }
   }
-  const [archive, coverage, z, x, y] = url.slice('language-fallback://'.length).split('/')
+  const [archive, coverage, z, x, y] = (path ?? '').slice('language-fallback://'.length).split('/')
   if (!archive || !coverage) throw new Error('Invalid fallback tile URL')
   const id = ++nextId
   const currentWorker = worker

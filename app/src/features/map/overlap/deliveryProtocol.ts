@@ -1,7 +1,7 @@
 import { addProtocol } from 'maplibre-gl'
 import { type DeliveryTile, isTileDescendant, tileKey } from './delivery.ts'
 import type { DeliveryRequest, DeliveryResponse } from './deliveryStore.ts'
-import { diagnosticsEnabled } from './diagnostics.ts'
+import { checkTileTestFailure, diagnosticsEnabled } from './diagnostics.ts'
 import { serviceDiagnostics } from './serviceDiagnostics.ts'
 import type { TileCoordinate } from './types.ts'
 
@@ -116,6 +116,7 @@ addProtocol('language-overlap', async ({ url }, controller) => {
   )
     throw new Error('Invalid overlap tile URL')
   const tiles = snapshots.get(id)
+  checkTileTestFailure('coverage', id)
   // A released staging source may finish an already scheduled request. Empty
   // data is safe: the corresponding source is inactive or being removed.
   const native = tiles?.get(tileKey({ z, x, y }))
