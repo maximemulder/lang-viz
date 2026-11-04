@@ -806,3 +806,78 @@ h2 {
     border-radius: 0.75rem;
   }
 }
+
+.atlas-workspace[hidden] {
+  display: none;
+}
+.explorer-content {
+  min-height: 0;
+  display: grid;
+}
+.explorer-content > .atlas-workspace {
+  min-height: 0;
+}
+.workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.workspace-nav button {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #bdc8bd;
+  border-radius: 0.45rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.workspace-nav button[aria-pressed="true"] {
+  background: #315c4b;
+  border-color: #315c4b;
+  color: var(--paper);
+}
+.workspace-nav button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.word-entry-button {
+  border: 1px solid #bdc8bd;
+  border-radius: 0.3rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.62rem;
+  padding: 0.2rem 0.3rem;
+}
+.atlas-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+.atlas-sidebar > .language-finder {
+  flex: 1;
+  min-height: 0;
+}
+.map-data-error {
+  position: absolute;
+  top: 0.75rem;
+  left: 3.8rem;
+  max-width: calc(100% - 7.6rem);
+  z-index: 2;
+  background: var(--paper);
+  padding: 0.5rem;
+  border-radius: 0.4rem;
+  font-size: 0.7rem;
+}
+@media (max-width: 800px) {
+  .app-header {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .app-header .workspace-nav {
+    gap: 0.25rem;
+  }
+  .app-header .workspace-nav button {
+    padding: 0.4rem 0.6rem;
+  }
+}

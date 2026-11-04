@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!public/data"]
+    "includes": ["**", "!public/data", "!public/etymology"]
   },
   "formatter": {
     "enabled": true,

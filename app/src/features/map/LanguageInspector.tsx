@@ -1,7 +1,8 @@
-import { useAtomValue } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
 import { Popup } from 'react-map-gl/maplibre'
 import { temporalQualityLabel } from '../../domain/temporal'
 import { atlasDataAtom } from '../../state/atlasState'
+import { openLanguageWordsAtom } from '../../state/explorerState'
 
 export interface MapInspection {
   readonly longitude: number
@@ -17,6 +18,7 @@ interface LanguageInspectorProps {
 
 export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProps) => {
   const data = useAtomValue(atlasDataAtom)
+  const openWords = useSetAtom(openLanguageWordsAtom)
   const datasetsById = new Map(data.datasets.map((dataset) => [dataset.id, dataset]))
   const entries = inspection.variantIds.flatMap((variantId) => {
     const variant = data.variantById.get(variantId)
@@ -63,6 +65,15 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                   {language.iso6393 ? `${language.iso6393} · ` : ''}
                   {language.id}
                 </small>
+                {inspection.pinned && (
+                  <button
+                    type="button"
+                    className="word-entry-button"
+                    onClick={() => openWords(language)}
+                  >
+                    Explore word entries ↗
+                  </button>
+                )}
                 <small>
                   {dataset?.shortName ?? variant.datasetId} · {variant.temporalCoverage.label} ·{' '}
                   {temporalQualityLabel(variant.temporalCoverage.quality)}

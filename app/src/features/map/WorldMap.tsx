@@ -6,6 +6,7 @@ import { Protocol } from 'pmtiles'
 import { memo, Suspense, useEffect, useRef, useState } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { FeatureErrorBoundary } from '../../components/FeatureErrorBoundary'
 import { languageArchiveUrl } from '../../data/atlasRepository'
 import { geographyVariantsForLanguage } from '../../domain/geography'
 import { temporalView } from '../../domain/temporal'
@@ -19,6 +20,8 @@ import {
   viewportLanguageIdsAtom,
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
+import { atlasWordTrailAtom } from '../../state/explorerState'
+import { WordTrailLayer } from '../etymology/WordTrailLayer'
 import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
 import { MapSettings, type ProjectionMode } from './MapSettings'
@@ -197,7 +200,12 @@ const MapHint = () => {
   )
 }
 
-export const WorldMap = () => {
+export const WorldMap = ({ active = true }: { readonly active?: boolean }) => {
+  const trail = useAtomValue(atlasWordTrailAtom)
+  const mapRef = useRef<import('react-map-gl/maplibre').MapRef>(null)
+  useEffect(() => {
+    if (active) mapRef.current?.resize()
+  }, [active])
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
   const [inspection, setInspection] = useState<MapInspection | null>(null)
   const temporalSelection = useAtomValue(temporalViewAtom)
@@ -245,6 +253,7 @@ export const WorldMap = () => {
   // Pattern zoom fades blend two stripe phases and create false category colors.
   return (
     <MapView
+      ref={mapRef}
       initialViewState={INITIAL_VIEW}
       mapStyle={MAP_STYLE}
       projection={PROJECTIONS[projectionMode]}
@@ -308,22 +317,33 @@ export const WorldMap = () => {
         setViewportLanguageIds([...new Set(languageIds)])
       }}
     >
-      <Suspense fallback={null}>
-        <LanguageLayers
-          inspectedVariantIds={inspection?.pinned ? inspection.variantIds : NO_VARIANT_IDS}
-        />
-      </Suspense>
+      <FeatureErrorBoundary
+        fallback={
+          <div className="map-data-error">
+            Language areas unavailable. Generate the atlas data to enable polygons.
+          </div>
+        }
+      >
+        <Suspense fallback={null}>
+          <LanguageLayers
+            inspectedVariantIds={inspection?.pinned ? inspection.variantIds : NO_VARIANT_IDS}
+          />
+        </Suspense>
+      </FeatureErrorBoundary>
+      <WordTrailLayer />
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
 
       <MapSettings projectionMode={projectionMode} onProjectionChange={setProjectionMode} />
 
-      <Suspense fallback={null}>
-        <MapHint />
-        {inspection && (
-          <LanguageInspector inspection={inspection} onClose={() => updateInspection(null)} />
-        )}
-      </Suspense>
+      <FeatureErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          {!trail && <MapHint />}
+          {inspection && (
+            <LanguageInspector inspection={inspection} onClose={() => updateInspection(null)} />
+          )}
+        </Suspense>
+      </FeatureErrorBoundary>
     </MapView>
   )
 }

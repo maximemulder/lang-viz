@@ -5,11 +5,15 @@ downloaded Glottolog and Glottography datasets by the offline Python pipeline.
 
 ## Build the proof of concept
 
+Run these commands from the repository root. The geographic pipeline requires
+Python 3.12+, `uv`, Git, and a C++ compiler with Make. On macOS, Apple
+Command Line Tools provide the compiler, SQLite, and zlib headers.
+
 ```sh
 bash ./pipeline/atlas/fetch-sources.sh
-uv sync
+uv sync --frozen --no-dev
 bash ./pipeline/atlas/bootstrap-tippecanoe.sh
-uv run python -m pipeline.atlas.build
+uv run --frozen --no-dev python -m pipeline.atlas.build
 cd app
 npm install
 npm run dev
@@ -19,6 +23,13 @@ Generated browser artifacts are written to `app/public/data/` and are not
 committed. The normalized intermediate geometry is written to `data/processed/`.
 External datasets and Tippecanoe are fetched at the exact revisions recorded in
 `pipeline/atlas/sources.lock.tsv`.
+
+If the app says **Atlas data unavailable**, run the first four commands above
+to generate `app/public/data/manifest.json`, the language/source catalogs, and
+`language-areas.pmtiles`. Then reload the browser page; the running development
+server will serve the new files automatically. Restarting the frontend alone does
+not generate geographic data. This is normally a one-time setup per checkout;
+rerun it when the pinned sources or geographic pipeline change.
 
 The generated geometry catalog preserves four temporal source views:
 
@@ -48,6 +59,22 @@ npm run check
 npm run typecheck
 npm run build
 ```
+
+## Word histories and etymology
+
+Choose **Word histories** to explore the supplied DiACL word histories, search
+forms/meanings/languages, inspect word and relationship evidence, and compare
+forms for a concept. **Show on atlas** places the current history's language focal
+points and connections on the existing map. **Explore word entries** in a pinned
+map inspector opens lexical entries by exact Glottocode.
+
+The lexical feature builds automatically during `npm run dev`, `npm test`, and
+`npm run build` (Python 3 required). It reads the checked-in exports under
+`etymology/data/` and writes ignored static data to `app/public/etymology/`. Lexical data
+is fetched only when Word Histories opens. The existing geographic pipeline remains
+separate; word histories work without its generated catalog and tiles.
+
+See [integration, data matching, and exploration notes](etymology/README.md).
 
 ## Overlap hatching proof of concept
 

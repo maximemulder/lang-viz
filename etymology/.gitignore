@@ -1,0 +1,6 @@
+# Rebuildable standalone prototype copies; source remains in word-trails/dist/.
+word-trails/OPEN-ME.html
+word-trails/dist/data.js
+
+# Hosting metadata belongs to the original standalone deployment.
+word-trails/.openai/

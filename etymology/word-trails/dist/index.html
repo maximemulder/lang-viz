@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Explore recorded word histories, borrowing, and inheritance in the DiACL database. An interactive Data Visualization midterm prototype.">
+  <title>Word Trails — An Etymology Explorer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#workspace">Skip to explorer</a>
+<div class="app">
+  <aside class="rail" aria-label="Explorer navigation">
+    <a class="brand" href="#word=69562&amp;view=history" aria-label="Word Trails home"><span class="brand-mark" aria-hidden="true">w<span>↗</span></span><span>Word Trails<small>A LANGUAGE EXPLORER</small></span></a>
+    <div class="rail-rule"></div>
+    <p class="eyebrow">YOUR STARTING POINT</p>
+    <h2>Follow a word.<br>Find its connections.</h2>
+    <p class="rail-intro">Explore the paths that words take across languages.</p>
+    <label class="field-label" for="list-select">Vocabulary collection</label>
+    <select id="list-select" aria-label="Vocabulary collection"></select>
+    <label class="field-label" for="concept-select">Concept</label>
+    <select id="concept-select" aria-label="Select a concept"></select>
+    <button id="browse-concept" class="rail-action">Browse word entries <span aria-hidden="true">↗</span></button>
+    <div class="rail-rule"></div>
+    <p class="eyebrow">TRY A WORD HISTORY</p>
+    <div class="example-list">
+      <button class="example active" data-example="69562"><span>01</span><strong>wine</strong><small>Borrowed, then inherited</small><b aria-hidden="true">↗</b></button>
+      <button class="example" data-example="38213"><span>02</span><strong>water</strong><small>A reconstructed connection</small><b aria-hidden="true">↗</b></button>
+      <button class="example" data-example="38208"><span>03</span><strong>tooth</strong><small>Through earlier English</small><b aria-hidden="true">↗</b></button>
+    </div>
+    <div class="rail-bottom"><span class="live-dot"></span> Based on DiACL exports<small>Lexical snapshot · 24 Oct 2026</small><button id="about-button">About the data & prototype ↗</button></div>
+  </aside>
+  <div class="main-shell">
+    <header class="topbar">
+      <div class="search-wrap"><label for="word-search" class="sr-only">Search word forms, meanings, or languages</label><span class="search-icon" aria-hidden="true">⌕</span><input id="word-search" type="search" placeholder="Search a word, meaning, or language…" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd><div id="search-results" class="search-results" hidden></div></div>
+      <span class="prototype-label"><span></span> MIDTERM PROTOTYPE</span>
+    </header>
+    <main id="workspace">
+      <div class="page-heading"><div><p class="eyebrow">WORDS HAVE HISTORIES</p><h1>Where does <em id="focus-form">wine</em> come from?</h1><p id="focus-context">English · “wine”</p></div><button class="quiet-button" id="guide-button">How to explore <span aria-hidden="true">?</span></button></div>
+      <div id="guide" class="guide" hidden><strong>Start with a question.</strong> Follow arrows from source to later form. Select a word to inspect it, or select a connection to read its evidence. Use “Trace this word” to start a new history. Graph spacing does not represent dates.<button id="close-guide" aria-label="Close exploration guide">×</button></div>
+      <nav class="view-tabs" aria-label="Visualization views"><button data-view="history" class="active" aria-pressed="true"><span aria-hidden="true">⑂</span> Word history</button><button data-view="family" aria-pressed="false"><span aria-hidden="true">≡</span> Family comparison</button><button data-view="map" aria-pressed="false"><span aria-hidden="true">◎</span> Language map</button></nav>
+      <div class="workspace-grid">
+        <section class="visual-panel" aria-label="Main visualization">
+          <div class="panel-head"><div><p class="eyebrow" id="view-kicker">TRACE THE CONNECTIONS</p><h2 id="view-title">A word’s recorded journey</h2></div><span class="count-chip" id="visible-count">Loading data…</span></div>
+          <div class="view-controls" id="history-controls"><label>Earlier steps <select id="depth-select"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="6">6</option></select></label><label class="check-label"><input id="branches-check" type="checkbox" checked> Nearby branches</label><label class="check-label"><input id="stubs-check" type="checkbox"> Placeholders</label></div>
+          <div class="view-controls" id="family-controls" hidden><label>Family <select id="family-select"><option value="all">All represented families</option></select></label><label class="check-label"><input id="missing-check" type="checkbox"> Include languages with no concept entry</label></div>
+          <div class="view-controls" id="map-controls" hidden><label class="check-label"><input id="map-links-check" type="checkbox" checked> Show selected word links</label><small>Representative language focal points</small></div>
+          <div id="history-view" class="view-content"><div class="graph-wrap" id="graph-wrap"><svg id="history-graph" role="group" aria-label="Recorded word-history graph"></svg><div class="graph-tools"><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit-graph">Fit view</button><button id="zoom-in" aria-label="Zoom in">+</button></div><span class="graph-direction">SOURCE → LATER / DERIVED FORM</span></div></div>
+          <div id="family-view" class="view-content family-view" hidden><div id="comparison-summary" class="comparison-summary"></div><div class="table-scroll"><table><thead><tr><th scope="col">Language / family</th><th scope="col">Word forms</th><th scope="col">Recorded incoming relationships</th></tr></thead><tbody id="family-rows"></tbody></table></div></div>
+          <div id="map-view" class="view-content" hidden><div class="map-wrap"><svg id="language-map" role="group" aria-label="Representative locations of languages in the current word history"></svg></div><div id="map-status" class="map-status"></div><div id="map-language-list" class="map-language-list"></div></div>
+          <div class="legend" id="graph-legend"><span><i class="line inherited"></i>Inherited</span><span><i class="line borrowed"></i>Certainly borrowed</span><span><i class="line probable"></i>Probably borrowed</span><span><i class="line unspecified"></i>Unspecified</span><span><i class="line derivation"></i>Derivation</span><span><i class="line uncertain"></i>Uncertain origin</span><span><i class="line wander"></i>Wanderwort</span></div>
+          <div class="panel-foot"><span id="view-note">Loading the lexical dataset…</span><button id="reset-button">Reset example ↺</button></div>
+        </section>
+        <aside class="inspector" aria-label="Selected word or relationship details"><div class="inspector-top"><p class="eyebrow" id="detail-kind">SELECTED WORD</p><span class="tiny-dot"></span></div><div id="details" aria-live="polite"><h2>wine</h2><p>Loading word histories…</p></div></aside>
+      </div>
+      <section class="reading-strip"><div><span class="strip-number">01</span><p><strong>A word’s history ≠ a language’s family.</strong><small>Borrowing connects words across branches of the language tree.</small></p></div><div><span class="strip-number">02</span><p><strong>Unspecified doesn’t mean unrelated.</strong><small>A recorded link may lack a classification or an intermediate form.</small></p></div></section>
+      <footer><span>DIACL · <span id="dataset-count">74,635</span> word entries · 466 language records</span><span>Explore evidence. Keep uncertainty visible.</span></footer>
+    </main>
+  </div>
+</div>
+<dialog id="about-dialog"><div class="dialog-head"><p class="eyebrow">ABOUT WORD TRAILS</p><button id="close-about" aria-label="Close about dialog">×</button></div><h2>A first view into word histories.</h2><p>This midterm prototype supports tracing recorded etymological paths, comparing expressions for a concept, and inspecting the sources behind a connection.</p><h3>What is included?</h3><p>All 74,635 lexical records and 46,351 etymological links from your DiACL lexical export. Family grouping uses the supplied language tree: 450 of 466 lexical language records are mapped. The remaining records stay available as “Unmapped in tree.”</p><h3>How to read it</h3><ul><li>Arrows are recorded word relationships, not language-family edges.</li><li>An asterisk marks a reconstructed form; placeholder nodes are labeled separately.</li><li>Graph depth counts recorded links, not years. Some links skip intermediate stages.</li><li>The map shows representative language locations, not exact transmission routes.</li><li>Matching a concept does not automatically establish cognacy.</li><li>Missing records do not prove a word or relationship did not exist.</li></ul><h3>Data & sources</h3><p>Lexical export: 24 October 2026. Language tree: 23 October 2026. Word-list structure: 28 October 2026. Word-entry and relationship references remain separately inspectable.</p><p>The separate 422-row CSV is a metadata subset. The grammar export covers 17 Austronesian languages; it is reserved for future work and is not used to infer etymology.</p><p><a href="https://compling.eu/diacl/" target="_blank" rel="noopener">DiACL documentation ↗</a> · <a href="https://diacl.uni-frankfurt.de/" target="_blank" rel="noopener">DiACL database ↗</a></p><p class="muted">Data credit: Carling, Gerd (ed.), Diachronic Atlas of Comparative Linguistics Online, Goethe University Frankfurt. This is a student prototype, not an authoritative etymological dictionary.</p></dialog>
+<div id="toast" role="status" hidden></div>
+<script src="data.js"></script><script src="app.js"></script>
+</body>
+</html>

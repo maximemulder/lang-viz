@@ -12,7 +12,11 @@
     "check": "biome check .",
     "check:write": "biome check --write .",
     "format": "biome format --write .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "data:etymology": "python3 ../pipeline/etymology/build.py",
+    "predev": "npm run data:etymology",
+    "prebuild": "npm run data:etymology",
+    "pretest": "npm run data:etymology"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",

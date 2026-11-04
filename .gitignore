@@ -5,3 +5,5 @@ __pycache__/
 *.py[cod]
 data/processed/
 app/public/data/
+app/public/etymology/
+.DS_Store
