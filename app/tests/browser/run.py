@@ -233,8 +233,7 @@ def check_pixels(browser):
     samples = {}
     for projection in ("globe", "mercator"):
         browser.js(
-            "const select=document.querySelector('#map-settings-panel select');"
-            "select.value=arguments[0];select.dispatchEvent(new Event('change',{bubbles:true}))",
+            "document.querySelector('input[name=map-projection][value='+arguments[0]+']').click()",
             projection,
         )
         # Sampling happens in a render callback, before the drawing buffer is discarded.
@@ -644,7 +643,7 @@ def main():
                         case["solidPixels"] = check_pixels(browser)
                         # Restore globe before the existing navigation checks.
                         browser.js(
-                            "const select=document.querySelector('#map-settings-panel select');select.value='globe';select.dispatchEvent(new Event('change',{bubbles:true}))"
+                            "document.querySelector('input[name=map-projection][value=globe]').click()"
                         )
 
                     if scenario["name"] in ("britain-small", "britain-all"):
@@ -652,7 +651,7 @@ def main():
                         case["areaContinuity"] = {}
                         for projection in ("globe", "mercator"):
                             browser.js(
-                                "const select=document.querySelector('#map-settings-panel select');select.value=arguments[0];select.dispatchEvent(new Event('change',{bubbles:true}))",
+                                "document.querySelector('input[name=map-projection][value='+arguments[0]+']').click()",
                                 projection,
                             )
                             case["areaContinuity"][projection] = check_area_continuity(
@@ -662,7 +661,7 @@ def main():
                                 browser, args, projection
                             )
                         browser.js(
-                            "const select=document.querySelector('#map-settings-panel select');select.value='globe';select.dispatchEvent(new Event('change',{bubbles:true}))"
+                            "document.querySelector('input[name=map-projection][value=globe]').click()"
                         )
 
                     if scenario["name"] in ("britain-small", "britain-all"):

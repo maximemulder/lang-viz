@@ -1,8 +1,58 @@
 import { useAtom, useAtomValue } from 'jotai'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { languageOpacityAtom, overlapModeAtom, overlapStatusAtom } from '../../state/atlasState'
 
+import { globeLandPath, mercatorLandPath } from './projectionIcons'
+
 export type ProjectionMode = 'globe' | 'mercator'
+
+const SettingIcon = ({ kind }: { readonly kind: ProjectionMode | 'hatching' | 'blending' }) => {
+  const id = useId()
+  return (
+    <svg className="map-settings__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      {kind === 'globe' ? (
+        <>
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.25" />
+          <path d={globeLandPath} fill="currentColor" />
+        </>
+      ) : kind === 'mercator' ? (
+        <>
+          <rect
+            x="1.5"
+            y="4"
+            width="21"
+            height="16"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.25"
+          />
+          <path d={mercatorLandPath} fill="currentColor" />
+        </>
+      ) : (
+        <>
+          <defs>
+            <pattern
+              id={id}
+              width="4"
+              height="4"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(35)"
+            >
+              <path fill="#c77b60" d="M0 0h2v4H0z" />
+              <path fill="#7e9e92" d="M2 0h2v4H2z" />
+            </pattern>
+          </defs>
+          <rect x="2" y="4" width="13" height="14" rx="2" fill="#c77b60" />
+          <rect x="9" y="6" width="13" height="14" rx="2" fill="#7e9e92" />
+          <path
+            d="M11 6h4v10a2 2 0 0 1-2 2H9V8a2 2 0 0 1 2-2Z"
+            fill={kind === 'hatching' ? `url(#${id})` : '#a28d79'}
+          />
+        </>
+      )}
+    </svg>
+  )
+}
 
 export const MapSettings = ({
   projectionMode,
@@ -11,6 +61,7 @@ export const MapSettings = ({
   readonly projectionMode: ProjectionMode
   readonly onProjectionChange: (mode: ProjectionMode) => void
 }) => {
+  const tooltipId = useId()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
@@ -67,30 +118,58 @@ export const MapSettings = ({
         aria-label="Map settings"
         hidden={!open}
       >
-        <label>
-          <span>Projection</span>
-          <select
-            value={projectionMode}
-            onChange={(event) =>
-              onProjectionChange(event.currentTarget.value === 'globe' ? 'globe' : 'mercator')
-            }
-          >
-            <option value="globe">Globe</option>
-            <option value="mercator">Mercator</option>
-          </select>
-        </label>
-        <label>
-          <span>Overlap style</span>
-          <select
-            value={mode}
-            onChange={(event) =>
-              setMode(event.currentTarget.value === 'blending' ? 'blending' : 'hatching')
-            }
-          >
-            <option value="hatching">Alternating stripes</option>
-            <option value="blending">Color blending</option>
-          </select>
-        </label>
+        <fieldset className="map-settings__group">
+          <legend>Projection</legend>
+          <div className="map-settings__choices">
+            {(['globe', 'mercator'] as const).map((projection) => (
+              <label className="map-settings__choice" key={projection}>
+                <input
+                  type="radio"
+                  name="map-projection"
+                  value={projection}
+                  aria-label={projection === 'globe' ? 'Globe' : 'Mercator'}
+                  aria-describedby={`${tooltipId}-${projection}`}
+                  checked={projectionMode === projection}
+                  onChange={() => onProjectionChange(projection)}
+                />
+                <span className="map-settings__tile">
+                  <SettingIcon kind={projection} />
+                </span>
+                <span
+                  className="map-settings__tooltip"
+                  id={`${tooltipId}-${projection}`}
+                  role="tooltip"
+                >
+                  {projection === 'globe' ? 'Globe' : 'Mercator'}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="map-settings__group">
+          <legend>Overlap style</legend>
+          <div className="map-settings__choices">
+            {(['hatching', 'blending'] as const).map((style) => (
+              <label className="map-settings__choice" key={style}>
+                <input
+                  type="radio"
+                  name="map-overlap"
+                  value={style}
+                  aria-label={style === 'hatching' ? 'Alternating stripes' : 'Color blending'}
+                  aria-describedby={`${tooltipId}-${style}`}
+                  checked={mode === style}
+                  onChange={() => setMode(style)}
+                />
+                <span className="map-settings__tile">
+                  <SettingIcon kind={style} />
+                </span>
+                <span className="map-settings__tooltip" id={`${tooltipId}-${style}`} role="tooltip">
+                  {style === 'hatching' ? 'Alternating stripes' : 'Color blending'}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <label className="map-opacity-control" htmlFor="language-opacity">
           <span>
             Color intensity
@@ -109,13 +188,11 @@ export const MapSettings = ({
           className="map-settings__status"
           role="status"
           data-overlap-status={status}
-          hidden={mode === 'hatching' && status === 'idle'}
+          hidden={mode === 'blending' || status === 'idle'}
         >
-          {mode === 'blending'
-            ? 'Overlapping colors are blended'
-            : status === 'idle'
-              ? null
-              : message || 'Preparing overlap stripes…'}
+          {mode === 'hatching' && status !== 'idle'
+            ? message || 'Preparing overlap stripes…'
+            : null}
         </p>
       </section>
     </div>
