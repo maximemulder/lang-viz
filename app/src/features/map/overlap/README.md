@@ -224,6 +224,11 @@ a fixed screen width throughout zooming.
 - `OverlapHatching.tsx` connects application state and map events to the controller
   and declares the solid, stripe, and fallback layers. Loading/error feedback and
   Retry are visible on the map, independently of the settings panel.
+- `testing/` isolates browser fixture configuration, the test bridge, and synthetic
+  globe seam probes. React loads the controls only with `?overlap-test`; ordinary
+  navigation does not download the bridge or its fixture code. `diagnostics.ts`
+  keeps the small, flag-gated runtime metrics and fault-injection hooks used by
+  the controller and tile protocols. Britain remains a browser regression fixture.
 
 
 ## Geometry engine and ownership

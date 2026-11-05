@@ -32,6 +32,12 @@ Use `npm run test:browser -- --dev --scenario britain-small` to run the same
 checks against Vite development serving, including the MapLibre transform.
 The default remains the production build.
 
+The `?overlap-test` flag lazily loads `src/features/map/overlap/testing/`, which
+owns fixture selection, `window.overlapTest`, render observers, and the synthetic
+seam probe. The runner waits for that interface before configuring a scenario.
+Britain examples remain test fixtures; the application settings contain no demo
+selection or camera shortcut.
+
 ## Scenarios and outcomes
 
 `scenarios.json` defines Britain, a dense African region, and a world view, with

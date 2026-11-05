@@ -1,6 +1,6 @@
 import { addProtocol, Map as MapLibreMap, removeProtocol } from 'maplibre-gl'
-import { COVERAGE_LAYER, deliveryTile, encodeCoverageTile, tileKey } from './delivery.ts'
-import type { TileCoordinate } from './types.ts'
+import { COVERAGE_LAYER, deliveryTile, encodeCoverageTile, tileKey } from '../delivery.ts'
+import type { TileCoordinate } from '../types.ts'
 
 const nativeTile = (tile: TileCoordinate) => {
   // Adjacent rows deliberately have different boundary vertices. The canonical

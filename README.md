@@ -49,16 +49,15 @@ npm run typecheck
 npm run build
 ```
 
-## Overlap hatching proof of concept
+## Overlap rendering
 
 The map defaults to **Alternating stripes**: shared areas cycle through the
-colors of all selected languages covering them. Use **Try Britain example** to
-select English, Welsh, Scottish Gaelic, and Irish from the same contemporary
-Asher source and fly to their areas. The **Color blending** option provides the
-previous rendering for comparison. Hover and click inspect the displayed regions,
-including all contributors to an overlap at the displayed detail level.
+colors of all selected languages covering them. Select languages in the language
+panel and choose **Alternating stripes** or **Color blending** in Map settings.
+Hover and click inspect the displayed regions, including all contributors to an
+overlap at the displayed detail level.
 
-**Color strength** defaults to 82% and can be adjusted between 40% and 100%.
+**Color intensity** defaults to 82% and can be adjusted between 40% and 100%.
 Solid areas and overlap stripes share the same transparency. They are composited
 once over the basemap, so transparent stripes do not reveal other language fills
 underneath. Adjusting the slider does not recompute geometry.

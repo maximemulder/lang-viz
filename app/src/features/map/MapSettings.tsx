@@ -1,18 +1,8 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { useAtom, useAtomValue } from 'jotai'
 import { useEffect, useRef, useState } from 'react'
-import { useMap } from 'react-map-gl/maplibre'
-import {
-  geographyDatasetFilterAtom,
-  languageOpacityAtom,
-  overlapModeAtom,
-  overlapStatusAtom,
-  temporalViewAtom,
-  visibleLanguageIdsAtom,
-} from '../../state/atlasState'
+import { languageOpacityAtom, overlapModeAtom, overlapStatusAtom } from '../../state/atlasState'
 
 export type ProjectionMode = 'globe' | 'mercator'
-
-const EXAMPLE_LANGUAGE_IDS = ['stan1293', 'wels1247', 'scot1245', 'iris1253']
 
 export const MapSettings = ({
   projectionMode,
@@ -21,16 +11,12 @@ export const MapSettings = ({
   readonly projectionMode: ProjectionMode
   readonly onProjectionChange: (mode: ProjectionMode) => void
 }) => {
-  const { current: map } = useMap()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const [mode, setMode] = useAtom(overlapModeAtom)
   const [opacity, setOpacity] = useAtom(languageOpacityAtom)
   const { status, message } = useAtomValue(overlapStatusAtom)
-  const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
-  const setPeriod = useSetAtom(temporalViewAtom)
-  const setDatasetFilter = useSetAtom(geographyDatasetFilterAtom)
 
   useEffect(() => {
     if (!open) return
@@ -53,14 +39,6 @@ export const MapSettings = ({
       document.removeEventListener('keydown', dismissOnEscape)
     }
   }, [open])
-
-  const showExample = () => {
-    setPeriod('contemporary')
-    setDatasetFilter(['asher2007world'])
-    setVisibleIds(EXAMPLE_LANGUAGE_IDS)
-    setMode('hatching')
-    map?.flyTo({ center: [-4.5, 54.2], zoom: 4.4, duration: 900 })
-  }
 
   return (
     <div className="map-settings" ref={containerRef}>
@@ -127,18 +105,18 @@ export const MapSettings = ({
             onChange={(event) => setOpacity(Number(event.currentTarget.value) / 100)}
           />
         </label>
-        <div className="map-settings__example">
-          <button type="button" onClick={showExample}>
-            Try Britain example
-          </button>
-          <p role="status" data-overlap-status={status}>
-            {mode === 'blending'
-              ? 'Overlapping colors are blended'
-              : status === 'idle'
-                ? 'Select two or more languages, or try the example'
-                : message || 'Preparing overlap stripes…'}
-          </p>
-        </div>
+        <p
+          className="map-settings__status"
+          role="status"
+          data-overlap-status={status}
+          hidden={mode === 'hatching' && status === 'idle'}
+        >
+          {mode === 'blending'
+            ? 'Overlapping colors are blended'
+            : status === 'idle'
+              ? null
+              : message || 'Preparing overlap stripes…'}
+        </p>
       </section>
     </div>
   )

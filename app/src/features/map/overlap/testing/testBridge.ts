@@ -1,14 +1,14 @@
 import type { ErrorEvent, Map as MapLibreMap } from 'maplibre-gl'
-import { featureVariantIds, visibleVariantIds } from '../inspection'
+import { featureVariantIds, visibleVariantIds } from '../../inspection'
 import {
   browserMessages,
   failNextPublication,
-  type OverlapTestApi,
   overlapDiagnostics,
   setTileDelay,
-} from './diagnostics'
-import { BUFFERS, coverageSourceId, fallbackLayerId, stripeLayerId } from './layerIds'
-import { serviceDiagnostics } from './serviceDiagnostics'
+} from '../diagnostics'
+import { BUFFERS, coverageSourceId, fallbackLayerId, stripeLayerId } from '../layerIds'
+import { serviceDiagnostics } from '../serviceDiagnostics'
+import type { OverlapTestApi } from './api'
 
 /** Test controls and observers use public MapLibre APIs only. */
 export const installOverlapTestApi = (

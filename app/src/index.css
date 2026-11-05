@@ -550,21 +550,10 @@ h2 {
   font-size: 0.8rem;
 }
 
-.map-settings__example {
-  display: grid;
-  gap: 0.5rem;
+.map-settings__status {
+  margin: 0;
   padding-top: 0.8rem;
   border-top: 1px solid rgb(29 43 39 / 12%);
-}
-
-.map-settings__example button {
-  min-height: 2.25rem;
-  padding: 0.45rem;
-  border: 0;
-  border-radius: 0.35rem;
-  color: var(--paper);
-  background: var(--ink);
-  font-size: 0.75rem;
 }
 
 .map-opacity-control span {

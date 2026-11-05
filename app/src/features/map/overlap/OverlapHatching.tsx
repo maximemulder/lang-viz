@@ -1,16 +1,13 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Layer, Source, useMap } from 'react-map-gl/maplibre'
 import { languageArchiveUrl } from '../../../data/atlasRepository'
 import type { GeometryVariant } from '../../../domain/atlas'
 import {
   atlasDataAtom,
-  geographyDatasetFilterAtom,
   languageOpacityAtom,
   overlapModeAtom,
   overlapStatusAtom,
-  temporalViewAtom,
-  visibleLanguageIdsAtom,
 } from '../../../state/atlasState'
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
 import { COVERAGE_LAYER } from './delivery'
@@ -23,9 +20,10 @@ import {
   solidLayerId,
   stripeLayerId,
 } from './mapResources'
-import { installOverlapTestApi } from './testBridge'
 import { tilesForBounds } from './tiles'
 import { OverlapWorkerClient } from './workerClient'
+
+const OverlapTestControls = lazy(() => import('./testing/OverlapTestControls'))
 
 export const OverlapHatching = ({
   variants,
@@ -41,12 +39,9 @@ export const OverlapHatching = ({
   const { current } = useMap()
   const map = current?.getMap()
   const data = useAtomValue(atlasDataAtom)
-  const [mode, setMode] = useAtom(overlapModeAtom)
+  const mode = useAtomValue(overlapModeAtom)
   const opacity = useAtomValue(languageOpacityAtom)
   const setOverlapStatus = useSetAtom(overlapStatusAtom)
-  const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
-  const setPeriod = useSetAtom(temporalViewAtom)
-  const setDatasetFilter = useSetAtom(geographyDatasetFilterAtom)
   const [state, setState] = useState<HatchingState>(idleHatchingState)
   const configRef = useRef({ selectionKey, mode })
   const controllerRef = useRef<ReturnType<typeof createOverlapController> | null>(null)
@@ -56,32 +51,6 @@ export const OverlapHatching = ({
   useEffect(() => {
     setOverlapStatus({ status: state.status, message: state.message })
   }, [setOverlapStatus, state.status, state.message])
-
-  useEffect(() => {
-    if (!diagnosticsEnabled || !map) return
-    return installOverlapTestApi(
-      map,
-      (options) => {
-        setPeriod('contemporary')
-        setDatasetFilter(['asher2007world'])
-        setMode('hatching')
-        setVisibleIds(
-          options.languageIds === 'all'
-            ? [
-                ...new Set(
-                  data.variants
-                    .filter((v) => v.datasetId === 'asher2007world')
-                    .map((v) => v.languageId),
-                ),
-              ]
-            : options.languageIds,
-        )
-        map.jumpTo({ center: options.center, zoom: options.zoom })
-      },
-      () => refreshRef.current?.(),
-      () => configRef.current.selectionKey,
-    )
-  }, [map, data, setPeriod, setDatasetFilter, setMode, setVisibleIds])
 
   useEffect(() => {
     if (!map) return
@@ -163,6 +132,11 @@ export const OverlapHatching = ({
 
   return (
     <>
+      {diagnosticsEnabled && map && (
+        <Suspense fallback={null}>
+          <OverlapTestControls map={map} configRef={configRef} refreshRef={refreshRef} />
+        </Suspense>
+      )}
       {mode === 'hatching' && (state.status === 'loading' || state.status === 'error') && (
         <div className="overlap-feedback" data-status={state.status} role="status">
           <span>{state.message}</span>
