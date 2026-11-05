@@ -28,6 +28,10 @@ currently produces a few MB, with no video, trace, or downloaded browser cache.
 Repeated runs with distinct output directories accumulate artifacts; delete old
 ones as needed. At least 1 GiB of free space is required before running.
 
+Use `npm run test:browser -- --dev --scenario britain-small` to run the same
+checks against Vite development serving, including the MapLibre transform.
+The default remains the production build.
+
 ## Scenarios and outcomes
 
 `scenarios.json` defines Britain, a dense African region, and a world view, with
@@ -68,6 +72,26 @@ Britain-small samples a 16×16 framebuffer patch inside English-only coverage at
 language's exact opaque RGB color. This catches the former one-texel grid artifact.
 Broader spatial coverage and stripe-boundary pixel checks remain future cases.
 
+Britain-small also clicks English-only coverage, English/Welsh shared coverage,
+and empty space through WebDriver pointer actions, checking displayed memberships
+and the actual inspection popup. It replaces the full style and verifies restored
+stripe images, unchanged coverage URLs, no geometry recomputation, and shared
+membership inspection. Full style replacement can temporarily remove every layer;
+its blank frames are recorded separately as `styleReloadBlankFrames`. Ordinary
+navigation retains the existing zero-blank-layer assertion.
+
+Both Britain selections additionally monitor an interior English/Welsh overlap
+at `[-4, 52.3]` on every render, across zooms 3.4–7.4, interrupted/reversed zoom
+animations, and nearby pans. Each sequence runs in globe and Mercator. The probe
+requires an active shared face at that location and more than two distinct RGB
+values in an 8×8 framebuffer patch (the reference interior stripe patch includes
+filtered band edges). Frames record zoom, active snapshot URL, shared-face presence,
+and color count, capped at 600 per sequence. This is a targeted visual regression
+for a known stable overlap, not proof of continuity for every location, projection
+backend, or subpixel region. New-detail replacements now wait for complete
+computation and atomic-source readiness after movement; initial loads and
+same-detail extensions retain progressive publication.
+
 The terrain basemap is disabled by default to avoid external network variability.
 `--terrain` includes it for an end-to-end check; failures to load it are reported
 as map errors. Globe is the default projection. `--hardware` lets Firefox choose
@@ -105,9 +129,8 @@ milliseconds:
 - `patternsMs`: cumulative pattern lookup, generation, and registration across batches.
 - `patternPixels`: distinct padded image texels required by the result; multiply
   by four for RGBA bytes. This excludes per-tile atlas copies and packing overhead.
-- `coverageSourceMs` and `fallbackSourceMs`: first observed readiness of each
-  matching staging source, measured from that snapshot's creation.
-  `sourceReadyMs` sums paired-source preparation elapsed time across publications.
+- `sourceReadyMs`: sums atomic-source preparation elapsed time across publications.
+  Each source tile contains both coverage and clipped fallback layers.
   It overlaps worker computation and includes React scheduling, MapLibre preparation,
   and fallback fetch/clip work; do not add it to worker time to predict total time.
 - `firstCoverageMs`: dispatch until the first partial snapshot passes source readiness.
@@ -150,7 +173,20 @@ no test controls and collect no request reports or browser observers.
 
 The interface provides `configure({languageIds, center, zoom})`,
 `camera(center, zoom, duration?)`, `recompute()`, `unexpectedMemberships()`,
-`failNextPublication(service)`, `samplePixels(center, radius)`, and `snapshot()`. Selection uses
+`failNextPublication(service)`, `samplePixels(center, radius)`, `inspect(center)`,
+`reloadStyle()`, `watchStripes(centerOrNull)`, and `snapshot()`. Selection uses
 the application's state setters, and map observations use public MapLibre APIs.
 No React internals or worker monkey-patching is involved. History is bounded to
 100 request reports, 200 console messages, and 600 render intervals per document.
+
+Area lifecycle regressions sample eleven known Britain land locations on every
+render (up to 1,000 frames per sequence). They animate zooms 3.4–7.4 and same-detail
+pans, with coverage delivery and then fallback delivery independently delayed by
+700 ms. Both selections run in globe and Mercator. A point must retain a visible
+fill and its framebuffer pixel must differ from the flat ocean background after
+it has first loaded while in view. Newly exposed, never-loaded points may load
+normally; leaving the viewport resets that point's history. Per-frame evidence is
+saved as `area-<projection>-<service>.json`, and in `areaContinuity` reports.
+These checks reproduced losses from both upstream tile retention and independently
+loaded coverage/fallback masks; both corrections are required. They complement
+rather than replace the interior stripe and exact solid-color pixel checks.

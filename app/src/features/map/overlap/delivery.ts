@@ -46,7 +46,7 @@ export const encodeCoverageTile = (result: CoverageTile): DeliveryTile => ({
         pattern: feature.properties.pattern,
         ...(feature.properties.variantIds.length === 1
           ? { variantId: feature.properties.variantIds[0] as string }
-          : {}),
+          : { variantIds: JSON.stringify(feature.properties.variantIds) }),
       },
       geometry: feature.geometry.coordinates.flatMap((polygon) =>
         polygon.map((ring, index) => {
@@ -109,4 +109,12 @@ export const deliveryTile = (
     }
   }
   return encode(features)
+}
+
+/** MVT repeats its layer field: concatenate distinct layers without re-encoding. */
+export const combineTileLayers = (coverage: Uint8Array, fallback: Uint8Array): Uint8Array => {
+  const data = new Uint8Array(coverage.length + fallback.length)
+  data.set(coverage)
+  data.set(fallback, coverage.length)
+  return data
 }

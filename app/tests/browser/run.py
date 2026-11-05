@@ -151,6 +151,29 @@ class Browser:
 
         return wait_for(probe, timeout, "overlap result and first rendered coverage")
 
+    def settled(self, timeout):
+        stable_since = None
+        previous = None
+
+        def probe():
+            nonlocal stable_since, previous
+            state = self.snapshot()
+            stamp = (len(state["reports"]), state["status"])
+            ready = (
+                state["mapLoaded"]
+                and state["tilesLoaded"]
+                and not state["moving"]
+                and state["status"] == "ready"
+            )
+            if not ready or stamp != previous or stable_since is None:
+                previous = stamp
+                stable_since = time.monotonic() if ready else None
+            if ready and stable_since is not None and time.monotonic() - stable_since >= 0.3:
+                return state
+            return None
+
+        return wait_for(probe, timeout, "settled projection, navigation debounce and coverage")
+
     def screenshot(self, path):
         path.write_bytes(base64.b64decode(self.call("GET", "/screenshot")))
 
@@ -276,8 +299,205 @@ def check_failure_recovery(browser, url, args):
     return results
 
 
+def check_inspection(browser):
+    """Real pointer clicks must explain the membership of the displayed MVT face."""
+    results = []
+    for center, expected in (
+        ([-1.5, 52.5], ["stan1293"]),
+        ([-4, 52.3], ["stan1293", "wels1247"]),
+        ([2, 52.5], []),
+    ):
+        hit = browser.js("return window.overlapTest.inspect(arguments[0])", center)
+        members = sorted(variant.split(":")[-1] for variant in hit["variantIds"])
+        assert members == sorted(expected), (
+            f"Unexpected displayed membership at {center}: {members}"
+        )
+        x, y = hit["point"]
+        browser.call(
+            "POST",
+            "/actions",
+            {
+                "actions": [
+                    {
+                        "type": "pointer",
+                        "id": "inspection-mouse",
+                        "parameters": {"pointerType": "mouse"},
+                        "actions": [
+                            {
+                                "type": "pointerMove",
+                                "duration": 0,
+                                "origin": "viewport",
+                                "x": x,
+                                "y": y,
+                            },
+                            {"type": "pointerDown", "button": 0},
+                            {"type": "pointerUp", "button": 0},
+                        ],
+                    }
+                ]
+            },
+        )
+        wait_for(
+            lambda expected=expected: browser.js(
+                "return document.querySelectorAll('.language-inspector__entry').length===arguments[0]",
+                len(expected),
+            ),
+            10,
+            "inspection popup membership",
+        )
+        text = browser.js("return document.querySelector('.language-inspector')?.textContent || ''")
+        assert all(language in text for language in expected), (
+            f"Popup disagrees with coverage: {text}"
+        )
+        results.append({"center": center, "variantIds": hit["variantIds"]})
+    browser.call("DELETE", "/actions")
+    return results
+
+
+def check_style_reload(browser, args):
+    before = browser.snapshot()
+    browser.js("window.overlapTest.reloadStyle()")
+    state = wait_for(
+        lambda: (
+            s
+            if (s := browser.snapshot())["tilesLoaded"]
+            and not s["styleReloading"]
+            and s["patternImages"] > 0
+            else None
+        ),
+        args.timeout,
+        "coverage after style replacement",
+    )
+    check_state(state, require_stripes=True)
+    assert state["coverageUrls"] == before["coverageUrls"], "Style reload replaced valid geometry"
+    assert len(state["reports"]) == len(before["reports"]), "Style reload recomputed geometry"
+    # Image restoration is lazy: only patterns used by visible render tiles need
+    # to return immediately; offscreen retained patterns restore when requested.
+    assert not state["missingVisiblePatterns"], "Style reload lost visible stripe images"
+    assert browser.js("return window.overlapTest.inspect([-4,52.3]).variantIds.length") == 2
+    return state
+
+
+def check_zoom_continuity(browser, args, projection):
+    """A stable shared location must remain striped throughout large zoom changes."""
+    browser.js("window.overlapTest.watchStripes([-4,52.3])")
+    for zoom in (7.4, 3.4, 6.4, 4.4):
+        after = len(browser.snapshot()["reports"])
+        browser.js("window.overlapTest.camera([-4,52.3],arguments[0],900)", zoom)
+        state = browser.terminal(after, args.timeout)
+        check_state(state, require_stripes=True)
+    after = len(browser.snapshot()["reports"])
+    browser.call(
+        "POST",
+        "/execute/async",
+        {
+            "script": "const done=arguments[arguments.length-1];"
+            "window.overlapTest.camera([-4,52.3],7.4,900);"
+            "setTimeout(()=>window.overlapTest.camera([-4,52.3],3.4,900),180);"
+            "setTimeout(()=>window.overlapTest.camera([-4,52.3],6.4,900),360);"
+            "setTimeout(done,1400)",
+            "args": [],
+        },
+    )
+    state = browser.terminal(after, args.timeout)
+    check_state(state, require_stripes=True)
+    for center in ([-1, 53.5], [-4, 52.3]):
+        browser.js("window.overlapTest.camera(arguments[0],6.4,600)", center)
+        wait_for(lambda: not browser.snapshot()["moving"], args.timeout, "nearby pan")
+        time.sleep(0.2)  # allow the 120 ms navigation debounce to dispatch
+        state = wait_for(
+            lambda: (
+                s if (s := browser.snapshot())["status"] != "loading" and s["tilesLoaded"] else None
+            ),
+            args.timeout,
+            "pan publication",
+        )
+        check_state(state, require_stripes=True)
+    after = len(browser.snapshot()["reports"])
+    browser.js("window.overlapTest.camera([-4,52.3],4.4,900)")
+    check_state(browser.terminal(after, args.timeout), require_stripes=True)
+    state = browser.snapshot()
+    browser.js("window.overlapTest.watchStripes(null)")
+    frames = state["stripeFrames"]
+    lost = [frame for frame in frames if not frame["shared"]]
+    flat = [frame for frame in frames if frame["colors"] <= 2]
+    print(
+        f"Zoom continuity ({projection}): {len(frames)} sampled frames; {len(lost)} lost shared coverage; {len(flat)} flat pixel patches",
+        flush=True,
+    )
+    assert len(frames) >= 20, "Too few zoom frames sampled"
+    assert not lost, f"Shared coverage popped out during zoom: {lost[:8]}"
+    assert not flat, f"Stripe pixel patch became flat during zoom: {flat[:8]}"
+    return frames
+
+
+def check_area_continuity(browser, args, projection):
+    """Previously filled land interiors must survive delayed tile replacements."""
+    points = [
+        [-4, 52.3],
+        [-3, 52.3],
+        [-2, 52.3],
+        [-1, 52.3],
+        [0, 52.3],
+        [-0.3, 52.3],
+        [-3, 53.3],
+        [-2, 53.3],
+        [-1, 53.3],
+        [-2, 54.3],
+        [-3, 54.3],
+    ]
+    results = {}
+    for service in ("coverage", "fallback"):
+        browser.js(
+            "window.overlapTest.watchAreas(arguments[0]);window.overlapTest.setTileDelay(arguments[1],700)",
+            points,
+            service,
+        )
+        for center, zoom in [
+            ([-4, 52.3], 7.4),
+            ([-4, 52.3], 3.4),
+            ([-1, 53.3], 6.4),
+            ([-4, 52.3], 6.4),
+            ([-4, 52.3], 4.4),
+        ]:
+            browser.js("window.overlapTest.camera(arguments[0],arguments[1],900)", center, zoom)
+            wait_for(lambda: not browser.snapshot()["moving"], args.timeout, "area navigation")
+            time.sleep(0.2)  # allow the navigation debounce to dispatch, if needed
+            state = wait_for(
+                lambda: (
+                    s
+                    if (s := browser.snapshot())["status"] != "loading" and s["tilesLoaded"]
+                    else None
+                ),
+                args.timeout,
+                "area tiles and publication",
+            )
+            check_state(state, require_stripes=True)
+        state = browser.snapshot()
+        browser.js(
+            "window.overlapTest.watchAreas(null);window.overlapTest.setTileDelay(arguments[0],0)",
+            service,
+        )
+        frames = state["areaFrames"]
+        missing = [f for f in frames if f["disappeared"]]
+        print(
+            f"Area continuity ({projection}, slow {service}): {len(frames)} frames, {len(missing)} with disappearance",
+            flush=True,
+        )
+        (args.output / f"area-{projection}-{service}.json").write_text(json.dumps(frames, indent=2))
+        assert len(frames) >= 20 and sum(f["samples"] for f in frames) >= 200
+        assert not missing, f"Language area disappeared: {missing[:8]}"
+        results[service] = frames
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="Check Vite development serving instead of the production build",
+    )
     parser.add_argument("--headed", action="store_true", help="Show the Firefox window")
     parser.add_argument("--hardware", action="store_true", help="Do not force software rendering")
     parser.add_argument(
@@ -300,13 +520,14 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     if shutil.disk_usage(args.output).free < 1024**3:
         parser.error("Keep at least 1 GiB free before building/running browser checks")
-    if not args.skip_build:
+    if not args.skip_build and not args.dev:
         subprocess.run(["npm", "run", "build"], cwd=APP, check=True)
 
     archive = APP / "public/data/language-areas.pmtiles"
     result = {
         "schemaVersion": 1,
         "environment": {
+            "serving": "development" if args.dev else "production",
             "platform": platform.platform(),
             "cpuCount": os.cpu_count(),
             "headed": args.headed,
@@ -342,7 +563,7 @@ def main():
             [
                 "npm",
                 "run",
-                "preview",
+                "dev" if args.dev else "preview",
                 "--",
                 "--host",
                 "127.0.0.1",
@@ -405,8 +626,28 @@ def main():
                         )
 
                     if scenario["name"] == "britain-small":
+                        case["inspection"] = check_inspection(browser)
+                        case["styleReload"] = check_style_reload(browser, args)
                         case["solidPixels"] = check_pixels(browser)
                         # Restore globe before the existing navigation checks.
+                        browser.js(
+                            "const select=document.querySelector('#map-settings-panel select');select.value='globe';select.dispatchEvent(new Event('change',{bubbles:true}))"
+                        )
+
+                    if scenario["name"] in ("britain-small", "britain-all"):
+                        case["zoomContinuity"] = {}
+                        case["areaContinuity"] = {}
+                        for projection in ("globe", "mercator"):
+                            browser.js(
+                                "const select=document.querySelector('#map-settings-panel select');select.value=arguments[0];select.dispatchEvent(new Event('change',{bubbles:true}))",
+                                projection,
+                            )
+                            case["areaContinuity"][projection] = check_area_continuity(
+                                browser, args, projection
+                            )
+                            case["zoomContinuity"][projection] = check_zoom_continuity(
+                                browser, args, projection
+                            )
                         browser.js(
                             "const select=document.querySelector('#map-settings-panel select');select.value='globe';select.dispatchEvent(new Event('change',{bubbles:true}))"
                         )
@@ -415,7 +656,11 @@ def main():
                         # At the same detail level, only newly exposed computation
                         # tiles cross the overlap worker boundary. Returning inside
                         # retained coverage must not dispatch another request.
-                        after = len(browser.snapshot()["reports"])
+                        # Projection changes can expose additional tiles at the same
+                        # camera. Finish that update before asserting cache reuse.
+                        previous_view = browser.settled(args.timeout)
+                        return_center = previous_view["camera"]["center"]
+                        after = len(previous_view["reports"])
                         browser.js("window.overlapTest.camera([25,54.2], 4.4, 400)")
                         state = browser.terminal(after, args.timeout)
                         check_state(state)
@@ -428,7 +673,9 @@ def main():
                         ), "Coverage regressed to whole-collection GeoJSON delivery"
                         case["pan"] = {"snapshot": state}
                         count = len(state["reports"])
-                        browser.js("window.overlapTest.camera([-4.5,54.2], 4.4, 400)")
+                        browser.js(
+                            "window.overlapTest.camera(arguments[0], 4.4, 400)", return_center
+                        )
                         wait_for(
                             lambda: not browser.snapshot()["moving"], args.timeout, "return pan"
                         )

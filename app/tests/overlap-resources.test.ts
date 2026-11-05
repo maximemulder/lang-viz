@@ -215,3 +215,28 @@ test('request deadline terminates a stuck worker, reports an explicit error, and
   assert.equal(responses.length, 2)
   client.terminate()
 })
+
+test('overlap initialization failures discard the module registry before Retry', () => {
+  const workers: FakeWorker[] = []
+  const client = new OverlapWorkerClient(() => {
+    const worker = new FakeWorker()
+    workers.push(worker)
+    return worker
+  })
+  const responses: OverlapResponse[] = []
+  client.onmessage = ({ data }) => responses.push(data)
+  client.postMessage(request(1))
+  workers[0]?.send({
+    requestId: 1,
+    error: 'Initialization failed',
+    failure: 'initialization-error',
+    durationMs: 1,
+  })
+  assert.equal(workers[0]?.terminated, true)
+  assert.equal(client.restarts, 1)
+  assert.equal(responses.length, 1)
+  client.postMessage(request(2))
+  workers[1]?.send(finished(2))
+  assert.equal(responses.length, 2)
+  client.terminate()
+})

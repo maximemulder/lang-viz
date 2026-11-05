@@ -55,8 +55,8 @@ The map defaults to **Alternating stripes**: shared areas cycle through the
 colors of all selected languages covering them. Use **Try Britain example** to
 select English, Welsh, Scottish Gaelic, and Irish from the same contemporary
 Asher source and fly to their areas. The **Color blending** option provides the
-previous rendering for comparison. Hover and click still inspect the original
-language polygons, including all contributors to an overlap.
+previous rendering for comparison. Hover and click inspect the displayed regions,
+including all contributors to an overlap at the displayed detail level.
 
 **Color strength** defaults to 82% and can be adjusted between 40% and 100%.
 Solid areas and overlap stripes share the same transparency. They are composited

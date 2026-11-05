@@ -3,14 +3,22 @@ import type { CoverageResources } from './controller.ts'
 import { COVERAGE_LAYER } from './delivery.ts'
 import { type CoverageSnapshot, registerCoverage, releaseCoverage } from './deliveryProtocol.ts'
 import { preparePublicationTest } from './diagnostics.ts'
-import { fallbackTilesUrl } from './fallbackProtocol.ts'
+import {
+  BUFFERS,
+  coverageSourceId,
+  fallbackLayerId,
+  solidLayerId,
+  stripeLayerId,
+} from './layerIds.ts'
 import { checkPatternBudget, MAX_PATTERN_PIXELS, patternPixels, stripeImage } from './patterns.ts'
 
-export const BUFFERS = [0, 1] as const
-export const coverageSourceId = (buffer: number) => `language-overlap-regions-${buffer}`
-export const stripeLayerId = (buffer: number) => `language-overlap-hatching-${buffer}`
-export const solidLayerId = (buffer: number) => `language-overlap-solids-${buffer}`
-export const fallbackSourceId = (buffer: number) => `language-overlap-fallback-${buffer}`
+export {
+  BUFFERS,
+  coverageSourceId,
+  fallbackLayerId,
+  solidLayerId,
+  stripeLayerId,
+} from './layerIds.ts'
 
 /** Own MapLibre images, source identities, and error/readiness observations. */
 export const createMapResources = (
@@ -19,7 +27,7 @@ export const createMapResources = (
   colors: ReadonlyMap<string, string>,
   onSourceFailed: (snapshotId: number) => void,
 ): CoverageResources & { prune(): void; dispose(): void } => {
-  const ownedPatterns = new Set<string>()
+  const ownedPatterns = new Map<string, readonly string[]>()
   const snapshots = new Map<
     number,
     {
@@ -27,18 +35,27 @@ export const createMapResources = (
       buffer: 0 | 1
       patterns: Set<string>
       failed: boolean
+      retired: boolean
     }
   >()
+  const collectReleased = () => {
+    for (const [id, entry] of snapshots) {
+      if (!entry.retired) continue
+      const sourceUrl = (sourceId: string) =>
+        (map.getSource(sourceId)?.serialize() as VectorSourceSpecification | undefined)?.tiles?.[0]
+      // Controller state changes precede React's source removal. Keep bytes and
+      // images until the actual source has stopped referencing this snapshot.
+      if (sourceUrl(coverageSourceId(entry.buffer)) === entry.snapshot.url) continue
+      snapshots.delete(id)
+      releaseCoverage(entry.snapshot)
+    }
+  }
   const onError = (
     event: ErrorEvent & { sourceId?: string; source?: VectorSourceSpecification },
   ) => {
     for (const entry of snapshots.values()) {
       const url = event.source?.tiles?.[0]
-      if (
-        (event.sourceId === coverageSourceId(entry.buffer) && url === entry.snapshot.url) ||
-        (event.sourceId === fallbackSourceId(entry.buffer) &&
-          url === fallbackTilesUrl(archiveUrl, entry.snapshot.coverageTiles, entry.snapshot.id))
-      ) {
+      if (event.sourceId === coverageSourceId(entry.buffer) && url === entry.snapshot.url) {
         entry.failed = true
         onSourceFailed(entry.snapshot.id)
         return
@@ -50,11 +67,39 @@ export const createMapResources = (
     const layers = map.getLayersOrder()
     const inspection = layers.indexOf('inspected-language-areas')
     for (const buffer of BUFFERS)
-      for (const id of [solidLayerId(buffer), stripeLayerId(buffer), fallbackSourceId(buffer)])
+      for (const id of [solidLayerId(buffer), stripeLayerId(buffer), fallbackLayerId(buffer)])
         if (layers.indexOf(id) > inspection) map.moveLayer(id, 'inspected-language-areas')
   }
+  const addPattern = (id: string, members: readonly string[]) => {
+    const memberColors = members.map((member) => {
+      const color = colors.get(member)
+      if (!color) throw new Error(`Missing language color for ${member}`)
+      return color
+    })
+    map.addImage(id, stripeImage(memberColors), { pixelRatio: 1 })
+  }
+  const restorePattern = ({ id }: { id: string }) => {
+    const members = ownedPatterns.get(id)
+    if (!members || map.hasImage(id)) return
+    try {
+      // Style replacement drops runtime images while React restores the sources
+      // and layers. Recreate the validated image without repartitioning geometry.
+      addPattern(id, members)
+    } catch {
+      for (const entry of snapshots.values()) {
+        if (!entry.patterns.has(id)) continue
+        entry.failed = true
+        onSourceFailed(entry.snapshot.id)
+      }
+    }
+  }
   map.on('error', onError)
-  map.on('styledata', syncLayerOrder)
+  const onStyleData = () => {
+    collectReleased()
+    syncLayerOrder()
+  }
+  map.on('styledata', onStyleData)
+  map.on('styleimagemissing', restorePattern)
   syncLayerOrder()
   return {
     stage(tiles, buffer) {
@@ -70,7 +115,7 @@ export const createMapResources = (
       )
       checkPatternBudget(pixels)
       let resident = 0
-      for (const id of ownedPatterns) {
+      for (const id of ownedPatterns.keys()) {
         const image = map.getImage(id)?.data
         if (image) resident += (image.width + 2) * (image.height + 2)
       }
@@ -79,45 +124,40 @@ export const createMapResources = (
       checkPatternBudget(resident, 2 * MAX_PATTERN_PIXELS)
       for (const p of unique.values()) {
         if (map.hasImage(p.pattern)) continue
-        const memberColors = p.variantIds.map((id) => {
-          const color = colors.get(id)
-          if (!color) throw new Error(`Missing language color for ${id}`)
-          return color
-        })
-        map.addImage(p.pattern, stripeImage(memberColors), { pixelRatio: 1 })
-        ownedPatterns.add(p.pattern)
+        addPattern(p.pattern, p.variantIds)
+        ownedPatterns.set(p.pattern, p.variantIds)
       }
-      const snapshot = registerCoverage(tiles)
+      const snapshot = registerCoverage(tiles, archiveUrl)
       preparePublicationTest(snapshot.id)
       snapshots.set(snapshot.id, {
         snapshot,
         buffer,
         patterns: new Set(unique.keys()),
         failed: false,
+        retired: false,
       })
       return { snapshot, pixels }
     },
-    readiness(snapshot, buffer) {
+    isReady(snapshot, buffer) {
+      // Sources can finish an older camera's tiles during a zoom gesture. Keep
+      // the visible snapshot stable until the camera and replacement tiles settle.
+      if (map.isMoving()) return false
       const source = (id: string) =>
         map.getSource(id)?.serialize() as VectorSourceSpecification | undefined
       const failed = snapshots.get(snapshot.id)?.failed !== false
-      return {
-        coverage:
-          !failed &&
-          source(coverageSourceId(buffer))?.tiles?.[0] === snapshot.url &&
-          map.isSourceLoaded(coverageSourceId(buffer)),
-        fallback:
-          !failed &&
-          source(fallbackSourceId(buffer))?.tiles?.[0] ===
-            fallbackTilesUrl(archiveUrl, snapshot.coverageTiles, snapshot.id) &&
-          map.isSourceLoaded(fallbackSourceId(buffer)),
-      }
+      return (
+        !failed &&
+        source(coverageSourceId(buffer))?.tiles?.[0] === snapshot.url &&
+        map.isSourceLoaded(coverageSourceId(buffer))
+      )
     },
     release(snapshot) {
-      snapshots.delete(snapshot.id)
-      releaseCoverage(snapshot)
+      const entry = snapshots.get(snapshot.id)
+      if (entry) entry.retired = true
+      collectReleased()
     },
     prune() {
+      collectReleased()
       const sources = BUFFERS.map(coverageSourceId)
       if (sources.some((id) => map.getSource(id) && !map.isSourceLoaded(id))) return
       const referenced = new Set([...snapshots.values()].flatMap((s) => [...s.patterns]))
@@ -125,7 +165,7 @@ export const createMapResources = (
         if (map.getSource(id))
           for (const feature of map.querySourceFeatures(id, { sourceLayer: COVERAGE_LAYER }))
             referenced.add(feature.properties.pattern)
-      for (const id of ownedPatterns) {
+      for (const id of ownedPatterns.keys()) {
         if (referenced.has(id)) continue
         if (map.hasImage(id)) map.removeImage(id)
         ownedPatterns.delete(id)
@@ -133,10 +173,11 @@ export const createMapResources = (
     },
     dispose() {
       map.off('error', onError)
-      map.off('styledata', syncLayerOrder)
+      map.off('styledata', onStyleData)
+      map.off('styleimagemissing', restorePattern)
       for (const entry of snapshots.values()) releaseCoverage(entry.snapshot)
       snapshots.clear()
-      for (const id of ownedPatterns) if (map.hasImage(id)) map.removeImage(id)
+      for (const id of ownedPatterns.keys()) if (map.hasImage(id)) map.removeImage(id)
       ownedPatterns.clear()
     },
   }

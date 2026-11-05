@@ -394,6 +394,7 @@ test('direct MVT delivery preserves membership, winding, holes, and retained par
     assert.equal(layer?.length, 1)
     const feature = layer?.feature(0)
     assert.equal(feature?.properties.pattern, 'overlap:A|B')
+    assert.equal(feature?.properties.variantIds, '["A","B"]')
     assert.ok(feature)
     const polygons = classifyRings(feature.loadGeometry())
     assert.equal(polygons.length, 1)

@@ -15,12 +15,11 @@ import {
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
 import { COVERAGE_LAYER } from './delivery'
 import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
-import { fallbackTilesUrl } from './fallbackProtocol'
 import {
   BUFFERS,
   coverageSourceId,
   createMapResources,
-  fallbackSourceId,
+  fallbackLayerId,
   solidLayerId,
   stripeLayerId,
 } from './mapResources'
@@ -106,7 +105,7 @@ export const OverlapHatching = ({
     })
     controllerRef.current = controller
     const refresh = () => {
-      if (!map.getLayer('selected-language-areas')) return
+      if (map.isMoving() || !map.getLayer('selected-language-areas')) return
       const bounds = map.getBounds()
       controller.refresh(
         tilesForBounds(
@@ -219,18 +218,8 @@ export const OverlapHatching = ({
                     'fill-antialias': true,
                   }}
                 />
-              </Source>
-              <Source
-                id={fallbackSourceId(buffer)}
-                type="vector"
-                tiles={[
-                  fallbackTilesUrl(languageArchiveUrl(), snapshot.coverageTiles, snapshot.id),
-                ]}
-                minzoom={0}
-                maxzoom={8}
-              >
                 <Layer
-                  id={fallbackSourceId(buffer)}
+                  id={fallbackLayerId(buffer)}
                   source-layer={data.manifest.vectorLayer}
                   type="fill"
                   filter={['in', ['get', 'variant_id'], ['literal', variants.map(({ id }) => id)]]}

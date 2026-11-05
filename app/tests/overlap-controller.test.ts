@@ -29,7 +29,7 @@ const fixture = () => {
   const sent: OverlapRequest[] = []
   const registered = new Map<number, ReadonlyMap<string, DeliveryTile>>()
   let nextId = 0
-  const readiness = { coverage: false, fallback: false }
+  const readiness = { loaded: false }
   const resources: CoverageResources = {
     stage(tiles) {
       const id = ++nextId
@@ -40,11 +40,11 @@ const fixture = () => {
           id,
           url: `snapshot:${id}`,
           coverageTiles: [...tiles.values()].map((t) => t.tile),
-          maxzoom: 2,
+          maxzoom: tiles.values().next().value?.tile.z ?? 0,
         },
       }
     },
-    readiness: () => readiness,
+    isReady: () => readiness.loaded,
     release: (snapshot) => {
       registered.delete(snapshot.id)
     },
@@ -85,7 +85,7 @@ const fixture = () => {
       durationMs: 1,
     })
   const publish = () => {
-    readiness.coverage = readiness.fallback = true
+    readiness.loaded = true
     controller.publish()
   }
   const initial = () => {
@@ -119,13 +119,13 @@ const fixture = () => {
   }
 }
 
-test('publication waits for both sources, retains the old snapshot, and coalesces arrivals', (context) => {
+test('publication waits for the composite source, retains the old snapshot, and coalesces arrivals', (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] })
   const f = fixture()
   context.after(() => f.controller.dispose())
   f.initial()
   const previous = f.state.snapshots[0]
-  f.readiness.coverage = f.readiness.fallback = false
+  f.readiness.loaded = false
   f.controller.refresh([coordinate(1), coordinate(2)])
   assert.deepEqual(f.sent.at(-1)?.knownTiles, ['2/0/0'])
   f.receive(tile(1))
@@ -134,11 +134,10 @@ test('publication waits for both sources, retains the old snapshot, and coalesce
   f.receive(tile(2))
   f.finish()
   assert.equal(f.registered.size, 2, 'arrivals do not replace a staging source')
-  f.readiness.coverage = true
   f.controller.publish()
   assert.equal(f.state.activeBuffer, 0)
   assert.equal(f.state.snapshots[0], previous)
-  f.readiness.fallback = true
+  f.readiness.loaded = true
   f.controller.publish()
   assert.equal(f.state.status, 'loading', 'newer arrivals still need a second publication')
   context.mock.timers.tick(32)
@@ -245,7 +244,7 @@ test('publication deadline discards unready staging and prevents late publicatio
   context.after(() => f.controller.dispose())
   f.initial()
   const previous = f.state.snapshots[0]
-  f.readiness.fallback = false
+  f.readiness.loaded = false
   f.controller.refresh([coordinate(1)])
   f.receive(tile(1))
   f.finish()
@@ -254,6 +253,29 @@ test('publication deadline discards unready staging and prevents late publicatio
   assert.equal(f.state.status, 'error')
   assert.equal(f.state.snapshots[0], previous)
   assert.equal(f.registered.size, 1)
+})
+
+test('a valid prefix after computation failure still has a source-loading deadline', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture()
+  context.after(() => f.controller.dispose())
+  f.initial()
+  const previous = f.state.snapshots[0]
+  f.readiness.loaded = false
+  f.controller.refresh([coordinate(1), coordinate(2)])
+  f.receive(tile(1))
+  f.controller.receive({
+    requestId: required(f.sent.at(-1)).requestId,
+    error: 'Too complex',
+    failure: 'tile-deadline',
+    durationMs: 1,
+  })
+  assert.equal(f.registered.size, 2, 'a completed prefix can stage after a later tile fails')
+  context.mock.timers.tick(PUBLICATION_TIMEOUT_MS)
+  f.publish()
+  assert.equal(f.registered.size, 1, 'unready prefix staging must be released')
+  assert.equal(f.state.snapshots[0], previous)
+  assert.match(f.state.message, /too long to load/)
 })
 
 test('retained output budgets preserve good coverage and zoom changes reset known tiles', (context) => {
@@ -269,18 +291,113 @@ test('retained output budgets preserve good coverage and zoom changes reset know
   assert.deepEqual(f.sent.at(-1)?.knownTiles, [])
 })
 
+test('zoom transitions retain all old stripes until the complete new detail is ready', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture()
+  context.after(() => f.controller.dispose())
+  f.initial()
+  const previous = f.state.snapshots[0]
+  f.controller.refresh([coordinate(0, 3), coordinate(1, 3)])
+  f.receive({ ...tile(0), tile: coordinate(0, 3) })
+  context.mock.timers.tick(300)
+  f.publish()
+  assert.equal(f.registered.size, 1, 'a new-detail prefix must not replace old striped coverage')
+  assert.equal(f.state.snapshots[0], previous)
+  f.receive({ ...tile(1), tile: coordinate(1, 3) })
+  f.readiness.loaded = false
+  f.finish()
+  f.controller.publish()
+  assert.equal(
+    f.state.snapshots[0],
+    previous,
+    'complete geometry still waits for its atomic source',
+  )
+  f.publish()
+  assert.equal(f.state.status, 'ready')
+  assert.equal(f.state.activeBuffer, 1)
+  assert.equal(f.state.snapshots[1]?.coverageTiles.length, 2)
+  assert.equal(f.registered.size, 1)
+})
+
+test('failed cross-zoom prefixes preserve old stripes and remain reusable on Retry or zoom reversal', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture()
+  context.after(() => f.controller.dispose())
+  f.initial()
+  const previous = f.state.snapshots[0]
+  f.controller.refresh([coordinate(0, 3), coordinate(1, 3)])
+  f.receive({ ...tile(0), tile: coordinate(0, 3) })
+  f.controller.receive({
+    requestId: required(f.sent.at(-1)).requestId,
+    error: 'Too complex',
+    failure: 'tile-deadline',
+    durationMs: 1,
+  })
+  f.publish()
+  assert.equal(f.registered.size, 1)
+  assert.equal(f.state.snapshots[0], previous)
+  context.mock.timers.tick(PUBLICATION_TIMEOUT_MS)
+  assert.match(
+    f.state.message,
+    /Too complex/,
+    'a deliberately withheld prefix has no loading deadline',
+  )
+  f.controller.retry()
+  f.controller.refresh([coordinate(0, 3), coordinate(1, 3)])
+  assert.deepEqual(f.sent.at(-1)?.knownTiles, ['3/0/0'])
+  const obsolete = required(f.sent.at(-1)).requestId
+  f.controller.refresh([coordinate(0)])
+  assert.deepEqual(
+    f.sent.at(-1)?.knownTiles,
+    ['2/0/0'],
+    'the still-visible native tile survives zoom reversal',
+  )
+  f.controller.receive({
+    requestId: obsolete,
+    tile: { ...tile(1), tile: coordinate(1, 3) },
+    durationMs: 1,
+  })
+  f.finish()
+  f.publish()
+  assert.equal(f.state.status, 'ready')
+  assert.deepEqual(f.state.snapshots[f.state.activeBuffer ?? 0]?.coverageTiles, [coordinate(0)])
+  assert.equal(
+    f.state.snapshots[0],
+    previous,
+    'returning to displayed tiles needs no source replacement',
+  )
+})
+
+test('a completed zoom replacement still has a loading deadline after a worker failure', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture()
+  context.after(() => f.controller.dispose())
+  f.initial()
+  const previous = f.state.snapshots[0]
+  f.readiness.loaded = false
+  f.controller.refresh([coordinate(0, 3)])
+  f.receive({ ...tile(0), tile: coordinate(0, 3) })
+  f.finish()
+  assert.equal(f.registered.size, 2)
+  f.controller.workerFailed()
+  context.mock.timers.tick(PUBLICATION_TIMEOUT_MS)
+  assert.equal(f.registered.size, 1)
+  assert.equal(f.state.snapshots[0], previous)
+  assert.match(f.state.message, /too long to load/)
+})
+
 // The adapter imports browser protocol registration. Only location is needed
 // to keep its explicit diagnostics switch off in this Node test environment.
 Object.assign(globalThis, { location: { search: '' } })
-const { createMapResources, coverageSourceId, fallbackSourceId } = await import(
+const { createMapResources, coverageSourceId } = await import(
   '../src/features/map/overlap/mapResources.ts'
 )
-const { fallbackTilesUrl } = await import('../src/features/map/overlap/fallbackProtocol.ts')
 
 test('MapLibre adapter rejects errored sources despite loaded=true and ignores unrelated errors', () => {
   const listeners = new Map<string, (event: unknown) => void>()
   const sources = new Map<string, string>()
   const failures: number[] = []
+  let moving = false
   const map = {
     on: (event: string, callback: (event: unknown) => void) => listeners.set(event, callback),
     off: (event: string) => listeners.delete(event),
@@ -288,22 +405,80 @@ test('MapLibre adapter rejects errored sources despite loaded=true and ignores u
     getSource: (id: string) =>
       sources.has(id) ? { serialize: () => ({ tiles: [sources.get(id)] }) } : undefined,
     isSourceLoaded: () => true,
+    isMoving: () => moving,
   } as unknown as MapLibreMap
   const resources = createMapResources(map, 'archive', new Map(), (id) => failures.push(id))
   // Empty tiles need no images; they still establish coverage/fallback identities.
   const { snapshot } = resources.stage(new Map([['2/0/0', tile(0, 0)]]), 0)
   sources.set(coverageSourceId(0), snapshot.url)
-  const fallback = fallbackTilesUrl('archive', snapshot.coverageTiles, snapshot.id)
-  sources.set(fallbackSourceId(0), fallback)
-  assert.deepEqual(resources.readiness(snapshot, 0), { coverage: true, fallback: true })
+  assert.deepEqual(resources.isReady(snapshot, 0), true)
+  moving = true
+  assert.deepEqual(
+    resources.isReady(snapshot, 0),
+    false,
+    'loaded sources cannot switch buffers during a camera gesture',
+  )
+  moving = false
   const error = required(listeners.get('error'))
-  error({ sourceId: 'terrain', source: { tiles: [fallback] } })
-  error({ sourceId: fallbackSourceId(0), source: { tiles: ['obsolete-mask'] } })
+  error({ sourceId: 'terrain', source: { tiles: [snapshot.url] } })
+  error({ sourceId: coverageSourceId(0), source: { tiles: ['obsolete-mask'] } })
   assert.deepEqual(failures, [])
-  error({ sourceId: fallbackSourceId(0), source: { tiles: [fallback] } })
+  error({ sourceId: coverageSourceId(0), source: { tiles: [snapshot.url] } })
   assert.deepEqual(failures, [snapshot.id])
-  assert.deepEqual(resources.readiness(snapshot, 0), { coverage: false, fallback: false })
+  assert.deepEqual(resources.isReady(snapshot, 0), false)
   resources.release(snapshot)
+  resources.dispose()
+  assert.equal(listeners.size, 0)
+})
+
+test('style replacement restores owned stripe images without recomputing and releases them on disposal', () => {
+  const listeners = new Map<string, (event: unknown) => void>()
+  const images = new Map<string, { width: number; height: number; data: Uint8Array }>()
+  const failures: number[] = []
+  const sources = new Map<string, string>()
+  const map = {
+    on: (event: string, callback: (event: unknown) => void) => listeners.set(event, callback),
+    off: (event: string) => listeners.delete(event),
+    getLayer: () => undefined,
+    getSource: (id: string) =>
+      sources.has(id) ? { serialize: () => ({ tiles: [sources.get(id)] }) } : undefined,
+    isSourceLoaded: () => true,
+    querySourceFeatures: () => [],
+    getImage: (id: string) => (images.has(id) ? { data: images.get(id) } : undefined),
+    hasImage: (id: string) => images.has(id),
+    addImage: (id: string, image: { width: number; height: number; data: Uint8Array }) =>
+      images.set(id, image),
+    removeImage: (id: string) => images.delete(id),
+  } as unknown as MapLibreMap
+  const resources = createMapResources(
+    map,
+    'archive',
+    new Map([
+      ['A', '#ff0000'],
+      ['B', '#0000ff'],
+    ]),
+    (id) => failures.push(id),
+  )
+  const { snapshot } = resources.stage(new Map([['2/0/0', tile(0)]]), 0)
+  const original = required(images.get('overlap:A|B'))
+  images.clear()
+  const restore = required(listeners.get('styleimagemissing'))
+  restore({ id: 'overlap:A|B' })
+  assert.deepEqual(images.get('overlap:A|B'), original)
+  restore({ id: 'unrelated-image' })
+  assert.equal(images.size, 1)
+  assert.deepEqual(failures, [])
+  sources.set(coverageSourceId(0), snapshot.url)
+  resources.release(snapshot)
+  resources.prune()
+  assert.equal(images.size, 1, 'React still references the retiring coverage source')
+  sources.set(coverageSourceId(0), 'replacement-snapshot')
+  required(listeners.get('styledata'))({})
+  resources.prune()
+  assert.equal(images.size, 0, 'detached sources release their last pattern reference')
+  images.clear()
+  restore({ id: 'overlap:A|B' })
+  assert.equal(images.size, 0, 'released and pruned images cannot be resurrected')
   resources.dispose()
   assert.equal(listeners.size, 0)
 })

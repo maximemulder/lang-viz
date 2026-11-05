@@ -35,8 +35,6 @@ interface RequestReport {
   patternsMs?: number
   patternPixels?: number
   sourceReadyMs?: number
-  coverageSourceMs?: number
-  fallbackSourceMs?: number
   firstRenderMs?: number
   firstCoverageMs?: number
   firstCoverageRenderMs?: number
@@ -89,6 +87,15 @@ export const overlapDiagnostics = {
 }
 
 type TileService = 'coverage' | 'fallback'
+const tileDelays = { coverage: 0, fallback: 0 }
+export const setTileDelay = (service: TileService, milliseconds: number) => {
+  if (diagnosticsEnabled) tileDelays[service] = milliseconds
+}
+export const delayTileTest = async (service: TileService, signal: AbortSignal) => {
+  if (!diagnosticsEnabled || !tileDelays[service]) return
+  await new Promise((resolve) => setTimeout(resolve, tileDelays[service]))
+  signal.throwIfAborted()
+}
 let nextPublicationFailure: TileService | null = null
 let tileFailure: { service: TileService; snapshotId: number } | null = null
 
@@ -121,6 +128,11 @@ export interface OverlapTestApi {
   camera(center: [number, number], zoom: number, duration?: number): void
   recompute(): void
   failNextPublication(service: TileService): void
+  inspect(center: [number, number]): { variantIds: string[]; point: [number, number] }
+  reloadStyle(): void
+  setTileDelay(service: TileService, milliseconds: number): void
+  watchAreas(points: [number, number][] | null): void
+  watchStripes(center: [number, number] | null): void
   samplePixels(center: [number, number], radius: number): Promise<number[]>
   unexpectedMemberships(): string[]
   snapshot(): unknown

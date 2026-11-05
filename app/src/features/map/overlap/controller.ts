@@ -21,12 +21,13 @@ export interface CoverageResources {
     snapshot: CoverageSnapshot
     pixels: number
   }
-  readiness(snapshot: CoverageSnapshot, buffer: 0 | 1): { coverage: boolean; fallback: boolean }
+  isReady(snapshot: CoverageSnapshot, buffer: 0 | 1): boolean
   release(snapshot: CoverageSnapshot): void
 }
 
 interface Publication {
   readonly snapshot: CoverageSnapshot
+  readonly tiles: ReadonlyMap<string, DeliveryTile>
   readonly buffer: 0 | 1
   readonly version: number
   readonly stagedAt: number
@@ -118,10 +119,16 @@ export const createOverlapController = (options: {
     cancelTimers()
     discardStaging()
   }
+  const changesDetail = () =>
+    active !== null &&
+    results.size > 0 &&
+    results.values().next().value?.tile.z !== active.snapshot.maxzoom
   const fail = (reason: string, message: string, blockPublication: boolean) => {
     if (!request) return
     worker.cancel()
-    clearTimeout(deadline)
+    // Valid prefixes can still need publication after computation fails. Keep
+    // their source-loading deadline until they publish or are discarded.
+    if (blockPublication || !results.size || (changesDetail() && !staging)) clearTimeout(deadline)
     request.phase = 'failed'
     request.error = message
     request.publicationBlocked ||= blockPublication
@@ -138,13 +145,23 @@ export const createOverlapController = (options: {
     batch = undefined
     if (!request || request.publicationBlocked || staging || !results.size) return
     if (active?.version === request.version) return
+    // A prefix at a new detail level can replace previously striped areas with
+    // solid fallback. Keep the old snapshot until the whole replacement succeeds;
+    // a failed prefix stays cached for Retry without degrading the current view.
+    if (changesDetail() && request.phase !== 'complete') return
     if (request.phase === 'computing' && [...results.values()].every((tile) => !tile.features))
       return
     const started = performance.now()
     try {
       const buffer = active?.buffer === 0 ? 1 : 0
       const { snapshot, pixels } = resources.stage(results, buffer)
-      staging = { snapshot, buffer, version: request.version, stagedAt: performance.now() }
+      staging = {
+        snapshot,
+        tiles: new Map(results),
+        buffer,
+        version: request.version,
+        stagedAt: performance.now(),
+      }
       update({
         patternsMs: (report()?.patternsMs ?? 0) + performance.now() - started,
         patternPixels: pixels,
@@ -166,18 +183,13 @@ export const createOverlapController = (options: {
   }
   const publish = () => {
     if (!request || !staging || request.publicationBlocked) return
-    const ready = resources.readiness(staging.snapshot, staging.buffer)
     const elapsed = performance.now() - staging.stagedAt
-    if (ready.coverage && report()?.coverageSourceMs === undefined)
-      update({ coverageSourceMs: elapsed })
-    if (ready.fallback && report()?.fallbackSourceMs === undefined)
-      update({ fallbackSourceMs: elapsed })
-    if (!ready.coverage || !ready.fallback) return
+    if (!resources.isReady(staging.snapshot, staging.buffer)) return
     const previous = active
     active = staging
     staging = null
     const finished = request.phase === 'complete' && active.version === request.version
-    if (finished) clearTimeout(deadline)
+    if (request.phase !== 'computing' && active.version === request.version) clearTimeout(deadline)
     update({
       ...(request.error ? {} : { outcome: finished ? 'ready' : 'pending' }),
       firstCoverageMs: report()?.firstCoverageMs ?? performance.now() - request.startedAt,
@@ -226,6 +238,14 @@ export const createOverlapController = (options: {
       }
       const desired = new Set(tiles.map(tileKey))
       for (const key of results.keys()) if (!desired.has(key)) results.delete(key)
+      // Reversing a zoom can return to the still-visible snapshot before its
+      // replacement finishes. Reuse those native tiles instead of fetching them again.
+      let vertices = [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0)
+      for (const [key, tile] of active?.tiles ?? []) {
+        if (!desired.has(key) || results.has(key) || vertices + tile.vertices > 200_000) continue
+        results.set(key, tile)
+        vertices += tile.vertices
+      }
       request = {
         id: ++nextRequestId,
         selectionKey,
@@ -289,6 +309,15 @@ export const createOverlapController = (options: {
         return
       }
       request.phase = 'complete'
+      if (
+        active &&
+        results.size === active.tiles.size &&
+        [...results].every(([key, tile]) => active?.tiles.get(key) === tile)
+      ) {
+        // A zoom reversal may already be displaying exactly the requested tiles.
+        // Mark that publication current without rebuilding its sources or images.
+        active = { ...active, version: request.version }
+      }
       stage()
       if (!staging && active?.version === request.version && !request.error) {
         clearTimeout(deadline)

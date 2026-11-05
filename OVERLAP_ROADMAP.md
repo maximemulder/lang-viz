@@ -1,6 +1,6 @@
 # Overlap roadmap
 
-Last updated: 2026-11-02.
+Last updated: 2026-11-05.
 
 This document tracks the limitations to lift after the browser overlap-hatching
 proof of concept. Item IDs are stable so future sessions can refer to them.
@@ -79,7 +79,49 @@ tiles are omitted and untouched tiles pass through unchanged. Fallback overlaps
 use source-order solid fills until stripes are available, without claiming full
 memberships. Normal vector-tile loading latency still applies.
 Zoom changes retain the previous display until a matching snapshot at the new
-detail level and its fallback mask are ready; further tiles can publish progressively.
+detail level has completed the entire requested partition and its atomic coverage/fallback source
+is ready. Cross-detail prefixes cannot replace existing striped coverage. Initial
+loads and same-detail extensions still publish progressively. Snapshot swaps and
+new requests wait until camera movement finishes. Reversing a zoom can reuse
+native tiles from the visible snapshot without rebuilding its sources.
+
+Continuity correction (2026-11-05): a new fixed-location browser probe reproduced
+10 rendered frames in which an English/Welsh overlap reverted to solid fallback
+after a partial zoom-out publication. The layer remained enabled, so the earlier
+layer-activation assertion missed this regional loss. Holding cross-detail
+replacement until completion removed the reproduced gap. Expanded Firefox checks
+sampled 1,913 frames across four-language/all-language selections, globe/Mercator,
+large zoom changes, interrupted zooms, and nearby pans: zero missing shared faces
+and zero flat stripe patches at the probe. All 55 unit tests, lint, type checks,
+and production build pass; five browser scenarios and source-failure recovery pass.
+New-detail failures preserve the old snapshot and cache completed tiles for Retry.
+Source geometry still changes with detail, and normal tile-loading latency,
+unseen areas, and subpixel overlaps remain outside a universal no-pop guarantee.
+
+Area lifecycle follow-up (2026-11-05): delayed-delivery browser probes reproduced
+square areas exposing the background. Two independent causes were isolated:
+MapLibre 6.14.0 discards deeper loaded siblings when any nearer generation is
+available, and limits descendant retention to three levels; separately loaded
+fallback masks can also advance before their coverage. Retention alone still
+reproduced 37 missing frames in the four-language Mercator test, and 36 in the
+all-language case with slow fallback. Coverage and clipped fallback now travel in
+one atomic MVT/source. A version-guarded Vite correction retains the nearest loaded
+tile per branch only for overlap sources. Source retirement also waits for actual
+React detachment before releasing bytes/images. The library workaround requires
+review on upgrades; newly exposed areas still have ordinary loading latency, and
+old snapshots temporarily keep fallback at their own computation detail.
+Production Firefox validation passed all five previously supported scenarios.
+The expanded area probes sampled 2,719 rendered frames across both Britain
+selections, both projections, 700 ms delays on each tile service, large zoom-outs,
+and nearby pans: zero disappearing filled areas or exposed background pixels.
+The separate stripe probes sampled another 1,896 frames with no lost shared face
+or flat stripe patch. Source-error recovery, style restoration, selection clearing,
+resource checks, and all 61 unit tests passed. These remain reference-location
+regressions rather than a universal no-blank guarantee for never-loaded regions.
+The Britain-small development-server run also passed. Its first run exposed a
+Vite dependency-version query that bypassed the build transform; query handling
+now has an integration regression. Navigation-cache assertions wait for projection
+changes and their debounced coverage refresh to settle before recording the view.
 
 Verification: tile-retention regression test and Firefox checks across pans,
 return navigation, zoom changes, selection clearing, and an injected worker
@@ -94,8 +136,9 @@ The committed production-browser harness now checks cold/warm source publication
 animated zoom-out, selection clearing, and retained coverage plus loaded fallback
 when a world-view update reaches a limit.
 
-**Remaining:** Broaden automated navigation checks to injected failures and
-spatial/pixel assertions. Pans/return and dense-to-small selection supersession
+**Remaining:** Broaden automated navigation checks to more locations, boundaries,
+and injected streaming failures. Focused spatial/pixel checks now cover the
+reproduced zoom regression. Pans/return and dense-to-small selection supersession
 now run in the production-browser harness.
 Incremental tile delivery and batched partial publication are implemented (OVL-04).
 Prefetching and selective in-place render-tile replacement remain possible improvements.
@@ -158,6 +201,30 @@ and initialization; a 12-second publication deadline also covers source staging.
 Errors preserve available coverage and give feedback. These UI-thread watchdogs
 are subject to browser timer scheduling/throttling; individual GEOS operations
 remain synchronous. Termination releases the worker's WASM context and caches.
+
+Recovery hardening (2026-11-05): fallback tile requests now also have an 8-second
+watchdog and 150 ms cancellation acknowledgement grace. Blocked fallback workers
+are terminated; cancellation restarts replay only live requests within their
+original deadlines. Deadline/initialization failures reject outstanding requests
+explicitly. Failed lazy initialization can retry; both worker clients discard
+failed module registries before Retry. Cancellation is checked after initialization
+before native clipping. Valid completed prefixes retain their
+publication deadline even after a later tile fails. Unit regressions exercise
+these recovery paths with deterministic clocks.
+
+Verification (2026-11-05): all 52 Node tests, lint/type checks, and production
+build pass. Five browser scenarios (`britain-small`, `regional-small`,
+`world-small`, `britain-all`, `regional-all`) pass cold/warm runs and applicable
+navigation, supersession, inspection, style replacement, solid pixel, and injected
+source-failure recovery checks. Full style replacement recorded one temporary
+blank-layer frame, separately from navigation, with no missing visible patterns
+after restoration. The all-language world scenario intermittently exceeds the
+unchanged 1.5-second tile deadline on this host. A temporary copy of the committed
+app at `e1b47d4`, using the same installed dependencies and archive, also failed
+on that deadline after two completed tiles. The required-stripes browser assertion
+and production budget remain unchanged; the full browser command is therefore
+not reliably green on this host. Next isolate the cold partition cost and confirm
+the existing provisional targets on representative hardware before changing budgets.
 
 **Evidence (2026-10-28):** Firefox 156, headless, 1440×1000 requested window,
 basemap off; software rendering requested (actual backend not independently
@@ -251,9 +318,13 @@ Current POC limits, to revisit rather than simply remove:
 
 **Current limitation:** Simplified and quantized display tiles can remove small
 overlaps or change them with zoom. Reducing computation zoom can make coverage
-less detailed than the original language layer. Tile seams are a potential
-artifact, and picking the original polygons can disagree with displayed coverage.
-These are accuracy risks; they have not all been captured as regression cases.
+less detailed than the original language layer. Tile seams remain a potential
+artifact. Inspection now reads explicit membership metadata from the active
+coverage and clipped fallback layers, including retained detail, rather than
+querying hidden original polygons. Unit regressions cover differing detail,
+holes, inactive staging, and fallback; browser pointer clicks cover single/shared/
+empty hits. Pinned outlines still use original source geometry. Boundary and
+small-region accuracy risks have not all been captured as regression cases.
 
 **Work:** Define the expected display accuracy and zoom policy. Add difficult
 tile-edge, date-line, small-region, and projection cases. Align inspection with
@@ -292,8 +363,8 @@ behavior is explicit without silently dropping contributors.
 
 ### OVL-07 — Separate orchestration from rendering and controls
 
-**Status:** Implemented for the current lifecycle (2026-11-02); broader remount
-and style-reload checks remain.
+**Status:** Implemented for the current lifecycle; style-image restoration added
+(2026-11-05). Broader component remount checks remain.
 
 `controller.ts` now owns requests, retained coverage, explicit computation phases,
 publication batches/deadlines, supersession, and failure/retry transitions.
@@ -312,7 +383,13 @@ coalescing, failures/recovery, stale selections/modes, deadlines, budgets, and
 cleanup. The browser harness injects actual coverage/fallback protocol failures
 and checks retained source identity, released staging, and Retry recovery.
 
-**Remaining:** Broaden style replacement/component remount and injected streaming
+Owned images now restore on `styleimagemissing` after style replacement without
+repartitioning. A unit regression checks restoration, pruning, and listener cleanup;
+the production browser harness checks a full style rebuild, unchanged snapshot
+identity, image restoration, and inspection. Explicit style-rebuild blank frames
+are recorded separately from navigation continuity.
+
+**Remaining:** Broaden component remount and injected streaming
 failure checks. Keep new transitions in the controller rather than rebuilding
 an imperative lifecycle inside React.
 

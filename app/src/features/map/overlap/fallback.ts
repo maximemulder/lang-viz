@@ -1,13 +1,18 @@
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { type Feature, fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
 import { PbfReader } from 'pbf'
-import type { MultiPolygon } from './geometry.ts'
+import { type MultiPolygon, OverlapInitializationError } from './geometry.ts'
+import { lazyResource } from './lazyResource.ts'
 import { coverageRectangles } from './tiles.ts'
 import type { TileCoordinate } from './types.ts'
 
-let clipper:
-  | Promise<Awaited<ReturnType<typeof import('./geos.ts').createFallbackClipper>>>
-  | undefined
+const loadClipper = lazyResource(() =>
+  import('./geos.ts')
+    .then(({ createFallbackClipper }) => createFallbackClipper())
+    .catch((error: unknown) => {
+      throw new OverlapInitializationError(error)
+    }),
+)
 
 export interface FallbackClipMetrics {
   features: number
@@ -26,7 +31,9 @@ export const clipFallbackTile = async (
   tile: TileCoordinate,
   coverage: readonly TileCoordinate[],
   metrics?: FallbackClipMetrics,
+  signal?: AbortSignal,
 ): Promise<Uint8Array> => {
+  signal?.throwIfAborted()
   if (!data.length) return data
   const rectangles = coverageRectangles(tile, coverage, 1)
   if (!rectangles.length) return data
@@ -42,6 +49,7 @@ export const clipFallbackTile = async (
   if (metrics) metrics.decodeMs += performance.now() - started
   const layers: Record<string, GeoJSONWrapper> = {}
   for (const [name, layer] of Object.entries(source.layers)) {
+    signal?.throwIfAborted()
     started = performance.now()
     const masks = coverageRectangles(tile, coverage, layer.extent)
     const features = Array.from({ length: layer.length }, (_, i) => layer.feature(i)).filter(
@@ -84,8 +92,8 @@ export const clipFallbackTile = async (
     if (metrics) metrics.decodeMs += performance.now() - started
     if (candidates.length) {
       started = performance.now()
-      clipper ??= import('./geos.ts').then(({ createFallbackClipper }) => createFallbackClipper())
-      const clip = await clipper
+      const clip = await loadClipper()
+      signal?.throwIfAborted()
       if (metrics) metrics.initializeMs += performance.now() - started
       started = performance.now()
       const clipped = clip(

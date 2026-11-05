@@ -35,9 +35,10 @@ proposed priorities, and completion criteria across sessions.
    tag and the selected variants' colors. Only shared faces allocate opaque,
    power-of-two stripe images. The two layers filter disjoint faces and apply
    the same `fill-layer-opacity`, so interiors receive opacity once. Avoiding
-   one-texel solid patterns removes atlas-sampling grid artifacts. Both sources
-   must load successfully before original fills are suppressed; original geometry
-   remains available for picking and pinned outlines stay above coverage.
+   one-texel solid patterns removes atlas-sampling grid artifacts. Coverage and
+   clipped fallback share one MVT/source, which must load before original fills
+   are suppressed. Coverage tiles
+   carry explicit contributor IDs for picking; pinned source outlines stay above coverage.
 
 Color intensity defaults to 82%, adjustable between 40% and 100% without geometry
 recomputation. Each region blends with the basemap, never with another language
@@ -53,9 +54,16 @@ Patterns use one texture pixel per logical pixel, preserving the previous displa
 period at one quarter of its previous stripe image storage. Solids allocate no images.
 Diagonal rows reuse one cyclic color band rather than computing every pixel separately.
 
-Hover/click continue to query the original selected-language layer, rather than
-trying to reconstruct identities from a visible stripe pixel. Changes to period,
-source, or per-language override naturally change the variant IDs sent to the
+Hover/click query only the active solid, stripe, and clipped fallback layers.
+Shared faces carry a JSON-encoded `variantIds` MVT property; single faces carry
+`variantId`. Inspection uses those memberships rather than stripe colors or image
+names, including when retained coverage uses a different detail level. Holes in
+coverage never fall back to hidden original polygons. Before coverage is available,
+in blending mode, or after an error restores original fills, inspection uses the
+original selected-language layer.
+Fallback inspection retains all source contributors, although its source-order
+solid colors may hide some of them. Pinned outlines still use source geometry.
+Changes to period, source, or per-language override naturally change the variant IDs sent to the
 worker. Query-defined areas could later feed the same rendering layer with
 different IDs and colors.
 
@@ -67,32 +75,63 @@ different IDs and colors.
   The main thread retains encoded tiles and tells the worker which ones are
   already present. Extending coverage computes/transfers only additions; forced
   benchmark republishing still exercises worker caches. Zoom changes request a
-  single new detail level, without mixing overlapping tile resolutions.
+  single new detail level, without mixing overlapping tile resolutions. Reversing
+  a zoom reuses native tiles from the still-visible snapshot. If the requested
+  tile references already match that snapshot, completion updates its status
+  without replacing sources or images. Refreshes do not dispatch during camera movement.
 - Two vector sources buffer immutable coverage snapshots served through the
   `language-overlap` protocol. Each snapshot references retained encoded tiles
-  without copying geometry. At native zoom the protocol serves existing bytes;
+  without copying geometry. At native zoom the coverage layer uses existing bytes;
   during zoom-out retention it transforms/combines descendant MVTs into requested
-  parent tiles. The source maxzoom matches computation zoom, so MapLibre handles
+  parent tiles. Every response also includes its complementary original-language
+  fallback layer. The protocol waits for both, then concatenates their distinct
+  protobuf layer fields without decoding/re-encoding them. Cancellation or failure
+  cancels the sibling operation. Both layers therefore use the same loaded tile,
+  resolution, retention decisions, and stencil footprint. The source maxzoom matches computation zoom, so MapLibre handles
   zoom-in overzooming. A lazy delivery worker assembles parents, with a 48-entry/
   8 MiB LRU payload cache keyed by the relevant descendant identities. Only new
   encoded tiles are copied into that worker across snapshots; release drops
   unused native references. Native and empty requests do not start that worker.
+- `tileRetention.ts` retains the nearest loaded descendant in **each branch** of
+  a pending parent tile. MapLibre 6.14.0's default retains only the nearest loaded
+  generation across all branches and discards children more than three levels
+  deeper. Both behaviors can temporarily drop visible square areas. A Vite
+  transform in `build/maplibreTileRetention.ts` intercepts only atlas overlap
+  sources; all other sources keep upstream behavior. MapLibre is pinned to
+  6.14.0, and builds reject version/method changes until this workaround is reviewed.
+  Development dependency optimization excludes MapLibre so the same correction
+  runs in development and production. Loaded covering ancestors replace only
+  their own branches, avoiding duplicate opacity. Mixed generations can fully
+  cover a parent; incomplete branches still seek loaded ancestors. This retains
+  existing loaded tiles, without another geometry cache, worker, or fill underneath.
 - Completed tiles accumulate during a 250 ms initial grace period; completion
-  flushes immediately, so fast requests publish once. Longer requests publish
-  progressively, batching arrivals for 32 ms and coalescing results while a
-  staging source loads. Old coverage remains visible. Each buffer has its own
-  fallback source and matching tile mask; only when both sources are ready does
-  opacity switch. Both protocol URLs include snapshot identity. Source errors are
+  flushes immediately, so fast requests publish once. Initial loads and same-detail
+  extensions publish progressively, batching arrivals for 32 ms and coalescing results while a
+  staging source loads. Old coverage remains visible. Each buffer has one source
+  containing both coverage and its matching clipped fallback; opacity switches
+  only when that source is ready, after the camera stops moving. When changing
+  detail with existing coverage, the full requested partition must complete before
+  staging a replacement. This avoids switching previously striped areas back to
+  solid fallback between tile arrivals. A failed new-detail prefix stays available
+  for Retry while the old detail remains visible. This deliberately delays new
+  detail until the whole request succeeds; newly exposed areas can still use solid
+  fallback outside retained coverage. The protocol URL includes snapshot identity. Source errors are
   matched to that identity: MapLibre's loaded flag alone also accepts errored tiles.
   Failed staging is discarded while the previous valid buffer remains visible.
   A streaming error in an active source restores original fills, avoiding holes
   behind its clipped fallback mask. The visible status offers Retry, which reuses
   completed tiles and computes only unfinished additions. Exactly one buffer contributes color. Superseded/inactive
-  snapshots are released. MapLibre still prepares visible tiles in each new
+  snapshots are retired first, then their data and images are released only after
+  React has detached the actual source or changed its URL. This prevents source
+  requests from observing released data during the publication/React commit gap.
+  MapLibre still prepares visible tiles in each new
   snapshot buffer; this is not selective in-place GPU tile replacement.
-- Each result records all computed tile interiors, including empty tiles. A
-  `language-fallback` protocol streams original vector tiles outside those
-  interiors as the camera moves, independently of overlap calculation. Whole
+- Each result records all computed tile interiors, including empty tiles.
+  The fallback worker streams original vector geometry outside those interiors
+  as the camera moves, independently of overlap calculation, but its bytes are
+  delivered atomically with coverage through `language-overlap`. Both layers now
+  share the computation zoom; solid fallback is temporarily coarser while an old
+  snapshot remains visible during a zoom-in. Whole
   uncovered tiles pass through; whole covered tiles return empty. For boundary
   tiles, a separate worker uses GEOS to clip each feature against the uncovered
   tile area and `@maplibre/vt-pbf` to encode the result. No language-to-language
@@ -119,6 +158,14 @@ different IDs and colors.
   available coverage. These UI-thread watchdogs are subject to browser timer
   scheduling/throttling; an individual WASM call itself is still synchronous.
   Opacity changes require neither computation nor source updates.
+- Fallback tile requests have an 8-second UI-thread watchdog. Aborted requests
+  reject immediately; their worker acknowledges cancellation within a 150 ms grace
+  period or is terminated. Cancellation restarts replay only live requests within
+  their original deadlines, so obsolete tiles cannot fail unrelated visible tiles.
+  Deadline/initialization failures reject outstanding work; the next request starts
+  a fresh worker. Responsive cancellation preserves caches.
+  Cancellation during lazy initialization is checked before entering native clipping.
+  Publication deadlines also remain armed for valid prefixes after computation fails.
 - At most 48 decoded tiles and 16 MiB of decompressed tile bytes are cached.
   Native-result caching is bounded by 48 entries and 150,000 coordinate positions.
   Encoded cache entries share those lifetimes through weak keys. The receiver
@@ -142,7 +189,8 @@ different IDs and colors.
 - A limit or computation failure retains the last valid coverage for the same
   selection; solid fallback colors continue outside it. Before any coverage is
   available, ordinary language fills remain active. Successfully completed tile
-  prefixes may publish even if a later tile fails; a failed tile never enters the
+  prefixes may publish on initial loads and same-detail extensions even if a later
+  tile fails; cross-detail prefixes cannot replace existing coverage. A failed tile never enters the
   coverage mask. The 200,000-position bound is also checked against retained plus
   newly delivered tiles on the main thread.
 
@@ -163,6 +211,8 @@ a fixed screen width throughout zooming.
   and source readiness/error identity. Released or unrelated sources cannot fail
   a current publication. Fallback cache identity remains the local mask, even
   though source URLs include a distinct snapshot revision.
+  It restores owned stripe images on `styleimagemissing` after full style replacement,
+  reusing validated memberships and colors without recomputing geometry.
 - `OverlapHatching.tsx` connects application state and map events to the controller
   and declares the solid, stripe, and fallback layers. Loading/error feedback and
   Retry are visible on the map, independently of the settings panel.
@@ -172,7 +222,11 @@ a fixed screen width throughout zooming.
 
 `geometry.ts` defines engine-independent coordinate, membership, and partition
 contracts. `loadCoveragePartition()` lazily imports `geos.ts` and shares one
-initialization promise. The Vite worker uses ES modules so the production build
+initialization promise. Failed initialization clears the shared promise so the
+next request can retry; fallback initialization follows the same policy. Both
+worker clients also discard workers reporting initialization failure, so Retry
+gets a fresh browser module registry even after a failed module evaluation.
+The Vite worker uses ES modules so the production build
 preserves a separate GEOS chunk. The first partition's 1.5-second deadline starts
 after initialization, and superseded requests are checked again after that await.
 
@@ -197,11 +251,19 @@ cache limits and tile budgets remain in place.
 `npm run test:browser` runs the production app in installed Firefox and records
 cold/warm measurements, screenshots, explicit limit outcomes, zoom-out retention,
 pan/return reuse, selection clearing, resource counters, and superseding dense work with a smaller selection. It also samples solid framebuffer pixels in globe/Mercator views and injects coverage/fallback protocol failures to verify retention and Retry. See [browser harness usage](../../../../tests/browser/README.md)
-for setup, scenario definitions, and timing semantics.
+for setup, scenario definitions, and timing semantics. Real pointer clicks check
+single/shared/empty inspection. Full style replacement checks image restoration,
+source identity, and geometry reuse. Frames during that explicit reload are
+counted separately from ordinary navigation because the entire style is rebuilt.
+Britain-small and Britain-all also track a stable English/Welsh overlap every
+render during large zooms, interrupted/reversed zooms, and nearby pans in globe
+and Mercator views. The probe requires shared coverage and a varied 8×8 framebuffer
+patch throughout; it can catch regional stripe loss even while a layer stays enabled.
+These focused spatial checks do not establish seamless rendering at every boundary.
 
 `npm test` covers three-way memberships and disjointness, holes, touching edges,
 duplicate fragments, tile clipping, geometry budgets, date-line tile selection,
-stripe colors, native solid delivery, and cancellation. Controller regressions cover paired-source readiness, coalescing, stale responses, selection/mode changes, failures, Retry, deadlines, budgets, and cleanup. GEOS regressions require valid, disjoint
+stripe colors, native solid delivery, and cancellation. Controller regressions cover atomic-source readiness, coalescing, stale responses, selection/mode changes, failures, Retry, deadlines, budgets, and cleanup. GEOS regressions require valid, disjoint
 coverage and complete memberships for both captured topology failures, handle
 mixed polygon/line/point results and invalid inputs, and check native ownership
 on success, failure, and budget rejection. The optional dense archive regression

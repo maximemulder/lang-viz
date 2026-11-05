@@ -1,7 +1,7 @@
 import { PMTiles } from 'pmtiles'
 import { OverlapComputer } from './compute.ts'
 import { type DeliveryTile, encodeCoverageTile, tileKey } from './delivery.ts'
-import { OverlapBudgetError } from './geometry.ts'
+import { OverlapBudgetError, OverlapInitializationError } from './geometry.ts'
 import type { OverlapMetrics, OverlapResponse } from './types.ts'
 import type { WorkerInput, WorkerOutput } from './workerClient.ts'
 
@@ -88,11 +88,16 @@ self.onmessage = async ({ data: request }: MessageEvent<WorkerInput>) => {
     if (import.meta.env.DEV) console.warn('Overlap calculation failed', error)
     const response: OverlapResponse = {
       requestId: request.requestId,
-      failure: error instanceof OverlapBudgetError ? error.reason : 'geometry-error',
+      failure:
+        error instanceof OverlapBudgetError
+          ? error.reason
+          : error instanceof OverlapInitializationError
+            ? 'initialization-error'
+            : 'geometry-error',
       durationMs: performance.now() - started,
       ...(metrics ? { metrics } : {}),
       error:
-        error instanceof OverlapBudgetError
+        error instanceof OverlapBudgetError || error instanceof OverlapInitializationError
           ? error.message
           : 'Overlap stripes are unavailable in this view. Try zooming in or selecting fewer languages.',
     }

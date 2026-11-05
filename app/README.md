@@ -5,12 +5,16 @@ the world's languages.
 
 ## Development
 
-Requires Node.js 20.19 or newer.
+Use Node.js 24 or newer for development and tests.
 
 ```sh
 npm install
 npm run dev
 ```
+
+MapLibre is pinned to 6.14.0 for a narrowly scoped tile-retention workaround.
+Review `build/maplibreTileRetention.ts` and the overlap lifecycle regressions before
+upgrading it; the build deliberately rejects an unreviewed version change.
 
 Other useful commands:
 

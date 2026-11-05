@@ -3,6 +3,12 @@ import { test } from 'node:test'
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { type Feature, fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
 import { PbfReader } from 'pbf'
+import {
+  COVERAGE_LAYER,
+  combineTileLayers,
+  deliveryTile,
+  encodeCoverageTile,
+} from '../src/features/map/overlap/delivery.ts'
 import { clipFallbackTile } from '../src/features/map/overlap/fallback.ts'
 import { FallbackCache } from '../src/features/map/overlap/fallbackCache.ts'
 import { coverageRectangles } from '../src/features/map/overlap/tiles.ts'
@@ -37,6 +43,49 @@ const area = (rings: [number, number][][]) =>
     }
     return sum + signed / 2
   }, 0)
+
+test('fallback cancellation during lazy initialization skips native clipping', async () => {
+  const controller = new AbortController()
+  const metrics = new FallbackCache().stats()
+  const pending = clipFallbackTile(data, tile, [{ z: 1, x: 0, y: 0 }], metrics, controller.signal)
+  controller.abort()
+  await assert.rejects(pending, { name: 'AbortError' })
+  assert.equal(metrics.overlayMs, 0, 'an acknowledged cancellation must not later enter GEOS')
+})
+
+test('one MVT preserves complementary coverage and fallback layers with independent extents and metadata', async () => {
+  const covered = { z: 1, x: 0, y: 0 }
+  const coverage = encodeCoverageTile({
+    tile: covered,
+    extent: 16,
+    vertices: 5,
+    features: [
+      {
+        type: 'Feature',
+        properties: { pattern: 'overlap:A|B', variantIds: ['A', 'B'] },
+        geometry: { type: 'MultiPolygon', coordinates: [[ring(0, 0, 16, 16)]] },
+      },
+    ],
+  })
+  const parent = deliveryTile(new Map([['1/0/0', coverage]]), tile)
+  const fallback = await clipFallbackTile(data, tile, [covered])
+  const combined = new VectorTile(new PbfReader(combineTileLayers(parent, fallback)))
+  const shared = combined.layers[COVERAGE_LAYER]
+  const solid = combined.layers.language_areas
+  assert.ok(shared && solid)
+  assert.equal(shared.extent, 8192)
+  assert.equal(solid.extent, 16)
+  assert.equal(shared.feature(0).properties.variantIds, '["A","B"]')
+  const geometryArea = (feature: ReturnType<typeof shared.feature>) =>
+    area(feature.loadGeometry().map((points) => points.map(({ x, y }): [number, number] => [x, y])))
+  assert.equal(geometryArea(shared.feature(0)) / shared.extent ** 2, 0.25)
+  assert.deepEqual([solid.feature(0).id, solid.feature(1).id], [7, 8])
+  assert.equal(solid.feature(0).properties.variant_id, 'A')
+  assert.equal(geometryArea(solid.feature(0)), 192)
+  assert.equal(geometryArea(solid.feature(1)), 192)
+  assert.deepEqual(combineTileLayers(parent, new Uint8Array()), parent)
+  assert.deepEqual(combineTileLayers(new Uint8Array(), fallback), fallback)
+})
 
 test('cached fallback geometry changes only when its local coverage changes', async () => {
   const cache = new FallbackCache()

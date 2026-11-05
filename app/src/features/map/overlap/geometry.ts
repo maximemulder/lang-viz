@@ -1,3 +1,5 @@
+import { lazyResource } from './lazyResource.ts'
+
 // Keep the worker/cache contract independent of the geometry engine.
 export type Position = [number, number]
 export type Polygon = Position[][]
@@ -41,10 +43,17 @@ export class OverlapBudgetError extends Error {
 
 export class OverlapGeometryError extends Error {}
 
-let partitionPromise: Promise<CoveragePartition> | undefined
+export class OverlapInitializationError extends Error {
+  constructor(cause: unknown) {
+    super('Could not initialize overlap geometry. Try again.', { cause })
+  }
+}
 
 /** Load/initialize WASM once, on the first uncached computation in this worker. */
-export const loadCoveragePartition = (): Promise<CoveragePartition> => {
-  partitionPromise ??= import('./geos.ts').then(({ createGeosPartition }) => createGeosPartition())
-  return partitionPromise
-}
+export const loadCoveragePartition = lazyResource<CoveragePartition>(() =>
+  import('./geos.ts')
+    .then(({ createGeosPartition }) => createGeosPartition())
+    .catch((error: unknown) => {
+      throw new OverlapInitializationError(error)
+    }),
+)

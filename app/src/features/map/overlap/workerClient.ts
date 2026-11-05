@@ -63,6 +63,12 @@ export class OverlapWorkerClient {
         this.request = undefined
         clearTimeout(this.deadline)
       }
+      if ('failure' in response && response.failure === 'initialization-error') {
+        // Failed module evaluations are cached by the browser too. A fresh
+        // worker gives Retry a new module registry as well as a new WASM context.
+        this.terminate()
+        this.restarts++
+      }
       this.onmessage?.({ data: response } as MessageEvent<OverlapResponse>)
     }
     worker.onerror = () => {

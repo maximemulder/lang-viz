@@ -1,7 +1,8 @@
 import { addProtocol } from 'maplibre-gl'
-import { type DeliveryTile, isTileDescendant, tileKey } from './delivery.ts'
+import { combineTileLayers, type DeliveryTile, isTileDescendant, tileKey } from './delivery.ts'
 import type { DeliveryRequest, DeliveryResponse } from './deliveryStore.ts'
-import { checkTileTestFailure, diagnosticsEnabled } from './diagnostics.ts'
+import { checkTileTestFailure, delayTileTest, diagnosticsEnabled } from './diagnostics.ts'
+import { requestFallbackTile } from './fallbackProtocol.ts'
 import { serviceDiagnostics } from './serviceDiagnostics.ts'
 import type { TileCoordinate } from './types.ts'
 
@@ -79,14 +80,17 @@ export interface CoverageSnapshot {
 }
 
 /** Snapshots share immutable encoded tile buffers; they never copy the geometry. */
-export const registerCoverage = (tiles: ReadonlyMap<string, DeliveryTile>): CoverageSnapshot => {
+export const registerCoverage = (
+  tiles: ReadonlyMap<string, DeliveryTile>,
+  archiveUrl: string,
+): CoverageSnapshot => {
   const id = ++nextId
   snapshots.set(id, new Map(tiles))
   recordSnapshots()
   if (worker) postSnapshot(id, tiles)
   return {
     id,
-    url: `language-overlap://${id}/{z}/{x}/{y}`,
+    url: `language-overlap://${id}/{z}/{x}/{y}?archive=${encodeURIComponent(archiveUrl.replace(/^pmtiles:\/\//, ''))}`,
     coverageTiles: [...tiles.values()].map(({ tile }) => tile),
     maxzoom: tiles.values().next().value?.tile.z ?? 0,
   }
@@ -104,31 +108,19 @@ export const releaseCoverage = (snapshot: CoverageSnapshot) => {
   for (const id of sentIds) if (!used.has(id)) sentIds.delete(id)
 }
 
-addProtocol('language-overlap', async ({ url }, controller) => {
-  controller.signal.throwIfAborted()
-  const [id, z, x, y] = url.slice('language-overlap://'.length).split('/').map(Number)
-  if (
-    id === undefined ||
-    z === undefined ||
-    x === undefined ||
-    y === undefined ||
-    ![id, z, x, y].every(Number.isInteger)
-  )
-    throw new Error('Invalid overlap tile URL')
+const requestCoverageTile = async (id: number, target: TileCoordinate, signal: AbortSignal) => {
+  await delayTileTest('coverage', signal)
+  signal.throwIfAborted()
   const tiles = snapshots.get(id)
   checkTileTestFailure('coverage', id)
-  // A released staging source may finish an already scheduled request. Empty
-  // data is safe: the corresponding source is inactive or being removed.
-  const native = tiles?.get(tileKey({ z, x, y }))
+  const native = tiles?.get(tileKey(target))
   if (
     native ||
     !tiles ||
-    ![...tiles.values()].some(
-      (tile) => tile.data.length && isTileDescendant(tile.tile, { z, x, y }),
-    )
+    ![...tiles.values()].some((tile) => tile.data.length && isTileDescendant(tile.tile, target))
   ) {
     if (diagnosticsEnabled) serviceDiagnostics.nativeRequests++
-    return { data: (native?.data ?? new Uint8Array()).slice().buffer }
+    return native?.data ?? new Uint8Array()
   }
   const request = ++nextRequestId
   const currentWorker = ensureWorker()
@@ -136,22 +128,57 @@ addProtocol('language-overlap', async ({ url }, controller) => {
     pending.get(request)?.reject(new DOMException('Tile request aborted', 'AbortError'))
     pending.delete(request)
   }
-  controller.signal.addEventListener('abort', abort, { once: true })
-  let data: Uint8Array
+  signal.addEventListener('abort', abort, { once: true })
   try {
-    data = await new Promise<Uint8Array>((resolve, reject) => {
+    return await new Promise<Uint8Array>((resolve, reject) => {
       pending.set(request, { resolve, reject })
-      currentWorker.postMessage({
-        request,
-        snapshot: id,
-        tile: { z, x, y },
-      } satisfies DeliveryRequest)
+      currentWorker.postMessage({ request, snapshot: id, tile: target } satisfies DeliveryRequest)
     })
   } finally {
+    signal.removeEventListener('abort', abort)
+  }
+}
+
+addProtocol('language-overlap', async ({ url }, controller) => {
+  controller.signal.throwIfAborted()
+  const [path = '', query] = url.split('?')
+  const [id, z, x, y] = path.slice('language-overlap://'.length).split('/').map(Number)
+  const archiveUrl = new URLSearchParams(query).get('archive')
+  if (
+    id === undefined ||
+    z === undefined ||
+    x === undefined ||
+    y === undefined ||
+    ![id, z, x, y].every(Number.isInteger) ||
+    !archiveUrl
+  )
+    throw new Error('Invalid overlap tile URL')
+  const tiles = snapshots.get(id)
+  // Removed sources can finish already scheduled requests; they no longer draw.
+  if (!tiles) return { data: new ArrayBuffer(0) }
+  const cancellation = new AbortController()
+  const abort = () => cancellation.abort()
+  controller.signal.addEventListener('abort', abort, { once: true })
+  try {
+    const target = { z, x, y }
+    const [coverage, fallback] = await Promise.all([
+      requestCoverageTile(id, target, cancellation.signal),
+      requestFallbackTile(
+        archiveUrl,
+        [...tiles.values()].map(({ tile }) => tile),
+        target,
+        id,
+        cancellation.signal,
+      ),
+    ])
+    controller.signal.throwIfAborted()
+    // One source owns both sides of the partition. Tile retention and stencil
+    // clipping cannot select a fallback mask without its coverage geometry.
+    return { data: combineTileLayers(coverage, new Uint8Array(fallback)).buffer as ArrayBuffer }
+  } finally {
+    cancellation.abort()
     controller.signal.removeEventListener('abort', abort)
   }
-  // The worker transferred a disposable copy, independent of its cached bytes.
-  return { data: data.buffer as ArrayBuffer }
 })
 
 if (import.meta.hot)

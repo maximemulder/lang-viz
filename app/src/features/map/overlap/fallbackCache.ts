@@ -90,7 +90,7 @@ export class FallbackCache {
     // Uncovered pass-through results already live in the raw cache.
     if (!rects.length) return data
     const started = performance.now()
-    const result = await clipFallbackTile(data, tile, coverage, this.metrics)
+    const result = await clipFallbackTile(data, tile, coverage, this.metrics, signal)
     this.metrics.clipMs += performance.now() - started
     signal.throwIfAborted()
     this.results.set(resultKey, result)

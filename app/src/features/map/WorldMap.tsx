@@ -1,5 +1,5 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import type { FilterSpecification, MapGeoJSONFeature, MapLayerMouseEvent } from 'maplibre-gl'
+import type { FilterSpecification, MapLayerMouseEvent } from 'maplibre-gl'
 import { addProtocol, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { Protocol } from 'pmtiles'
@@ -20,6 +20,7 @@ import {
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
 import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
+import { visibleVariantIds } from './inspection'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
 import { MapSettings, type ProjectionMode } from './MapSettings'
 import { diagnosticsEnabled } from './overlap/diagnostics'
@@ -55,21 +56,12 @@ const SELECTED_LANGUAGE_LAYER_ID = 'selected-language-areas'
 const HOVER_QUERY_INTERVAL_MS = 40
 const NO_VARIANT_IDS: readonly string[] = []
 
-const inspectionFromFeatures = (
-  features: readonly MapGeoJSONFeature[],
+const inspectionFromVariants = (
+  variantIds: readonly string[],
   longitude: number,
   latitude: number,
   pinned: boolean,
 ): MapInspection | null => {
-  const variantIds = [
-    ...new Set(
-      features.flatMap((feature) => {
-        const variantId = feature.properties.variant_id
-        return typeof variantId === 'string' ? [variantId] : []
-      }),
-    ),
-  ].sort()
-
   return variantIds.length > 0 ? { longitude, latitude, variantIds, pinned } : null
 }
 
@@ -265,13 +257,8 @@ export const WorldMap = () => {
           pendingHoverEventRef.current = null
           if (!latestEvent || inspectionRef.current?.pinned) return
 
-          const features = latestEvent.target.getLayer(SELECTED_LANGUAGE_LAYER_ID)
-            ? latestEvent.target.queryRenderedFeatures(latestEvent.point, {
-                layers: [SELECTED_LANGUAGE_LAYER_ID],
-              })
-            : []
-          const nextInspection = inspectionFromFeatures(
-            features,
+          const nextInspection = inspectionFromVariants(
+            visibleVariantIds(latestEvent.target, latestEvent.point),
             latestEvent.lngLat.lng,
             latestEvent.lngLat.lat,
             false,
@@ -290,12 +277,14 @@ export const WorldMap = () => {
       }}
       onClick={(event) => {
         cancelPendingHoverQuery()
-        const features = event.target.getLayer(SELECTED_LANGUAGE_LAYER_ID)
-          ? event.target.queryRenderedFeatures(event.point, {
-              layers: [SELECTED_LANGUAGE_LAYER_ID],
-            })
-          : []
-        updateInspection(inspectionFromFeatures(features, event.lngLat.lng, event.lngLat.lat, true))
+        updateInspection(
+          inspectionFromVariants(
+            visibleVariantIds(event.target, event.point),
+            event.lngLat.lng,
+            event.lngLat.lat,
+            true,
+          ),
+        )
       }}
       onIdle={(event) => {
         if (!event.target.getLayer(LANGUAGE_HIT_LAYER_ID)) return
