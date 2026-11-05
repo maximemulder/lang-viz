@@ -1,6 +1,6 @@
-import { useAtom, useAtomValue } from 'jotai'
+import { useAtom } from 'jotai'
 import { useEffect, useId, useRef, useState } from 'react'
-import { languageOpacityAtom, overlapModeAtom, overlapStatusAtom } from '../../state/atlasState'
+import { languageOpacityAtom, overlapModeAtom } from '../../state/atlasState'
 
 import { BIOMES } from './biomes'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
@@ -73,7 +73,6 @@ export const MapSettings = ({
   const toggleRef = useRef<HTMLButtonElement>(null)
   const [mode, setMode] = useAtom(overlapModeAtom)
   const [opacity, setOpacity] = useAtom(languageOpacityAtom)
-  const { status, message } = useAtomValue(overlapStatusAtom)
 
   useEffect(() => {
     if (!open) return
@@ -233,16 +232,6 @@ export const MapSettings = ({
             onChange={(event) => setOpacity(Number(event.currentTarget.value) / 100)}
           />
         </label>
-        <p
-          className="map-settings__status"
-          role="status"
-          data-overlap-status={status}
-          hidden={mode === 'blending' || status === 'idle'}
-        >
-          {mode === 'hatching' && status !== 'idle'
-            ? message || 'Preparing overlap stripes…'
-            : null}
-        </p>
       </section>
     </div>
   )
