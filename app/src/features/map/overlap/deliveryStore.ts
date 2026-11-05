@@ -38,7 +38,10 @@ export class DeliveryStore {
       parentRequests: this.parentRequests,
       parentCacheHits: this.parentCacheHits,
       assemblyMs: this.assemblyMs,
-      nativeBytes: [...this.tiles.values()].reduce((sum, tile) => sum + tile.data.byteLength, 0),
+      nativeBytes: [...this.tiles.values()].reduce(
+        (sum, tile) => sum + tile.data.byteLength + tile.renderData.byteLength,
+        0,
+      ),
       parentBytes: this.parents.bytes,
       parentEntries: this.parents.size,
       snapshots: this.snapshots.size,
@@ -71,7 +74,7 @@ export class DeliveryStore {
       const tile = this.tiles.get(id)
       if (tile) tiles.set(tileKey(tile.tile), tile)
     }
-    const data = deliveryTile(tiles, target)
+    const data = deliveryTile(tiles, target, true)
     this.assemblyMs += performance.now() - started
     this.parents.set(key, data)
     return data

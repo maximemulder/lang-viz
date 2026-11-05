@@ -3,6 +3,7 @@ import { type Feature, fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf
 import { PbfReader } from 'pbf'
 import { type MultiPolygon, OverlapInitializationError } from './geometry.ts'
 import { lazyResource } from './lazyResource.ts'
+import { bufferTileEdges } from './tileBuffer.ts'
 import { coverageRectangles } from './tiles.ts'
 import type { TileCoordinate } from './types.ts'
 
@@ -32,6 +33,7 @@ export const clipFallbackTile = async (
   coverage: readonly TileCoordinate[],
   metrics?: FallbackClipMetrics,
   signal?: AbortSignal,
+  buffered = false,
 ): Promise<Uint8Array> => {
   signal?.throwIfAborted()
   if (!data.length) return data
@@ -130,7 +132,7 @@ export const clipFallbackTile = async (
       if (!geometry?.length) continue
       output.push({
         type: 3,
-        geometry,
+        geometry: buffered ? bufferTileEdges(geometry, layer.extent) : geometry,
         tags: feature.properties,
         ...(feature.id === undefined ? {} : { id: feature.id }),
       })

@@ -196,8 +196,16 @@ different IDs and colors.
 
 This is display geometry. Tile simplification can remove small overlap regions,
 especially when zoomed out. Computation zoom reduction can differ from the base
-layer's detail level. Geometry is clipped to tile interiors to avoid duplicate
-coverage; precision differences in the source tiles can still leave tiny seams.
+layer's detail level. Canonical geometry is clipped to tile interiors to avoid
+duplicate coverage. Render payloads extend only tile-cut edges into a 1/128-tile
+buffer, matching MapLibre's globe stencil border. Globe tessellation and stencil
+edges can otherwise differ enough to expose background pixels. The buffer joins
+the original polygon ring, keeping coastlines and interior geometry unchanged;
+it is not a general polygon inflation. Native tiles retain both canonical and
+render encodings. Parents assemble canonical bytes before adding their own outer
+buffer, so child buffers never become overlapping interior geometry. Clipped
+fallback uses the same buffer; uncovered archive tiles keep their original buffer.
+Both encodings are included in snapshot/delivery byte diagnostics.
 The standard fill renderer supports both globe and Mercator projection. Stripe
 spacing follows MapLibre's map-anchored pattern scaling, rather than staying at
 a fixed screen width throughout zooming.

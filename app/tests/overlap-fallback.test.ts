@@ -97,8 +97,12 @@ test('cached fallback geometry changes only when its local coverage changes', as
   const first = await cache.get(archive, 'a', tile, [mask], signal)
   assert.equal(await cache.get(archive, 'a', tile, [outside, mask], signal), first)
   const second = await cache.get(archive, 'a', tile, [{ z: 2, x: 0, y: 0 }], signal)
-  const firstFeature = new VectorTile(new PbfReader(first)).layers.language_areas?.feature(0)
-  const secondFeature = new VectorTile(new PbfReader(second)).layers.language_areas?.feature(0)
+  // Render buffers live outside the canonical tile. Clip them back before
+  // comparing covered areas; this must also preserve the original hole.
+  const firstCore = await clipFallbackTile(first, tile, [mask])
+  const secondCore = await clipFallbackTile(second, tile, [{ z: 2, x: 0, y: 0 }])
+  const firstFeature = new VectorTile(new PbfReader(firstCore)).layers.language_areas?.feature(0)
+  const secondFeature = new VectorTile(new PbfReader(secondCore)).layers.language_areas?.feature(0)
   assert.ok(firstFeature && secondFeature)
   assert.equal(area(firstFeature.loadGeometry().map((ring) => ring.map(({ x, y }) => [x, y]))), 176)
   assert.equal(

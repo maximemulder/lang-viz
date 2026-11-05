@@ -438,7 +438,11 @@ def check_area_continuity(browser, args, projection):
         [-3, 52.3],
         [-2, 52.3],
         [-1, 52.3],
-        [0, 52.3],
+        # Keep this continuity probe inside land and away from the exact x=0
+        # tile cut. A render-only apron can briefly color that cut before the
+        # newly exposed neighboring tile has ever loaded. The fully loaded
+        # synthetic seam probe separately checks exact tile boundaries.
+        [0.1, 52.3],
         [-0.3, 52.3],
         [-3, 53.3],
         [-2, 53.3],
@@ -626,6 +630,15 @@ def main():
                         )
 
                     if scenario["name"] == "britain-small":
+                        case["tileSeams"] = browser.js("return window.overlapTest.probeTileSeams()")
+                        assert any(
+                            r["gaps"]
+                            for r in case["tileSeams"]
+                            if not r["buffered"] and r["projection"] == "globe"
+                        ), "Unbuffered control did not reproduce globe cracks"
+                        assert all(r["gaps"] == 0 for r in case["tileSeams"] if r["buffered"]), (
+                            f"Buffered tile cracks: {case['tileSeams']}"
+                        )
                         case["inspection"] = check_inspection(browser)
                         case["styleReload"] = check_style_reload(browser, args)
                         case["solidPixels"] = check_pixels(browser)

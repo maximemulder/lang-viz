@@ -134,6 +134,7 @@ export interface OverlapTestApi {
   watchAreas(points: [number, number][] | null): void
   watchStripes(center: [number, number] | null): void
   samplePixels(center: [number, number], radius: number): Promise<number[]>
+  probeTileSeams(): Promise<unknown>
   unexpectedMemberships(): string[]
   snapshot(): unknown
 }

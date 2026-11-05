@@ -123,6 +123,29 @@ Vite dependency-version query that bypassed the build transform; query handling
 now has an integration regression. Navigation-cache assertions wait for projection
 changes and their debounced coverage refresh to settle before recording the view.
 
+Globe seam correction (2026-11-05): a fully filled synthetic vector map reproduced
+thin background cracks at tile cuts in globe projection (207 exposed pixels across
+native and assembled-parent control views), while Mercator controls were clean.
+The render tiles now extend tile-cut edges into MapLibre's existing 1/128-tile
+stencil border, joining each apron into its original polygon ring. Canonical
+interiors remain separate and unchanged; parents assemble those bytes before
+buffering only their own outer edge. Clipped fallback uses the same treatment.
+This follows ordinary vector-tile buffering and adds no MapLibre workaround.
+Native coverage retains a second encoded render payload; receiver and delivery
+byte counters account for both. GEOS-based tests confirm identical canonical
+coverage, holes, and masks, including retained parents. All 64 unit tests pass.
+The browser regression scans 600×400 interior pixels in 32 loaded views across
+both projections: five native/overzoom levels and three zoom-out parent levels,
+each buffered and unbuffered. All 16 buffered views expose zero background pixels.
+Production Firefox also passed Britain-small, Britain-all, and regional-all,
+including 2,711 delayed-navigation area frames and 1,906 stripe frames
+with no disappearance, style/inspection checks, resource bounds, and protocol
+failure recovery. The development Britain-small run passed as well.
+One navigation continuity point moved from longitude 0 to 0.1 degrees to remain
+inside land rather than exactly on a tile cut: an apron can briefly color a newly
+exposed cut before its neighboring tile ever loads. Fully loaded exact boundaries
+are now checked separately by the stronger synthetic regression.
+
 Verification: tile-retention regression test and Firefox checks across pans,
 return navigation, zoom changes, selection clearing, and an injected worker
 failure. All 150 sampled navigation frames kept one coverage layer active and

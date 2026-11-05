@@ -190,3 +190,13 @@ saved as `area-<projection>-<service>.json`, and in `areaContinuity` reports.
 These checks reproduced losses from both upstream tile retention and independently
 loaded coverage/fallback masks; both corrections are required. They complement
 rather than replace the interior stripe and exact solid-color pixel checks.
+
+Britain-small also runs a synthetic tile-seam probe in a temporary map, using
+actual coverage encoding and parent assembly. Adjacent rows have different
+boundary vertices but fill the whole map. It scans 600×400 framebuffer pixels
+at five native/overzoom levels and three zoom-out parent levels, in globe and
+Mercator. Unbuffered controls must reproduce globe cracks; every buffered view
+must have zero exposed background pixels. Results are stored as `tileSeams`.
+The land continuity probe stays away from exact tile cuts: a render buffer can
+briefly color an edge before a newly exposed neighboring tile ever loads. Exact
+boundaries are covered separately by the fully loaded synthetic seam probe.

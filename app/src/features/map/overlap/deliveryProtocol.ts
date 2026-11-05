@@ -63,7 +63,10 @@ const snapshots = new Map<number, ReadonlyMap<string, DeliveryTile>>()
 const recordSnapshots = () => {
   if (!diagnosticsEnabled) return
   const tiles = new Set([...snapshots.values()].flatMap((snapshot) => [...snapshot.values()]))
-  const bytes = [...tiles].reduce((sum, tile) => sum + tile.data.byteLength, 0)
+  const bytes = [...tiles].reduce(
+    (sum, tile) => sum + tile.data.byteLength + tile.renderData.byteLength,
+    0,
+  )
   serviceDiagnostics.receiver = {
     snapshots: snapshots.size,
     tiles: tiles.size,
@@ -120,7 +123,7 @@ const requestCoverageTile = async (id: number, target: TileCoordinate, signal: A
     ![...tiles.values()].some((tile) => tile.data.length && isTileDescendant(tile.tile, target))
   ) {
     if (diagnosticsEnabled) serviceDiagnostics.nativeRequests++
-    return native?.data ?? new Uint8Array()
+    return native?.renderData ?? new Uint8Array()
   }
   const request = ++nextRequestId
   const currentWorker = ensureWorker()

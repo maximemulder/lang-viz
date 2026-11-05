@@ -219,6 +219,7 @@ export const installOverlapTestApi = (
         })
         map.triggerRepaint()
       }),
+    probeTileSeams: () => import('./tileSeamProbe').then(({ probeTileSeams }) => probeTileSeams()),
     unexpectedMemberships: () => {
       const selected = new Set<string>(JSON.parse(selectionKey()))
       return [
