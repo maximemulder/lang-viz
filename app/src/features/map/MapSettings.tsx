@@ -2,6 +2,8 @@ import { useAtom, useAtomValue } from 'jotai'
 import { useEffect, useId, useRef, useState } from 'react'
 import { languageOpacityAtom, overlapModeAtom, overlapStatusAtom } from '../../state/atlasState'
 
+import { BIOMES } from './biomes'
+import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
 import { globeLandPath, mercatorLandPath } from './projectionIcons'
 
 export type ProjectionMode = 'globe' | 'mercator'
@@ -57,7 +59,11 @@ const SettingIcon = ({ kind }: { readonly kind: ProjectionMode | 'hatching' | 'b
 export const MapSettings = ({
   projectionMode,
   onProjectionChange,
+  backgroundMode,
+  onBackgroundChange,
 }: {
+  readonly backgroundMode: BackgroundMode
+  readonly onBackgroundChange: (mode: BackgroundMode) => void
   readonly projectionMode: ProjectionMode
   readonly onProjectionChange: (mode: ProjectionMode) => void
 }) => {
@@ -118,6 +124,49 @@ export const MapSettings = ({
         aria-label="Map settings"
         hidden={!open}
       >
+        <fieldset className="map-settings__group">
+          <legend>Background</legend>
+          <div className="map-settings__choices">
+            {BACKGROUND_OPTIONS.map(({ value, label, preview }) => (
+              <label className="map-settings__choice" key={value}>
+                <input
+                  type="radio"
+                  name="map-background"
+                  value={value}
+                  aria-label={label}
+                  aria-describedby={`${tooltipId}-${value}`}
+                  checked={backgroundMode === value}
+                  onChange={() => onBackgroundChange(value)}
+                />
+                <span className="map-settings__tile">
+                  <img
+                    className="map-settings__icon map-settings__thumbnail"
+                    src={preview}
+                    alt=""
+                    draggable={false}
+                  />
+                </span>
+                <span className="map-settings__tooltip" id={`${tooltipId}-${value}`} role="tooltip">
+                  {label}
+                </span>
+              </label>
+            ))}
+          </div>
+          {backgroundMode === 'biomes' && (
+            <details className="map-settings__biome-legend">
+              <summary>Biome legend</summary>
+              <ul>
+                {BIOMES.map(({ id, label, color }) => (
+                  <li key={id}>
+                    <span style={{ backgroundColor: color }} aria-hidden="true" />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+              <p>RESOLVE 2017 ecological reference</p>
+            </details>
+          )}
+        </fieldset>
         <fieldset className="map-settings__group">
           <legend>Projection</legend>
           <div className="map-settings__choices">

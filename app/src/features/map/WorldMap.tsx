@@ -19,9 +19,10 @@ import {
   viewportLanguageIdsAtom,
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
-import { GEOGRAPHIC_BASEMAP } from './geographicBasemap'
+import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { visibleVariantIds } from './inspection'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
+import { MapBackground } from './MapBackground'
 import { MapSettings, type ProjectionMode } from './MapSettings'
 import { diagnosticsEnabled } from './overlap/diagnostics'
 import { OverlapHatching } from './overlap/OverlapHatching'
@@ -30,14 +31,15 @@ setWorkerUrl(maplibreWorkerUrl)
 const pmtilesProtocol = new Protocol()
 addProtocol('pmtiles', pmtilesProtocol.tile)
 
-const MAP_STYLE =
+const BASEMAP_DISABLED =
   diagnosticsEnabled && new URLSearchParams(location.search).get('overlap-basemap') === 'off'
-    ? {
-        ...GEOGRAPHIC_BASEMAP,
-        sources: {},
-        layers: GEOGRAPHIC_BASEMAP.layers.filter((layer) => layer.type === 'background'),
-      }
-    : GEOGRAPHIC_BASEMAP
+const MAP_STYLE = BASEMAP_DISABLED
+  ? {
+      ...GEOGRAPHIC_BASEMAP,
+      sources: {},
+      layers: GEOGRAPHIC_BASEMAP.layers.filter((layer) => layer.type === 'background'),
+    }
+  : GEOGRAPHIC_BASEMAP
 
 const INITIAL_VIEW = {
   longitude: 12,
@@ -190,6 +192,7 @@ const MapHint = () => {
 }
 
 export const WorldMap = () => {
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('terrain')
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
   const [inspection, setInspection] = useState<MapInspection | null>(null)
   const temporalSelection = useAtomValue(temporalViewAtom)
@@ -297,6 +300,7 @@ export const WorldMap = () => {
         setViewportLanguageIds([...new Set(languageIds)])
       }}
     >
+      {!BASEMAP_DISABLED && <MapBackground mode={backgroundMode} />}
       <Suspense fallback={null}>
         <LanguageLayers
           inspectedVariantIds={inspection?.pinned ? inspection.variantIds : NO_VARIANT_IDS}
@@ -305,7 +309,12 @@ export const WorldMap = () => {
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
 
-      <MapSettings projectionMode={projectionMode} onProjectionChange={setProjectionMode} />
+      <MapSettings
+        projectionMode={projectionMode}
+        onProjectionChange={setProjectionMode}
+        backgroundMode={backgroundMode}
+        onBackgroundChange={setBackgroundMode}
+      />
 
       <Suspense fallback={null}>
         <MapHint />
