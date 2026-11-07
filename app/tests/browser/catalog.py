@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check all-level search and map selection in the production application."""
+"""Check hierarchy browsing, ranked search, keyboard navigation and map selection."""
 
 import json
 import subprocess
@@ -23,8 +23,8 @@ def search(browser, query, glottocode):
         lambda: browser.js(
             """
             const row = [...document.querySelectorAll('.language-row')]
-              .find(row => row.textContent.includes(arguments[0]));
-            return row ? {text: row.textContent, disabled: row.querySelector('input').disabled} : null;
+              .find(row => row.dataset.languageId === arguments[0]);
+            return row ? {text: row.textContent, disabled: row.querySelector('input').disabled, level: row.getAttribute('aria-level')} : null;
             """,
             glottocode,
         ),
@@ -76,6 +76,143 @@ def main():
         browser.call("POST", "/url", {"url": origin + "/?overlap-test=1&overlap-basemap=off"})
         wait_for(lambda: browser.js("return !!window.overlapTest"), 45, "application")
         try:
+            wait_for(
+                lambda: browser.js("return document.querySelectorAll('.language-row').length"),
+                20,
+                "tree roots",
+            )
+            results["initialBrowse"] = browser.js("""
+                return {count: document.querySelector('.finder-actions p').textContent,
+                    rows: [...document.querySelectorAll('.language-row')].map(row => ({name: row.textContent, level: row.getAttribute('aria-level')}))};
+                """)
+            assert "429 roots" in results["initialBrowse"]["count"]
+            assert all(row["level"] == "1" for row in results["initialBrowse"]["rows"])
+            browser.screenshot(output / "browse.png")
+
+            # Expanding a family is independent of drawing it, and shows immediate groups.
+            search(browser, "abkh1242", "abkh1242")
+            browser.js("document.querySelector('.language-row__disclosure').click()")
+            children = wait_for(
+                lambda: browser.js("""
+                const children = [...document.querySelectorAll('.language-row[aria-level="2"]')];
+                return children.length === 3 ? children.map(row => row.dataset.languageId) : null;
+                """),
+                10,
+                "family children",
+            )
+            assert set(children) == {"abkh1243", "circ1239", "ubyk1235"}
+            assert browser.snapshot()["selectedCount"] == 0
+            browser.screenshot(output / "expanded-family.png")
+
+            # Arrow navigation moves focus, enters children and returns to/collapses the parent.
+            browser.js("document.querySelector('.language-row').focus()")
+
+            def key(value):
+                browser.call(
+                    "POST",
+                    "/actions",
+                    {
+                        "actions": [
+                            {
+                                "type": "key",
+                                "id": "tree-keyboard",
+                                "actions": [
+                                    {"type": "keyDown", "value": value},
+                                    {"type": "keyUp", "value": value},
+                                ],
+                            }
+                        ]
+                    },
+                )
+                browser.call("DELETE", "/actions")
+
+            key("\ue014")  # Right: already expanded, enter first child.
+            wait_for(
+                lambda: browser.js(
+                    "return document.activeElement?.getAttribute('aria-level') === '2'"
+                ),
+                10,
+                "keyboard child focus",
+            )
+            key("\ue012")  # Left: return to parent.
+            wait_for(
+                lambda: browser.js(
+                    "return document.activeElement?.dataset.languageId === 'abkh1242'"
+                ),
+                10,
+                "keyboard parent focus",
+            )
+            key("\ue012")  # Left: collapse.
+            assert (
+                browser.js(
+                    "return document.querySelector('.language-row').getAttribute('aria-expanded')"
+                )
+                == "false"
+            )
+            key("\ue015")  # Down: end of this one-root result stays on the parent.
+            assert browser.js("return document.activeElement?.dataset.languageId") == "abkh1242"
+            key("\ue00d")  # Space: select just this family area.
+            wait_for(lambda: browser.snapshot()["selectedCount"] == 1, 10, "keyboard map selection")
+            assert browser.js("return document.querySelector('.language-row input').checked")
+            key("\ue00d")
+            wait_for(
+                lambda: browser.snapshot()["selectedCount"] == 0, 10, "keyboard map deselection"
+            )
+            results["keyboard"] = "passed"
+
+            # No polygon is required to explore a branch.
+            search(browser, "jiny1235", "jiny1235")
+            browser.js("document.querySelector('.language-row__disclosure').click()")
+            assert wait_for(
+                lambda: browser.js(
+                    "return document.querySelectorAll('.language-row[aria-level=\"2\"]').length === 3"
+                ),
+                10,
+                "unmapped children",
+            )
+            assert browser.snapshot()["selectedCount"] == 0
+
+            # A search hit can be revealed in its complete classification, including deep ancestors.
+            search(browser, "上海", "shan1293")
+            browser.js("document.querySelector('.language-row').click();")
+            browser.js("document.querySelector('.finder-detail__reveal').click()")
+            revealed = wait_for(
+                lambda: browser.js("""
+                const row = document.activeElement;
+                return row?.dataset.languageId === 'shan1293' && Number(row.getAttribute('aria-level')) > 1
+                    ? {key: row.dataset.treeKey, level: row.getAttribute('aria-level'), query: document.querySelector('input[type=search]').value} : null;
+                """),
+                15,
+                "reveal in classification",
+            )
+            assert revealed["query"] == "" and revealed["key"].startswith("sino1245/")
+            results["revealedDialect"] = revealed
+            browser.screenshot(output / "revealed-dialect.png")
+            key("\ue010")  # End: focus reaches a virtualized, initially unmounted root.
+            wait_for(
+                lambda: browser.js(
+                    "return document.activeElement?.getAttribute('aria-posinset') === '429'"
+                ),
+                10,
+                "virtualized end navigation",
+            )
+            key("\ue011")  # Home.
+            wait_for(
+                lambda: browser.js(
+                    "return document.activeElement?.getAttribute('aria-posinset') === '1'"
+                ),
+                10,
+                "virtualized home navigation",
+            )
+
+            # An exact name should lead, without treating ancestor names as matches for descendants.
+            search(browser, "Mandarin Chinese", "mand1415")
+            assert (
+                browser.js("return document.querySelector('.language-row').dataset.languageId")
+                == "mand1415"
+            )
+            results["rankedSearch"] = "passed"
+
             # Unmapped entries must remain discoverable, including by original-script aliases.
             results["unmappedLanguage"] = search(browser, "jiny1235", "jiny1235")
             assert results["unmappedLanguage"]["disabled"]
@@ -174,6 +311,21 @@ def main():
             }
             results["mixedLevels"] = inspection
             browser.screenshot(output / "mixed-levels.png")
+
+            # The tree keeps useful space on narrow screens, including with entry details open.
+            browser.call("POST", "/window/rect", {"width": 390, "height": 844})
+            search(browser, "abkh1242", "abkh1242")
+            browser.js("document.querySelector('.language-row').click()")
+            narrow = browser.js("""
+                const list = document.querySelector('.language-list');
+                return {height: list.clientHeight, width: innerWidth,
+                    documentWidth: document.documentElement.scrollWidth};
+                """)
+            assert narrow["height"] >= 88, narrow
+            assert narrow["documentWidth"] <= narrow["width"], narrow
+            results["narrowLayout"] = narrow
+            browser.js("document.querySelector('.language-finder').scrollIntoView({block:'end'})")
+            browser.screenshot(output / "narrow.png")
         except Exception:
             results["failureSnapshot"] = browser.snapshot()
             browser.screenshot(output / "failure.png")

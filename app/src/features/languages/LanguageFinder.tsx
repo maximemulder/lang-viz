@@ -1,6 +1,12 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { useEffect, useRef, useState } from 'react'
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type {
   AtlasData,
   GeographyDatasetSelection,
@@ -9,6 +15,12 @@ import type {
 } from '../../domain/atlas'
 import { searchCatalog } from '../../domain/catalog'
 import { geographyVariantsForLanguage } from '../../domain/geography'
+import {
+  buildLanguageHierarchy,
+  flattenLanguageHierarchy,
+  type HierarchyRow,
+  languageAncestors,
+} from '../../domain/hierarchy'
 import {
   isTemporalViewSelection,
   TEMPORAL_VIEWS,
@@ -30,80 +42,102 @@ import {
 } from '../../state/atlasState'
 
 interface LanguageRowProps {
-  readonly language: Language
+  readonly row: HierarchyRow
+  readonly expanded: boolean
+  readonly active: boolean
+  readonly context: string | null
+  readonly onExpand: () => void
+  readonly onFocus: () => void
+  readonly onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void
 }
 
-const LanguageRow = ({ language }: LanguageRowProps) => {
+const LanguageRow = ({
+  row,
+  expanded,
+  active,
+  context,
+  onExpand,
+  onFocus,
+  onKeyDown,
+}: LanguageRowProps) => {
+  const { language } = row
   const data = useAtomValue(atlasDataAtom)
   const visibleIds = useAtomValue(visibleLanguageIdsAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
-  const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
   const variants = geographyVariantsForLanguage(data, language, temporalSelection, datasetSelection)
-  const hasGeometry = variants.length > 0
   const isVisible = visibleIds.includes(language.id)
   const activeVariant =
     variants.find((variant) => variant.id === overrides[language.id]) ?? variants[0]
+  const availability = variants.length
+    ? null
+    : language.geometryVariantIds.length
+      ? 'No polygon for selected sources / period'
+      : 'No polygon available'
 
   return (
-    <article className={`language-row${hasGeometry ? '' : ' language-row--unavailable'}`}>
-      <label className="language-row__identity">
-        <input
-          type="checkbox"
-          checked={isVisible}
-          disabled={!hasGeometry && !isVisible}
-          onChange={() => toggleVisible(language.id)}
-        />
-        <span
-          className="language-row__swatch"
-          style={{ backgroundColor: activeVariant?.color ?? '#b8c0bc' }}
-          aria-hidden="true"
-        />
-        <span>
-          <strong>{language.name}</strong>
-          <small>
-            {language.level} · {language.familyName ? `${language.familyName} · ` : ''}
-            {language.id}
-          </small>
-        </span>
-      </label>
-
-      {variants.length > 1 ? (
-        <select
-          className="language-row__variant"
-          aria-label={`Geographic source for ${language.name}`}
-          value={activeVariant?.id}
-          onChange={(event) =>
-            setGeometryOverride({ languageId: language.id, variantId: event.currentTarget.value })
-          }
+    <div
+      role="treeitem"
+      aria-label={`${language.name}, ${language.level}${availability ? `, ${availability}` : ''}`}
+      aria-level={row.depth + 1}
+      aria-posinset={row.position}
+      aria-setsize={row.siblingCount}
+      aria-expanded={row.childCount ? expanded : undefined}
+      aria-checked={isVisible}
+      tabIndex={active ? 0 : -1}
+      data-tree-key={row.key}
+      data-language-id={language.id}
+      className={`language-row${active ? ' language-row--active' : ''}`}
+      style={{ paddingLeft: `${4 + row.depth * 14}px`, minWidth: `${280 + row.depth * 14}px` }}
+      onFocus={onFocus}
+      onClick={(event) => {
+        event.currentTarget.focus()
+        onFocus()
+      }}
+      onKeyDown={onKeyDown}
+    >
+      {row.childCount ? (
+        <button
+          type="button"
+          className="language-row__disclosure"
+          tabIndex={-1}
+          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${language.name}`}
+          onClick={onExpand}
         >
-          {variants.map((variant) => (
-            <option key={variant.id} value={variant.id}>
-              {variant.label}
-              {variant.temporalCoverage.quality === 'proxy' ||
-              variant.temporalCoverage.quality === 'mixed'
-                ? ` · ${temporalQualityLabel(variant.temporalCoverage.quality)}`
-                : ''}
-            </option>
-          ))}
-        </select>
+          <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+        </button>
       ) : (
-        <small className="language-row__availability">
-          {variants[0]
-            ? `${variants[0].label}${
-                variants[0].temporalCoverage.quality === 'proxy' ||
-                variants[0].temporalCoverage.quality === 'mixed'
-                  ? ` · ${temporalQualityLabel(variants[0].temporalCoverage.quality)}`
-                  : ''
-              }`
-            : language.geometryVariantIds.length === 0
-              ? 'No polygon available'
-              : 'No polygon for selected sources / period'}
-        </small>
+        <span className="language-row__leaf" aria-hidden="true">
+          ·
+        </span>
       )}
-    </article>
+      <span
+        className="language-row__identity"
+        title={[`${language.name} · ${language.id}`, context].filter(Boolean).join('\n')}
+      >
+        <span className="language-row__name">
+          {language.name}
+          {row.childCount > 0 && <small className="language-row__children">{row.childCount}</small>}
+        </span>
+        {context && <small className="language-row__context">{context}</small>}
+      </span>
+      <span className={`language-row__level language-row__level--${language.level}`}>
+        {language.level}
+      </span>
+      <input
+        type="checkbox"
+        tabIndex={-1}
+        aria-label={`Show ${language.name} on map`}
+        title={availability ?? `Show ${language.name} on map`}
+        checked={isVisible}
+        disabled={!variants.length && !isVisible}
+        style={{ accentColor: activeVariant?.color }}
+        onChange={() => toggleVisible(language.id)}
+      />
+      {availability && <span className="visually-hidden">{availability}</span>}
+    </div>
   )
 }
 
@@ -230,22 +264,70 @@ export const LanguageFinder = () => {
   const [scope, setScope] = useAtom(finderScopeAtom)
   const [temporalSelection, setTemporalSelection] = useAtom(temporalViewAtom)
   const showLanguages = useSetAtom(showLanguagesAtom)
+  const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
+  const overrides = useAtomValue(geometryOverridesAtom)
+  const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
+  const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
+  const [focusedKey, setFocusedKey] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const { languages, showableIds } = searchCatalog(
-    data,
-    query,
-    scope === 'viewport' ? new Set(viewportIds) : null,
-    temporalSelection,
-    datasetFilter,
+  const pendingFocus = useRef<string | null>(null)
+  const hierarchy = useMemo(() => buildLanguageHierarchy(data.languages), [data])
+  const isSearching = Boolean(query.trim())
+  const isBrowsingRoots = !isSearching && scope === 'world'
+  const search = useMemo(
+    () =>
+      searchCatalog(
+        data,
+        query,
+        scope === 'viewport' ? new Set(viewportIds) : null,
+        temporalSelection,
+        datasetFilter,
+      ),
+    [data, query, scope, viewportIds, temporalSelection, datasetFilter],
   )
+  const roots = isBrowsingRoots ? hierarchy.roots : search.languages
+  const rows = useMemo(
+    () => flattenLanguageHierarchy(hierarchy, roots, expandedKeys),
+    [hierarchy, roots, expandedKeys],
+  )
+  const showableIds = roots
+    .filter(
+      (language) =>
+        geographyVariantsForLanguage(data, language, temporalSelection, datasetFilter).length > 0,
+    )
+    .map(({ id }) => id)
+  const activeKey = rows.some((row) => row.key === focusedKey) ? focusedKey : rows[0]?.key
   const virtualizer = useVirtualizer({
-    count: languages.length,
+    count: rows.length,
     getScrollElement: () => listRef.current,
-    estimateSize: () => 70,
+    estimateSize: () => 44,
     overscan: 8,
-    getItemKey: (index) => languages[index]?.id ?? index,
+    getItemKey: (index) => rows[index]?.key ?? index,
   })
+  const virtualRows = virtualizer.getVirtualItems()
+
+  // Focus after virtualization mounts a row reached by keyboard or classification navigation.
+  useEffect(() => {
+    if (!pendingFocus.current) return
+    const index = rows.findIndex((row) => row.key === pendingFocus.current)
+    if (index < 0) return
+    if (!virtualRows.some((row) => row.index === index)) {
+      virtualizer.scrollToIndex(index, { align: 'auto' })
+      return
+    }
+    const element = [
+      ...(listRef.current?.querySelectorAll<HTMLElement>('[data-tree-key]') ?? []),
+    ].find((element) => element.dataset.treeKey === pendingFocus.current)
+    if (element) {
+      element.focus({ preventScroll: true })
+      element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      element.querySelector('input')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      pendingFocus.current = null
+    }
+  }, [rows, virtualRows, virtualizer])
+
   const visibleIdSet = new Set(visibleIds)
   const shownCount = visibleIds.filter((languageId) => {
     const language = data.languageById.get(languageId)
@@ -255,23 +337,110 @@ export const LanguageFinder = () => {
     )
   }).length
   const areAllFilteredSelected =
-    showableIds.length > 0 && showableIds.every((languageId) => visibleIdSet.has(languageId))
-
+    showableIds.length > 0 && showableIds.every((id) => visibleIdSet.has(id))
   const toggleFilteredLanguages = () => {
     if (areAllFilteredSelected) {
       const filteredIdSet = new Set(showableIds)
-      setVisibleIds(visibleIds.filter((languageId) => !filteredIdSet.has(languageId)))
-      return
-    }
-    showLanguages(showableIds)
+      setVisibleIds(visibleIds.filter((id) => !filteredIdSet.has(id)))
+    } else showLanguages(showableIds)
   }
+  const toggleExpanded = (key: string) =>
+    setExpandedKeys((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  const focusRow = (index: number) => {
+    const row = rows[index]
+    if (!row) return
+    pendingFocus.current = row.key
+    setFocusedKey(row.key)
+    setDetailId(row.language.id)
+    virtualizer.scrollToIndex(index, { align: 'auto' })
+  }
+  const handleTreeKey = (
+    event: ReactKeyboardEvent<HTMLElement>,
+    row: HierarchyRow,
+    index: number,
+  ) => {
+    switch (event.key) {
+      case 'ArrowDown':
+        focusRow(Math.min(rows.length - 1, index + 1))
+        break
+      case 'ArrowUp':
+        focusRow(Math.max(0, index - 1))
+        break
+      case 'Home':
+        focusRow(0)
+        break
+      case 'End':
+        focusRow(rows.length - 1)
+        break
+      case 'ArrowRight':
+        if (!row.childCount) return
+        if (!expandedKeys.has(row.key)) toggleExpanded(row.key)
+        else focusRow(index + 1)
+        break
+      case 'ArrowLeft':
+        if (row.childCount && expandedKeys.has(row.key)) toggleExpanded(row.key)
+        else if (row.parentKey)
+          focusRow(rows.findIndex((candidate) => candidate.key === row.parentKey))
+        break
+      case ' ':
+        if (
+          visibleIdSet.has(row.language.id) ||
+          geographyVariantsForLanguage(data, row.language, temporalSelection, datasetFilter).length
+        )
+          toggleVisible(row.language.id)
+        break
+      case 'Enter':
+        setDetailId(row.language.id)
+        break
+      default:
+        return
+    }
+    event.preventDefault()
+  }
+  const revealInClassification = (language: Language) => {
+    const path = [...languageAncestors(hierarchy, language), language]
+    const next = new Set(expandedKeys)
+    let key = ''
+    for (const entry of path) {
+      key = key ? `${key}/${entry.id}` : entry.id
+      if (entry.id !== language.id) next.add(key)
+    }
+    setExpandedKeys(next)
+    setQuery('')
+    setScope('world')
+    setFocusedKey(key)
+    setDetailId(language.id)
+    pendingFocus.current = key
+    const nextRows = flattenLanguageHierarchy(hierarchy, hierarchy.roots, next)
+    virtualizer.scrollToOffset(nextRows.findIndex((row) => row.key === key) * 44)
+  }
+  const detail = detailId ? data.languageById.get(detailId) : undefined
+  const detailVariants = detail
+    ? geographyVariantsForLanguage(data, detail, temporalSelection, datasetFilter)
+    : []
+  const activeVariant =
+    detailVariants.find((variant) => variant.id === overrides[detailId ?? '']) ?? detailVariants[0]
+  const sourceSummary =
+    datasetFilter === 'all'
+      ? 'All sources'
+      : datasetFilter.length === 0
+        ? 'No sources'
+        : datasetFilter.length === 1
+          ? (data.datasets.find((dataset) => dataset.id === datasetFilter[0])?.shortName ??
+            '1 source')
+          : `${datasetFilter.length} sources`
 
   return (
     <aside className="language-finder" aria-label="Language finder">
       <header className="language-finder__header">
         <div>
           <p className="eyebrow">Language layers</p>
-          <h2>Find a language or group</h2>
+          <h2>Explore languages</h2>
         </div>
         <span className="selection-count">
           {shownCount === visibleIds.length
@@ -279,90 +448,210 @@ export const LanguageFinder = () => {
             : `${shownCount} of ${visibleIds.length} shown`}
         </span>
       </header>
-
       <label className="search-field">
         <span className="visually-hidden">Search families, languages and dialects</span>
         <input
           type="search"
           value={query}
-          placeholder="Name, family, ISO or Glottocode…"
-          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="Name, alternative name, ISO or Glottocode…"
+          onChange={(event) => {
+            setQuery(event.currentTarget.value)
+            pendingFocus.current = null
+            setFocusedKey(null)
+            setDetailId(null)
+            virtualizer.scrollToOffset(0)
+          }}
         />
       </label>
-
-      <div className="finder-filters">
-        <label className="finder-filters__period">
-          <span>Geographic period</span>
-          <select
-            value={temporalSelection}
-            onChange={(event) => {
-              const value = event.currentTarget.value
-              if (isTemporalViewSelection(value)) setTemporalSelection(value)
-            }}
-          >
-            {TEMPORAL_VIEWS.map((view) => (
-              <option key={view.id} value={view.id}>
-                {view.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <GeographySourceFilter
-          data={data}
-          selection={datasetFilter}
-          temporalSelection={temporalSelection}
-          onChange={setDatasetFilter}
-        />
-
-        <label>
-          <span>Area</span>
-          <select
-            value={scope}
-            onChange={(event) =>
-              setScope(event.currentTarget.value === 'viewport' ? 'viewport' : 'world')
-            }
-          >
-            <option value="world">Whole world</option>
-            <option value="viewport">Current map ({viewportIds.length})</option>
-          </select>
-        </label>
-      </div>
-
-      <p className="temporal-note">{temporalView(temporalSelection).description}</p>
-
+      <details className="finder-options">
+        <summary>
+          Map filters{' '}
+          <span>
+            {sourceSummary} · {temporalView(temporalSelection).shortLabel} ·{' '}
+            {scope === 'world' ? 'Whole world' : 'Current map'}
+          </span>
+        </summary>
+        <div className="finder-filters">
+          <label className="finder-filters__period">
+            <span>Geographic period</span>
+            <select
+              value={temporalSelection}
+              onChange={(event) => {
+                const value = event.currentTarget.value
+                if (isTemporalViewSelection(value)) setTemporalSelection(value)
+              }}
+            >
+              {TEMPORAL_VIEWS.map((view) => (
+                <option key={view.id} value={view.id}>
+                  {view.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <GeographySourceFilter
+            data={data}
+            selection={datasetFilter}
+            temporalSelection={temporalSelection}
+            onChange={setDatasetFilter}
+          />
+          <label>
+            <span>Area</span>
+            <select
+              value={scope}
+              onChange={(event) => {
+                setScope(event.currentTarget.value === 'viewport' ? 'viewport' : 'world')
+                pendingFocus.current = null
+                setFocusedKey(null)
+                virtualizer.scrollToOffset(0)
+              }}
+            >
+              <option value="world">Whole world</option>
+              <option value="viewport">Current map ({viewportIds.length})</option>
+            </select>
+          </label>
+        </div>
+        <p className="temporal-note">{temporalView(temporalSelection).description}</p>
+      </details>
       <div className="finder-actions">
-        <p>
-          <strong>{languages.length.toLocaleString()}</strong> matches ·{' '}
+        <p aria-live="polite">
+          <strong>{roots.length.toLocaleString()}</strong>{' '}
+          {isBrowsingRoots ? 'roots' : roots.length === 1 ? 'match' : 'matches'} ·{' '}
           {showableIds.length.toLocaleString()} mappable
+          <small>
+            {isBrowsingRoots
+              ? `${data.languages.length.toLocaleString()} entries in the classification`
+              : 'Expand a match to browse all its children'}
+          </small>
         </p>
         <div>
-          <button type="button" onClick={toggleFilteredLanguages} disabled={!showableIds.length}>
-            {areAllFilteredSelected ? 'Deselect all' : 'Select all'}
+          <button
+            type="button"
+            onClick={toggleFilteredLanguages}
+            disabled={!showableIds.length}
+            title="Select only these starting entries with available polygons; descendants are not selected"
+          >
+            {areAllFilteredSelected ? 'Deselect' : 'Select'} {isBrowsingRoots ? 'roots' : 'matches'}
           </button>
           <button type="button" className="button-secondary" onClick={() => setVisibleIds([])}>
-            Clear all
+            Clear map
           </button>
         </div>
       </div>
-
-      <div className="language-list" ref={listRef}>
-        <div className="language-list__sizer" style={{ height: `${virtualizer.getTotalSize()}px` }}>
-          {virtualizer.getVirtualItems().map((virtualRow) => {
-            const language = languages[virtualRow.index]
-            if (!language) return null
+      <div
+        className="language-list"
+        ref={listRef}
+        role="tree"
+        tabIndex={virtualRows.some((row) => rows[row.index]?.key === activeKey) ? -1 : 0}
+        onFocus={(event) => {
+          if (event.target === event.currentTarget) focusRow(virtualRows[0]?.index ?? 0)
+        }}
+        aria-label={isBrowsingRoots ? 'Language classification' : 'Expandable search results'}
+      >
+        {rows.length === 0 && (
+          <p className="finder-empty">
+            No matching entries{scope === 'viewport' ? ' in the current map area' : ''}. Try another
+            name or identifier.
+          </p>
+        )}
+        <div
+          className="language-list__sizer"
+          role="presentation"
+          style={{ height: `${virtualizer.getTotalSize()}px` }}
+        >
+          {virtualRows.map((virtualRow) => {
+            const row = rows[virtualRow.index]
+            if (!row) return null
+            const context =
+              row.depth === 0 && !isBrowsingRoots
+                ? languageAncestors(hierarchy, row.language)
+                    .map(({ name }) => name)
+                    .join(' › ')
+                : null
             return (
               <div
                 className="language-list__item"
-                key={language.id}
+                role="presentation"
+                key={row.key}
                 style={{ transform: `translateY(${virtualRow.start}px)` }}
               >
-                <LanguageRow language={language} />
+                <LanguageRow
+                  row={row}
+                  context={context}
+                  expanded={expandedKeys.has(row.key)}
+                  active={row.key === activeKey}
+                  onExpand={() => toggleExpanded(row.key)}
+                  onFocus={() => {
+                    setFocusedKey(row.key)
+                    setDetailId(row.language.id)
+                  }}
+                  onKeyDown={(event) => handleTreeKey(event, row, virtualRow.index)}
+                />
               </div>
             )
           })}
         </div>
       </div>
+      <section className="finder-detail" aria-label="Entry details">
+        {detail ? (
+          <>
+            <div className="finder-detail__heading">
+              <strong>{detail.name}</strong>
+              <small>
+                {detail.level} · {detail.id}
+                {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
+              </small>
+            </div>
+            <nav className="finder-detail__path" aria-label="Classification ancestors">
+              {languageAncestors(hierarchy, detail).map((ancestor) => (
+                <button
+                  type="button"
+                  key={ancestor.id}
+                  onClick={() => revealInClassification(ancestor)}
+                >
+                  {ancestor.name}
+                  <span aria-hidden="true"> ›</span>
+                </button>
+              ))}
+            </nav>
+            {detailVariants.length > 1 ? (
+              <select
+                className="language-row__variant"
+                aria-label={`Geographic source for ${detail.name}`}
+                value={activeVariant?.id}
+                onChange={(event) =>
+                  setGeometryOverride({
+                    languageId: detail.id,
+                    variantId: event.currentTarget.value,
+                  })
+                }
+              >
+                {detailVariants.map((variant) => (
+                  <option key={variant.id} value={variant.id}>
+                    {variant.label} · {temporalQualityLabel(variant.temporalCoverage.quality)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p>
+                {activeVariant
+                  ? `${activeVariant.label} · ${temporalQualityLabel(activeVariant.temporalCoverage.quality)}`
+                  : detail.geometryVariantIds.length
+                    ? 'No polygon for selected sources / period'
+                    : 'No polygon available'}
+              </p>
+            )}
+            <button
+              type="button"
+              className="finder-detail__reveal"
+              onClick={() => revealInClassification(detail)}
+            >
+              Show in classification
+            </button>
+          </>
+        ) : (
+          <p>Expand branches to browse. Use checkboxes to show individual areas on the map.</p>
+        )}
+      </section>
     </aside>
   )
 }

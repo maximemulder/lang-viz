@@ -22,9 +22,27 @@ External datasets and Tippecanoe are fetched at the exact revisions recorded in
 
 The searchable catalog includes every Glottolog languoid: families and subfamilies,
 languages, and dialects. Search accepts primary and alternative names, ISO codes,
-and Glottocodes. Entries without polygons remain searchable; only entries with
-areas in the selected sources and period can be selected for display. Each row
-and map inspection identifies the classification level.
+and Glottocodes. Without a query, the compact tree starts at top-level families,
+isolates, and other parentless entries. Search ranks direct names and identifiers
+before partial matches and lets any languoid start an expandable subtree. An
+ancestor's name supplies context rather than matching all its descendants.
+Expanding a result shows all its immediate children, including entries without
+polygons and names that do not match the query. Counts and bulk selection refer
+to starting entries (roots or matches), independently of unfolded descendants.
+
+Glottolog's `values.csv` classification paths supply immediate `parentId` links;
+these include intermediate subfamilies and nested dialect groups. The separate
+`parentLanguageId` remains the language-level ancestor of a dialect. The details
+panel shows clickable ancestry and geographic sources, and "Show in classification"
+reveals a result within its full tree. Arrow keys navigate/unfold branches, Home
+and End move through the list, and Space toggles the focused entry's map area.
+
+Entries without polygons remain searchable and expandable; only entries with
+areas in the selected sources and period can be selected for display. Expansion
+and map selection are independent: selecting a family never selects descendants.
+Map source/period/viewport controls are under "Map filters". Viewport scope limits
+starting results; expanded branches still show their full classification children.
+Each row and map inspection identifies the classification level.
 
 The pipeline imports the existing Glottography language, family, and dialect
 areas, then uses original `features.geojson` polygons for entries not covered by
@@ -36,7 +54,7 @@ file, source feature IDs, and whether they use original or dataset-prepared area
 Unassigned features are omitted; identifiers absent from the pinned Glottolog
 catalog are reported as build warnings. Existing file and vector-layer names
 (`languages.json`, `language_areas`) also cover families and dialects; catalog
-schema version 3 uses `languoidCount` and `languoidWithGeometryCount`.
+schema version 4 adds immediate `parentId` links and uses `languoidCount` and `languoidWithGeometryCount`.
 
 The generated geometry catalog preserves four temporal source views:
 

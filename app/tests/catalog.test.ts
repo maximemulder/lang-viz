@@ -7,6 +7,7 @@ const entry = (id: string, level: Language['level'], mapped: boolean): Language 
   id,
   name: id,
   level,
+  parentId: level === 'family' ? null : level === 'language' ? 'family' : 'language',
   parentLanguageId: level === 'dialect' ? 'language' : null,
   alternativeNames: id === 'dialect' ? ['Shànghǎi', '上海'] : [],
   iso6393: null,
@@ -49,7 +50,7 @@ const variants: GeometryVariant[] = languages.flatMap((language) =>
 )
 const data: AtlasData = {
   manifest: {
-    schemaVersion: 3,
+    schemaVersion: 4,
     languoidCount: 4,
     languoidWithGeometryCount: 3,
     geometryVariantCount: 3,
@@ -102,4 +103,32 @@ test('the explicitly selected viewport scope still limits the catalog', () => {
     ['mapped dialect'],
   )
   assert.deepEqual(result.showableIds, ['mapped dialect'])
+})
+
+test('ancestor names do not turn every descendant into a direct match', () => {
+  const result = searchCatalog(data, 'Example family', null, 'all', 'all')
+  assert.deepEqual(result.languages, [])
+})
+
+test('exact names and identifiers rank before prefixes and incidental alias matches', () => {
+  const entries = [
+    {
+      ...entry('incidental', 'language', false),
+      name: 'A language',
+      alternativeNames: ['Old English variety'],
+    },
+    { ...entry('prefix', 'language', false), name: 'English-based creole' },
+    { ...entry('eng', 'language', false), name: 'English' },
+    { ...entry('alias', 'dialect', false), name: 'Another name', alternativeNames: ['English'] },
+  ]
+  const fixture = {
+    ...data,
+    languages: entries,
+    searchTextByLanguageId: new Map(entries.map((entry) => [entry.id, languageSearchText(entry)])),
+  }
+  assert.deepEqual(
+    searchCatalog(fixture, 'english', null, 'all', 'all').languages.map(({ id }) => id),
+    ['eng', 'alias', 'prefix', 'incidental'],
+  )
+  assert.equal(searchCatalog(fixture, 'eng', null, 'all', 'all').languages[0]?.id, 'eng')
 })

@@ -17,6 +17,7 @@ import polars as pl
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GLOTTOLOG_LANGUAGES = PROJECT_ROOT / "datasets/glottolog-cldf/cldf/languages.csv"
 GLOTTOLOG_NAMES = GLOTTOLOG_LANGUAGES.with_name("names.csv")
+GLOTTOLOG_VALUES = GLOTTOLOG_LANGUAGES.with_name("values.csv")
 PROCESSED_DIR = PROJECT_ROOT / "data/processed"
 PUBLIC_DATA_DIR = PROJECT_ROOT / "app/public/data"
 NORMALIZED_GEOMETRIES = PROCESSED_DIR / "language-areas.geojsonl"
@@ -242,6 +243,42 @@ def read_alternative_names() -> dict[str, list[str]]:
     return {key: sorted(values) for key, values in names.items()}
 
 
+def read_parent_ids(known_languoids: set[str]) -> dict[str, str]:
+    """Read immediate parents from Glottolog's root-to-parent classification paths."""
+    classifications = (
+        pl.scan_csv(GLOTTOLOG_VALUES, infer_schema_length=10_000)
+        .filter(pl.col("Parameter_ID") == "classification")
+        .select("Language_ID", "Value")
+        .collect()
+    )
+    parents: dict[str, str] = {}
+    for row in classifications.to_dicts():
+        child = str(row["Language_ID"])
+        if not row["Value"]:
+            continue
+        path = str(row["Value"]).split("/")
+        if child not in known_languoids or any(node not in known_languoids for node in path):
+            raise ValueError(f"Unknown languoid in classification of {child}")
+        if child in path or len(path) != len(set(path)):
+            raise ValueError(f"Cyclic classification of {child}")
+        if child in parents:
+            raise ValueError(f"Duplicate classification of {child}")
+        parents[child] = path[-1]
+
+    # Validate the resulting edges, including cycles spanning different input paths.
+    checked: set[str] = set()
+    for child in parents:
+        visiting: set[str] = set()
+        node = child
+        while node in parents and node not in checked:
+            if node in visiting:
+                raise ValueError(f"Cyclic classification of {child}")
+            visiting.add(node)
+            node = parents[node]
+        checked.update(visiting)
+    return parents
+
+
 def temporal_coverage(
     source: GeographySource, language_id: str, asher_quality: dict[str, str]
 ) -> dict[str, Any]:
@@ -463,6 +500,7 @@ def build(skip_tiles: bool) -> None:
     known_languoids = {str(row["Glottocode"]) for row in rows}
     level_by_languoid = {str(row["Glottocode"]): str(row["Level"]) for row in rows}
     alternative_names = read_alternative_names()
+    parent_ids = read_parent_ids(known_languoids)
     family_by_languoid = {
         str(row["Glottocode"]): (
             names.get(str(row["Family_ID"])) if row["Family_ID"] is not None else None
@@ -485,6 +523,7 @@ def build(skip_tiles: bool) -> None:
                 "familyId": row["Family_ID"],
                 "familyName": family_by_languoid[language_id],
                 "level": row["Level"],
+                "parentId": parent_ids.get(language_id),
                 "parentLanguageId": row["Language_ID"],
                 "alternativeNames": alternative_names.get(language_id, []),
                 "macroarea": row["Macroarea"],
@@ -502,7 +541,7 @@ def build(skip_tiles: bool) -> None:
     write_json(
         PUBLIC_DATA_DIR / "manifest.json",
         {
-            "schemaVersion": 3,
+            "schemaVersion": 4,
             "languoidCount": len(languages),
             "languoidWithGeometryCount": sum(
                 bool(language["geometryVariantIds"]) for language in languages

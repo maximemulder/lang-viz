@@ -120,11 +120,18 @@ def test_catalog_exports_unmappable_entries_and_aliases_at_every_level(tmp_path,
         atlas, "read_glottolog", lambda: (rows, {r["Glottocode"]: r["Name"] for r in rows})
     )
     monkeypatch.setattr(atlas, "read_alternative_names", lambda: {"dial1234": ["上海", "Shànghǎi"]})
+    monkeypatch.setattr(
+        atlas, "read_parent_ids", lambda ids: {"lang1234": "root1234", "dial1234": "lang1234"}
+    )
     monkeypatch.setattr(atlas, "normalize_geometries", lambda *args: ([], {}))
     atlas.build(skip_tiles=True)
     exported = {r["id"]: r for r in json.loads((tmp_path / "languages.json").read_text())}
     assert len(exported) == 3
     assert exported["dial1234"]["parentLanguageId"] == "lang1234"
+    assert exported["dial1234"]["parentId"] == "lang1234"
+    assert exported["lang1234"]["parentId"] == "root1234"
+    assert exported["root1234"]["parentId"] is None
+    assert json.loads((tmp_path / "manifest.json").read_text())["schemaVersion"] == 4
     assert exported["dial1234"]["alternativeNames"] == ["上海", "Shànghǎi"]
     assert all(r["geometryVariantIds"] == [] for r in exported.values())
     assert json.loads((tmp_path / "manifest.json").read_text())["languoidCount"] == 3
@@ -137,3 +144,69 @@ def test_alternative_names_are_deduplicated(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(atlas, "GLOTTOLOG_NAMES", path)
     assert atlas.read_alternative_names() == {"dial1234": ["Shànghǎi", "上海"]}
+
+
+def test_classification_paths_export_immediate_parents_including_dialect_groups(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "values.csv"
+    pl.DataFrame(
+        {
+            "Language_ID": ["subf1234", "lang1234", "dial1234", "leaf1234", "root1234", "root1234"],
+            "Parameter_ID": ["classification"] * 5 + ["subclassification"],
+            "Value": [
+                "root1234",
+                "root1234/subf1234",
+                "root1234/subf1234/lang1234",
+                "root1234/subf1234/lang1234/dial1234",
+                None,
+                "ignored",
+            ],
+        }
+    ).write_csv(path)
+    monkeypatch.setattr(atlas, "GLOTTOLOG_VALUES", path)
+    assert atlas.read_parent_ids(
+        {"root1234", "subf1234", "lang1234", "dial1234", "leaf1234", "isol1234"}
+    ) == {
+        "subf1234": "root1234",
+        "lang1234": "subf1234",
+        "dial1234": "lang1234",
+        "leaf1234": "dial1234",
+    }
+
+
+@pytest.mark.parametrize(
+    "paths, message",
+    [
+        (["missing1"], "Unknown languoid"),
+        (["root1234/leaf1234"], "Cyclic classification"),
+        (["root1234/root1234"], "Cyclic classification"),
+        (["root1234", "root1234"], "Duplicate classification"),
+    ],
+)
+def test_invalid_classification_fails(tmp_path, monkeypatch, paths, message):
+    path = tmp_path / "values.csv"
+    pl.DataFrame(
+        {
+            "Language_ID": ["leaf1234"] * len(paths),
+            "Parameter_ID": ["classification"] * len(paths),
+            "Value": paths,
+        }
+    ).write_csv(path)
+    monkeypatch.setattr(atlas, "GLOTTOLOG_VALUES", path)
+    with pytest.raises(ValueError, match=message):
+        atlas.read_parent_ids({"root1234", "leaf1234"})
+
+
+def test_cycles_across_classification_paths_fail(tmp_path, monkeypatch):
+    path = tmp_path / "values.csv"
+    pl.DataFrame(
+        {
+            "Language_ID": ["root1234", "leaf1234"],
+            "Parameter_ID": ["classification"] * 2,
+            "Value": ["leaf1234", "root1234"],
+        }
+    ).write_csv(path)
+    monkeypatch.setattr(atlas, "GLOTTOLOG_VALUES", path)
+    with pytest.raises(ValueError, match="Cyclic classification"):
+        atlas.read_parent_ids({"root1234", "leaf1234"})

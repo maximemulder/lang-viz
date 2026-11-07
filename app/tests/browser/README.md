@@ -212,3 +212,8 @@ must have zero exposed background pixels. Results are stored as `tileSeams`.
 The land continuity probe stays away from exact tile cuts: a render buffer can
 briefly color an edge before a newly exposed neighboring tile ever loads. Exact
 boundaries are covered separately by the fully loaded synthetic seam probe.
+
+The catalog browser check also covers compact root browsing, family and unmapped
+branch expansion, ranked search, deep classification reveal, and keyboard
+navigation across virtualized rows. Screenshots are saved in
+`test-results/catalog/` alongside the report.

@@ -27,6 +27,9 @@ export interface Language {
   readonly id: LanguageId
   readonly name: string
   readonly level: LanguoidLevel
+  /** Immediate classification parent, including intermediate groups and dialects. */
+  readonly parentId: LanguageId | null
+  /** Language-level ancestor for dialects; distinct from the immediate parent. */
   readonly parentLanguageId: LanguageId | null
   readonly alternativeNames: readonly string[]
   readonly iso6393: string | null

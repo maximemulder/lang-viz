@@ -1,5 +1,5 @@
 # target	revision	repository	sparse paths (comma-separated)
-datasets/glottolog-cldf	072ca0d0410039fb8b779be8fc165bac575d2cda	https://github.com/glottolog/glottolog-cldf.git	cldf/languages.csv,cldf/names.csv
+datasets/glottolog-cldf	072ca0d0410039fb8b779be8fc165bac575d2cda	https://github.com/glottolog/glottolog-cldf.git	cldf/languages.csv,cldf/names.csv,cldf/values.csv
 datasets/glottography/asher2007world	5590fcc8870d8883a323ff0defd5a1a6a03e9611	https://github.com/Glottography/asher2007world.git	cldf/contemporary/languages.geojson,cldf/traditional/languages.geojson,cldf/traditional/languages.csv,cldf/traditional/contributions.csv,cldf/contemporary/families.geojson,cldf/contemporary/features.geojson,cldf/traditional/families.geojson,cldf/traditional/features.geojson
 datasets/glottography/bouckaert2012indoeuropean	23d461786f81df99a7813eae72e95e1067d9240f	https://github.com/Glottography/bouckaert2012indoeuropean.git	cldf/languages.geojson,cldf/families.geojson,cldf/dialects.geojson,cldf/features.geojson
 datasets/glottography/carling2025diacl	7a8588553d69799de95efe1787a3fc87d03aa1f2	https://github.com/Glottography/carling2025diacl.git	cldf/languages.geojson,cldf/families.geojson,cldf/dialects.geojson,cldf/features.geojson
