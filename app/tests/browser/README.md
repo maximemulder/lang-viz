@@ -7,6 +7,7 @@ npm run test:browser
 npm run test:browser -- --scenario britain-small
 npm run test:browser -- --runs 3 --output test-results/baseline
 npm run test:browser -- --headed --hardware
+npm run test:catalog-browser
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
@@ -14,6 +15,11 @@ dependencies, and generated atlas data under `public/data/`. The runner uses
 Python's standard library and geckodriver's W3C WebDriver API. It installs and
 downloads nothing. Firefox/geckodriver setup is described in
 [Mozilla's documentation](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html).
+
+`test:catalog-browser` builds the production app and checks family, language,
+and dialect discovery, alternative-name searches for unmapped entries, selection
+and inspection of original family/dialect areas, and mixed-level overlap rendering.
+Its screenshots, report, and server logs are written to `test-results/catalog/`.
 
 Each invocation builds the production app, starts a local Vite preview and
 geckodriver on available ports, opens a temporary Firefox profile, and cleans up

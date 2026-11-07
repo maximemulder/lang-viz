@@ -1,13 +1,13 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useRef, useState } from 'react'
-import { normalizeLanguageQuery } from '../../data/atlasRepository'
 import type {
   AtlasData,
   GeographyDatasetSelection,
   Language,
   TemporalViewSelection,
 } from '../../domain/atlas'
+import { searchCatalog } from '../../domain/catalog'
 import { geographyVariantsForLanguage } from '../../domain/geography'
 import {
   isTemporalViewSelection,
@@ -64,7 +64,8 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
         <span>
           <strong>{language.name}</strong>
           <small>
-            {language.familyName ?? 'Unclassified'} · {language.id}
+            {language.level} · {language.familyName ? `${language.familyName} · ` : ''}
+            {language.id}
           </small>
         </span>
       </label>
@@ -97,7 +98,9 @@ const LanguageRow = ({ language }: LanguageRowProps) => {
                   ? ` · ${temporalQualityLabel(variants[0].temporalCoverage.quality)}`
                   : ''
               }`
-            : `No polygon in ${temporalView(temporalSelection).shortLabel.toLocaleLowerCase()}`}
+            : language.geometryVariantIds.length === 0
+              ? 'No polygon available'
+              : 'No polygon for selected sources / period'}
         </small>
       )}
     </article>
@@ -229,21 +232,13 @@ export const LanguageFinder = () => {
   const showLanguages = useSetAtom(showLanguagesAtom)
   const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
   const listRef = useRef<HTMLDivElement>(null)
-  const normalizedQuery = normalizeLanguageQuery(query.trim())
-  const viewportIdSet = new Set(viewportIds)
-  const languages = data.languages.filter((language) => {
-    const variants = geographyVariantsForLanguage(data, language, temporalSelection, datasetFilter)
-    if (
-      normalizedQuery &&
-      !data.searchTextByLanguageId.get(language.id)?.includes(normalizedQuery)
-    ) {
-      return false
-    }
-    if (scope === 'viewport' && !viewportIdSet.has(language.id)) {
-      return false
-    }
-    return variants.length > 0
-  })
+  const { languages, showableIds } = searchCatalog(
+    data,
+    query,
+    scope === 'viewport' ? new Set(viewportIds) : null,
+    temporalSelection,
+    datasetFilter,
+  )
   const virtualizer = useVirtualizer({
     count: languages.length,
     getScrollElement: () => listRef.current,
@@ -251,7 +246,6 @@ export const LanguageFinder = () => {
     overscan: 8,
     getItemKey: (index) => languages[index]?.id ?? index,
   })
-  const showableIds = languages.map((language) => language.id)
   const visibleIdSet = new Set(visibleIds)
   const shownCount = visibleIds.filter((languageId) => {
     const language = data.languageById.get(languageId)
@@ -277,7 +271,7 @@ export const LanguageFinder = () => {
       <header className="language-finder__header">
         <div>
           <p className="eyebrow">Language layers</p>
-          <h2>Find a language</h2>
+          <h2>Find a language or group</h2>
         </div>
         <span className="selection-count">
           {shownCount === visibleIds.length
@@ -287,7 +281,7 @@ export const LanguageFinder = () => {
       </header>
 
       <label className="search-field">
-        <span className="visually-hidden">Search languages</span>
+        <span className="visually-hidden">Search families, languages and dialects</span>
         <input
           type="search"
           value={query}

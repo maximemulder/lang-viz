@@ -5,7 +5,7 @@ import type {
   Language,
   TemporalViewSelection,
 } from './atlas'
-import { variantMatchesTemporalView } from './temporal'
+import { variantMatchesTemporalView } from './temporal.ts'
 
 export const variantMatchesGeographySelection = (
   variant: GeometryVariant,

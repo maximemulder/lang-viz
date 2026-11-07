@@ -17,7 +17,16 @@ while IFS=$'\t' read -r target revision repository sparse_paths; do
 
   if [[ -d "$destination/.git" ]]; then
     current_revision="$(git -C "$destination" rev-parse HEAD)"
-    if [[ "$current_revision" == "$revision" ]]; then
+    paths_present=true
+    if [[ -n "${sparse_paths:-}" ]]; then
+      IFS=',' read -r -a paths <<< "$sparse_paths"
+      for path in "${paths[@]}"; do
+        if [[ ! -f "$destination/$path" ]]; then
+          paths_present=false
+        fi
+      done
+    fi
+    if [[ "$current_revision" == "$revision" && "$paths_present" == true ]]; then
       echo "Using $target at $revision"
       continue
     fi

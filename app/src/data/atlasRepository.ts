@@ -5,6 +5,7 @@ import type {
   GeometryVariant,
   Language,
 } from '../domain/atlas'
+import { languageSearchText } from '../domain/catalog'
 
 const dataUrl = (fileName: string) => `${import.meta.env.BASE_URL}data/${fileName}`
 
@@ -16,12 +17,6 @@ const fetchJson = async <T>(fileName: string): Promise<T> => {
   return response.json() as Promise<T>
 }
 
-const normalizeSearchText = (value: string) =>
-  value
-    .normalize('NFKD')
-    .replace(/\p{Mark}/gu, '')
-    .toLocaleLowerCase()
-
 let atlasDataPromise: Promise<AtlasData> | undefined
 
 export const loadAtlasData = (): Promise<AtlasData> => {
@@ -31,11 +26,11 @@ export const loadAtlasData = (): Promise<AtlasData> => {
     fetchJson<readonly GeometryVariant[]>('geometry-variants.json'),
     fetchJson<readonly GeographyDataset[]>('geography-datasets.json'),
   ]).then(([manifest, languages, variants, datasets]) => {
-    if (manifest.schemaVersion !== 2) {
+    if (manifest.schemaVersion !== 3) {
       throw new Error(`Unsupported atlas schema version: ${manifest.schemaVersion}`)
     }
-    if (languages.length !== manifest.languageCount) {
-      throw new Error('Language catalog does not match its manifest')
+    if (languages.length !== manifest.languoidCount) {
+      throw new Error('Languoid catalog does not match its manifest')
     }
     if (variants.length !== manifest.geometryVariantCount) {
       throw new Error('Geometry catalog does not match its manifest')
@@ -49,22 +44,13 @@ export const loadAtlasData = (): Promise<AtlasData> => {
       languageById: new Map(languages.map((language) => [language.id, language])),
       variantById: new Map(variants.map((variant) => [variant.id, variant])),
       searchTextByLanguageId: new Map(
-        languages.map((language) => [
-          language.id,
-          normalizeSearchText(
-            [language.name, language.id, language.iso6393, language.familyName]
-              .filter(Boolean)
-              .join(' '),
-          ),
-        ]),
+        languages.map((language) => [language.id, languageSearchText(language)]),
       ),
     }
   })
 
   return atlasDataPromise
 }
-
-export const normalizeLanguageQuery = normalizeSearchText
 
 export const languageArchiveUrl = () => {
   const archiveUrl = new URL(dataUrl('language-areas.pmtiles'), window.location.href)

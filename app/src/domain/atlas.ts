@@ -1,4 +1,5 @@
 export type LanguageId = string
+export type LanguoidLevel = 'family' | 'language' | 'dialect'
 export type GeometryVariantId = string
 export type GeographyDatasetId = string
 export type GeographyDatasetSelection = 'all' | readonly GeographyDatasetId[]
@@ -21,9 +22,13 @@ export type TemporalCoverage =
       readonly year: number
     }
 
+/** A Glottolog languoid of any level; the legacy catalog name is retained. */
 export interface Language {
   readonly id: LanguageId
   readonly name: string
+  readonly level: LanguoidLevel
+  readonly parentLanguageId: LanguageId | null
+  readonly alternativeNames: readonly string[]
   readonly iso6393: string | null
   readonly familyId: LanguageId | null
   readonly familyName: string | null
@@ -41,6 +46,10 @@ export interface GeometryVariant {
   readonly layer: 'contemporary' | 'traditional' | 'snapshot' | 'mixed-periods'
   readonly label: string
   readonly featureId: number
+  readonly featureCount: number
+  readonly geometryKind: 'source' | 'dataset-family' | 'dataset-language' | 'dataset-dialect'
+  readonly sourceFile: string
+  readonly sourceFeatureIds: readonly string[]
   readonly color: string
   readonly temporalCoverage: TemporalCoverage
   readonly sourceYear: number
@@ -56,8 +65,8 @@ export interface GeographyDataset {
 
 export interface AtlasManifest {
   readonly schemaVersion: number
-  readonly languageCount: number
-  readonly languageWithGeometryCount: number
+  readonly languoidCount: number
+  readonly languoidWithGeometryCount: number
   readonly geometryVariantCount: number
   readonly vectorLayer: string
   readonly archive: string

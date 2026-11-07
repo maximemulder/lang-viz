@@ -43,7 +43,7 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
       <section aria-label="Languages at this location">
         <header className="language-inspector__header">
           <strong>
-            {entries.length === 1 ? entries[0]?.language.name : `${entries.length} languages here`}
+            {entries.length === 1 ? entries[0]?.language.name : `${entries.length} entries here`}
           </strong>
           {!inspection.pinned && <small>Click to keep open</small>}
         </header>
@@ -58,7 +58,10 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
               />
               <div>
                 {entries.length > 1 && <strong>{language.name}</strong>}
-                <p>{language.familyName ?? 'Unclassified'}</p>
+                <p>
+                  {language.level}
+                  {language.familyName ? ` · ${language.familyName}` : ''}
+                </p>
                 <small>
                   {language.iso6393 ? `${language.iso6393} · ` : ''}
                   {language.id}
@@ -66,6 +69,11 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                 <small>
                   {dataset?.shortName ?? variant.datasetId} · {variant.temporalCoverage.label} ·{' '}
                   {temporalQualityLabel(variant.temporalCoverage.quality)}
+                </small>
+                <small>
+                  {variant.geometryKind === 'source'
+                    ? 'Original source areas'
+                    : 'Area supplied by the dataset'}
                 </small>
               </div>
             </article>

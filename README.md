@@ -20,6 +20,24 @@ committed. The normalized intermediate geometry is written to `data/processed/`.
 External datasets and Tippecanoe are fetched at the exact revisions recorded in
 `pipeline/atlas/sources.lock.tsv`.
 
+The searchable catalog includes every Glottolog languoid: families and subfamilies,
+languages, and dialects. Search accepts primary and alternative names, ISO codes,
+and Glottocodes. Entries without polygons remain searchable; only entries with
+areas in the selected sources and period can be selected for display. Each row
+and map inspection identifies the classification level.
+
+The pipeline imports the existing Glottography language, family, and dialect
+areas, then uses original `features.geojson` polygons for entries not covered by
+those prepared layers. Separate original polygons for one languoid are displayed
+together as one source variant, without dissolving their boundaries. Explicitly
+shared source polygons retain each referenced languoid. No new areas are
+aggregated through the classification tree. Geometry variants record their input
+file, source feature IDs, and whether they use original or dataset-prepared areas.
+Unassigned features are omitted; identifiers absent from the pinned Glottolog
+catalog are reported as build warnings. Existing file and vector-layer names
+(`languages.json`, `language_areas`) also cover families and dialects; catalog
+schema version 3 uses `languoidCount` and `languoidWithGeometryCount`.
+
 The generated geometry catalog preserves four temporal source views:
 
 - contemporary areas from Asher, Wurm and Hattori's Pacific atlas, and Matsumae's
@@ -48,6 +66,8 @@ npm run check
 npm run typecheck
 npm run build
 ```
+
+Pipeline regressions can be checked with `uv run pytest`.
 
 ## Overlap rendering
 

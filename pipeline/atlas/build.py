@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import warnings
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ import polars as pl
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GLOTTOLOG_LANGUAGES = PROJECT_ROOT / "datasets/glottolog-cldf/cldf/languages.csv"
+GLOTTOLOG_NAMES = GLOTTOLOG_LANGUAGES.with_name("names.csv")
 PROCESSED_DIR = PROJECT_ROOT / "data/processed"
 PUBLIC_DATA_DIR = PROJECT_ROOT / "app/public/data"
 NORMALIZED_GEOMETRIES = PROCESSED_DIR / "language-areas.geojsonl"
@@ -34,6 +36,7 @@ class GeographySource:
     source_year: int
     focal_year: int | None
     path: Path
+    supplementary_files: tuple[str, ...] = ()
 
 
 DATASETS = (
@@ -88,6 +91,7 @@ SOURCES = (
         focal_year=None,
         path=PROJECT_ROOT
         / "datasets/glottography/asher2007world/cldf/contemporary/languages.geojson",
+        supplementary_files=("families.geojson", "features.geojson"),
     ),
     GeographySource(
         variant_prefix="asher2007world:traditional",
@@ -102,6 +106,7 @@ SOURCES = (
         focal_year=None,
         path=PROJECT_ROOT
         / "datasets/glottography/asher2007world/cldf/traditional/languages.geojson",
+        supplementary_files=("families.geojson", "features.geojson"),
     ),
     GeographySource(
         variant_prefix="carling2025diacl:1750",
@@ -115,6 +120,7 @@ SOURCES = (
         source_year=2025,
         focal_year=1750,
         path=PROJECT_ROOT / "datasets/glottography/carling2025diacl/cldf/languages.geojson",
+        supplementary_files=("families.geojson", "dialects.geojson", "features.geojson"),
     ),
     GeographySource(
         variant_prefix="bouckaert2012indoeuropean:mixed-periods",
@@ -129,6 +135,7 @@ SOURCES = (
         focal_year=None,
         path=PROJECT_ROOT
         / "datasets/glottography/bouckaert2012indoeuropean/cldf/languages.geojson",
+        supplementary_files=("families.geojson", "dialects.geojson", "features.geojson"),
     ),
     GeographySource(
         variant_prefix="wurm1981pacific:contemporary",
@@ -141,8 +148,7 @@ SOURCES = (
         temporal_quality="approximate",
         source_year=1981,
         focal_year=None,
-        path=PROJECT_ROOT
-        / "datasets/glottography/wurm1981pacific/cldf/languages.geojson",
+        path=PROJECT_ROOT / "datasets/glottography/wurm1981pacific/cldf/languages.geojson",
     ),
     GeographySource(
         variant_prefix="matsumae2021exploring:contemporary",
@@ -155,8 +161,8 @@ SOURCES = (
         temporal_quality="approximate",
         source_year=2021,
         focal_year=None,
-        path=PROJECT_ROOT
-        / "datasets/glottography/matsumae2021exploring/cldf/languages.geojson",
+        path=PROJECT_ROOT / "datasets/glottography/matsumae2021exploring/cldf/languages.geojson",
+        supplementary_files=("families.geojson", "dialects.geojson", "features.geojson"),
     ),
 )
 
@@ -185,6 +191,7 @@ def read_glottolog() -> tuple[list[dict[str, Any]], dict[str, str]]:
             "Level",
             "ISO639P3code",
             "Family_ID",
+            "Language_ID",
             "Macroarea",
             "Countries",
             "Latitude",
@@ -213,8 +220,6 @@ def read_asher_traditional_quality() -> dict[str, str]:
     )
     quality_by_language: dict[str, str] = {}
     for row in languages.select("Glottocode", "Feature_IDs", "Speaker_Area").to_dicts():
-        if row["Speaker_Area"] != "languages":
-            continue
         feature_ids = str(row["Feature_IDs"] or "").split()
         years = {year_by_feature_id.get(feature_id) for feature_id in feature_ids}
         has_contact_data = "traditional" in years
@@ -227,6 +232,14 @@ def read_asher_traditional_quality() -> dict[str, str]:
             else "proxy"
         )
     return quality_by_language
+
+
+def read_alternative_names() -> dict[str, list[str]]:
+    names: dict[str, set[str]] = defaultdict(set)
+    for row in pl.read_csv(GLOTTOLOG_NAMES).select("Language_ID", "Name").to_dicts():
+        if row["Name"]:
+            names[str(row["Language_ID"])].add(str(row["Name"]))
+    return {key: sorted(values) for key, values in names.items()}
 
 
 def temporal_coverage(
@@ -276,70 +289,128 @@ def language_color(language_id: str) -> str:
     return "#{:02x}{:02x}{:02x}".format(*channels)
 
 
+def source_geometries(source: GeographySource, known_languoids: set[str]):
+    """Use existing prepared areas, then original features for remaining languoids.
+
+    Multiple original polygons keep their boundaries and share one selectable variant.
+    No geometries are dissolved, propagated through the tree, or synthesized here.
+    """
+    covered: set[str] = set()
+    for path in [
+        source.path,
+        *(source.path.with_name(name) for name in source.supplementary_files),
+    ]:
+        collection = json.loads(path.read_text(encoding="utf-8"))
+        by_languoid: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        unknown: set[str] = set()
+        for feature in collection["features"]:
+            reference = feature["properties"].get("cldf:languageReference")
+            # Asher uses pipes for explicitly shared source polygons; empty segments
+            # denote an unassigned component, not an extra language.
+            references = reference.split("|") if reference else []
+            for languoid_id in dict.fromkeys(references):
+                if not languoid_id:
+                    continue
+                if languoid_id not in known_languoids:
+                    unknown.add(languoid_id)
+                    continue
+                if languoid_id not in covered:
+                    by_languoid[languoid_id].append(feature)
+        if unknown:
+            warnings.warn(
+                f"Unmatched Glottocodes in {path}: {', '.join(sorted(unknown))}",
+                stacklevel=2,
+            )
+        for languoid_id, features in by_languoid.items():
+            if path.name != "features.geojson" and len(features) != 1:
+                raise ValueError(f"Duplicate prepared area in {path}: {languoid_id}")
+            yield languoid_id, path.name, features
+        covered.update(by_languoid)
+
+
 def normalize_geometries(
-    known_languages: set[str], family_by_language: dict[str, str | None]
+    known_languoids: set[str],
+    family_by_languoid: dict[str, str | None],
+    level_by_languoid: dict[str, str],
 ) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
     variants: list[dict[str, Any]] = []
-    variants_by_language: dict[str, list[str]] = defaultdict(list)
-    seen_variant_ids: set[str] = set()
+    variants_by_languoid: dict[str, list[str]] = defaultdict(list)
     feature_id = 1
     asher_quality = read_asher_traditional_quality()
 
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     with NORMALIZED_GEOMETRIES.open("w", encoding="utf-8") as output:
         for source in SOURCES:
-            collection = json.loads(source.path.read_text(encoding="utf-8"))
-            for feature in collection["features"]:
-                properties = feature["properties"]
-                language_id = str(properties["cldf:languageReference"])
-                if language_id not in known_languages:
-                    raise ValueError(f"Unknown Glottocode in {source.path}: {language_id}")
-
-                variant_id = f"{source.variant_prefix}:{language_id}"
-                if variant_id in seen_variant_ids:
-                    raise ValueError(f"Duplicate geometry variant: {variant_id}")
-                seen_variant_ids.add(variant_id)
-
-                color = language_color(language_id)
-                coverage = temporal_coverage(source, language_id, asher_quality)
-                quality = str(coverage["quality"])
-                normalized = {
-                    "type": "Feature",
-                    "id": feature_id,
-                    "properties": {
-                        "variant_id": variant_id,
-                        "language_id": language_id,
-                        "dataset_id": source.dataset_id,
-                        "layer": source.layer,
-                        "temporal_view": source.temporal_view,
-                        "temporal_quality": quality,
-                        "source_year": source.source_year,
-                        "focal_year": source.focal_year,
-                        "color": color,
-                        "family": family_by_language.get(language_id),
-                    },
-                    "geometry": feature["geometry"],
-                }
-                output.write(json.dumps(normalized, ensure_ascii=False, separators=(",", ":")))
-                output.write("\n")
-
+            for languoid_id, source_file, features in source_geometries(source, known_languoids):
+                variant_id = f"{source.variant_prefix}:{languoid_id}"
+                color = language_color(languoid_id)
+                coverage = temporal_coverage(source, languoid_id, asher_quality)
+                if source.temporal_view == "time-of-contact" and source_file == "features.geojson":
+                    years = {str(f["properties"].get("year")) for f in features}
+                    coverage["quality"] = (
+                        "direct"
+                        if years == {"traditional"}
+                        else "mixed"
+                        if "traditional" in years
+                        else "proxy"
+                    )
+                geometry_kind = {
+                    "features.geojson": "source",
+                    "languages.geojson": "dataset-language",
+                    "families.geojson": "dataset-family",
+                    "dialects.geojson": "dataset-dialect",
+                }[source_file]
+                suffix = {
+                    "source": " · original source areas",
+                    "dataset-family": " · family area",
+                    "dataset-dialect": " · dialect area",
+                    "dataset-language": "",
+                }[geometry_kind]
                 variants.append(
                     {
                         "id": variant_id,
-                        "languageId": language_id,
+                        "languageId": languoid_id,
                         "datasetId": source.dataset_id,
                         "layer": source.layer,
-                        "label": source.label,
+                        "label": source.label + suffix,
                         "featureId": feature_id,
+                        "featureCount": len(features),
+                        "geometryKind": geometry_kind,
+                        "sourceFile": source_file,
+                        "sourceFeatureIds": [
+                            str(f["properties"]["id"])
+                            for f in features
+                            if f["properties"].get("id") is not None
+                        ],
                         "color": color,
                         "temporalCoverage": coverage,
                         "sourceYear": source.source_year,
                     }
                 )
-                variants_by_language[language_id].append(variant_id)
-                feature_id += 1
-
-    return variants, variants_by_language
+                variants_by_languoid[languoid_id].append(variant_id)
+                for feature in features:
+                    normalized = {
+                        "type": "Feature",
+                        "id": feature_id,
+                        "properties": {
+                            "variant_id": variant_id,
+                            "language_id": languoid_id,
+                            "level": level_by_languoid[languoid_id],
+                            "dataset_id": source.dataset_id,
+                            "layer": source.layer,
+                            "temporal_view": source.temporal_view,
+                            "temporal_quality": coverage["quality"],
+                            "source_year": source.source_year,
+                            "focal_year": source.focal_year,
+                            "color": color,
+                            "family": family_by_languoid.get(languoid_id),
+                        },
+                        "geometry": feature["geometry"],
+                    }
+                    output.write(json.dumps(normalized, ensure_ascii=False, separators=(",", ":")))
+                    output.write("\n")
+                    feature_id += 1
+    return variants, variants_by_languoid
 
 
 def find_tippecanoe() -> str | None:
@@ -372,6 +443,7 @@ def build_tiles() -> None:
             "--simplification=10",
             "--include=variant_id",
             "--include=language_id",
+            "--include=level",
             "--include=dataset_id",
             "--include=layer",
             "--include=temporal_view",
@@ -388,18 +460,21 @@ def build_tiles() -> None:
 
 def build(skip_tiles: bool) -> None:
     rows, names = read_glottolog()
-    language_rows = [row for row in rows if row["Level"] == "language"]
-    known_languages = {str(row["Glottocode"]) for row in language_rows}
-    family_by_language = {
+    known_languoids = {str(row["Glottocode"]) for row in rows}
+    level_by_languoid = {str(row["Glottocode"]): str(row["Level"]) for row in rows}
+    alternative_names = read_alternative_names()
+    family_by_languoid = {
         str(row["Glottocode"]): (
             names.get(str(row["Family_ID"])) if row["Family_ID"] is not None else None
         )
-        for row in language_rows
+        for row in rows
     }
 
-    variants, variants_by_language = normalize_geometries(known_languages, family_by_language)
+    variants, variants_by_languoid = normalize_geometries(
+        known_languoids, family_by_languoid, level_by_languoid
+    )
     languages = []
-    for row in language_rows:
+    for row in rows:
         language_id = str(row["Glottocode"])
         countries = str(row["Countries"]).split(";") if row["Countries"] else []
         languages.append(
@@ -408,12 +483,15 @@ def build(skip_tiles: bool) -> None:
                 "name": row["Name"],
                 "iso6393": row["ISO639P3code"],
                 "familyId": row["Family_ID"],
-                "familyName": family_by_language[language_id],
+                "familyName": family_by_languoid[language_id],
+                "level": row["Level"],
+                "parentLanguageId": row["Language_ID"],
+                "alternativeNames": alternative_names.get(language_id, []),
                 "macroarea": row["Macroarea"],
                 "countries": countries,
                 "latitude": row["Latitude"],
                 "longitude": row["Longitude"],
-                "geometryVariantIds": variants_by_language.get(language_id, []),
+                "geometryVariantIds": variants_by_languoid.get(language_id, []),
             }
         )
 
@@ -424,9 +502,9 @@ def build(skip_tiles: bool) -> None:
     write_json(
         PUBLIC_DATA_DIR / "manifest.json",
         {
-            "schemaVersion": 2,
-            "languageCount": len(languages),
-            "languageWithGeometryCount": sum(
+            "schemaVersion": 3,
+            "languoidCount": len(languages),
+            "languoidWithGeometryCount": sum(
                 bool(language["geometryVariantIds"]) for language in languages
             ),
             "geometryVariantCount": len(variants),
@@ -439,8 +517,8 @@ def build(skip_tiles: bool) -> None:
         build_tiles()
 
     print(
-        f"Exported {len(languages):,} languages and {len(variants):,} geometry variants "
-        f"({sum(bool(language['geometryVariantIds']) for language in languages):,} languages covered)."
+        f"Exported {len(languages):,} languoids and {len(variants):,} geometry variants "
+        f"({sum(bool(language['geometryVariantIds']) for language in languages):,} languoids covered)."
     )
 
 
