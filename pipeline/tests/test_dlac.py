@@ -21,6 +21,12 @@ def dlac_archive(tmp_path, monkeypatch):
         (13, "Han Chinese Languages", "Manderin Supergroup"),
         (14, "None (Uninhabited)", ""),
         (15, "Kam-Tai Languages", "Mandarin Supergroup"),
+        (16, "Mongolian and Han Chinese Languages", "Mandarin Supergroup"),
+        (17, "Korean Languages", ""),
+        (18, "Kam-Tai and Han Chinese Languages", "Mandarin Supergroup"),
+        (19, "Tibeto-Burman Languages", ""),
+        (20, "Han Chinese Languages", "Shaozhou Tuhua"),
+        (21, "Han Chinese Languages", "Danzhou Dialect (Unclassified)"),
     ]
     with shapefile.Writer(str(stem), shapeType=shapefile.POLYGON) as writer:
         writer.field("CH_LANGS_", "N")
@@ -72,6 +78,12 @@ def test_shared_partial_and_ambiguous_assignments_survive_conversion(dlac_archiv
         "hakk1236|minn1248",
         "minn1248",
         "huiz1242",
+        "mand1415",
+        None,
+        None,
+        "mong1329|mand1415",
+        "kore1280",
+        "taik1256|mand1415",
         None,
         None,
         None,
@@ -80,18 +92,32 @@ def test_shared_partial_and_ambiguous_assignments_survive_conversion(dlac_archiv
         "mapped",
         "mapped",
         "partial",
-        "unmapped",
+        "mapped",
         "uninhabited",
         "inconsistent",
+        "mapped",
+        "mapped",
+        "mapped",
+        "unmapped",
+        "unmapped",
+        "unmapped",
     ]
-    assert [p["id"] for p in props] == [f"dlac:{i}" for i in range(10, 16)]
+    assert [p["id"] for p in props] == [f"dlac:{i}" for i in range(10, 22)]
     assert props[3]["CHINESE_GR"] == "Manderin Supergroup"
     assert props[3]["assignments"][0]["label"] == "Mandarin Supergroup"
     assert props[2]["assignments"][0]["status"] == "unresolved"
     assert all(feature["geometry"]["type"] == "Polygon" for feature in features)
     report = json.loads(output.with_name("mapping-report.json").read_text())
-    assert report["mappedFeatureCount"] == 3
-    assert report["glottocodes"] == ["hakk1236", "huiz1242", "minn1248"]
+    assert report["mappedFeatureCount"] == 7
+    assert report["glottocodes"] == [
+        "hakk1236",
+        "huiz1242",
+        "kore1280",
+        "mand1415",
+        "minn1248",
+        "mong1329",
+        "taik1256",
+    ]
     assert report["regionalCoverageOnly"] is True
 
 
@@ -104,20 +130,44 @@ def test_dlac_enters_normal_source_variants_without_descendant_assignment(
     monkeypatch.setattr(atlas, "PROCESSED_DIR", tmp_path / "processed")
     monkeypatch.setattr(atlas, "NORMALIZED_GEOMETRIES", tmp_path / "processed/areas.geojsonl")
     monkeypatch.setattr(atlas, "read_asher_traditional_quality", dict)
-    levels = {code: "family" if code == "minn1248" else "language" for code in known}
-    levels["desc1234"] = "language"
+    families = {
+        "sini1245",
+        "mong1329",
+        "turk1311",
+        "hmon1336",
+        "taik1256",
+        "aust1307",
+        "indo1319",
+        "minn1248",
+        "ping1245",
+    }
+    levels = {code: "family" if code in families else "language" for code in known}
+    # Additional known descendants must not inherit any broad group polygon.
+    levels.update({"desc1234": "language", "cmnd1234": "dialect"})
     variants, references = atlas.normalize_geometries(set(levels), {}, levels)
     by_id = {v["languageId"]: v for v in variants}
-    assert set(by_id) == {"hakk1236", "minn1248", "huiz1242"}
-    assert "desc1234" not in references
+    assert set(by_id) == {
+        "hakk1236",
+        "minn1248",
+        "huiz1242",
+        "mand1415",
+        "mong1329",
+        "kore1280",
+        "taik1256",
+    }
+    assert {"desc1234", "cmnd1234"}.isdisjoint(references)
+    assert by_id["mand1415"]["sourceFeatureIds"] == ["dlac:13", "dlac:16", "dlac:18"]
+    assert by_id["mong1329"]["sourceFeatureIds"] == ["dlac:16"]
+    assert by_id["kore1280"]["sourceFeatureIds"] == ["dlac:17"]
+    assert by_id["taik1256"]["sourceFeatureIds"] == ["dlac:18"]
     assert by_id["minn1248"]["sourceFeatureIds"] == ["dlac:10", "dlac:11"]
     assert by_id["minn1248"]["featureCount"] == 2
     assert by_id["minn1248"]["geometryKind"] == "source"
     assert by_id["minn1248"]["sourceYear"] == 1987
     assert by_id["minn1248"]["temporalCoverage"]["label"] == "China, 1985–1987"
     normalized = [json.loads(line) for line in atlas.NORMALIZED_GEOMETRIES.read_text().splitlines()]
-    assert len(normalized) == 4
-    assert len({f["id"] for f in normalized}) == 4
+    assert len(normalized) == 10
+    assert len({f["id"] for f in normalized}) == 10
     assert all(f["properties"]["dataset_id"] == "dlac1987china" for f in normalized)
 
 

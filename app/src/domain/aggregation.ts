@@ -70,6 +70,31 @@ export const buildGeographyAvailability = (
   return result
 }
 
+/** Deepest mapped entries in a complete subtree, including its root when appropriate. */
+export const mappedLeavesForLanguage = (
+  languageId: string,
+  hierarchy: LanguageHierarchy,
+  availability: ReadonlyMap<string, GeographyAvailability>,
+) => {
+  const subtreeIds = new Set<string>()
+  const languageIds: string[] = []
+  const visit = (id: string): boolean => {
+    if (subtreeIds.has(id) || !hierarchy.languageById.has(id)) return false
+    subtreeIds.add(id)
+    let hasMappedDescendants = false
+    for (const child of hierarchy.childrenById.get(id) ?? []) {
+      // Visit every branch, even after finding geography in an earlier sibling.
+      if (visit(child.id)) hasMappedDescendants = true
+    }
+    if (hasMappedDescendants) return true
+    if (!availability.get(id)?.own) return false
+    languageIds.push(id)
+    return true
+  }
+  visit(languageId)
+  return { subtreeIds, languageIds }
+}
+
 export const areaMode = (available: GeographyAvailability, preferred?: AreaMode): AreaMode =>
   preferred ?? (available.own ? 'own' : 'descendants')
 

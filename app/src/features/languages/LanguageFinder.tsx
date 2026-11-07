@@ -7,7 +7,13 @@ import {
   useRef,
   useState,
 } from 'react'
-import { areaMode, areaStatus, areaVariants, isAreaAvailable } from '../../domain/aggregation'
+import {
+  areaMode,
+  areaStatus,
+  areaVariants,
+  isAreaAvailable,
+  mappedLeavesForLanguage,
+} from '../../domain/aggregation'
 import type {
   AtlasData,
   GeographyDatasetSelection,
@@ -38,6 +44,7 @@ import {
   selectedMapAreasAtom,
   setGeometryOverrideAtom,
   showLanguagesAtom,
+  showMappedLeavesAtom,
   temporalViewAtom,
   toggleVisibleLanguageAtom,
   viewportLanguageIdsAtom,
@@ -302,6 +309,7 @@ export const LanguageFinder = () => {
   const [scope, setScope] = useAtom(finderScopeAtom)
   const [temporalSelection, setTemporalSelection] = useAtom(temporalViewAtom)
   const showLanguages = useSetAtom(showLanguagesAtom)
+  const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
@@ -460,6 +468,10 @@ export const LanguageFinder = () => {
   }
   const detail = detailId ? data.languageById.get(detailId) : undefined
   const detailAvailability = detail ? availability.get(detail.id) : undefined
+  const mappedLeaves = useMemo(
+    () => (detailId ? mappedLeavesForLanguage(detailId, hierarchy, availability) : undefined),
+    [detailId, hierarchy, availability],
+  )
   const detailMode = detailAvailability
     ? areaMode(detailAvailability, modes[detailId ?? ''])
     : 'own'
@@ -654,6 +666,22 @@ export const LanguageFinder = () => {
                 </button>
               ))}
             </nav>
+            {mappedLeaves && (hierarchy.childrenById.get(detail.id)?.length ?? 0) > 0 && (
+              <div className="finder-detail__mapped-leaves">
+                <button
+                  type="button"
+                  disabled={!mappedLeaves.languageIds.length}
+                  onClick={() => showMappedLeaves(detail.id)}
+                >
+                  Show mapped leaves ({mappedLeaves.languageIds.length.toLocaleString()})
+                </button>
+                <p>
+                  Shows the deepest entries with polygons in this entire branch, each with its own
+                  color. Uses current sources and period; branches without polygons are omitted.
+                  Replaces selections within this branch.
+                </p>
+              </div>
+            )}
             {detailAvailability && (
               <label className="finder-detail__mode">
                 <span>Map representation</span>

@@ -432,19 +432,39 @@ in the existing catalogs and PMTiles. No additional frontend build step is neede
 
 `pipeline/dlac/candidates.csv` is the explicit crosswalk. Only rows marked
 `candidate` are imported. These are project correspondences, not source-provided
-identifiers. Rows marked `scope-review` (Mandarin supergroup, Mongolian, Korean,
-and Kam-Tai) and `unresolved` (Tibeto-Burman, Shaozhou Tuhua, and Danzhou) remain
-unassigned. The source record whose Chinese-group label contradicts its broad
-group is also excluded. Recognized components of partially mapped shared areas
-are retained; uninhabited areas have no language assignment. Unexpected labels,
+identifiers. The reviewed mappings include Mandarin Supergroup → Mandarin Chinese
+(`mand1415`), Mongolian Languages → Mongolic (`mong1329`), Korean Languages →
+Korean (`kore1280`), and Kam-Tai Languages → Tai-Kadai (`taik1256`). Rows marked
+`unresolved` (Tibeto-Burman, Shaozhou Tuhua, and Danzhou) remain unassigned; no
+source-only groups or inferred descendant areas are created. The source record
+whose Chinese-group label contradicts its broad group is also excluded.
+Recognized components of partially mapped shared areas are retained; uninhabited
+areas have no language assignment. Unexpected labels,
 unknown Glottocodes, duplicate source IDs, and checksum mismatches fail the build.
 
-192 of the 307 polygons have at least one accepted assignment, producing 13
-variants (shared polygons occur in each relevant variant). Of the records, 134
-are fully mapped, 58 partially mapped, 107 unmapped, 7 uninhabited, and 1 excluded
-for inconsistent labels. The 13 imported nodes include direct Jin and Hui
-language areas and Min/Pinghua family areas. Family polygons represent regional
-group coverage, not each individual descendant or a complete worldwide extent. Original polygons stay
+The mapping choices preserve the source's level and regional scope:
+
+- Glottolog lists **Mandarin Supergroup** as an alternative name for
+  [Mandarin Chinese](https://glottolog.org/resource/languoid/id/mand1415), rather
+  than the broader Mandarinic node, which contains other separately classified
+  languages. Its polygons are not copied onto individual Mandarin dialects.
+- **Mongolian Languages** describes the regional Mongolic family grouping,
+  rather than a single Mongolian language or the broader Mongolic-Khitan root.
+- **Korean Languages** is treated as regional Korean-language coverage in China.
+- **Kam-Tai Languages** uses the source atlas's broad terminology, including
+  Hainan coverage. It maps to Tai-Kadai, including its Hlaic and Kadaic branches,
+  rather than Glottolog's narrower Kam-Tai subgroup. See the original atlas's
+  classification discussion in [LaPolla's review](https://www.randylapolla.info/Papers/LaPolla_1997_Review_of_Language_Atlas_of_China.pdf).
+
+294 of the 307 polygons have at least one accepted assignment, producing 17
+variants (shared polygons occur in each relevant variant): 279 records are fully
+mapped, 15 partially mapped, 5 unmapped, 7 uninhabited, and 1 excluded for
+inconsistent labels. Mandarin has 117 polygons, Mongolic 28, Korean 6, and
+Tai-Kadai 41. These counts include shared regions and must not be summed as
+distinct source records. DLAC alone now supplies ten mapped Sino-Tibetan nodes.
+The imported nodes include direct Jin and Hui language areas and Min/Pinghua
+family areas. Family polygons represent regional group coverage, not each
+individual descendant or a complete worldwide extent. Original polygons stay
 separate; shared regions keep all accepted references. DLAC is appended after
 the existing sources, preserving their default precedence. It uses the existing
 approximately contemporary view with an explicit **China, 1985–1987** label;
@@ -472,8 +492,8 @@ an appropriate separate grant.
 
 See [the compatibility assessment](DLAC_ASSESSMENT.md) for the initial source
 audit, measured boundary agreement, and reproducible exploratory analysis. Its
-17 candidate-node count includes the four scope-review mappings omitted by the
-production importer.
+17 candidate-node count includes the four initially withheld scope-review
+mappings now enabled by the production importer.
 
 ## 5. How the datasets link
 

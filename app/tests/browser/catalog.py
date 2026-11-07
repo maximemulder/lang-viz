@@ -160,7 +160,7 @@ def main():
             )
             results["keyboard"] = "passed"
 
-            # No polygon is required to explore a branch.
+            # Expanding another branch still leaves map selection unchanged.
             search(browser, "jiny1235", "jiny1235")
             browser.js("document.querySelector('.language-row__disclosure').click()")
             assert wait_for(
@@ -214,7 +214,7 @@ def main():
             results["rankedSearch"] = "passed"
 
             # Unmapped entries must remain discoverable, including by original-script aliases.
-            results["unmappedLanguage"] = search(browser, "jiny1235", "jiny1235")
+            results["unmappedLanguage"] = search(browser, "ache1244", "ache1244")
             assert results["unmappedLanguage"]["disabled"]
             assert "No areas" in results["unmappedLanguage"]["text"]
             results["unmappedDialectAlias"] = search(browser, "上海", "shan1293")
@@ -482,6 +482,114 @@ def main():
             """)
             browser.screenshot(output / "aggregate-only.png")
             results["aggregationFiltersAndViewport"] = "passed"
+
+            # Show a complete family as individual deepest mapped entries, without unfolding it.
+            browser.js(
+                "window.overlapTest.configure(arguments[0])",
+                {
+                    "languageIds": ["sino1245", "beij1235", "jiny1235", "abkh1244"],
+                    "center": [112, 28],
+                    "zoom": 4,
+                },
+            )
+            search(browser, "sino1245", "sino1245")
+            browser.js("""
+                const row = document.querySelector('.language-row');
+                row.click();
+                if (row.getAttribute('aria-expanded') === 'true') {
+                    row.querySelector('.language-row__disclosure').click();
+                }
+            """)
+            browser.js("""
+                const filters = document.querySelector('.finder-options');
+                filters.open = true;
+                document.querySelector('.source-filter__trigger').click();
+            """)
+            browser.js("""
+                [...document.querySelectorAll('.source-filter__actions button')]
+                  .find(button => button.textContent === 'Clear').click();
+            """)
+            wait_for(
+                lambda: browser.js(
+                    "return document.querySelector('.source-filter__trigger').textContent.includes('No sources')"
+                ),
+                10,
+                "cleared geographic sources",
+            )
+            browser.js("""
+                [...document.querySelectorAll('.source-filter__option')]
+                  .find(label => label.querySelector('strong').textContent === 'DLAC')
+                  .querySelector('input').click();
+            """)
+            wait_for(
+                lambda: browser.js("""
+                    const button = document.querySelector('.finder-detail__mapped-leaves button');
+                    return button && !button.disabled && button.textContent === 'Show mapped leaves (10)';
+                """),
+                10,
+                "DLAC mapped leaf count",
+            )
+            browser.js("document.querySelector('.source-filter__trigger').click()")
+            browser.js("""
+                const select = document.querySelector('.finder-detail__mode select');
+                select.value = 'descendants';
+                select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            before = len(browser.snapshot()["reports"])
+            browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
+            leaves_state = ready_after(before, 10)
+            assert not leaves_state["errors"], leaves_state["errors"]
+            assert not browser.js("return document.querySelector('.language-row input').checked")
+            assert browser.js("return document.querySelectorAll('.language-row').length") == 1
+            assert "10 of 11 shown" in browser.js(
+                "return document.querySelector('.selection-count').textContent"
+            )
+            browser.screenshot(output / "dlac-family-leaves.png")
+
+            # Repeating the action is idempotent; filters update the count and disable empty actions.
+            browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
+            assert "10 of 11 shown" in browser.js(
+                "return document.querySelector('.selection-count').textContent"
+            )
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'year-1750';
+                select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            wait_for(
+                lambda: browser.js("""
+                    const button = document.querySelector('.finder-detail__mapped-leaves button');
+                    return button.disabled && button.textContent === 'Show mapped leaves (0)';
+                """),
+                10,
+                "unavailable mapped leaves",
+            )
+            assert "0 of 11 shown" in browser.js(
+                "return document.querySelector('.selection-count').textContent"
+            )
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'contemporary';
+                select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            wait_for(lambda: browser.snapshot()["selectedCount"] == 10, 10, "mapped leaf recovery")
+            leaf_ids = [
+                "ganc1239", "hakk1236", "jiny1235", "huiz1242", "wuch1236",
+                "xian1251", "ping1245", "yuec1235", "minn1248", "mand1415",
+            ]
+            for code in leaf_ids:
+                search(browser, code, code)
+                assert browser.js("""
+                    const row = document.querySelector('.language-row');
+                    return row.querySelector('input').checked && row.dataset.areaMode === 'own';
+                """), code
+            # Replace all selections in the subtree, including previously selected unavailable nodes.
+            for code, checked in [("beij1235", False), ("sino1245", False), ("abkh1244", True)]:
+                search(browser, code, code)
+                assert browser.js(
+                    "return document.querySelector('.language-row input').checked"
+                ) == checked, code
+            results["dlacFamilyLeaves"] = {"ids": leaf_ids, "selectedCount": 10}
 
             # The tree keeps useful space on narrow screens, including with entry details open.
             browser.call("POST", "/window/rect", {"width": 390, "height": 844})

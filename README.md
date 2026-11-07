@@ -65,6 +65,19 @@ Large aggregations use the existing geometry budgets and solid-area fallback.
 Expansion and map selection are independent; aggregating a family does not check
 its descendants individually. Entries without available areas remain searchable
 and expandable.
+
+To show a family's individually colored members, focus its row and choose
+**Show mapped leaves (N)** in the entry details. This traverses the entire subtree,
+including collapsed branches, and selects every deepest entry with a polygon for
+the current sources and period. It passes through unmapped groups and includes
+mapped languages or subfamilies when none of their descendants have qualifying
+areas. Branches without polygons are omitted; no coverage is inferred. Selections
+inside the subtree are replaced with these entries using their own areas and source
+choices; selections elsewhere remain. For example, select only **DLAC** under
+**Map filters**, search **Sino-Tibetan**, focus its row, and choose **Show mapped
+leaves**. This is a bulk selection at the time of the click: after changing filters,
+click it again to recompute the mapped leaves.
+
 Map source/period/viewport controls are under "Map filters". Viewport scope limits
 starting results, including aggregates with contributing areas in view; expanded
 branches still show their full classification children.

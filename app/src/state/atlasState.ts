@@ -6,6 +6,7 @@ import {
   areaMode,
   buildGeographyAvailability,
   type GeographyAvailability,
+  mappedLeavesForLanguage,
   resolveMapAreas,
 } from '../domain/aggregation'
 import type {
@@ -76,6 +77,22 @@ export const showLanguagesAtom = atom(null, (get, set, languageIds: readonly Lan
   }
   set(areaModesAtom, modes)
   set(visibleLanguageIdsAtom, [...new Set([...get(visibleLanguageIdsAtom), ...languageIds])])
+})
+
+export const showMappedLeavesAtom = atom(null, (get, set, languageId: LanguageId) => {
+  const leaves = mappedLeavesForLanguage(
+    languageId,
+    get(languageHierarchyAtom),
+    get(geographyAvailabilityAtom),
+  )
+  if (!leaves.languageIds.length) return
+  const modes = { ...get(areaModesAtom) }
+  for (const id of leaves.languageIds) modes[id] = 'own'
+  set(areaModesAtom, modes)
+  set(visibleLanguageIdsAtom, [
+    ...get(visibleLanguageIdsAtom).filter((id) => !leaves.subtreeIds.has(id)),
+    ...leaves.languageIds,
+  ])
 })
 
 export const setGeometryOverrideAtom = atom(

@@ -24,6 +24,9 @@ aggregation without individually selecting children, independently selecting a
 contributor, grouped hatching and blending, single-contributor aggregation, source/
 period availability recovery, viewport discovery, tree keyboard navigation, and
 narrow layouts.
+The family-selection check selects DLAC and displays all mapped Sino-Tibetan leaves
+individually, replaces existing subtree selections while retaining unrelated ones,
+and verifies period availability, count updates, and repeated selection.
 Its screenshots, report, and server logs are written to `test-results/catalog/`.
 
 Each invocation builds the production app, starts a local Vite preview and

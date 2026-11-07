@@ -11,6 +11,7 @@ import {
   mapAreaMemberships,
   mapAreaSelectionKey,
   mapAreaSourceColors,
+  mappedLeavesForLanguage,
   resolveMapAreas,
 } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
@@ -105,6 +106,95 @@ const required = <T>(value: T | undefined): T => {
   assert.ok(value)
   return value
 }
+
+test('mapped leaves traverse every branch to its deepest available geography', () => {
+  const leaves = mappedLeavesForLanguage('family', hierarchy, availability())
+  assert.deepEqual(leaves.languageIds, ['nested', 'other-dialect'])
+  assert.deepEqual(
+    [...leaves.subtreeIds].sort(),
+    languages
+      .filter(({ id }) => id !== 'isolate')
+      .map(({ id }) => id)
+      .sort(),
+    'All subtree entries are visited, including unmapped and collapsed branches',
+  )
+  const modes = Object.fromEntries(leaves.languageIds.map((id) => [id, 'own' as const]))
+  const areas = resolveMapAreas(leaves.languageIds, availability(), modes)
+  assert.deepEqual(
+    areas.map(({ id }) => id),
+    ['modern:nested', 'modern:other-dialect'],
+  )
+  assert.ok(areas.every(({ mode, variants }) => mode === 'own' && variants.length === 1))
+})
+
+test('mapped leaves apply source and period filters before determining the frontier', () => {
+  assert.deepEqual(
+    mappedLeavesForLanguage('family', hierarchy, availability('all', ['historic'])).languageIds,
+    ['language'],
+    'A mapped ancestor is retained when all its finer geography is filtered out',
+  )
+  assert.deepEqual(
+    mappedLeavesForLanguage('family', hierarchy, availability('time-of-contact')).languageIds,
+    ['language'],
+  )
+  assert.deepEqual(
+    mappedLeavesForLanguage('family', hierarchy, availability('contemporary')).languageIds,
+    ['nested', 'other-dialect'],
+  )
+  assert.deepEqual(
+    mappedLeavesForLanguage('family', hierarchy, availability('all', [])).languageIds,
+    [],
+  )
+})
+
+test('mapped leaves handle subgroups, mapped roots with unmapped children, and missing geography', () => {
+  assert.deepEqual(mappedLeavesForLanguage('unmapped', hierarchy, availability()).languageIds, [
+    'other-dialect',
+  ])
+  assert.deepEqual(mappedLeavesForLanguage('nested', hierarchy, availability()).languageIds, [
+    'nested',
+  ])
+  assert.deepEqual(
+    mappedLeavesForLanguage('language', hierarchy, availability('time-of-contact')).languageIds,
+    ['language'],
+  )
+  for (const id of ['gap', 'isolate', 'unknown']) {
+    assert.deepEqual(mappedLeavesForLanguage(id, hierarchy, availability()).languageIds, [])
+  }
+})
+
+test('mapped leaves preserve contributor source overrides', () => {
+  const alternate = { ...required(data.variantById.get('modern:nested')), id: 'alternate:nested' }
+  const withAlternate = {
+    ...data,
+    languages: languages.map((language) =>
+      language.id === 'nested'
+        ? { ...language, geometryVariantIds: [...language.geometryVariantIds, alternate.id] }
+        : language,
+    ),
+    variantById: new Map([...data.variantById, [alternate.id, alternate]]),
+  }
+  const available = buildGeographyAvailability(
+    withAlternate,
+    buildLanguageHierarchy(withAlternate.languages),
+    'all',
+    'all',
+    { nested: alternate.id },
+  )
+  const leaves = mappedLeavesForLanguage('family', hierarchy, available)
+  assert.deepEqual(leaves.languageIds, ['nested', 'other-dialect'])
+  assert.equal(
+    resolveMapAreas(leaves.languageIds, available, { nested: 'own' })[0]?.id,
+    alternate.id,
+  )
+})
+
+test('mapped leaf traversal terminates on malformed cyclic classifications', () => {
+  const cyclic = buildLanguageHierarchy([entry('a', 'b'), entry('b', 'a')])
+  const leaves = mappedLeavesForLanguage('a', cyclic, new Map())
+  assert.deepEqual([...leaves.subtreeIds], ['a', 'b'])
+  assert.deepEqual(leaves.languageIds, [])
+})
 
 test('aggregation excludes the entry itself and stops at the first mapped descendant per branch', () => {
   const all = availability()

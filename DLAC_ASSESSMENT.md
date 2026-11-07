@@ -1,12 +1,13 @@
 # Language Atlas of China: compatibility assessment
 
-**Integration update:** the production pipeline now includes a conservative
-subset of DLAC, documented in [DATASETS.md](DATASETS.md#44-language-atlas-of-china).
-It enables 13 clear correspondences, excludes four scope-review hypotheses and
-the inconsistent record, and distributes [a source notice](pipeline/dlac/NOTICE.md)
-under the conservative BY-NC-SA policy. The measurements below describe the
-initial assessment before integration; its candidate counts include hypotheses
-that are not enabled in production.
+**Integration update:** the production pipeline now includes the reviewed DLAC
+correspondences, documented in [DATASETS.md](DATASETS.md#44-language-atlas-of-china).
+It enables 17 nodes, including the subsequently reviewed Mandarin, Mongolic,
+Korean, and broad Tai-Kadai correspondences. The three groups without equivalent
+Glottocodes and the inconsistent record remain excluded. It distributes
+[a source notice](pipeline/dlac/NOTICE.md) under the conservative BY-NC-SA policy.
+The assessment below records the initial hypotheses and scope questions before
+integration; the current production decisions and counts are in DATASETS.md.
 
 Assessed 7 November 2026 against the local schema-v4 catalog: 27,177 languoids,
 6,647 with geometry, and 14,337 source variants. The analysis uses the source
