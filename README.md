@@ -1,7 +1,8 @@
 # Interactive atlas of the world's languages
 
 The browser application lives in `app/`; its static data is generated from the
-downloaded Glottolog and Glottography datasets by the offline Python pipeline.
+downloaded Glottolog, Glottography, and Digital Language Atlas of China datasets
+by the offline Python pipeline.
 
 ## Build the proof of concept
 
@@ -18,7 +19,12 @@ npm run dev
 Generated browser artifacts are written to `app/public/data/` and are not
 committed. The normalized intermediate geometry is written to `data/processed/`.
 External datasets and Tippecanoe are fetched at the exact revisions recorded in
-`pipeline/atlas/sources.lock.tsv`.
+`pipeline/atlas/sources.lock.tsv`; DLAC's Dataverse files are pinned by file ID and
+SHA-256 in `pipeline/dlac/fetch.sh` and fetched by the same source-fetch command.
+The atlas build converts DLAC's shapefile automatically. See
+[DLAC's mapping and reuse policy](DATASETS.md#44-language-atlas-of-china), including
+the conflicting CC0/BY-NC-SA metadata and the conservative noncommercial terms
+used for its contribution. The build distributes a source notice beside the data.
 
 The searchable catalog includes every Glottolog languoid: families and subfamilies,
 languages, and dialects. Search accepts primary and alternative names, ISO codes,
@@ -79,8 +85,8 @@ schema version 4 adds immediate `parentId` links and uses `languoidCount` and `l
 
 The generated geometry catalog preserves four temporal source views:
 
-- contemporary areas from Asher, Wurm and Hattori's Pacific atlas, and Matsumae's
-  Northeast Asian dataset;
+- contemporary areas from Asher, Wurm and Hattori's Pacific atlas, Matsumae's
+  Northeast Asian dataset, and DLAC's regional China source (labeled 1985–1987);
 - Asher time-of-contact areas, with contemporary proxies explicitly marked;
 - the DiACL polygon archive's approximate 1750 snapshot;
 - Bouckaert's mixed modern-and-ancient Indo-European source view.

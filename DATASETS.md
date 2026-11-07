@@ -415,6 +415,66 @@ CSV columns:
 
 ---
 
+### 4.4 Language Atlas of China
+
+The **Digital Language Atlas of China** (Crissman,
+[Harvard Dataverse V6.0, DOI 10.7910/DVN/OHYYXH](https://doi.org/10.7910/DVN/OHYYXH))
+is included as source `dlac1987china`. It contains 307 WGS84 polygons for major
+groups, based on the **1987 atlas**, representing **1985–1987**. The digital
+release in 2012 is not the represented date or the second edition of the atlas.
+
+The standard `bash pipeline/atlas/fetch-sources.sh` also runs
+`pipeline/dlac/fetch.sh`. It fetches the shapefile ZIP (file 2423709) and Word
+dictionary (2423710) into `datasets/dlac/raw/`, verifying pinned SHA-256 hashes.
+`uv run python -m pipeline.atlas.build` then converts the shapefile with PyShp,
+links it to the pinned Glottolog classification, and includes the mapped polygons
+in the existing catalogs and PMTiles. No additional frontend build step is needed.
+
+`pipeline/dlac/candidates.csv` is the explicit crosswalk. Only rows marked
+`candidate` are imported. These are project correspondences, not source-provided
+identifiers. Rows marked `scope-review` (Mandarin supergroup, Mongolian, Korean,
+and Kam-Tai) and `unresolved` (Tibeto-Burman, Shaozhou Tuhua, and Danzhou) remain
+unassigned. The source record whose Chinese-group label contradicts its broad
+group is also excluded. Recognized components of partially mapped shared areas
+are retained; uninhabited areas have no language assignment. Unexpected labels,
+unknown Glottocodes, duplicate source IDs, and checksum mismatches fail the build.
+
+192 of the 307 polygons have at least one accepted assignment, producing 13
+variants (shared polygons occur in each relevant variant). Of the records, 134
+are fully mapped, 58 partially mapped, 107 unmapped, 7 uninhabited, and 1 excluded
+for inconsistent labels. The 13 imported nodes include direct Jin and Hui
+language areas and Min/Pinghua family areas. Family polygons represent regional
+group coverage, not each individual descendant or a complete worldwide extent. Original polygons stay
+separate; shared regions keep all accepted references. DLAC is appended after
+the existing sources, preserving their default precedence. It uses the existing
+approximately contemporary view with an explicit **China, 1985–1987** label;
+`sourceYear` is 1987, not the digital release year.
+
+The ignored `data/processed/dlac/features.geojson` retains all source records,
+raw labels, unique `CH_LANGS_` IDs, original geometry, and component decisions.
+`mapping-report.json` records accepted and excluded assignments, mapping counts,
+regional scope, represented years, and source/crosswalk hashes. The selectable
+catalog variants refer to the stable `dlac:<CH_LANGS_>` feature IDs. The legacy
+`CH_LANGS_I` field is not unique and is retained only as provenance.
+
+**License and attribution:** Dataverse metadata declares **CC0 1.0**, while the
+bundled dictionary explicitly specifies **CC BY-NC-SA 3.0**, academic noncommercial
+use, and attribution. This conflict remains unresolved. The integration follows
+the more restrictive BY-NC-SA terms for the DLAC contribution and adaptations:
+credit, noncommercial use, retained notices, and ShareAlike. The complete supplied
+attribution, source links, and project modifications are in
+[the DLAC notice](pipeline/dlac/NOTICE.md). The build copies that notice beside the
+distributed data as `app/public/data/DLAC-NOTICE.md`; no license UI is added.
+Independent code and other source datasets retain their own licenses. Ignoring
+raw datasets in Git does not prevent publication of derived geometry by the
+website. Commercial reuse requires resolving the conflicting terms or obtaining
+an appropriate separate grant.
+
+See [the compatibility assessment](DLAC_ASSESSMENT.md) for the initial source
+audit, measured boundary agreement, and reproducible exploratory analysis. Its
+17 candidate-node count includes the four scope-review mappings omitted by the
+production importer.
+
 ## 5. How the datasets link
 
 **Common language key: the Glottocode.**
@@ -497,4 +557,10 @@ All use the Glottocode as language identifier and are available in CLDF.
 
 - Most planned datasets are CC-BY-4.0. Wikidata structured data is CC0;
   **wurm1981pacific** is CC-BY-NC-4.0, which is acceptable for a course project.
-- Every dataset used must be credited in the app and the report, using each project's citation instructions (README or `.zenodo.json`).
+- **DLAC** has conflicting CC0 metadata and a bundled CC BY-NC-SA 3.0 notice.
+  This integration follows the more restrictive noncommercial ShareAlike terms;
+  see [section 4.4](#44-language-atlas-of-china) and
+  [the supplied attribution and project notice](pipeline/dlac/NOTICE.md).
+- Retain each source's citation and applicable notices in the documentation and
+  distributed data. DLAC's notice is shipped beside the catalogs and tiles; its
+  UI attribution is deferred for now.

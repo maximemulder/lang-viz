@@ -14,6 +14,8 @@ from typing import Any
 
 import polars as pl
 
+from pipeline.dlac.prepare import prepare as prepare_dlac
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GLOTTOLOG_LANGUAGES = PROJECT_ROOT / "datasets/glottolog-cldf/cldf/languages.csv"
 GLOTTOLOG_NAMES = GLOTTOLOG_LANGUAGES.with_name("names.csv")
@@ -38,6 +40,7 @@ class GeographySource:
     focal_year: int | None
     path: Path
     supplementary_files: tuple[str, ...] = ()
+    source_format: str = "geojson"
 
 
 DATASETS = (
@@ -75,6 +78,13 @@ DATASETS = (
         "shortName": "Matsumae",
         "citation": "Matsumae et al. (2021)",
         "license": "CC-BY-4.0",
+    },
+    {
+        "id": "dlac1987china",
+        "name": "Digital Language Atlas of China",
+        "shortName": "DLAC",
+        "citation": "Crissman (2002), based on Language Atlas of China (1987)",
+        "license": "CC-BY-NC-SA-3.0; conflicting CC0 metadata (see DLAC-NOTICE.md)",
     },
 )
 
@@ -164,6 +174,20 @@ SOURCES = (
         focal_year=None,
         path=PROJECT_ROOT / "datasets/glottography/matsumae2021exploring/cldf/languages.geojson",
         supplementary_files=("families.geojson", "dialects.geojson", "features.geojson"),
+    ),
+    GeographySource(
+        variant_prefix="dlac1987china:contemporary",
+        dataset_id="dlac1987china",
+        layer="contemporary",
+        label="DLAC — China, 1985–1987",
+        temporal_kind="named-period",
+        temporal_view="contemporary",
+        temporal_label="China, 1985–1987",
+        temporal_quality="approximate",
+        source_year=1987,
+        focal_year=None,
+        path=PROJECT_ROOT / "datasets/dlac/raw/ACSN_MajorLanguages_pgn.zip",
+        source_format="dlac-shapefile",
     ),
 )
 
@@ -333,8 +357,11 @@ def source_geometries(source: GeographySource, known_languoids: set[str]):
     No geometries are dissolved, propagated through the tree, or synthesized here.
     """
     covered: set[str] = set()
+    primary_path = source.path
+    if source.source_format == "dlac-shapefile":
+        primary_path = prepare_dlac(source.path, PROCESSED_DIR / "dlac", known_languoids)
     for path in [
-        source.path,
+        primary_path,
         *(source.path.with_name(name) for name in source.supplementary_files),
     ]:
         collection = json.loads(path.read_text(encoding="utf-8"))
@@ -538,6 +565,7 @@ def build(skip_tiles: bool) -> None:
     write_json(PUBLIC_DATA_DIR / "languages.json", languages)
     write_json(PUBLIC_DATA_DIR / "geometry-variants.json", variants)
     write_json(PUBLIC_DATA_DIR / "geography-datasets.json", DATASETS)
+    shutil.copyfile(PROJECT_ROOT / "pipeline/dlac/NOTICE.md", PUBLIC_DATA_DIR / "DLAC-NOTICE.md")
     write_json(
         PUBLIC_DATA_DIR / "manifest.json",
         {

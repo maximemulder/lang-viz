@@ -58,3 +58,5 @@ while IFS=$'\t' read -r target revision repository sparse_paths; do
     exit 1
   fi
 done < "$lock_file"
+
+ATLAS_FETCH_ROOT="$project_root" bash "$(dirname "${BASH_SOURCE[0]}")/../dlac/fetch.sh"

@@ -39,13 +39,21 @@ def test_fetch_adds_new_sparse_paths_at_the_same_revision(tmp_path):
     script.with_name("sources.lock.tsv").write_text(
         f"datasets/example\t{revision}\t{origin}\tcldf/languages.csv,cldf/names.csv\n"
     )
+    dlac = script.parent.parent / "dlac/fetch.sh"
+    dlac.parent.mkdir()
+    dlac.write_text('test "$ATLAS_FETCH_ROOT" = "$EXPECTED_FETCH_ROOT"\necho "DLAC fetched"\n')
     result = subprocess.run(
         ["bash", str(script)],
-        env={**os.environ, "ATLAS_FETCH_ROOT": str(tmp_path / "workspace")},
+        env={
+            **os.environ,
+            "ATLAS_FETCH_ROOT": str(tmp_path / "workspace"),
+            "EXPECTED_FETCH_ROOT": str(tmp_path / "workspace"),
+        },
         capture_output=True,
         text=True,
         check=True,
     )
     assert "Fetching datasets/example" in result.stdout
+    assert "DLAC fetched" in result.stdout
     assert (checkout / "cldf/names.csv").is_file()
     assert git("rev-parse", "HEAD", cwd=checkout) == revision

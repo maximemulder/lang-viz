@@ -1,0 +1,22 @@
+field,label,glottocode,status,note
+LANGUAGE_F,Han Chinese Languages,sini1245,candidate,Sinitic umbrella; use the more specific Chinese group where supplied
+LANGUAGE_F,Mongolian Languages,mong1329,scope-review,Regional Mongolic grouping; do not equate with the Mongolian macrolanguage or Mongolic-Khitan root
+LANGUAGE_F,Turkic Languages,turk1311,candidate,Regional extent of the Turkic family; not its global extent
+LANGUAGE_F,Korean Languages,kore1280,scope-review,Korean language candidate; regional coverage only
+LANGUAGE_F,Tibeto-Burman Languages,,unresolved,No equivalent node in the pinned classification; Sino-Tibetan includes Sinitic and is too broad
+LANGUAGE_F,Miao-Yao Languages,hmon1336,candidate,Hmong-Mien family terminology
+LANGUAGE_F,Kam-Tai Languages,taik1256,scope-review,Check source scope against Tai-Kadai versus the narrower Kam-Tai node kamt1241
+LANGUAGE_F,Austronesian Languages,aust1307,candidate,Regional extent of the Austronesian family
+LANGUAGE_F,Indo-European Languages,indo1319,candidate,Regional extent of the Indo-European family
+CHINESE_GR,Mandarin Supergroup,mand1415,scope-review,Check scope against Mandarinic mand1471; do not assign every Mandarinic descendant this polygon
+CHINESE_GR,Jin Group,jiny1235,candidate,Jinyu Chinese; own source area currently missing
+CHINESE_GR,Wu Group,wuch1236,candidate,Wu Chinese
+CHINESE_GR,Gan Group,ganc1239,candidate,Gan Chinese
+CHINESE_GR,Hui Group,huiz1242,candidate,Hui Chinese; do not confuse with Huizhou dialect huiz1243 under Hakka
+CHINESE_GR,Hakka Group,hakk1236,candidate,Hakka Chinese
+CHINESE_GR,Xiang Group,xian1251,candidate,Xiang Chinese
+CHINESE_GR,Min Supergroup,minn1248,candidate,Min family; do not copy the supergroup polygon onto individual Min languages
+CHINESE_GR,Pinghua Group,ping1245,candidate,Pinghua family; preserve Northern and Southern Pinghua as separate descendants
+CHINESE_GR,Yue (Cantonese) Group,yuec1235,candidate,Yue Chinese
+CHINESE_GR,Shaozhou Tuhua,,unresolved,Qujiang Hakka-Shibei Shaoguan Tuhua quji1234 is only a possible partial match
+CHINESE_GR,Danzhou Dialect (Unclassified),,unresolved,Requires linguistic review; no same-name node found
