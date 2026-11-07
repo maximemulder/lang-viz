@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { featureVariantIds, visibleVariantIds } from '../src/features/map/inspection.ts'
 import {
+  blendLayerId,
   fallbackLayerId,
   solidLayerId,
   stripeLayerId,
@@ -22,6 +23,21 @@ test('inspection reads explicit memberships, independent of pattern naming and c
     { variantIds: '[1]' },
   ])
     assert.deepEqual(featureVariantIds(properties), [])
+})
+
+test('inspection follows grouped blending coverage, including all overlapping selections', () => {
+  const active = blendLayerId(0, 0)
+  const stale = blendLayerId(1, 0)
+  const map = {
+    getLayersOrder: () => [active, stale],
+    getLayer: (id: string) => [active, stale, 'selected-language-areas'].includes(id),
+    getPaintProperty: (id: string) => (id === active ? 1 : 0),
+    queryRenderedFeatures: (_point: unknown, { layers }: { layers: string[] }) => {
+      assert.deepEqual(layers, [active])
+      return [{ properties: { variantIds: '["descendants:family","child"]' } }]
+    },
+  } as unknown as MapLibreMap
+  assert.deepEqual(visibleVariantIds(map, [0, 0]), ['child', 'descendants:family'])
 })
 
 test('inspection follows active coverage and clipped fallback, ignoring original detail and staging', () => {

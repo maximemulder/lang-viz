@@ -1,5 +1,11 @@
 import type { Map as MapLibreMap, PointLike } from 'maplibre-gl'
-import { BUFFERS, fallbackLayerId, solidLayerId, stripeLayerId } from './overlap/layerIds.ts'
+import {
+  BUFFERS,
+  blendLayerPrefix,
+  fallbackLayerId,
+  solidLayerId,
+  stripeLayerId,
+} from './overlap/layerIds.ts'
 
 /** Coverage memberships are explicit MVT metadata, independent of stripe image names. */
 export const featureVariantIds = (properties: Record<string, unknown>): string[] => {
@@ -16,11 +22,17 @@ export const featureVariantIds = (properties: Record<string, unknown>): string[]
 
 /** Pick the same geometry that contributes color, including retained detail and clipped fallback. */
 export const visibleVariantIds = (
-  map: Pick<MapLibreMap, 'getLayer' | 'getPaintProperty' | 'queryRenderedFeatures'>,
+  map: Pick<MapLibreMap, 'getLayer' | 'getPaintProperty' | 'queryRenderedFeatures'> &
+    Partial<Pick<MapLibreMap, 'getLayersOrder'>>,
   point: PointLike,
 ): string[] => {
   const coverage = BUFFERS.flatMap((buffer) =>
-    [solidLayerId(buffer), stripeLayerId(buffer), fallbackLayerId(buffer)].filter(
+    [
+      solidLayerId(buffer),
+      stripeLayerId(buffer),
+      fallbackLayerId(buffer),
+      ...(map.getLayersOrder?.() ?? []).filter((id) => id.startsWith(blendLayerPrefix(buffer))),
+    ].filter(
       (id) => map.getLayer(id) && Number(map.getPaintProperty(id, 'fill-layer-opacity')) > 0,
     ),
   )

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { areaMode, areaStatus, areaVariants, isAreaAvailable } from '../../domain/aggregation'
 import type {
   AtlasData,
   GeographyDatasetSelection,
@@ -14,9 +15,7 @@ import type {
   TemporalViewSelection,
 } from '../../domain/atlas'
 import { searchCatalog } from '../../domain/catalog'
-import { geographyVariantsForLanguage } from '../../domain/geography'
 import {
-  buildLanguageHierarchy,
   flattenLanguageHierarchy,
   type HierarchyRow,
   languageAncestors,
@@ -28,11 +27,15 @@ import {
   temporalView,
 } from '../../domain/temporal'
 import {
+  areaModesAtom,
   atlasDataAtom,
   finderScopeAtom,
+  geographyAvailabilityAtom,
   geographyDatasetFilterAtom,
   geometryOverridesAtom,
+  languageHierarchyAtom,
   languageQueryAtom,
+  selectedMapAreasAtom,
   setGeometryOverrideAtom,
   showLanguagesAtom,
   temporalViewAtom,
@@ -61,26 +64,32 @@ const LanguageRow = ({
   onKeyDown,
 }: LanguageRowProps) => {
   const { language } = row
-  const data = useAtomValue(atlasDataAtom)
   const visibleIds = useAtomValue(visibleLanguageIdsAtom)
-  const overrides = useAtomValue(geometryOverridesAtom)
-  const temporalSelection = useAtomValue(temporalViewAtom)
-  const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
+  const availability = useAtomValue(geographyAvailabilityAtom)
+  const [modes, setModes] = useAtom(areaModesAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
-  const variants = geographyVariantsForLanguage(data, language, temporalSelection, datasetSelection)
+  const available = availability.get(language.id)
+  if (!available) return null
+  const mode = areaMode(available, modes[language.id])
+  const variants = areaVariants(available, mode)
   const isVisible = visibleIds.includes(language.id)
-  const activeVariant =
-    variants.find((variant) => variant.id === overrides[language.id]) ?? variants[0]
-  const availability = variants.length
-    ? null
-    : language.geometryVariantIds.length
-      ? 'No polygon for selected sources / period'
-      : 'No polygon available'
+  const status = areaStatus(available, mode)
+  const canChoose = Boolean(
+    (available.own && available.descendants.length) ||
+      (!variants.length && (available.own || available.descendants.length)),
+  )
+  const availabilityLabel = variants.length
+    ? `${status}${mode === 'descendants' ? `, ${variants.length} contributors, ${available.uncoveredBranches.length} uncovered branches` : ''}`
+    : available.hasAnyAreas
+      ? 'No areas for this representation with the selected sources / period'
+      : 'No areas available, including descendants'
 
   return (
     <div
       role="treeitem"
-      aria-label={`${language.name}, ${language.level}${availability ? `, ${availability}` : ''}`}
+      aria-label={`${language.name}, ${language.level}, ${availabilityLabel}`}
+      data-area-mode={mode}
+      data-area-status={status}
       aria-level={row.depth + 1}
       aria-posinset={row.position}
       aria-setsize={row.siblingCount}
@@ -118,25 +127,54 @@ const LanguageRow = ({
         title={[`${language.name} · ${language.id}`, context].filter(Boolean).join('\n')}
       >
         <span className="language-row__name">
-          {language.name}
+          <span className="language-row__label">{language.name}</span>
+          <small className={`language-row__level language-row__level--${language.level}`}>
+            {language.level}
+          </small>
           {row.childCount > 0 && <small className="language-row__children">{row.childCount}</small>}
         </span>
         {context && <small className="language-row__context">{context}</small>}
       </span>
-      <span className={`language-row__level language-row__level--${language.level}`}>
-        {language.level}
-      </span>
+      {canChoose ? (
+        <select
+          className="language-row__area-mode"
+          aria-label={`Map representation for ${language.name}`}
+          title={availabilityLabel}
+          tabIndex={active ? 0 : -1}
+          value={mode}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) =>
+            setModes({
+              ...modes,
+              [language.id]: event.currentTarget.value === 'own' ? 'own' : 'descendants',
+            })
+          }
+        >
+          <option value="own" disabled={!available.own}>
+            Own area{!available.own ? ' (unavailable)' : ''}
+          </option>
+          <option value="descendants" disabled={!available.descendants.length}>
+            Descendant areas{!available.descendants.length ? ' (unavailable)' : ''}
+          </option>
+        </select>
+      ) : (
+        <span
+          className={`language-row__area-status${variants.length ? '' : ' language-row__area-status--unavailable'}`}
+          title={availabilityLabel}
+        >
+          {status}
+        </span>
+      )}
       <input
         type="checkbox"
         tabIndex={-1}
         aria-label={`Show ${language.name} on map`}
-        title={availability ?? `Show ${language.name} on map`}
+        title={availabilityLabel}
         checked={isVisible}
         disabled={!variants.length && !isVisible}
-        style={{ accentColor: activeVariant?.color }}
+        style={{ accentColor: mode === 'own' ? available.own?.color : available.color }}
         onChange={() => toggleVisible(language.id)}
       />
-      {availability && <span className="visually-hidden">{availability}</span>}
     </div>
   )
 }
@@ -273,19 +311,28 @@ export const LanguageFinder = () => {
   const [detailId, setDetailId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const pendingFocus = useRef<string | null>(null)
-  const hierarchy = useMemo(() => buildLanguageHierarchy(data.languages), [data])
+  const hierarchy = useAtomValue(languageHierarchyAtom)
+  const availability = useAtomValue(geographyAvailabilityAtom)
+  const [modes, setModes] = useAtom(areaModesAtom)
+  const mapAreas = useAtomValue(selectedMapAreasAtom)
   const isSearching = Boolean(query.trim())
   const isBrowsingRoots = !isSearching && scope === 'world'
+  const viewportSearchIds = useMemo(() => {
+    if (scope !== 'viewport') return null
+    const visible = new Set(viewportIds)
+    return new Set(
+      [...availability]
+        .filter(([id, available]) =>
+          areaVariants(available, areaMode(available, modes[id])).some((variant) =>
+            visible.has(variant.languageId),
+          ),
+        )
+        .map(([id]) => id),
+    )
+  }, [scope, viewportIds, availability, modes])
   const search = useMemo(
-    () =>
-      searchCatalog(
-        data,
-        query,
-        scope === 'viewport' ? new Set(viewportIds) : null,
-        temporalSelection,
-        datasetFilter,
-      ),
-    [data, query, scope, viewportIds, temporalSelection, datasetFilter],
+    () => searchCatalog(data, query, viewportSearchIds, temporalSelection, datasetFilter),
+    [data, query, viewportSearchIds, temporalSelection, datasetFilter],
   )
   const roots = isBrowsingRoots ? hierarchy.roots : search.languages
   const rows = useMemo(
@@ -293,10 +340,7 @@ export const LanguageFinder = () => {
     [hierarchy, roots, expandedKeys],
   )
   const showableIds = roots
-    .filter(
-      (language) =>
-        geographyVariantsForLanguage(data, language, temporalSelection, datasetFilter).length > 0,
-    )
+    .filter((language) => isAreaAvailable(availability.get(language.id), modes[language.id]))
     .map(({ id }) => id)
   const activeKey = rows.some((row) => row.key === focusedKey) ? focusedKey : rows[0]?.key
   const virtualizer = useVirtualizer({
@@ -329,13 +373,7 @@ export const LanguageFinder = () => {
   }, [rows, virtualRows, virtualizer])
 
   const visibleIdSet = new Set(visibleIds)
-  const shownCount = visibleIds.filter((languageId) => {
-    const language = data.languageById.get(languageId)
-    return (
-      language &&
-      geographyVariantsForLanguage(data, language, temporalSelection, datasetFilter).length > 0
-    )
-  }).length
+  const shownCount = mapAreas.length
   const areAllFilteredSelected =
     showableIds.length > 0 && showableIds.every((id) => visibleIdSet.has(id))
   const toggleFilteredLanguages = () => {
@@ -364,6 +402,7 @@ export const LanguageFinder = () => {
     row: HierarchyRow,
     index: number,
   ) => {
+    if (event.target !== event.currentTarget) return
     switch (event.key) {
       case 'ArrowDown':
         focusRow(Math.min(rows.length - 1, index + 1))
@@ -390,7 +429,7 @@ export const LanguageFinder = () => {
       case ' ':
         if (
           visibleIdSet.has(row.language.id) ||
-          geographyVariantsForLanguage(data, row.language, temporalSelection, datasetFilter).length
+          isAreaAvailable(availability.get(row.language.id), modes[row.language.id])
         )
           toggleVisible(row.language.id)
         break
@@ -420,9 +459,11 @@ export const LanguageFinder = () => {
     virtualizer.scrollToOffset(nextRows.findIndex((row) => row.key === key) * 44)
   }
   const detail = detailId ? data.languageById.get(detailId) : undefined
-  const detailVariants = detail
-    ? geographyVariantsForLanguage(data, detail, temporalSelection, datasetFilter)
-    : []
+  const detailAvailability = detail ? availability.get(detail.id) : undefined
+  const detailMode = detailAvailability
+    ? areaMode(detailAvailability, modes[detailId ?? ''])
+    : 'own'
+  const detailVariants = detailAvailability?.ownVariants ?? []
   const activeVariant =
     detailVariants.find((variant) => variant.id === overrides[detailId ?? '']) ?? detailVariants[0]
   const sourceSummary =
@@ -528,7 +569,7 @@ export const LanguageFinder = () => {
             type="button"
             onClick={toggleFilteredLanguages}
             disabled={!showableIds.length}
-            title="Select only these starting entries with available polygons; descendants are not selected"
+            title="Show these starting entries using their chosen representations. Descendant areas remain one selection."
           >
             {areAllFilteredSelected ? 'Deselect' : 'Select'} {isBrowsingRoots ? 'roots' : 'matches'}
           </button>
@@ -613,7 +654,74 @@ export const LanguageFinder = () => {
                 </button>
               ))}
             </nav>
-            {detailVariants.length > 1 ? (
+            {detailAvailability && (
+              <label className="finder-detail__mode">
+                <span>Map representation</span>
+                <select
+                  aria-label={`Map representation for ${detail.name}`}
+                  value={detailMode}
+                  onChange={(event) =>
+                    setModes({
+                      ...modes,
+                      [detail.id]: event.currentTarget.value === 'own' ? 'own' : 'descendants',
+                    })
+                  }
+                  disabled={!detailAvailability.own && !detailAvailability.descendants.length}
+                >
+                  <option value="own" disabled={!detailAvailability.own}>
+                    Own area{!detailAvailability.own ? ' (unavailable)' : ''}
+                  </option>
+                  <option value="descendants" disabled={!detailAvailability.descendants.length}>
+                    Descendant areas{!detailAvailability.descendants.length ? ' (unavailable)' : ''}
+                  </option>
+                </select>
+              </label>
+            )}
+            {detailMode === 'descendants' && detailAvailability ? (
+              <div className="finder-detail__aggregation">
+                <p>
+                  {detailAvailability.descendants.length.toLocaleString()} contributing entries ·{' '}
+                  {detailAvailability.uncoveredBranches.length.toLocaleString()} uncovered branches
+                  with these filters.
+                </p>
+                <p>Uses the first available area down each branch. Coverage may be incomplete.</p>
+                <details>
+                  <summary>Contributors and sources</summary>
+                  <ul>
+                    {detailAvailability.descendants.map((variant) => (
+                      <li key={variant.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const contributor = data.languageById.get(variant.languageId)
+                            if (contributor) revealInClassification(contributor)
+                          }}
+                        >
+                          {data.languageById.get(variant.languageId)?.name}
+                        </button>
+                        <small>
+                          {variant.label} · {temporalQualityLabel(variant.temporalCoverage.quality)}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+                {detailAvailability.uncoveredBranches.length > 0 && (
+                  <details>
+                    <summary>Uncovered branches</summary>
+                    <ul>
+                      {detailAvailability.uncoveredBranches.map((entry) => (
+                        <li key={entry.id}>
+                          <button type="button" onClick={() => revealInClassification(entry)}>
+                            {entry.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            ) : detailVariants.length > 1 ? (
               <select
                 className="language-row__variant"
                 aria-label={`Geographic source for ${detail.name}`}
@@ -649,7 +757,10 @@ export const LanguageFinder = () => {
             </button>
           </>
         ) : (
-          <p>Expand branches to browse. Use checkboxes to show individual areas on the map.</p>
+          <p>
+            Own area = supplied polygons. Descendant areas = combined available branches. No areas /
+            Filtered out = unavailable. Check a row to show its chosen representation.
+          </p>
         )}
       </section>
     </aside>

@@ -8,6 +8,7 @@ import {
 } from '../diagnostics'
 import { BUFFERS, coverageSourceId, fallbackLayerId, stripeLayerId } from '../layerIds'
 import { serviceDiagnostics } from '../serviceDiagnostics'
+import { parseOverlapSelection } from '../types.ts'
 import type { OverlapTestApi } from './api'
 
 /** Test controls and observers use public MapLibre APIs only. */
@@ -17,6 +18,12 @@ export const installOverlapTestApi = (
   recompute: () => void,
   selectionKey: () => string,
 ) => {
+  const selectedIds = () => {
+    const selection = parseOverlapSelection(selectionKey())
+    return selection.variantGroups
+      ? [...new Set(Object.values(selection.variantGroups).flat())]
+      : selection.variantIds
+  }
   const errors: string[] = []
   const frames: number[] = []
   let previousFrame = 0
@@ -128,7 +135,7 @@ export const installOverlapTestApi = (
         ? Number(map.getPaintProperty(stripeLayerId(buffer), 'fill-layer-opacity')) > 0
         : false,
     )
-    if (JSON.parse(selectionKey()).length > 1 && !original && !active) {
+    if (selectedIds().length > 1 && !original && !active) {
       if (styleReloading) styleReloadBlankFrames++
       else blankLayerFrames++
     }
@@ -221,7 +228,10 @@ export const installOverlapTestApi = (
       }),
     probeTileSeams: () => import('./tileSeamProbe').then(({ probeTileSeams }) => probeTileSeams()),
     unexpectedMemberships: () => {
-      const selected = new Set<string>(JSON.parse(selectionKey()))
+      const selected = new Set<string>([
+        ...selectedIds(),
+        ...parseOverlapSelection(selectionKey()).variantIds,
+      ])
       return [
         ...new Set(
           BUFFERS.flatMap((buffer) => {
@@ -245,7 +255,7 @@ export const installOverlapTestApi = (
       return {
         status: status?.getAttribute('data-overlap-status'),
         message: status?.textContent,
-        selectedCount: JSON.parse(selectionKey()).length,
+        selectedCount: selectedIds().length,
         camera: { center: map.getCenter().toArray(), zoom: map.getZoom() },
         moving: map.isMoving(),
         tilesLoaded: map.areTilesLoaded(),

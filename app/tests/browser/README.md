@@ -19,6 +19,11 @@ downloads nothing. Firefox/geckodriver setup is described in
 `test:catalog-browser` builds the production app and checks family, language,
 and dialect discovery, alternative-name searches for unmapped entries, selection
 and inspection of original family/dialect areas, and mixed-level overlap rendering.
+It also checks visible geography status, switching own/descendant representations,
+aggregation without individually selecting children, independently selecting a
+contributor, grouped hatching and blending, single-contributor aggregation, source/
+period availability recovery, viewport discovery, tree keyboard navigation, and
+narrow layouts.
 Its screenshots, report, and server logs are written to `test-results/catalog/`.
 
 Each invocation builds the production app, starts a local Vite preview and

@@ -37,19 +37,40 @@ panel shows clickable ancestry and geographic sources, and "Show in classificati
 reveals a result within its full tree. Arrow keys navigate/unfold branches, Home
 and End move through the list, and Space toggles the focused entry's map area.
 
-Entries without polygons remain searchable and expandable; only entries with
-areas in the selected sources and period can be selected for display. Expansion
-and map selection are independent: selecting a family never selects descendants.
+Each row shows its map representation: "Own area" for directly supplied polygons,
+"Descendant areas" for an aggregation, "Filtered out" for geography hidden by the
+current sources/period, or "No areas" when the entire branch has no polygons.
+Entries with both representations have an inline selector; the details panel also
+offers this choice. Own areas are the default when available. Otherwise, available
+descendant areas make an entry selectable. Selecting an entry remembers its chosen
+representation across filter changes; unavailable selections stay checked and can
+be removed or switched to the other representation.
+
+Aggregation starts with the entry's children and uses the first available polygon
+source down each branch. A mapped child's dialects are not added again. Source and
+period filters, and each contributor's geographic-source override, apply before
+choosing this frontier. The details panel lists contributors, source provenance,
+and uncovered branches; the aggregation represents available coverage, rather
+than an inferred complete extent. Geometry is unioned per selected entry in the
+map worker and displayed with one color and one checkbox. A contributor can still
+be selected separately. Both hatching and blending preserve the grouped coverage.
+Large aggregations use the existing geometry budgets and solid-area fallback.
+
+Expansion and map selection are independent; aggregating a family does not check
+its descendants individually. Entries without available areas remain searchable
+and expandable.
 Map source/period/viewport controls are under "Map filters". Viewport scope limits
-starting results; expanded branches still show their full classification children.
+starting results, including aggregates with contributing areas in view; expanded
+branches still show their full classification children.
 Each row and map inspection identifies the classification level.
 
 The pipeline imports the existing Glottography language, family, and dialect
 areas, then uses original `features.geojson` polygons for entries not covered by
 those prepared layers. Separate original polygons for one languoid are displayed
 together as one source variant, without dissolving their boundaries. Explicitly
-shared source polygons retain each referenced languoid. No new areas are
-aggregated through the classification tree. Geometry variants record their input
+shared source polygons retain each referenced languoid. The pipeline preserves
+source geometry; optional descendant aggregation happens in the browser rather
+than creating new dataset records. Geometry variants record their input
 file, source feature IDs, and whether they use original or dataset-prepared areas.
 Unassigned features are omitted; identifiers absent from the pinned Glottolog
 catalog are reported as build warnings. Existing file and vector-layer names

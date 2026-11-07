@@ -25,6 +25,8 @@ export interface OverlapRequest {
   readonly archiveUrl: string
   readonly sourceLayer: string
   readonly variantIds: readonly string[]
+  /** Map source polygons to selected representations before union/partition. */
+  readonly variantGroups?: Readonly<Record<string, readonly string[]>>
   readonly tiles: readonly TileCoordinate[]
   /** Tiles retained by the receiver for this same selection; send only additions. */
   readonly knownTiles?: readonly string[]
@@ -72,3 +74,13 @@ export type OverlapResponse =
     }
 
 export const patternId = (variantIds: readonly string[]) => `overlap:${variantIds.join('|')}`
+
+export interface OverlapSelection {
+  readonly variantIds: readonly string[]
+  readonly variantGroups?: Readonly<Record<string, readonly string[]>>
+}
+
+export const parseOverlapSelection = (key: string): OverlapSelection => {
+  const selection = JSON.parse(key)
+  return Array.isArray(selection) ? { variantIds: selection } : selection
+}

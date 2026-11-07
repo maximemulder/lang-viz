@@ -1,7 +1,8 @@
 import { useAtomValue } from 'jotai'
 import { Popup } from 'react-map-gl/maplibre'
+import { inspectedMapAreaIds } from '../../domain/aggregation'
 import { temporalQualityLabel } from '../../domain/temporal'
-import { atlasDataAtom } from '../../state/atlasState'
+import { atlasDataAtom, selectedMapAreasAtom } from '../../state/atlasState'
 
 export interface MapInspection {
   readonly longitude: number
@@ -17,13 +18,17 @@ interface LanguageInspectorProps {
 
 export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProps) => {
   const data = useAtomValue(atlasDataAtom)
+  const areas = useAtomValue(selectedMapAreasAtom)
   const datasetsById = new Map(data.datasets.map((dataset) => [dataset.id, dataset]))
-  const entries = inspection.variantIds.flatMap((variantId) => {
-    const variant = data.variantById.get(variantId)
-    const language = variant ? data.languageById.get(variant.languageId) : undefined
+  const entries = inspectedMapAreaIds(inspection.variantIds, areas).flatMap((variantId) => {
+    const area = areas.find(({ id }) => id === variantId)
+    const variant = data.variantById.get(variantId) ?? area?.variants[0]
+    const language = variant
+      ? data.languageById.get(area?.languageId ?? variant.languageId)
+      : undefined
     if (!variant || !language) return []
 
-    return [{ language, variant, dataset: datasetsById.get(variant.datasetId) }]
+    return [{ language, variant, area, dataset: datasetsById.get(variant.datasetId) }]
   })
 
   if (entries.length === 0) return null
@@ -49,11 +54,11 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
         </header>
 
         <div className="language-inspector__entries">
-          {entries.map(({ language, variant, dataset }) => (
-            <article className="language-inspector__entry" key={variant.id}>
+          {entries.map(({ language, variant, area, dataset }) => (
+            <article className="language-inspector__entry" key={area?.id ?? variant.id}>
               <span
                 className="language-inspector__swatch"
-                style={{ backgroundColor: variant.color }}
+                style={{ backgroundColor: area?.color ?? variant.color }}
                 aria-hidden="true"
               />
               <div>
@@ -66,15 +71,37 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                   {language.iso6393 ? `${language.iso6393} · ` : ''}
                   {language.id}
                 </small>
-                <small>
-                  {dataset?.shortName ?? variant.datasetId} · {variant.temporalCoverage.label} ·{' '}
-                  {temporalQualityLabel(variant.temporalCoverage.quality)}
-                </small>
-                <small>
-                  {variant.geometryKind === 'source'
-                    ? 'Original source areas'
-                    : 'Area supplied by the dataset'}
-                </small>
+                {area?.mode === 'descendants' ? (
+                  <>
+                    <small>Descendant areas · {area.variants.length} contributing entries</small>
+                    <small>
+                      {[
+                        ...new Set(
+                          area.variants.map(
+                            (item) => datasetsById.get(item.datasetId)?.shortName ?? item.datasetId,
+                          ),
+                        ),
+                      ].join(', ')}{' '}
+                      ·{' '}
+                      {[...new Set(area.variants.map((item) => item.temporalCoverage.label))].join(
+                        ', ',
+                      )}
+                    </small>
+                    <small>Combined available branches; coverage may be incomplete.</small>
+                  </>
+                ) : (
+                  <>
+                    <small>
+                      {dataset?.shortName ?? variant.datasetId} · {variant.temporalCoverage.label} ·{' '}
+                      {temporalQualityLabel(variant.temporalCoverage.quality)}
+                    </small>
+                    <small>
+                      {variant.geometryKind === 'source'
+                        ? 'Original source areas'
+                        : 'Area supplied by the dataset'}
+                    </small>
+                  </>
+                )}
               </div>
             </article>
           ))}

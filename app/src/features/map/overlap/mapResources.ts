@@ -5,6 +5,7 @@ import { type CoverageSnapshot, registerCoverage, releaseCoverage } from './deli
 import { preparePublicationTest } from './diagnostics.ts'
 import {
   BUFFERS,
+  blendLayerPrefix,
   coverageSourceId,
   fallbackLayerId,
   solidLayerId,
@@ -26,6 +27,7 @@ export const createMapResources = (
   archiveUrl: string,
   colors: ReadonlyMap<string, string>,
   onSourceFailed: (snapshotId: number) => void,
+  drawPatterns: () => boolean = () => true,
 ): CoverageResources & { prune(): void; dispose(): void } => {
   const ownedPatterns = new Map<string, readonly string[]>()
   const snapshots = new Map<
@@ -67,7 +69,12 @@ export const createMapResources = (
     const layers = map.getLayersOrder()
     const inspection = layers.indexOf('inspected-language-areas')
     for (const buffer of BUFFERS)
-      for (const id of [solidLayerId(buffer), stripeLayerId(buffer), fallbackLayerId(buffer)])
+      for (const id of [
+        solidLayerId(buffer),
+        stripeLayerId(buffer),
+        fallbackLayerId(buffer),
+        ...layers.filter((id) => id.startsWith(blendLayerPrefix(buffer))),
+      ])
         if (layers.indexOf(id) > inspection) map.moveLayer(id, 'inspected-language-areas')
   }
   const addPattern = (id: string, members: readonly string[]) => {
@@ -106,7 +113,7 @@ export const createMapResources = (
       const unique = new Map(
         [...tiles.values()]
           .flatMap((tile) => tile.patterns)
-          .filter((p) => p.variantIds.length > 1)
+          .filter((p) => drawPatterns() && p.variantIds.length > 1)
           .map((p) => [p.pattern, p]),
       )
       const pixels = [...unique.values()].reduce(

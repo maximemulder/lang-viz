@@ -366,6 +366,70 @@ test('tile delivery groups disconnected faces without losing holes or reusing st
   assert.equal(empty?.features.length, 0)
 })
 
+test('grouped source polygons union once and retain independently selected child membership', async () => {
+  const features: Feature[] = ['A', 'B'].map((id, index) => {
+    const geometry = box(index * 4, 0, 8 + index * 4, 8)[0]
+    assert.ok(geometry)
+    return { type: 3, tags: { variant_id: id }, geometry }
+  })
+  const layer = new GeoJSONWrapper(features, { extent: 16, version: 2 })
+  layer.name = 'areas'
+  const bytes = fromVectorTileJs({ layers: { areas: layer } })
+  const archive = { getZxy: async () => ({ data: Uint8Array.from(bytes).buffer }) }
+  const request = {
+    requestId: 1,
+    archiveUrl: 'grouped',
+    sourceLayer: 'areas',
+    variantIds: ['A', 'B'],
+    tiles: [{ z: 0, x: 0, y: 0 }],
+  }
+  const computer = new OverlapComputer()
+  const grouped = await Array.fromAsync(
+    computer.computeTiles(
+      archive,
+      { ...request, variantGroups: { A: ['family'], B: ['family'] } },
+      () => true,
+    ),
+  )
+  assert.deepEqual(
+    grouped[0]?.features.map(({ properties }) => properties.variantIds),
+    [['family']],
+  )
+  assert.equal(
+    area(grouped[0]?.features[0]?.geometry.coordinates ?? []),
+    96,
+    'Union contains no duplicated overlap',
+  )
+  const child = await Array.fromAsync(
+    computer.computeTiles(
+      archive,
+      { ...request, variantGroups: { A: ['family', 'child'], B: ['family'] } },
+      () => true,
+    ),
+  )
+  const regions = new Map(
+    child[0]?.features.map(({ properties, geometry }) => [
+      properties.variantIds.join(','),
+      area(geometry.coordinates),
+    ]),
+  )
+  assert.deepEqual(Object.fromEntries(regions), { 'child,family': 64, family: 32 })
+  const ungrouped = await Array.fromAsync(computer.computeTiles(archive, request, () => true))
+  assert.equal(ungrouped[0]?.features.length, 3, 'Membership changes invalidate cached partitions')
+  const again = await Array.fromAsync(
+    computer.computeTiles(
+      archive,
+      { ...request, variantGroups: { A: ['family'], B: ['family'] } },
+      () => true,
+    ),
+  )
+  assert.equal(
+    again[0]?.features,
+    grouped[0]?.features,
+    'Original grouped partition remains reusable',
+  )
+})
+
 test('direct MVT delivery preserves membership, winding, holes, and retained parent coverage', () => {
   const shell = box(0, 0, 12, 12)[0]?.[0]
   const hole = box(4, 4, 8, 8)[0]?.[0]

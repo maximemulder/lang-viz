@@ -119,6 +119,25 @@ const fixture = () => {
   }
 }
 
+test('grouped coverage is computed even with one source polygon and carries its ownership', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture()
+  context.after(() => f.controller.dispose())
+  const key = JSON.stringify({ variantIds: ['A'], variantGroups: { A: ['descendants:family'] } })
+  f.controller.configure(key, true)
+  f.controller.refresh([coordinate(0)])
+  assert.deepEqual(f.sent[0]?.variantIds, ['A'])
+  assert.deepEqual(f.sent[0]?.variantGroups, { A: ['descendants:family'] })
+  f.receive({
+    ...tile(0),
+    patterns: [{ pattern: 'overlap:descendants:family', variantIds: ['descendants:family'] }],
+  })
+  f.finish()
+  f.publish()
+  assert.equal(f.coverage, key)
+  assert.equal(f.state.status, 'ready')
+})
+
 test('publication waits for the composite source, retains the old snapshot, and coalesces arrivals', (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] })
   const f = fixture()

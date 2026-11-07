@@ -216,7 +216,7 @@ def main():
             # Unmapped entries must remain discoverable, including by original-script aliases.
             results["unmappedLanguage"] = search(browser, "jiny1235", "jiny1235")
             assert results["unmappedLanguage"]["disabled"]
-            assert "No polygon available" in results["unmappedLanguage"]["text"]
+            assert "No areas" in results["unmappedLanguage"]["text"]
             results["unmappedDialectAlias"] = search(browser, "上海", "shan1293")
             assert results["unmappedDialectAlias"]["disabled"]
             assert "dialect" in results["unmappedDialectAlias"]["text"]
@@ -311,6 +311,177 @@ def main():
             }
             results["mixedLevels"] = inspection
             browser.screenshot(output / "mixed-levels.png")
+
+            # Own and descendant representations remain distinct, with grouped rendering.
+            # An interior point of the source polygon; the Glottolog point is outside it.
+            center = [40.8144288679004, 43.27592703258703]
+            browser.js(
+                "window.overlapTest.configure(arguments[0])",
+                {"languageIds": [], "center": center, "zoom": 5},
+            )
+            search(browser, "abkh1242", "abkh1242")
+            browser.js("document.querySelector('.language-row').click()")
+
+            def choose_mode(mode):
+                browser.js(
+                    """
+                    const select = document.querySelector('.language-row__area-mode');
+                    select.value = arguments[0];
+                    select.dispatchEvent(new Event('change', {bubbles:true}));
+                """,
+                    mode,
+                )
+
+            def ready_after(before, count):
+                return wait_for(
+                    lambda: (
+                        state
+                        if len((state := browser.snapshot())["reports"]) > before
+                        and state["reports"][-1]["outcome"] == "ready"
+                        and state["selectedCount"] == count
+                        and state["tilesLoaded"]
+                        and not state["moving"]
+                        else None
+                    ),
+                    45,
+                    "grouped map coverage",
+                )
+
+            def inspect_at_center():
+                return browser.js("return window.overlapTest.inspect(arguments[0])", center)
+
+            choose_mode("descendants")
+            before = len(browser.snapshot()["reports"])
+            browser.js("document.querySelector('.language-row input').click()")
+            grouped = ready_after(before, 1)
+            assert not grouped["errors"], grouped["errors"]
+            assert grouped["reports"][-1]["sharedPatterns"] == 0
+            assert inspect_at_center()["variantIds"] == ["descendants:abkh1242"], (
+                inspect_at_center()
+            )
+            x, y = inspect_at_center()["point"]
+            browser.call(
+                "POST",
+                "/actions",
+                {
+                    "actions": [
+                        {
+                            "type": "pointer",
+                            "id": "aggregate-mouse",
+                            "parameters": {"pointerType": "mouse"},
+                            "actions": [
+                                {"type": "pointerMove", "origin": "viewport", "x": x, "y": y},
+                                {"type": "pointerDown", "button": 0},
+                                {"type": "pointerUp", "button": 0},
+                            ],
+                        }
+                    ]
+                },
+            )
+            browser.call("DELETE", "/actions")
+            popup = wait_for(
+                lambda: browser.js(
+                    "return document.querySelector('.language-inspector')?.textContent"
+                ),
+                10,
+                "aggregate inspection popup",
+            )
+            assert "Abkhaz-Adyge" in popup and "abkh1242" in popup
+            assert "Descendant areas" in popup and "3 contributing entries" in popup
+            assert "3 contributing entries" in browser.js(
+                "return document.querySelector('.finder-detail').textContent"
+            )
+            browser.js("document.querySelector('.language-row__disclosure').click()")
+            assert browser.js(
+                "return [...document.querySelectorAll('.language-row[aria-level=\"2\"] input')].every(input => !input.checked)"
+            )
+            browser.screenshot(output / "aggregated-family.png")
+
+            # The same geometry can contribute to the family and an independent child selection.
+            search(browser, "abkh1244", "abkh1244")
+            before = len(browser.snapshot()["reports"])
+            browser.js("document.querySelector('.language-row input').click()")
+            grouped_child = ready_after(before, 2)
+            assert not browser.js(
+                "return !!document.querySelector('.language-inspector--pinned')"
+            ), "Selection changes close stale inspection"
+            expected = {"descendants:abkh1242", "asher2007world:contemporary:abkh1244"}
+            assert set(inspect_at_center()["variantIds"]) == expected, inspect_at_center()
+            assert grouped_child["reports"][-1]["sharedPatterns"] > 0
+            results["aggregationWithChild"] = inspect_at_center()
+
+            # Blending uses the same unioned coverage, so contributor overlap isn't applied twice.
+            before = len(browser.snapshot()["reports"])
+            browser.js("document.querySelector('input[aria-label=\"Color blending\"]').click()")
+            blended = ready_after(before, 2)
+            assert not blended["errors"], blended["errors"]
+            assert set(inspect_at_center()["variantIds"]) == expected, inspect_at_center()
+            browser.screenshot(output / "aggregated-blending.png")
+            before = len(browser.snapshot()["reports"])
+            browser.js(
+                "document.querySelector('input[aria-label=\"Alternating stripes\"]').click()"
+            )
+            ready_after(before, 2)
+
+            search(browser, "abkh1242", "abkh1242")
+            choose_mode("own")
+            wait_for(
+                lambda: "asher2007world:contemporary:abkh1242" in inspect_at_center()["variantIds"],
+                20,
+                "own representation",
+            )
+            browser.js(
+                "[...document.querySelectorAll('.finder-actions button')].find(button => button.textContent === 'Clear map').click()"
+            )
+
+            # An entry with no own polygons can be selected through a single mapped descendant.
+            row = search(browser, "abkh1243", "abkh1243")
+            assert not row["disabled"] and "Descendant areas" in row["text"]
+            before = len(browser.snapshot()["reports"])
+            browser.js("document.querySelector('.language-row input').click()")
+            ready_after(before, 1)
+            assert inspect_at_center()["variantIds"] == ["descendants:abkh1243"], (
+                inspect_at_center()
+            )
+            results["previouslyUnmappedAggregate"] = row
+
+            # Filters hide the selected representation without unchecking it; restoration recovers it.
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'year-1750'; select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            wait_for(lambda: browser.snapshot()["selectedCount"] == 0, 10, "filtered aggregation")
+            assert browser.js("return document.querySelector('.language-row input').checked")
+            assert (
+                browser.js("return document.querySelector('.language-row').dataset.areaStatus")
+                == "Filtered out"
+            )
+            assert "0 of 1 shown" in browser.js(
+                "return document.querySelector('.selection-count').textContent"
+            )
+            before = len(browser.snapshot()["reports"])
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'contemporary'; select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            ready_after(before, 1)
+            browser.js("""
+                const select = document.querySelector('.finder-filters select:not(.finder-filters__period select)');
+                select.value = 'viewport'; select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            wait_for(
+                lambda: browser.js(
+                    "return !!document.querySelector('.language-row[data-language-id=\"abkh1243\"]')"
+                ),
+                15,
+                "aggregate in viewport search",
+            )
+            browser.js("""
+                const select = document.querySelector('.finder-filters select:not(.finder-filters__period select)');
+                select.value = 'world'; select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            browser.screenshot(output / "aggregate-only.png")
+            results["aggregationFiltersAndViewport"] = "passed"
 
             # The tree keeps useful space on narrow screens, including with entry details open.
             browser.call("POST", "/window/rect", {"width": 390, "height": 844})

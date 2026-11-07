@@ -74,6 +74,7 @@ const indexFeatures = (layer: VectorTileLayer | undefined) => {
 const inputsFromFeatures = (
   features: readonly VectorTileFeature[],
   metrics?: OverlapMetrics,
+  groups?: OverlapRequest['variantGroups'],
 ): CoverageInput[] => {
   const inputs: CoverageInput[] = []
   let vertexCount = 0
@@ -91,7 +92,7 @@ const inputsFromFeatures = (
         }),
       ),
     )
-    inputs.push({ id, geometry })
+    for (const member of groups?.[id] ?? [id]) inputs.push({ id: member, geometry })
   }
   return inputs
 }
@@ -225,7 +226,7 @@ export class OverlapComputer {
         yield { tile, extent: layer.extent, features: [], vertices: 0 }
         continue
       }
-      const resultKey = `${key}:${localIds.join('|')}`
+      const resultKey = `${key}:${JSON.stringify(localIds.map((id) => [id, request.variantGroups?.[id] ?? [id]]))}`
       let result = this.results.get(resultKey)
       if (result) {
         if (metrics) metrics.partitionCacheHits++
@@ -240,7 +241,7 @@ export class OverlapComputer {
         const decodeStart = performance.now()
         let inputs: CoverageInput[]
         try {
-          inputs = inputsFromFeatures(features, metrics)
+          inputs = inputsFromFeatures(features, metrics, request.variantGroups)
         } finally {
           if (metrics) metrics.decodeMs += performance.now() - decodeStart
         }

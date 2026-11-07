@@ -7,14 +7,19 @@ import { memo, Suspense, useEffect, useRef, useState } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
-import { geographyVariantsForLanguage } from '../../domain/geography'
+import {
+  inspectedSourceVariantIds,
+  mapAreaMemberships,
+  mapAreaSelectionKey,
+  mapAreaSourceColors,
+} from '../../domain/aggregation'
 import { temporalView } from '../../domain/temporal'
 import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
-  geometryOverridesAtom,
   languageOpacityAtom,
   overlapModeAtom,
+  selectedMapAreasAtom,
   temporalViewAtom,
   viewportLanguageIdsAtom,
   visibleLanguageIdsAtom,
@@ -79,29 +84,20 @@ interface LanguageLayersProps {
 
 const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
   const data = useAtomValue(atlasDataAtom)
-  const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
-  const overrides = useAtomValue(geometryOverridesAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const overlapMode = useAtomValue(overlapModeAtom)
   const opacity = useAtomValue(languageOpacityAtom)
   const [coverageKey, setCoverageKey] = useState<string | null>(null)
-  const activeVariants = visibleLanguageIds.flatMap((languageId) => {
-    const language = data.languageById.get(languageId)
-    if (!language || language.geometryVariantIds.length === 0) return []
-    const variants = geographyVariantsForLanguage(
-      data,
-      language,
-      temporalSelection,
-      datasetSelection,
-    )
-    const override = overrides[languageId]
-    const variant = variants.find(({ id }) => id === override) ?? variants[0]
-    return variant ? [variant] : []
-  })
-  const variantIds = activeVariants.map(({ id }) => id)
-  const selectionKey = JSON.stringify([...variantIds].sort())
-  const coverageReady = overlapMode === 'hatching' && coverageKey === selectionKey
+  const areas = useAtomValue(selectedMapAreasAtom)
+  const memberships = mapAreaMemberships(areas)
+  const variantIds = Object.keys(memberships).sort()
+  const sourceColors = mapAreaSourceColors(areas)
+  const selectionKey = mapAreaSelectionKey(areas, overlapMode)
+  const inspectedIds = inspectedSourceVariantIds(inspectedVariantIds, areas)
+  const hasAggregation = areas.some(({ mode }) => mode === 'descendants')
+  const coverageReady =
+    (overlapMode === 'hatching' || hasAggregation) && coverageKey === selectionKey
   const filter: FilterSpecification = ['in', ['get', 'variant_id'], ['literal', variantIds]]
   const temporalFilter: FilterSpecification =
     temporalSelection === 'all'
@@ -136,11 +132,15 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
           type="fill"
           filter={filter}
           paint={{
-            'fill-color': ['get', 'color'],
+            'fill-color': ['get', ['get', 'variant_id'], ['literal', sourceColors]],
             // Once ready, coverage and its spatially clipped vector fallback
             // replace these fills. Neither draws beneath the other's interiors.
-            'fill-opacity': overlapMode === 'blending' ? opacity : coverageReady ? 0 : 1,
-            'fill-layer-opacity': overlapMode === 'hatching' ? opacity : 1,
+            'fill-opacity': coverageReady
+              ? 0
+              : overlapMode === 'blending' && !hasAggregation
+                ? opacity
+                : 1,
+            'fill-layer-opacity': overlapMode === 'hatching' || hasAggregation ? opacity : 1,
             'fill-opacity-transition': { duration: 0 },
             'fill-layer-opacity-transition': { duration: 0 },
           }}
@@ -150,7 +150,7 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
           source={LANGUAGE_SOURCE_ID}
           source-layer={data.manifest.vectorLayer}
           type="line"
-          filter={['in', ['get', 'variant_id'], ['literal', inspectedVariantIds]]}
+          filter={['in', ['get', 'variant_id'], ['literal', inspectedIds]]}
           paint={{
             'line-color': '#fffdf7',
             'line-opacity': 0.95,
@@ -159,7 +159,9 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
         />
       </Source>
       <OverlapHatching
-        variants={activeVariants}
+        variants={areas}
+        sourceVariantIds={variantIds}
+        sourceColors={sourceColors}
         selectionKey={selectionKey}
         coverageReady={coverageReady}
         onCoverageReady={setCoverageKey}
@@ -169,17 +171,9 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
 })
 
 const MapHint = () => {
-  const data = useAtomValue(atlasDataAtom)
   const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
-  const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
-  const visibleInPeriodCount = visibleLanguageIds.filter((languageId) => {
-    const language = data.languageById.get(languageId)
-    return (
-      language &&
-      geographyVariantsForLanguage(data, language, temporalSelection, datasetSelection).length > 0
-    )
-  }).length
+  const visibleInPeriodCount = useAtomValue(selectedMapAreasAtom).length
 
   return (
     <div className={`map-hint${visibleInPeriodCount ? ' map-hint--active' : ''}`} role="status">
@@ -197,8 +191,13 @@ export const WorldMap = () => {
   const [inspection, setInspection] = useState<MapInspection | null>(null)
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
+  const inspectionSelectionKey = mapAreaSelectionKey(useAtomValue(selectedMapAreasAtom))
   const inspectionRef = useRef<MapInspection | null>(null)
-  const inspectionFilterRef = useRef({ datasetSelection, temporalSelection })
+  const inspectionFilterRef = useRef({
+    datasetSelection,
+    temporalSelection,
+    inspectionSelectionKey,
+  })
   const pendingHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
   const hoverQueryTimerRef = useRef<number | null>(null)
   const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
@@ -212,9 +211,10 @@ export const WorldMap = () => {
     const previousFilters = inspectionFilterRef.current
     if (
       previousFilters.datasetSelection !== datasetSelection ||
-      previousFilters.temporalSelection !== temporalSelection
+      previousFilters.temporalSelection !== temporalSelection ||
+      previousFilters.inspectionSelectionKey !== inspectionSelectionKey
     ) {
-      inspectionFilterRef.current = { datasetSelection, temporalSelection }
+      inspectionFilterRef.current = { datasetSelection, temporalSelection, inspectionSelectionKey }
       updateInspection(null)
     }
   })

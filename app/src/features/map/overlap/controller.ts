@@ -4,6 +4,7 @@ import type { overlapDiagnostics } from './diagnostics.ts'
 import { OverlapPatternError } from './patterns.ts'
 import { coverageTilesKey, retainCoverageTiles } from './tiles.ts'
 import type { OverlapResponse, TileCoordinate } from './types.ts'
+import { parseOverlapSelection } from './types.ts'
 import { type OverlapWorkerClient, PUBLICATION_TIMEOUT_MS } from './workerClient.ts'
 
 export interface HatchingState {
@@ -224,8 +225,12 @@ export const createOverlapController = (options: {
     },
     refresh(viewport: readonly TileCoordinate[]) {
       if (disposed) return
-      const variantIds: string[] = enabled ? JSON.parse(selectionKey) : []
-      const tiles = retainCoverageTiles(variantIds.length > 1 ? viewport : [], retained)
+      const selection = enabled ? parseOverlapSelection(selectionKey) : { variantIds: [] }
+      const { variantIds } = selection
+      const tiles = retainCoverageTiles(
+        variantIds.length > 1 || selection.variantGroups ? viewport : [],
+        retained,
+      )
       const key = JSON.stringify([variantIds, coverageTilesKey(tiles)])
       retained = tiles
       if (key === previousKey) return
@@ -271,6 +276,7 @@ export const createOverlapController = (options: {
         archiveUrl: options.archiveUrl,
         sourceLayer: options.sourceLayer,
         variantIds,
+        ...(selection.variantGroups ? { variantGroups: selection.variantGroups } : {}),
         tiles,
         knownTiles: [...results.keys()],
         ...(diagnostics ? { profile: true } : {}),
