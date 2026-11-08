@@ -512,6 +512,29 @@ h2 {
   color: #6d726d;
   background: #eeefeb;
 }
+
+.language-row--unavailable {
+  color: #6d726d;
+  background: #f0f0eb;
+}
+
+.language-row--unavailable
+  :where(.language-row__context, .language-row__children, .language-row__level) {
+  color: inherit;
+}
+
+.language-row--unavailable :where(.language-row__level) {
+  background: #e5e6e0;
+}
+
+.language-row--unavailable input {
+  filter: grayscale(1);
+}
+
+.language-row--unavailable:hover,
+.language-row--unavailable.language-row--active {
+  background: #e7e8e2;
+}
 .finder-detail__mode {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

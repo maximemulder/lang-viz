@@ -75,7 +75,7 @@ const LanguageRow = ({
   const mode = areaMode(available, modes[language.id])
   const variants = areaVariants(available, mode)
   const isVisible = visibleIds.includes(language.id)
-  const status = areaStatus(available, mode)
+  const status = variants.length ? areaStatus(available, mode) : 'No area'
   const availabilityLabel = variants.length
     ? `${status}${mode === 'descendants' ? `, ${variants.length} contributors, ${available.uncoveredBranches.length} uncovered branches` : ''}`
     : available.hasAnyAreas
@@ -96,7 +96,7 @@ const LanguageRow = ({
       tabIndex={active ? 0 : -1}
       data-tree-key={row.key}
       data-language-id={language.id}
-      className={`language-row${active ? ' language-row--active' : ''}`}
+      className={`language-row${active ? ' language-row--active' : ''}${variants.length ? '' : ' language-row--unavailable'}`}
       style={{ paddingLeft: `${4 + row.depth * 14}px`, minWidth: `${280 + row.depth * 14}px` }}
       onFocus={onFocus}
       onClick={(event) => {
@@ -201,7 +201,15 @@ export const ExploreLanguages = () => {
     () => searchCatalog(data, query, viewportSearchIds, temporalSelection, datasetFilter),
     [data, query, viewportSearchIds, temporalSelection, datasetFilter],
   )
-  const roots = isBrowsingRoots ? hierarchy.roots : search.languages
+  const roots = useMemo(
+    () =>
+      (isBrowsingRoots ? hierarchy.roots : search.languages).toSorted(
+        (a, b) =>
+          Number(isAreaAvailable(availability.get(b.id), modes[b.id])) -
+          Number(isAreaAvailable(availability.get(a.id), modes[a.id])),
+      ),
+    [isBrowsingRoots, hierarchy.roots, search.languages, availability, modes],
+  )
   const filteredMappedLeaves = useMemo(
     () =>
       mappedLeavesForLanguages(

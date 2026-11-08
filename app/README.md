@@ -39,7 +39,11 @@ The sidebar shows one view at a time:
 - **Explore** searches the catalog and browses its classification. Check an entry
   to display it, or use the bulk mapped-leaves action. Click its name (or press
   Enter on a tree row) to inspect it. Arrow keys browse the tree; Space toggles
-  its map selection.
+  its map selection. Entries with usable areas come first, including with an empty
+  search. Each group retains relevance order for searches and alphabetical order
+  for classification roots. Entries without areas are muted and labeled
+  No area; tooltips explain source/period or representation constraints. Expanded
+  branches retain their classification order.
 - **On map** lists the selected entries independently of the Explore query and
   map position. Its search only filters this list. Entries without areas under
   the current geography settings remain listed and can be inspected or removed.

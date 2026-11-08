@@ -102,6 +102,34 @@ def main():
                 """)
             assert "429 roots" in results["initialBrowse"]["count"]
             assert all(row["level"] == "1" for row in results["initialBrowse"]["rows"])
+            # Check every virtualized root, including the boundary between availability groups.
+            roots_by_position = {}
+            height, step = browser.js("""
+                const list = document.querySelector('.language-list');
+                return [list.scrollHeight, Math.max(44, Math.floor(list.clientHeight / 44) * 44)];
+            """)
+            for offset in range(0, height + step, step):
+                root_rows = browser.call("POST", "/execute/async", {
+                    "script": """
+                        const done = arguments[arguments.length - 1];
+                        document.querySelector('.language-list').scrollTop = arguments[0];
+                        requestAnimationFrame(() => requestAnimationFrame(() => done(
+                            [...document.querySelectorAll('.language-row')].map(row => ({
+                                position: Number(row.getAttribute('aria-posinset')),
+                                unavailable: row.classList.contains('language-row--unavailable')
+                            }))
+                        )));
+                    """,
+                    "args": [offset],
+                })
+                roots_by_position.update((row["position"], row["unavailable"]) for row in root_rows)
+            availability_order = [roots_by_position[position] for position in sorted(roots_by_position)]
+            assert len(availability_order) == 429, "Every classification root must remain discoverable"
+            assert any(availability_order) and not all(availability_order)
+            assert availability_order == sorted(availability_order), "Empty search must put roots with areas first"
+            results["emptySearchAreaGroups"] = {"withAreas": availability_order.count(False), "withoutAreas": availability_order.count(True)}
+            browser.js("document.querySelector('.language-list').scrollTop = 0")
+            wait_for(lambda: browser.js("return !!document.querySelector('.language-row[aria-posinset=\"1\"]')"), 10, "first grouped root")
             browser.screenshot(output / "browse.png")
 
             # Expanding a family is independent of drawing it, and shows immediate groups.
@@ -228,10 +256,33 @@ def main():
             )
             results["rankedSearch"] = "passed"
 
+            # Area availability groups search matches, including descendant representations.
+            search(browser, "abkh", "abkh1244")
+            grouped_results = browser.js("""
+                return [...document.querySelectorAll('.language-row[aria-level="1"]')].map(row => ({
+                    id: row.dataset.languageId,
+                    unavailable: row.classList.contains('language-row--unavailable'),
+                    status: row.querySelector('.language-row__area-status').textContent,
+                    reason: row.querySelector('.language-row__area-status').title,
+                    color: getComputedStyle(row).color
+                }));
+            """)
+            assert any(row["unavailable"] for row in grouped_results), grouped_results
+            assert any(not row["unavailable"] for row in grouped_results), grouped_results
+            assert [row["unavailable"] for row in grouped_results] == sorted(row["unavailable"] for row in grouped_results)
+            aggregate = next(row for row in grouped_results if row["id"] == 'abkh1243')
+            assert not aggregate["unavailable"] and aggregate["status"] == 'Descendant areas'
+            for row in grouped_results:
+                if row["unavailable"]:
+                    assert row["status"] == 'No area' and row["reason"]
+                    assert row["color"] != aggregate["color"], "The whole unavailable row is muted"
+            browser.screenshot(output / "search-area-groups.png")
+            results["searchAreaGroups"] = grouped_results
+
             # Unmapped entries must remain discoverable, including by original-script aliases.
             results["unmappedLanguage"] = search(browser, "ache1244", "ache1244")
             assert results["unmappedLanguage"]["disabled"]
-            assert "No areas" in results["unmappedLanguage"]["text"]
+            assert "No area" in results["unmappedLanguage"]["text"]
             results["unmappedDialectAlias"] = search(browser, "上海", "shan1293")
             assert results["unmappedDialectAlias"]["disabled"]
             assert "dialect" in results["unmappedDialectAlias"]["text"]
@@ -577,8 +628,13 @@ def main():
             assert browser.js("return document.querySelector('.language-row input').checked")
             assert (
                 browser.js("return document.querySelector('.language-row').dataset.areaStatus")
-                == "Filtered out"
+                == "No area"
             )
+            assert browser.js("""
+                const row = document.querySelector('.language-row');
+                return row.classList.contains('language-row--unavailable') &&
+                    row.querySelector('.language-row__area-status').title.includes('sources / period');
+            """), "Period-constrained results explain why they have no area"
             assert "0 of 1 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
