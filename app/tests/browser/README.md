@@ -9,6 +9,8 @@ npm run test:browser -- --runs 3 --output test-results/baseline
 npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
 npm run test:source-browser
+npm run test:delivery-browser
+npm run test:prepared-browser
 npm run test:coverage-browser
 npm run test:branch-browser
 npm run test:parts-browser
@@ -19,6 +21,20 @@ dependencies, and generated atlas data under `public/data/`. The runner uses
 Python's standard library and geckodriver's W3C WebDriver API. It installs and
 downloads nothing. Firefox/geckodriver setup is described in
 [Mozilla's documentation](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html).
+
+`test:delivery-browser` checks the production app's lightweight startup geometry
+index, DLAC-only source routing, zoom-5 prepared coverage with zero live Boolean
+time, pan/return navigation, and lazy source-record retrieval. Both the original
+source and overlap delivery URLs must reference only the required dataset/period.
+Reports and screenshots go to `test-results/delivery/`.
+
+`test:prepared-browser` requires prepared parts through all source zooms (run
+`npm run precompute:parts` with its defaults). It checks both Asher periods from
+the world view into dense African and Asian regions at zooms 4–5, European detail
+through zoom 8, pan/return and subset selection in globe and Mercator. Each view
+must finish at the requested detail with zero live input/partition work and no
+unexpected memberships. The other five dataset/period profiles are checked at
+zooms 4, 6 and 8. Reports and screenshots go to `test-results/prepared/`.
 
 `test:source-browser` checks DLAC's Tibeto-Burman, Shaozhou Tuhua, and Danzhou
 entries against the real catalog and tiles: source-label and namespaced-ID search,

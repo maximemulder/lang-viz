@@ -20,6 +20,7 @@ import {
   openLanguageDetailsAtom,
   revealLanguageAtom,
 } from '../../state/languageControls'
+import { GeometrySourceRecords } from './GeometrySourceRecords'
 import { PinnedMapEntries } from './PinnedMapEntries'
 
 export const LanguageDetails = () => {
@@ -214,6 +215,13 @@ export const LanguageDetails = () => {
               ? 'No polygon for selected sources / period'
               : 'No polygon available'}
         </p>
+      )}
+      {detailMode === 'own' && activeVariant && (
+        <GeometrySourceRecords
+          key={activeVariant.id}
+          manifest={data.manifest}
+          variant={activeVariant}
+        />
       )}
       <button type="button" className="finder-detail__reveal" onClick={() => reveal(detail.id)}>
         Show in classification

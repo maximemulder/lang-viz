@@ -1,4 +1,5 @@
-import { PMTiles } from 'pmtiles'
+import type { PMTiles } from 'pmtiles'
+import { openGeometryArchive } from '../../../data/geometryArchives.ts'
 import { OverlapComputer } from './compute.ts'
 import { type DeliveryTile, encodeCoverageTile, tileKey } from './delivery.ts'
 import { OverlapBudgetError, OverlapInitializationError } from './geometry.ts'
@@ -7,8 +8,8 @@ import type { WorkerInput, WorkerOutput } from './workerClient.ts'
 
 let latestRequestId = 0
 let archiveUrl = ''
-let archive: PMTiles
-let computer = new OverlapComputer()
+let archive: Pick<PMTiles, 'getZxy'>
+const computer = new OverlapComputer()
 const encoded = new WeakMap<object, DeliveryTile>()
 let controller: AbortController | undefined
 
@@ -45,8 +46,7 @@ self.onmessage = async ({ data: request }: MessageEvent<WorkerInput>) => {
   try {
     if (archiveUrl !== request.archiveUrl) {
       archiveUrl = request.archiveUrl
-      archive = new PMTiles(archiveUrl)
-      computer = new OverlapComputer()
+      archive = openGeometryArchive(archiveUrl)
     }
     const known = new Set(request.knownTiles)
     const missing = request.tiles.filter((tile) => !known.has(tileKey(tile)))

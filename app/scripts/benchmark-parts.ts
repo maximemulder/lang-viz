@@ -2,7 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { FileSource, PMTiles } from 'pmtiles'
 import { buildGeographyAvailability, mapAreaSelectionKey } from '../src/domain/aggregation.ts'
-import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
+import type { AtlasData, GeometryVariant, Language, TemporalViewId } from '../src/domain/atlas.ts'
 import { buildBranchMapEntries } from '../src/domain/branches.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
 import { pinMapEntry, resolveMapEntries } from '../src/domain/mapEntries.ts'
@@ -10,6 +10,7 @@ import { OverlapComputer } from '../src/features/map/overlap/compute.ts'
 import { createPartsResolver } from '../src/features/map/overlap/coverageParts.ts'
 import { encodeCoverageTile } from '../src/features/map/overlap/delivery.ts'
 import { OverlapBudgetError } from '../src/features/map/overlap/geometry.ts'
+import { tilesForBounds } from '../src/features/map/overlap/tiles.ts'
 import {
   type OverlapMetrics,
   type OverlapRequest,
@@ -64,8 +65,13 @@ const metrics = (): OverlapMetrics => ({
   completedTiles: 0,
 })
 const allRoots = hierarchy.roots.map((x) => x.id)
-const branch = (dataset: string, roots = allRoots, remove?: string): OverlapSelection => {
-  const context = { sources: [dataset], period: 'contemporary' as const }
+const branch = (
+  dataset: string,
+  roots = allRoots,
+  remove?: string,
+  period: TemporalViewId = 'contemporary',
+): OverlapSelection => {
+  const context = { sources: [dataset], period }
   const availability = buildGeographyAvailability(
     data,
     hierarchy,
@@ -99,6 +105,23 @@ const aggregate = (dataset: string, id: string): OverlapSelection => {
 }
 const world = [0, 1].flatMap((x) => [0, 1].map((y) => ({ z: 1, x, y })))
 const cases = [
+  ...[4, 5, 6, 7, 8].flatMap((zoom) => [
+    {
+      name: `Asher-Africa-zoom${zoom}`,
+      selection: branch('asher2007world'),
+      tiles: tilesForBounds({ west: 10, south: 10, east: 10.001, north: 10.001 }, zoom),
+    },
+    {
+      name: `Asher-Asia-zoom${zoom}`,
+      selection: branch('asher2007world'),
+      tiles: tilesForBounds({ west: 100, south: 30, east: 100.001, north: 30.001 }, zoom),
+    },
+  ]),
+  {
+    name: 'Asher-contact-Africa-zoom4',
+    selection: branch('asher2007world', allRoots, undefined, 'time-of-contact'),
+    tiles: [{ z: 4, x: 8, y: 7 }],
+  },
   { name: 'Asher-Europe-full', selection: branch('asher2007world'), tiles: [{ z: 3, x: 4, y: 2 }] },
   {
     name: 'Asher-Halh-branch',

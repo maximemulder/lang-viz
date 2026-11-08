@@ -75,6 +75,31 @@ Tools: `pycldf` (reading CLDF; `cldf createdb` for SQLite if useful), `pyglottog
 
 ### 3.3 Exports for the browser
 
+The current geographic atlas uses:
+
+- `manifest.json`: catalog counts, source archive profiles, prepared coverage profiles and per-profile zoom limits.
+- `languages.json`: search, classification, coordinates and geometry availability for the full catalog.
+- `geometry-index.json`: geometry variant metadata needed for browsing and selection.
+- `geography-datasets.json`: dataset citations and licenses.
+- `geometry/v1-<hash>/<dataset>/<period>.pmtiles`: original source geometry, fetched by HTTP range for viewport tiles. Filters and pinned entries determine which profiles load. Tile-join filters the combined offline archive without re-tiling geometry.
+- `coverage-parts/v2-<hash>/<dataset>/<period>/…`: selection-independent prepared MVT parts and a content-addressed availability index. Indexes and tiles load on demand. Complete indexed levels distinguish known-empty tiles from unprepared detail; no empty tile files are required.
+- `provenance/<dataset>/<period>.json`: original source filenames and feature IDs, loaded only when requested in Details.
+
+`geometry-variants.json` and `language-areas.pmtiles` remain offline inputs and
+compatibility assets. Source rendering, fallback and overlap computation use the
+same profile router. Combining source tiles preserves every contributor; it does
+not substitute for computing cross-dataset intersections. Prepared indexes are
+cached by profile and tile caches remain bounded. Reusable parts cover every
+dataset/period through the source archive's maximum client-supported zoom
+(currently 8). There are no dataset-specific zoom defaults. Incremental generation
+preserves existing profiles and higher zoom levels, publishing each completed
+zoom atomically so interrupted fine-detail preparation retains intermediate coverage.
+Visited tiles are an optional cache: receiver vertex and pattern-memory pressure
+evicts offscreen history before rejecting the visible viewport. Display budgets
+remain unchanged and worker caches still support return pans.
+
+Other views may later add these exports:
+
 - `languages.json`: compact table of all languages with the fields the views need.
 - `tree.json`: the Glottolog classification (possibly split per family and loaded on demand).
 - `features/…json`: feature definitions and values, possibly one file per feature.

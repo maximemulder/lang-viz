@@ -10,6 +10,9 @@ const client = new FallbackWorkerClient(
   },
 )
 
+export const requestSourceTile = (archiveUrl: string, tile: TileCoordinate, signal: AbortSignal) =>
+  client.request({ archiveUrl, coverage: [], tile }, signal)
+
 /** Load the complementary layer for the same atomic MVT as coverage. */
 export const requestFallbackTile = async (
   archiveUrl: string,

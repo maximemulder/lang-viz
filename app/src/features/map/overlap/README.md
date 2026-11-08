@@ -33,15 +33,24 @@ The browser uses prepared branch tiles only when the exact selected variants and
 refinements match; aggregate aliases, mixed-source selections and different
 policies cannot reuse them. Missing optional files fall back to bounded live
 computation. Prepared results use the existing cache, output, pattern, publication,
-and cancellation limits. Higher zooms remain live.
+and cancellation limits. Higher zooms try reusable parts before live calculation.
 
 `npm run precompute:parts` creates a separate selection-independent partition for
-each dataset/period at zooms 0–3. It uses the same simplified source archive, with
+each dataset/period at every source level supported by the client (currently
+zooms 0–8). The same default applies to all datasets, including both Asher periods.
+It uses the same simplified source tiles, with
 no refinement policy: every face retains all original memberships. The assets
-are versioned by format and archive hash, resumable, and published atomically in
-`manifest.coverageParts` after all requested profiles complete. The generator
-accepts repeated `--dataset` options and `--max-zoom` (0–8); a filtered run publishes
-only its requested profiles. Generation never combines datasets or periods.
+are versioned by format and archive hash and resumable. Each completed zoom
+is published atomically in `manifest.coverageParts`; interrupted later levels
+cannot remove intermediate coverage. The generator accepts repeated `--dataset` and `--period`
+options and `--max-zoom` (0–8). Filtered runs preserve other profiles and do not
+downgrade completed zoom levels. Generation never combines datasets or periods.
+It traverses the actual PMTiles directory, including run-length entries, rather
+than iterating the world grid. Only nonempty coverage gets an MVT file. A versioned,
+lazy profile index lists its nonempty tiles at each complete level. Omitted tiles
+at indexed levels are known empty; unindexed levels or unavailable assets fall
+back live. Availability indexes stay out of the startup manifest and are cached
+for at most eight profiles. The old dense and inline-index manifest shapes remain readable.
 
 `coverageParts.ts` resolves a profile from actual variant metadata and indexes
 its MVT memberships. Selection changes filter original contributors, map them to
@@ -61,7 +70,7 @@ preserving the existing precision and resource policy.
 
 Exact full branch tiles remain the first choice. Reusable parts handle partial
 branches, independently selected entries and aggregates from one dataset/period.
-Mixed selections, higher zooms and missing/malformed optional assets fall back
+Mixed selections, unprepared zooms and missing/malformed optional assets fall back
 live. Existing source outlines, fallback clipping, inspection, render modes,
 cancellation and output/pattern/publication limits still apply. Prepared parts
 remove partition overlay work; they do not remove fallback clipping, MVT encoding,
@@ -89,7 +98,15 @@ proposed priorities, and completion criteria across sessions.
    if more than 48 tiles would be required. Date-line viewports wrap tile X
    coordinates without requesting duplicate world copies.
 2. A persistent module worker reads those tiles directly from the existing
-   PMTiles archive. Index variant metadata once per decoded tile, then decode only
+   dataset/period PMTiles archives required by selected entries. Original map
+   browsing separately requests the profiles allowed by its filters plus pinned
+   entries' profiles. `data/geometryArchives.ts` merges source MVT layers in the
+   worker without changing memberships; cross-profile overlaps still use the
+   live partitioner. Split archives are filtered from the original archive using
+   tile-join, preserving coordinates, IDs and attributes. Up to 16 archive readers
+   retain range indexes per worker. Partition caches survive source-profile changes
+   and clearing a selection; archive identity remains part of result keys.
+   Index variant metadata once per decoded tile, then decode only
    selected variant geometries; retain integer tile coordinates for Boolean operations.
 3. Lazily load and initialize GEOS once in the persistent worker. Union duplicate
    fragments per variant and clip away the tile buffer. Insert coverage into an
@@ -251,6 +268,10 @@ different IDs and colors.
   references; old snapshots can retain different encoded tiles during transitions.
   These are not total browser/WASM/GPU memory limits.
   These are LRU caches; the byte limit does not include decoded object overhead.
+  Receiver history is expendable: before rejecting visible coverage for its
+  200,000-position or pattern-memory limit, the controller discards offscreen
+  retained tiles and republishes the current viewport. Worker caches remain
+  available for a return pan. Visible tiles still enforce the same budgets.
   Cached feature metadata adds JS object overhead. Archive URL and source layer
   are part of cache identity, along with tile coordinates and local selection.
 - A tile accepts at most 100,000 selected input vertices, 12,000 intermediate

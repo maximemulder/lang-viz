@@ -12,6 +12,8 @@
     "test:browser": "python3 tests/browser/run.py",
     "test:catalog-browser": "npm run build && python3 tests/browser/catalog.py",
     "test:source-browser": "npm run build && python3 tests/browser/source_languoids.py",
+    "test:delivery-browser": "npm run build && python3 tests/browser/delivery.py",
+    "test:prepared-browser": "npm run build && python3 tests/browser/prepared.py",
     "test:coverage-browser": "npm run build && python3 tests/browser/coverage.py",
     "test": "node --test --test-isolation=none tests/*.test.ts",
     "dev": "vite",

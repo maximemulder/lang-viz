@@ -2,6 +2,7 @@ import { useAtomValue, useSetAtom } from 'jotai'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMap } from 'react-map-gl/maplibre'
 import { languageArchiveUrl } from '../../../data/atlasRepository'
+import { selectGeometryArchives } from '../../../data/geometryArchives'
 import type { GeometryVariant } from '../../../domain/atlas'
 import {
   atlasDataAtom,
@@ -41,6 +42,9 @@ export const OverlapHatching = ({
   const { current } = useMap()
   const map = current?.getMap()
   const data = useAtomValue(atlasDataAtom)
+  const archiveUrl = languageArchiveUrl(
+    selectGeometryArchives(data.manifest, data.variants, [], 'all', sourceVariantIds),
+  ).replace(/^pmtiles:\/\//, '')
   const languageColors = useAtomValue(languageColorsAtom)
   const mode = useAtomValue(overlapModeAtom)
   const opacity = useAtomValue(languageOpacityAtom)
@@ -56,6 +60,10 @@ export const OverlapHatching = ({
   const colorsRef = useRef(colors)
   const resourcesRef = useRef<ReturnType<typeof createMapResources> | null>(null)
   const configRef = useRef({ selectionKey, mode })
+  const archiveRef = useRef(archiveUrl)
+  useEffect(() => {
+    archiveRef.current = archiveUrl
+  }, [archiveUrl])
   const controllerRef = useRef<ReturnType<typeof createOverlapController> | null>(null)
   const refreshRef = useRef<(() => void) | null>(null)
   const retryRef = useRef<(() => void) | null>(null)
@@ -71,7 +79,7 @@ export const OverlapHatching = ({
     )
     const resources = createMapResources(
       map,
-      languageArchiveUrl(),
+      () => archiveRef.current,
       colorsRef.current,
       (id) => controller.sourceFailed(id),
       () => configRef.current.mode === 'hatching',
@@ -84,7 +92,7 @@ export const OverlapHatching = ({
     const controller = createOverlapController({
       worker,
       resources,
-      archiveUrl: languageArchiveUrl().replace(/^pmtiles:\/\//, ''),
+      archiveUrl: () => archiveRef.current,
       sourceLayer: data.manifest.vectorLayer,
       onChange: setState,
       onCoverageReady,

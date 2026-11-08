@@ -524,6 +524,51 @@ def build_tiles() -> None:
         ],
         check=True,
     )
+    build_geometry_profiles()
+
+
+def build_geometry_profiles() -> None:
+    """Filter existing display tiles without re-simplifying or re-tiling polygons."""
+    tippecanoe = find_tippecanoe()
+    tile_join = Path(tippecanoe).with_name("tile-join") if tippecanoe else None
+    binary = str(tile_join) if tile_join and tile_join.is_file() else shutil.which("tile-join")
+    if not binary:
+        raise RuntimeError("tile-join was not found. Run pipeline/atlas/bootstrap-tippecanoe.sh.")
+    digest = hashlib.sha256(PMTILES_ARCHIVE.read_bytes()).hexdigest()[:20]
+    directory = f"geometry/v1-{digest}"
+    variants = json.loads((PUBLIC_DATA_DIR / "geometry-variants.json").read_text())
+    profiles = []
+    for dataset_id, view_id in sorted(
+        {(v["datasetId"], v["temporalCoverage"]["viewId"]) for v in variants}
+    ):
+        relative = f"{directory}/{dataset_id}/{view_id}.pmtiles"
+        output = PUBLIC_DATA_DIR / relative
+        output.parent.mkdir(parents=True, exist_ok=True)
+        if not output.exists():
+            temporary = output.with_name(f"{view_id}.tmp.pmtiles")
+            predicate = {
+                "*": ["all", ["==", "dataset_id", dataset_id], ["==", "temporal_view", view_id]]
+            }
+            subprocess.run(
+                [
+                    binary,
+                    "--force",
+                    "--no-tile-size-limit",
+                    "--quiet",
+                    f"--output={temporary}",
+                    f"--feature-filter={json.dumps(predicate)}",
+                    str(PMTILES_ARCHIVE),
+                ],
+                check=True,
+            )
+            temporary.replace(output)
+        profiles.append({"datasetId": dataset_id, "viewId": view_id, "archive": relative})
+    manifest_path = PUBLIC_DATA_DIR / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["geometryProfiles"] = profiles
+    temporary_manifest = manifest_path.with_suffix(".tmp")
+    write_json(temporary_manifest, manifest)
+    temporary_manifest.replace(manifest_path)
 
 
 def build(skip_tiles: bool) -> None:
@@ -583,6 +628,26 @@ def build(skip_tiles: bool) -> None:
     languages.sort(key=lambda language: (str(language["name"]).casefold(), language["id"]))
     write_json(PUBLIC_DATA_DIR / "languages.json", languages)
     write_json(PUBLIC_DATA_DIR / "geometry-variants.json", variants)
+    # Runtime discovery needs availability and source labels, not thousands of
+    # original feature identifiers. Keep that audit detail behind a lazy request.
+    write_json(
+        PUBLIC_DATA_DIR / "geometry-index.json",
+        [
+            {k: v for k, v in variant.items() if k not in {"sourceFile", "sourceFeatureIds"}}
+            for variant in variants
+        ],
+    )
+    for dataset_id, view_id in sorted(
+        {(v["datasetId"], v["temporalCoverage"]["viewId"]) for v in variants}
+    ):
+        write_json(
+            PUBLIC_DATA_DIR / "provenance" / dataset_id / f"{view_id}.json",
+            {
+                v["id"]: {"sourceFile": v["sourceFile"], "sourceFeatureIds": v["sourceFeatureIds"]}
+                for v in variants
+                if v["datasetId"] == dataset_id and v["temporalCoverage"]["viewId"] == view_id
+            },
+        )
     write_json(PUBLIC_DATA_DIR / "geography-datasets.json", DATASETS)
     shutil.copyfile(PROJECT_ROOT / "pipeline/dlac/NOTICE.md", PUBLIC_DATA_DIR / "DLAC-NOTICE.md")
     write_json(
@@ -596,6 +661,8 @@ def build(skip_tiles: bool) -> None:
             "geometryVariantCount": len(variants),
             "vectorLayer": "language_areas",
             "archive": "language-areas.pmtiles",
+            "geometryIndex": "geometry-index.json",
+            "geometryProvenance": "provenance/",
         },
     )
 

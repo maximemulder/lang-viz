@@ -258,6 +258,18 @@ def test_build_exports_source_entries_and_geometry_together(dlac_archive, tmp_pa
     monkeypatch.setattr(atlas, "NORMALIZED_GEOMETRIES", tmp_path / "processed/areas.geojsonl")
     monkeypatch.setattr(atlas, "PUBLIC_DATA_DIR", tmp_path / "public")
     atlas.build(skip_tiles=True)
+    public = tmp_path / "public"
+    manifest = json.loads((public / "manifest.json").read_text())
+    index = json.loads((public / manifest["geometryIndex"]).read_text())
+    detailed = json.loads((public / "geometry-variants.json").read_text())
+    provenance = json.loads((public / "provenance/dlac1987china/contemporary.json").read_text())
+    assert {v["id"] for v in index} == {v["id"] for v in detailed}
+    assert all("sourceFile" not in v and "sourceFeatureIds" not in v for v in index)
+    for variant in detailed:
+        assert provenance[variant["id"]] == {
+            "sourceFile": variant["sourceFile"],
+            "sourceFeatureIds": variant["sourceFeatureIds"],
+        }
     exported = {e["id"]: e for e in json.loads((tmp_path / "public/languages.json").read_text())}
     assert set(exported) == known
     for language_id in [code for code in known if ":" in code]:

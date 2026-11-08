@@ -24,7 +24,7 @@ export {
 /** Own MapLibre images, source identities, and error/readiness observations. */
 export const createMapResources = (
   map: MapLibreMap,
-  archiveUrl: string,
+  archiveUrl: string | (() => string),
   colors: ReadonlyMap<string, string>,
   onSourceFailed: (snapshotId: number) => void,
   drawPatterns: () => boolean = () => true,
@@ -161,7 +161,10 @@ export const createMapResources = (
         addPattern(p.pattern, p.variantIds)
         ownedPatterns.set(p.pattern, p.variantIds)
       }
-      const snapshot = registerCoverage(tiles, archiveUrl)
+      const snapshot = registerCoverage(
+        tiles,
+        typeof archiveUrl === 'function' ? archiveUrl() : archiveUrl,
+      )
       preparePublicationTest(snapshot.id)
       snapshots.set(snapshot.id, {
         snapshot,

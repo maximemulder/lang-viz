@@ -1,10 +1,11 @@
-import { PMTiles } from 'pmtiles'
+import type { PMTiles } from 'pmtiles'
+import { openGeometryArchive } from '../../../data/geometryArchives.ts'
 import { FallbackCache } from './fallbackCache.ts'
 import type { FallbackInput, FallbackOutput } from './fallbackWorkerClient.ts'
 import { OverlapInitializationError } from './geometry.ts'
 
 let archiveUrl = ''
-let archive: PMTiles
+let archive: Pick<PMTiles, 'getZxy'>
 const controllers = new Map<number, AbortController>()
 const cache = new FallbackCache()
 
@@ -19,7 +20,7 @@ self.onmessage = async ({ data }: MessageEvent<FallbackInput>) => {
   try {
     if (archiveUrl !== data.archiveUrl) {
       archiveUrl = data.archiveUrl
-      archive = new PMTiles(archiveUrl)
+      archive = openGeometryArchive(archiveUrl)
     }
     const result = await cache.get(
       archive,

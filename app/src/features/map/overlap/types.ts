@@ -35,6 +35,8 @@ export interface OverlapRequest {
     readonly directory: string
     readonly profile: string
     readonly maxZoom: number
+    readonly tileIndex?: string
+    readonly tiles?: Readonly<Record<string, readonly string[]>>
   }
   readonly tiles: readonly TileCoordinate[]
   /** Tiles retained by the receiver for this same selection; send only additions. */

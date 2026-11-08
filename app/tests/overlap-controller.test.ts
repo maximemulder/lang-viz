@@ -7,6 +7,7 @@ import {
   idleHatchingState,
 } from '../src/features/map/overlap/controller.ts'
 import type { DeliveryTile } from '../src/features/map/overlap/delivery.ts'
+import { OverlapPatternError } from '../src/features/map/overlap/patterns.ts'
 import type { OverlapRequest, TileCoordinate } from '../src/features/map/overlap/types.ts'
 import { PUBLICATION_TIMEOUT_MS } from '../src/features/map/overlap/workerClient.ts'
 
@@ -297,17 +298,43 @@ test('a valid prefix after computation failure still has a source-loading deadli
   assert.match(f.state.message, /too long to load/)
 })
 
-test('retained output budgets preserve good coverage and zoom changes reset known tiles', (context) => {
+test('visible output evicts offscreen history before rejecting a viewport, while visible budgets remain enforced', (context) => {
   const f = fixture()
   context.after(() => f.controller.dispose())
   f.initial()
   f.controller.refresh([coordinate(1)])
   f.receive({ ...tile(1), vertices: 200_000 })
+  f.finish()
+  f.publish()
+  assert.equal(f.state.status, 'ready')
+  assert.deepEqual(f.state.snapshots[f.state.activeBuffer ?? 0]?.coverageTiles, [coordinate(1)])
+  const sent = f.sent.length
+  f.controller.refresh([coordinate(1)])
+  assert.equal(f.sent.length, sent, 'Eviction must not trigger an idle redispatch')
+  f.controller.refresh([coordinate(1), coordinate(2)])
+  f.receive(tile(2))
   f.publish()
   assert.equal(f.state.status, 'error')
   assert.equal(f.registered.size, 1)
   f.controller.refresh([coordinate(0, 1)])
   assert.deepEqual(f.sent.at(-1)?.knownTiles, [])
+})
+
+test('texture pressure discards offscreen history before publishing current coverage', (context) => {
+  const f = fixture()
+  context.after(() => f.controller.dispose())
+  f.initial()
+  const stage = f.resources.stage
+  f.resources.stage = (tiles, buffer) => {
+    if (tiles.size > 1) throw new OverlapPatternError('pattern-memory', 'Too many cached patterns')
+    return stage(tiles, buffer)
+  }
+  f.controller.refresh([coordinate(1)])
+  f.receive(tile(1))
+  f.finish()
+  f.publish()
+  assert.equal(f.state.status, 'ready')
+  assert.deepEqual(f.state.snapshots[f.state.activeBuffer ?? 0]?.coverageTiles, [coordinate(1)])
 })
 
 test('zoom transitions retain all old stripes until the complete new detail is ready', (context) => {

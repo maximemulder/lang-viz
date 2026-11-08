@@ -98,16 +98,43 @@ about two minutes on the development machine and resumes completed tiles. The br
 uses these tiles only for an exact geometry/refinement match.
 
 `npm run precompute:parts` additionally prepares reusable disjoint coverage at
-zooms 0–3 for each dataset/period. Each piece retains every original contributor,
+all source zooms for every dataset/period (currently 0–8). Each piece retains every original contributor,
 including ancestors hidden in a branch view. Partial branches, child removal,
 independent entries and descendant aggregates can therefore reuse the same
 geometry: runtime work selects memberships and joins matching shared edges,
 without general polygon unions, intersections or differences. Exact full branch
 views still prefer the more compact prepared branch tiles. Mixed datasets or
-periods, higher zooms and missing optional assets use the bounded live engine.
+periods, unprepared zooms and missing optional assets use the bounded live engine.
 Run both preparation commands again after regenerating atlas data; deployment
 runs them automatically. To limit generation, use e.g.
-`npm run precompute:parts -- --dataset asher2007world --max-zoom 3`.
+`npm run precompute:parts -- --dataset asher2007world --period contemporary --max-zoom 6`.
+Filtered runs preserve other completed profiles and never downgrade higher-detail
+preparation. Each completed zoom is published atomically; interrupted runs
+resume existing tiles. The generator visits source archive entries rather than
+the world grid. Empty areas are recorded in a small availability index instead
+of individual files. Indexes and parts load only for the active dataset/period
+and viewport; each profile has its own prepared zoom limit (up to source zoom 8).
+The default has no dataset-specific exceptions: both Asher periods and every
+other profile receive all source levels. The browser can therefore compose
+single-profile full views, subsets and aggregates at intermediate zooms without
+live polygon overlay. `npm run test:prepared-browser` covers dense Asher regions,
+world-to-regional navigation, subsets, both periods, and the other datasets.
+When visited tiles consume the receiver's position or pattern budget, offscreen
+history is evicted before rejecting visible coverage. This keeps the current
+view's detail without increasing the rendering limits; worker caches still
+serve return pans.
+
+Original geometry is also split by dataset/period into PMTiles archives. The
+browser requests ranges only from archives required by the current browsing
+filters and pinned entries. Pinned comparisons retain their original sources
+and periods. Source tiles are filtered from the combined archive without changing
+their coordinates or simplification; mixed-source tiles are assembled in a worker
+before live overlap calculation. The combined archive remains an offline input
+and supports older manifests.
+
+Search, hierarchy, availability and source labels remain eager metadata. The
+browser uses `geometry-index.json`; full source feature identifiers load per
+dataset/period only when **Original source records** is expanded in Details.
 
 Map source/period/viewport controls are under "Map filters". Viewport scope limits
 starting results, including aggregates with contributing areas in view; expanded

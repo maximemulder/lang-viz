@@ -7,6 +7,8 @@ import { memo, Suspense, useEffect, useRef, useState } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
+import { selectGeometryArchives } from '../../data/geometryArchives'
+import { geometryTileUrl } from '../../data/geometryProtocol'
 import {
   inspectedSourceVariantIds,
   mapAreaMemberships,
@@ -112,13 +114,24 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
       ? ['has', 'dataset_id']
       : ['in', ['get', 'dataset_id'], ['literal', datasetSelection]]
   const availableGeometryFilter: FilterSpecification = ['all', temporalFilter, datasetFilter]
+  const archiveUrl = languageArchiveUrl(
+    selectGeometryArchives(
+      data.manifest,
+      data.variants,
+      datasetSelection,
+      temporalSelection,
+      variantIds,
+    ),
+  ).replace(/^pmtiles:\/\//, '')
 
   return (
     <>
       <Source
         id={LANGUAGE_SOURCE_ID}
         type="vector"
-        url={languageArchiveUrl()}
+        tiles={[geometryTileUrl(archiveUrl)]}
+        minzoom={0}
+        maxzoom={8}
         attribution="Language areas: Asher & Moseley (2007), Bouckaert et al. (2012), Carling et al. (2025)"
       >
         <Layer

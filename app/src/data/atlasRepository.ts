@@ -6,6 +6,7 @@ import type {
   Language,
 } from '../domain/atlas'
 import { buildLanguageSearchIndex } from '../domain/catalog'
+import { geometryArchiveUrl } from './geometryArchives'
 
 const dataUrl = (fileName: string) => `${import.meta.env.BASE_URL}data/${fileName}`
 
@@ -20,12 +21,12 @@ const fetchJson = async <T>(fileName: string): Promise<T> => {
 let atlasDataPromise: Promise<AtlasData> | undefined
 
 export const loadAtlasData = (): Promise<AtlasData> => {
-  atlasDataPromise ??= Promise.all([
-    fetchJson<AtlasManifest>('manifest.json'),
-    fetchJson<readonly Language[]>('languages.json'),
-    fetchJson<readonly GeometryVariant[]>('geometry-variants.json'),
-    fetchJson<readonly GeographyDataset[]>('geography-datasets.json'),
-  ]).then(([manifest, languages, variants, datasets]) => {
+  atlasDataPromise ??= fetchJson<AtlasManifest>('manifest.json').then(async (manifest) => {
+    const [languages, variants, datasets] = await Promise.all([
+      fetchJson<readonly Language[]>('languages.json'),
+      fetchJson<readonly GeometryVariant[]>(manifest.geometryIndex ?? 'geometry-variants.json'),
+      fetchJson<readonly GeographyDataset[]>('geography-datasets.json'),
+    ])
     if (manifest.schemaVersion !== 5) {
       throw new Error(`Unsupported atlas schema version: ${manifest.schemaVersion}`)
     }
@@ -50,7 +51,31 @@ export const loadAtlasData = (): Promise<AtlasData> => {
   return atlasDataPromise
 }
 
-export const languageArchiveUrl = () => {
+export interface GeometryProvenance {
+  readonly sourceFile: string
+  readonly sourceFeatureIds: readonly string[]
+}
+const provenance = new Map<string, Promise<Record<string, GeometryProvenance>>>()
+
+export const loadGeometryProvenance = async (manifest: AtlasManifest, variant: GeometryVariant) => {
+  if (variant.sourceFile && variant.sourceFeatureIds)
+    return { sourceFile: variant.sourceFile, sourceFeatureIds: variant.sourceFeatureIds }
+  if (!manifest.geometryProvenance) throw new Error('Source records are unavailable')
+  const file = `${manifest.geometryProvenance}${variant.datasetId}/${variant.temporalCoverage.viewId}.json`
+  let pending = provenance.get(file)
+  if (!pending) {
+    pending = fetchJson<Record<string, GeometryProvenance>>(file).catch((error) => {
+      provenance.delete(file)
+      throw error
+    })
+    provenance.set(file, pending)
+  }
+  const record = (await pending)[variant.id]
+  if (!record) throw new Error('Source records are unavailable')
+  return record
+}
+
+export const languageArchiveUrl = (archives?: readonly string[]) => {
   const archiveUrl = new URL(dataUrl('language-areas.pmtiles'), window.location.href)
-  return `pmtiles://${archiveUrl.href}`
+  return `pmtiles://${geometryArchiveUrl(archiveUrl.href, archives)}`
 }

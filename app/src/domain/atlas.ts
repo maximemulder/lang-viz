@@ -64,8 +64,8 @@ export interface GeometryVariant {
   readonly featureId: number
   readonly featureCount: number
   readonly geometryKind: 'source' | 'dataset-family' | 'dataset-language' | 'dataset-dialect'
-  readonly sourceFile: string
-  readonly sourceFeatureIds: readonly string[]
+  readonly sourceFile?: string
+  readonly sourceFeatureIds?: readonly string[]
   /** Legacy categorical seed. Runtime presentation uses the languoid color resolver. */
   readonly color: string
   readonly temporalCoverage: TemporalCoverage
@@ -87,6 +87,13 @@ export interface AtlasManifest {
   readonly geometryVariantCount: number
   readonly vectorLayer: string
   readonly archive: string
+  readonly geometryIndex?: string
+  readonly geometryProvenance?: string
+  readonly geometryProfiles?: readonly {
+    readonly datasetId: GeographyDatasetId
+    readonly viewId: TemporalViewId
+    readonly archive: string
+  }[]
   readonly branchCoverage?: {
     readonly directory: string
     readonly maxZoom: number
@@ -99,6 +106,11 @@ export interface AtlasManifest {
       readonly id: string
       readonly datasetId: GeographyDatasetId
       readonly viewId: TemporalViewId
+      /** Complete levels; omitted tiles at these levels are known empty. */
+      readonly maxZoom?: number
+      /** Small availability index, fetched only for an active profile. */
+      readonly tileIndex?: string
+      readonly tiles?: Readonly<Record<string, readonly string[]>>
     }[]
   }
 }

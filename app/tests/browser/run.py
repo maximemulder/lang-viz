@@ -152,13 +152,15 @@ class Browser:
 
         return wait_for(probe, timeout, "overlap result and first rendered coverage")
 
-    def settled(self, timeout):
+    def settled(self, timeout, *, fail_on_error=False):
         stable_since = None
         previous = None
 
         def probe():
             nonlocal stable_since, previous
             state = self.snapshot()
+            if fail_on_error and state["status"] == "error":
+                raise AssertionError(state["reports"][-1])
             stamp = (len(state["reports"]), state["status"])
             ready = (
                 state["mapLoaded"]

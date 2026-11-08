@@ -271,3 +271,119 @@ test('prepared metadata cache remains bounded, isolates profiles and does not pu
     [],
   )
 })
+
+test('sparse parts distinguish known-empty, unprepared and missing nonempty tiles at per-profile zooms', async (t) => {
+  const variants = [
+    { id: 'a', datasetId: 'one', temporalCoverage: { viewId: 'contemporary' } },
+  ] as GeometryVariant[]
+  const resolve = createPartsResolver(
+    {
+      directory: 'parts/',
+      maxZoom: 5,
+      profiles: [
+        {
+          id: 'one-now',
+          datasetId: 'one',
+          viewId: 'contemporary',
+          maxZoom: 4,
+          tiles: { '3': [], '4': ['1-2'] },
+        },
+      ],
+    },
+    variants,
+  )
+  const config = resolve(['a'])
+  assert.ok(config)
+  assert.equal(config.maxZoom, 4)
+  let fetches = 0,
+    reads = 0
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetches++
+    return new Response('', { status: 404 })
+  })
+  const archive = {
+    getZxy: async () => {
+      reads++
+      return undefined
+    },
+  }
+  const computer = new OverlapComputer()
+  const request = { ...base, variantIds: ['a'], parts: config }
+  const report = metrics()
+  await Array.fromAsync(
+    computer.computeTiles(
+      archive,
+      { ...request, tiles: [{ z: 4, x: 0, y: 0 }] },
+      () => true,
+      report,
+    ),
+  )
+  assert.equal(fetches, 0)
+  assert.equal(reads, 0)
+  assert.equal(report.partsTiles, 1)
+  for (const tile of [
+    { z: 4, x: 1, y: 2 },
+    { z: 2, x: 0, y: 0 },
+    { z: 5, x: 0, y: 0 },
+  ])
+    await Array.fromAsync(
+      new OverlapComputer().computeTiles(archive, { ...request, tiles: [tile] }, () => true),
+    )
+  assert.equal(fetches, 1, 'Only a declared nonempty tile should cause a parts request')
+  assert.equal(reads, 3, 'Missing assets and unprepared levels must still fall back live')
+})
+
+test('profile availability indexes load lazily, cache across tiles and selections, and fail safely', async (t) => {
+  const calls: string[] = []
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    calls.push(String(url))
+    return String(url).endsWith('.json')
+      ? Response.json({ '5': ['1-2'] })
+      : new Response(new Uint8Array())
+  })
+  let reads = 0
+  const archive = {
+    getZxy: async () => {
+      reads++
+      return undefined
+    },
+  }
+  const request = {
+    ...base,
+    parts: { ...parts, maxZoom: 5, tileIndex: 'dataset/contemporary/index-hash.json' },
+  }
+  const computer = new OverlapComputer()
+  for (const tile of [
+    { z: 5, x: 0, y: 0 },
+    { z: 5, x: 1, y: 2 },
+    { z: 5, x: 1, y: 3 },
+  ])
+    await Array.fromAsync(computer.computeTiles(archive, { ...request, tiles: [tile] }, () => true))
+  assert.equal(reads, 0)
+  assert.deepEqual(calls, [
+    'https://atlas.test/data/parts/dataset/contemporary/index-hash.json',
+    'https://atlas.test/data/parts/dataset/contemporary/5-1-2.pbf',
+  ])
+  for (const invalid of [null, [], { '5': null }, { '5': [123] }, { bad: [] }]) {
+    t.mock.method(globalThis, 'fetch', async () => Response.json(invalid))
+    await Array.fromAsync(
+      new OverlapComputer().computeTiles(
+        archive,
+        { ...request, tiles: [{ z: 5, x: 0, y: 0 }] },
+        () => true,
+      ),
+    )
+  }
+  assert.equal(reads, 5, 'Malformed indexes must never declare a tile empty')
+  const abort = new AbortController()
+  t.mock.method(globalThis, 'fetch', async () => {
+    abort.abort()
+    return Response.json({ '5': [] })
+  })
+  await assert.rejects(
+    Array.fromAsync(
+      new OverlapComputer().computeTiles(archive, request, () => true, undefined, abort.signal),
+    ),
+    { name: 'AbortError' },
+  )
+})

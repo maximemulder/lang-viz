@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Shared sidebar actions; scenario assertions belong in the browser suites."""
 
 from run import wait_for
@@ -41,13 +42,20 @@ def search(browser, query, glottocode):
     )
 
 
-def select_branches(browser, source, center, zoom=4.5, *, settle=True):
+def select_branches(browser, source, center, zoom=4.5, *, settle=True, period="contemporary"):
     browser.js(
         "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:arguments[1]})",
         center, zoom,
     )
     browser.js("""
         document.querySelector('.finder-options').open = true;
+    """)
+    browser.js("""
+        const select = document.querySelector('.finder-filters__period select');
+        select.value = arguments[0];
+        select.dispatchEvent(new Event('change', {bubbles:true}));
+    """, period)
+    browser.js("""
         document.querySelector('.source-filter__trigger').click();
     """)
     browser.js("""

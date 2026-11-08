@@ -16,7 +16,7 @@ export const createPartsResolver = (
   const profiles = new Map(
     config?.profiles.map((profile) => [
       JSON.stringify([profile.datasetId, profile.viewId]),
-      profile.id,
+      profile,
     ]),
   )
   const profileByVariant = new Map(
@@ -29,7 +29,13 @@ export const createPartsResolver = (
     if (!config || !ids.length) return undefined
     const profile = profileByVariant.get(ids[0] ?? '')
     if (!profile || ids.some((id) => profileByVariant.get(id) !== profile)) return undefined
-    return { directory: config.directory, maxZoom: config.maxZoom, profile }
+    return {
+      directory: config.directory,
+      maxZoom: profile.maxZoom ?? config.maxZoom,
+      profile: profile.id,
+      ...(profile.tileIndex ? { tileIndex: profile.tileIndex } : {}),
+      ...(profile.tiles ? { tiles: profile.tiles } : {}),
+    }
   }
 }
 
@@ -46,6 +52,7 @@ interface PartsTile {
 /** Selection-independent MVT/metadata cache; decoded coordinates belong to result caches. */
 export class CoverageParts {
   private readonly tiles = new Map<string, PartsTile>()
+  private readonly indexes = new Map<string, Readonly<Record<string, readonly string[]>>>()
   private bytes = 0
 
   stats() {
@@ -60,6 +67,53 @@ export class CoverageParts {
   ): Promise<CoverageTile | null> {
     const config = request.parts
     if (!config || tile.z > config.maxZoom) return null
+    let index = config.tiles
+    if (config.tileIndex) {
+      const url = new URL(config.tileIndex, new URL(config.directory, request.archiveUrl)).href
+      index = this.indexes.get(url)
+      if (!index) {
+        try {
+          const started = performance.now()
+          const response = await fetch(url, signal ? { signal } : {})
+          signal?.throwIfAborted()
+          if (!response.ok) return null
+          const parsed: unknown = await response.json()
+          signal?.throwIfAborted()
+          if (metrics) metrics.fetchMs += performance.now() - started
+          if (
+            !parsed ||
+            typeof parsed !== 'object' ||
+            Array.isArray(parsed) ||
+            !Object.entries(parsed).every(
+              ([z, coords]) =>
+                /^\d+$/.test(z) &&
+                Array.isArray(coords) &&
+                coords.every((c) => typeof c === 'string' && /^\d+-\d+$/.test(c)),
+            )
+          )
+            return null
+          index = parsed as Readonly<Record<string, readonly string[]>>
+          this.indexes.set(url, index)
+          if (this.indexes.size > 8) {
+            const oldest = this.indexes.keys().next().value
+            if (oldest !== undefined) this.indexes.delete(oldest)
+          }
+        } catch {
+          signal?.throwIfAborted()
+          return null
+        }
+      }
+    }
+    if (index) {
+      const level = index[String(tile.z)]
+      // No index means unprepared. A complete level's absent tiles are empty,
+      // including areas outside the source bounds; neither needs an HTTP request.
+      if (!level) return null
+      if (!level.includes(`${tile.x}-${tile.y}`)) {
+        if (metrics) metrics.partsTiles = (metrics.partsTiles ?? 0) + 1
+        return { tile, extent: 8192, features: [], vertices: 0 }
+      }
+    }
     const directory = new URL(`${config.profile}/`, new URL(config.directory, request.archiveUrl))
     const url = `${directory}${tile.z}-${tile.x}-${tile.y}.pbf`
     let cached = this.tiles.get(url)

@@ -331,6 +331,13 @@ export const installOverlapTestApi = (
           const source = map.getSource(coverageSourceId(buffer))
           return source ? [source.type] : []
         }),
+        geometryTiles: (
+          map.getSource('language-areas')?.serialize() as { tiles?: string[] } | undefined
+        )?.tiles,
+        coverageZooms: BUFFERS.flatMap((buffer) => {
+          const source = map.getSource(coverageSourceId(buffer))
+          return source ? [(source.serialize() as { maxzoom?: number }).maxzoom] : []
+        }),
         coverageUrls: BUFFERS.flatMap((buffer) => {
           const source = map.getSource(coverageSourceId(buffer))
           return source ? [(source.serialize() as { tiles?: string[] }).tiles?.[0]] : []

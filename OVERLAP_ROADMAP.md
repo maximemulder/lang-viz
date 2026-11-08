@@ -26,7 +26,9 @@ updates retain the last valid coverage; replacements load in a second source
 before swapping into view. A clipped vector fallback streams language colors
 outside computed tile interiors. Selection changes clear obsolete memberships.
 Complete single-dataset branch views have optional offline coverage at zooms 0–3;
-other selections are computed live.
+selection-independent prepared parts cover single-dataset/period subsets and
+branches at all source zooms (currently 0–8). Mixed profiles and unavailable
+optional assets still use bounded live computation.
 Geometry operations run on the CPU; MapLibre drawing runs on the GPU.
 
 See the [implementation notes](app/src/features/map/overlap/README.md) for the
@@ -512,6 +514,52 @@ Further work: extend detail levels based on storage/runtime measurements, reduce
 prepared tile transfer overhead for tiny selections, and measure remaining encoding,
 MapLibre preparation and fallback costs. Existing display-accuracy and memory
 limitations still apply.
+
+Prepared delivery update (2026-11-08): DLAC now has reusable parts through zoom 5;
+other profiles remain at zoom 3. Source polygons are filtered into dataset/period
+PMTiles archives without re-tiling; workers and original fills read only profiles
+required by their selections or browsing filters. Reusable preparation traverses
+archive directories rather than the global grid, writes no empty MVT files, and
+publishes a lazy, content-addressed availability index per completed profile.
+Filtered runs preserve other profiles and higher-detail preparation. The source
+and partition workers retain caches when selection profiles change. Geometry
+provenance loads on demand in Details; search and availability metadata remain eager.
+DLAC zooms 4–5 add 31 nonempty tiles and 121,595 bytes locally. All seven profiles
+now occupy 51,582,869 MVT bytes across 244 nonempty files. The production delivery
+browser check verifies zoom-5 parts with zero live overlay, source routing and
+pan/return navigation; existing catalog and parts suites cover mixed sources,
+refinement and cache reuse. The generator supports per-profile zooms up to source
+zoom 8 using `--dataset`, `--period` and `--max-zoom`; extending every profile still
+needs storage/runtime measurements. Mixed-source/period partitions remain live.
+
+All-dataset intermediate detail (2026-11-08): the earlier DLAC-specific default
+has been removed. Preparation now covers every source level supported by the
+client, currently zooms 0–8, for all seven dataset/period profiles, including both
+Asher contemporary and time-of-contact. Each complete zoom is published atomically;
+an interrupted fine-detail build preserves the intermediate levels it completed.
+The full local preparation produced 252,845,624 bytes across 61,992 nonempty MVT
+files in approximately ten minutes, with lower levels and completed tiles reused.
+Availability indexes and viewport tiles still load lazily; extending preparation
+does not make clients download the entire output.
+
+The Asher full-branch live engine reproduced tile deadlines at zoom 4 in tiles
+8/7 (Africa) and 12/6 (Asia), and at zoom 5 in the African case. Engine measurements
+on the development machine: prepared cold resolution/encoding took 116 ms,
+55 ms and 70 ms respectively, with zero live overlay time. The corresponding
+live requests failed at their existing 1.5-second tile deadlines. Time-of-contact
+Africa at zoom 4 likewise changed from a deadline to 114 ms with parts. These
+are local observations, not latency guarantees. `benchmark:parts` now includes
+African and Asian detail levels 4–8 and the historical period; `test:prepared-browser`
+checks actual source delivery, world-to-region navigation, both Asher periods,
+subsets, globe/Mercator, and every other dataset through source zoom 8.
+
+The new navigation checks also exposed receiver history pressure: a cold Asher
+Asia zoom-4 viewport fitted the output budget, but panning there from Africa
+retained offscreen geometry and exceeded 200,000 positions. The controller now
+evicts offscreen history before rejecting visible positions or pattern memory.
+The visible view retains its requested detail and existing budgets; worker caches
+remain available for return pans. Unit regressions cover position and texture
+eviction, stable idle requests, and genuine visible overflow retaining good coverage.
 
 ## Decisions still open
 

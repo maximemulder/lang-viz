@@ -55,7 +55,7 @@ export const idleHatchingState = (): HatchingState => ({
 export const createOverlapController = (options: {
   worker: Pick<OverlapWorkerClient, 'postMessage' | 'cancel' | 'terminate' | 'restarts'>
   resources: CoverageResources
-  archiveUrl: string
+  archiveUrl: string | (() => string)
   sourceLayer: string
   onChange(state: HatchingState): void
   onCoverageReady(key: string | null): void
@@ -69,6 +69,7 @@ export const createOverlapController = (options: {
   let nextRequestId = 0
   let previousKey = ''
   let retained: TileCoordinate[] = []
+  let viewportKeys = new Set<string>()
   const results = new Map<string, DeliveryTile>()
   let request: Request | null = null
   let active: Publication | null = null
@@ -143,6 +144,23 @@ export const createOverlapController = (options: {
     update({ outcome: 'error', failure: reason })
     emit()
   }
+  const pruneHistory = () => {
+    let changed = false
+    for (const key of results.keys()) {
+      if (viewportKeys.has(key)) continue
+      results.delete(key)
+      changed = true
+    }
+    if (changed) {
+      retained = retained.filter((tile) => viewportKeys.has(tileKey(tile)))
+      previousKey = JSON.stringify([
+        parseOverlapSelection(selectionKey).variantIds,
+        coverageTilesKey(retained),
+      ])
+      if (request) request.version++
+    }
+    return changed
+  }
   const stage = () => {
     clearTimeout(batch)
     batch = undefined
@@ -177,6 +195,16 @@ export const createOverlapController = (options: {
       })
       emit()
     } catch (error) {
+      // Visited tiles are an optional cache. They must not consume the texture
+      // budget needed to publish the current viewport.
+      if (
+        error instanceof OverlapPatternError &&
+        error.reason === 'pattern-memory' &&
+        pruneHistory()
+      ) {
+        stage()
+        return
+      }
       fail(
         error instanceof OverlapPatternError ? error.reason : 'render-error',
         error instanceof Error ? error.message : 'Could not draw overlap stripes.',
@@ -227,6 +255,7 @@ export const createOverlapController = (options: {
     },
     refresh(viewport: readonly TileCoordinate[]) {
       if (disposed) return
+      viewportKeys = new Set(viewport.map(tileKey))
       const selection = enabled ? parseOverlapSelection(selectionKey) : { variantIds: [] }
       const { variantIds } = selection
       const tiles = retainCoverageTiles(
@@ -276,7 +305,8 @@ export const createOverlapController = (options: {
       const parts = options.parts?.(variantIds)
       worker.postMessage({
         requestId: request.id,
-        archiveUrl: options.archiveUrl,
+        archiveUrl:
+          typeof options.archiveUrl === 'function' ? options.archiveUrl() : options.archiveUrl,
         sourceLayer: options.sourceLayer,
         variantIds,
         ...(selection.variantGroups ? { variantGroups: selection.variantGroups } : {}),
@@ -292,10 +322,18 @@ export const createOverlapController = (options: {
       if (disposed || response.requestId !== request?.id || request.phase !== 'computing') return
       if ('tile' in response) {
         const key = tileKey(response.tile.tile)
-        const vertices =
+        if (!retained.some((tile) => tileKey(tile) === key)) return
+        let vertices =
           [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0) -
           (results.get(key)?.vertices ?? 0) +
           response.tile.vertices
+        if (vertices > 200_000 && pruneHistory()) {
+          if (!viewportKeys.has(key)) return
+          vertices =
+            [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0) -
+            (results.get(key)?.vertices ?? 0) +
+            response.tile.vertices
+        }
         if (vertices > 200_000) {
           fail(
             'output-vertices',
