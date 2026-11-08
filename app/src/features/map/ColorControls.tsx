@@ -160,7 +160,7 @@ export const ColorControls = () => {
           Apply comparison roots
         </button>
         <p>
-          Comma-separated IDs. These start separate palettes; selected families and mapped-leaf
+          Comma-separated IDs. These start separate palettes; selected families and mapped-branch
           groups are also included.
         </p>
       </details>

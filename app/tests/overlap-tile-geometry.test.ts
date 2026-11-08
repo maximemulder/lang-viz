@@ -4,9 +4,14 @@ import { test } from 'node:test'
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { PbfReader } from 'pbf'
 import { FileSource, PMTiles } from 'pmtiles'
-import { buildGeographyAvailability, mappedLeavesForLanguages } from '../src/domain/aggregation.ts'
+import {
+  buildGeographyAvailability,
+  mapAreaSelectionKey,
+  mappedBranchForLanguages,
+} from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
+import { pinMapEntry, resolveMapEntries } from '../src/domain/mapEntries.ts'
 import { OverlapComputer } from '../src/features/map/overlap/compute.ts'
 import {
   COVERAGE_LAYER,
@@ -15,6 +20,7 @@ import {
   tileKey,
 } from '../src/features/map/overlap/delivery.ts'
 import { quantizeTilePolygon } from '../src/features/map/overlap/tileGeometry.ts'
+import { parseOverlapSelection } from '../src/features/map/overlap/types.ts'
 
 type Ring = [number, number][]
 const area = (ring: Ring) =>
@@ -122,7 +128,7 @@ test('native and zoom-out tiles keep a reversed sliver separate from a large isl
 })
 
 const archivePath = new URL('../public/data/language-areas.pmtiles', import.meta.url)
-test('real mapped leaves: German and Yue remain shells in native and parent tiles', {
+test('real mapped branches: German and Yue remain shells in native and parent tiles', {
   skip: !existsSync(archivePath) && 'Generate atlas data to run the archive regression',
 }, async () => {
   const languages: Language[] = JSON.parse(
@@ -134,6 +140,7 @@ test('real mapped leaves: German and Yue remain shells in native and parent tile
   const data = {
     languages,
     variants,
+    languageById: new Map(languages.map((language) => [language.id, language])),
     variantById: new Map(variants.map((variant) => [variant.id, variant])),
   } as AtlasData
   const hierarchy = buildLanguageHierarchy(languages)
@@ -144,12 +151,24 @@ test('real mapped leaves: German and Yue remain shells in native and parent tile
     ['dlac1987china', 'yuec1235', { z: 4, x: 12, y: 6 }],
   ] as const) {
     const availability = buildGeographyAvailability(data, hierarchy, 'contemporary', [dataset], {})
-    const leaves = mappedLeavesForLanguages(
+    const branch = mappedBranchForLanguages(
       hierarchy.roots.map(({ id }) => id),
       hierarchy,
       availability,
     ).languageIds
-    const variantIds = leaves.flatMap((id) => availability.get(id)?.own?.id ?? [])
+    const variantIds = branch.flatMap((id) => availability.get(id)?.own?.id ?? [])
+    const entries = branch.flatMap((id) => {
+      const entry = pinMapEntry(id, availability.get(id), 'own', {
+        sources: [dataset],
+        period: 'contemporary',
+      })
+      return entry
+        ? [{ ...entry, branchRootId: hierarchy.languageById.get(id)?.familyId ?? id }]
+        : []
+    })
+    const selection = parseOverlapSelection(
+      mapAreaSelectionKey(resolveMapEntries(entries, data, new Map())),
+    )
     const variantId = `${dataset}:contemporary:${language}`
     assert.ok(variantIds.includes(variantId))
     const [result] = await Array.fromAsync(
@@ -160,6 +179,7 @@ test('real mapped leaves: German and Yue remain shells in native and parent tile
           archiveUrl: 'local',
           sourceLayer: 'language_areas',
           variantIds,
+          ...selection,
           tiles: [tile],
         },
         () => true,

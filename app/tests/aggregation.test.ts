@@ -11,8 +11,8 @@ import {
   mapAreaMemberships,
   mapAreaSelectionKey,
   mapAreaSourceColors,
-  mappedLeavesForLanguage,
-  mappedLeavesForLanguages,
+  mappedBranchForLanguage,
+  mappedBranchForLanguages,
 } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
 import { buildLanguageSearchIndex, searchCatalog } from '../src/domain/catalog.ts'
@@ -223,99 +223,111 @@ test('viewport scope follows chosen own or descendant geometry, including empty 
   )
 })
 
-test('mapped leaves traverse every branch to its deepest available geography', () => {
-  const leaves = mappedLeavesForLanguage('family', hierarchy, availability())
-  assert.deepEqual(leaves.languageIds, ['nested', 'other-dialect'])
+test('mapped branches preserve mapped ancestors and visit every descendant', () => {
+  const branch = mappedBranchForLanguage('family', hierarchy, availability())
+  assert.deepEqual(branch.languageIds, ['nested', 'dialect', 'language', 'other-dialect', 'family'])
   assert.deepEqual(
-    [...leaves.subtreeIds].sort(),
+    [...branch.subtreeIds].sort(),
     languages
       .filter(({ id }) => id !== 'isolate')
       .map(({ id }) => id)
       .sort(),
     'All subtree entries are visited, including unmapped and collapsed branches',
   )
-  const modes = Object.fromEntries(leaves.languageIds.map((id) => [id, 'own' as const]))
-  const areas = resolveMapAreas(leaves.languageIds, availability(), modes)
+  const modes = Object.fromEntries(branch.languageIds.map((id) => [id, 'own' as const]))
+  const areas = resolveMapAreas(branch.languageIds, availability(), modes)
   assert.deepEqual(
     areas.map(({ id }) => id),
-    ['modern:nested', 'modern:other-dialect'],
+    [
+      'modern:nested',
+      'modern:dialect',
+      'historic:language',
+      'modern:other-dialect',
+      'historic:family',
+    ],
   )
   assert.ok(areas.every(({ mode, variants }) => mode === 'own' && variants.length === 1))
 })
 
-test('mapped leaves apply source and period filters before determining the frontier', () => {
+test('mapped branches apply source and period filters before selection', () => {
   assert.deepEqual(
-    mappedLeavesForLanguage('family', hierarchy, availability('all', ['historic'])).languageIds,
-    ['language'],
+    mappedBranchForLanguage('family', hierarchy, availability('all', ['historic'])).languageIds,
+    ['language', 'family'],
     'A mapped ancestor is retained when all its finer geography is filtered out',
   )
   assert.deepEqual(
-    mappedLeavesForLanguage('family', hierarchy, availability('time-of-contact')).languageIds,
-    ['language'],
+    mappedBranchForLanguage('family', hierarchy, availability('time-of-contact')).languageIds,
+    ['language', 'family'],
   )
   assert.deepEqual(
-    mappedLeavesForLanguage('family', hierarchy, availability('contemporary')).languageIds,
-    ['nested', 'other-dialect'],
+    mappedBranchForLanguage('family', hierarchy, availability('contemporary')).languageIds,
+    ['nested', 'dialect', 'language', 'other-dialect'],
   )
   assert.deepEqual(
-    mappedLeavesForLanguage('family', hierarchy, availability('all', [])).languageIds,
+    mappedBranchForLanguage('family', hierarchy, availability('all', [])).languageIds,
     [],
   )
 })
 
-test('bulk mapped leaves deduplicate overlapping matches in any order', () => {
+test('bulk mapped branches deduplicate overlapping matches in any order', () => {
   for (const roots of [
     ['family', 'language', 'nested', 'family'],
     ['nested', 'language', 'family'],
   ]) {
-    const leaves = mappedLeavesForLanguages(roots, hierarchy, availability())
-    assert.deepEqual(leaves.languageIds, ['nested', 'other-dialect'])
+    const branch = mappedBranchForLanguages(roots, hierarchy, availability())
+    assert.deepEqual(branch.languageIds, [
+      'nested',
+      'dialect',
+      'language',
+      'other-dialect',
+      'family',
+    ])
     assert.deepEqual(
-      leaves.subtreeIds,
-      mappedLeavesForLanguage('family', hierarchy, availability()).subtreeIds,
+      branch.subtreeIds,
+      mappedBranchForLanguage('family', hierarchy, availability()).subtreeIds,
     )
   }
 })
 
-test('bulk mapped leaves include only matched branches and respect geography filters', () => {
+test('bulk mapped branches include only matched branches and respect geography filters', () => {
   assert.deepEqual(
-    mappedLeavesForLanguages(['language', 'gap', 'unknown'], hierarchy, availability()).languageIds,
-    ['nested'],
+    mappedBranchForLanguages(['language', 'gap', 'unknown'], hierarchy, availability()).languageIds,
+    ['nested', 'dialect', 'language'],
   )
   assert.deepEqual(
-    mappedLeavesForLanguages(['language', 'unmapped'], hierarchy, availability()).languageIds,
-    ['nested', 'other-dialect'],
+    mappedBranchForLanguages(['language', 'unmapped'], hierarchy, availability()).languageIds,
+    ['nested', 'dialect', 'language', 'other-dialect'],
   )
   assert.deepEqual(
-    mappedLeavesForLanguages(['nested', 'family'], hierarchy, availability('time-of-contact'))
+    mappedBranchForLanguages(['nested', 'family'], hierarchy, availability('time-of-contact'))
       .languageIds,
-    ['language'],
+    ['language', 'family'],
   )
   assert.deepEqual(
-    mappedLeavesForLanguages(['family', 'language'], hierarchy, availability('all', []))
+    mappedBranchForLanguages(['family', 'language'], hierarchy, availability('all', []))
       .languageIds,
     [],
   )
-  assert.deepEqual(mappedLeavesForLanguages([], hierarchy, availability()).languageIds, [])
+  assert.deepEqual(mappedBranchForLanguages([], hierarchy, availability()).languageIds, [])
 })
 
-test('mapped leaves handle subgroups, mapped roots with unmapped children, and missing geography', () => {
-  assert.deepEqual(mappedLeavesForLanguage('unmapped', hierarchy, availability()).languageIds, [
+test('mapped branches handle subgroups, mapped roots with unmapped children, and missing geography', () => {
+  assert.deepEqual(mappedBranchForLanguage('unmapped', hierarchy, availability()).languageIds, [
     'other-dialect',
   ])
-  assert.deepEqual(mappedLeavesForLanguage('nested', hierarchy, availability()).languageIds, [
+  assert.deepEqual(mappedBranchForLanguage('nested', hierarchy, availability()).languageIds, [
     'nested',
   ])
   assert.deepEqual(
-    mappedLeavesForLanguage('language', hierarchy, availability('time-of-contact')).languageIds,
+    mappedBranchForLanguage('language', hierarchy, availability('time-of-contact')).languageIds,
     ['language'],
   )
   for (const id of ['gap', 'isolate', 'unknown']) {
-    assert.deepEqual(mappedLeavesForLanguage(id, hierarchy, availability()).languageIds, [])
+    assert.deepEqual(mappedBranchForLanguage(id, hierarchy, availability()).languageIds, [])
   }
 })
 
-test('mapped leaves preserve contributor source overrides', () => {
+test('mapped branches preserve contributor source overrides', () => {
   const alternate = { ...required(data.variantById.get('modern:nested')), id: 'alternate:nested' }
   const withAlternate = {
     ...data,
@@ -333,19 +345,19 @@ test('mapped leaves preserve contributor source overrides', () => {
     'all',
     { nested: alternate.id },
   )
-  const leaves = mappedLeavesForLanguage('family', hierarchy, available)
-  assert.deepEqual(leaves.languageIds, ['nested', 'other-dialect'])
+  const branch = mappedBranchForLanguage('family', hierarchy, available)
+  assert.deepEqual(branch.languageIds, ['nested', 'dialect', 'language', 'other-dialect', 'family'])
   assert.equal(
-    resolveMapAreas(leaves.languageIds, available, { nested: 'own' }, withAlternate)[0]?.id,
+    resolveMapAreas(branch.languageIds, available, { nested: 'own' }, withAlternate)[0]?.id,
     alternate.id,
   )
 })
 
-test('mapped leaf traversal terminates on malformed cyclic classifications', () => {
+test('mapped branch traversal terminates on malformed cyclic classifications', () => {
   const cyclic = buildLanguageHierarchy([entry('a', 'b'), entry('b', 'a')])
-  const leaves = mappedLeavesForLanguage('a', cyclic, new Map())
-  assert.deepEqual([...leaves.subtreeIds], ['a', 'b'])
-  assert.deepEqual(leaves.languageIds, [])
+  const branch = mappedBranchForLanguage('a', cyclic, new Map())
+  assert.deepEqual([...branch.subtreeIds], ['a', 'b'])
+  assert.deepEqual(branch.languageIds, [])
 })
 
 test('aggregation excludes the entry itself and stops at the first mapped descendant per branch', () => {
@@ -591,7 +603,7 @@ test('aggregate comparisons pin contributor variants and gaps and carry independ
   )
 })
 
-test('mapped-leaf replacement preserves other comparison contexts and individual color overrides', () => {
+test('branch replacement preserves other comparison contexts and individual color overrides', () => {
   const historicContext = { sources: ['historic'], period: 'time-of-contact' } as const
   const modernContext = { sources: ['modern'], period: 'contemporary' } as const
   const historic = required(
@@ -611,15 +623,15 @@ test('mapped-leaf replacement preserves other comparison contexts and individual
       period: 'all',
     }),
   )
-  const leaves = mappedLeavesForLanguage('family', hierarchy, availability('contemporary'))
-  const candidates = leaves.languageIds.map((id) =>
+  const branch = mappedBranchForLanguage('family', hierarchy, availability('contemporary'))
+  const candidates = branch.languageIds.map((id) =>
     required(pinMapEntry(id, availability('contemporary').get(id), 'own', modernContext, 'family')),
   )
   const manual = { ...required(candidates[0]), colorRootId: null, colorOverride: '#ff0000' }
   const replaced = replaceSubtreeMapEntries(
     [historic, modern, unrelated, manual],
     candidates,
-    leaves.subtreeIds,
+    branch.subtreeIds,
     modernContext,
   )
   assert.ok(replaced.includes(historic) && replaced.includes(unrelated))
@@ -627,7 +639,7 @@ test('mapped-leaf replacement preserves other comparison contexts and individual
   assert.equal(replaced.find(({ id }) => id === manual.id)?.colorOverride, '#ff0000')
   assert.equal(replaced.find(({ id }) => id === manual.id)?.colorRootId, 'family')
   assert.deepEqual(
-    replaceSubtreeMapEntries(replaced, candidates, leaves.subtreeIds, modernContext),
+    replaceSubtreeMapEntries(replaced, candidates, branch.subtreeIds, modernContext),
     replaced,
   )
   assert.equal(

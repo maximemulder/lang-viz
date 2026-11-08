@@ -105,6 +105,11 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                     </small>
                   </>
                 )}
+                {area?.branchRootId && (
+                  <small>
+                    Branch view · area not resolved to a more specific selected descendant.
+                  </small>
+                )}
                 {inspection.pinned && (
                   <button
                     type="button"

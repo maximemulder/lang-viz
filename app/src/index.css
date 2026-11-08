@@ -549,7 +549,7 @@ h2 {
   padding: 0.3rem;
   font-size: 0.65rem;
 }
-.finder-detail__mapped-leaves button {
+.finder-detail__branch button {
   margin: 0.4rem 0;
   padding: 0.35rem 0.5rem;
   border: 1px solid rgb(29 43 39 / 20%);
@@ -560,7 +560,7 @@ h2 {
   font-size: 0.65rem;
   cursor: pointer;
 }
-.finder-detail__mapped-leaves button:disabled {
+.finder-detail__branch button:disabled {
   color: var(--muted-ink);
   cursor: default;
   opacity: 0.6;

@@ -4,13 +4,13 @@ import { type RefObject, useEffect } from 'react'
 import {
   areaModesAtom,
   atlasDataAtom,
+  branchColorRootsAtom,
   clearMapSelectionAtom,
   colorConfigurationAtom,
   geographyDatasetFilterAtom,
   geometryOverridesAtom,
   languageColorsAtom,
   mapEntriesAtom,
-  mappedLeafColorRootsAtom,
   overlapModeAtom,
   overlapStatusAtom,
   selectedMapAreasAtom,
@@ -81,7 +81,7 @@ export default function OverlapTestControls({
             roots: Object.fromEntries(
               ids.map((id) => [id, store.get(semanticPaletteAtom).rootById.get(id)]),
             ),
-            mappedLeafRoots: store.get(mappedLeafColorRootsAtom),
+            branchRoots: store.get(branchColorRootsAtom),
           }),
         },
         () => store.get(overlapStatusAtom),

@@ -29,6 +29,8 @@ export interface MapEntry {
   readonly context: GeographyContext
   readonly colorRootId: LanguageId | null
   readonly colorOverride: string | null
+  /** Entries added together refine ancestors in this branch and pinned context. */
+  readonly branchRootId?: LanguageId | undefined
 }
 
 export const geographyContextKey = ({ sources, period }: GeographyContext) =>
@@ -118,8 +120,15 @@ export const replaceSubtreeMapEntries = (
       )
       .map((entry) => {
         const replacement = replacements.get(mapEntryKey(entry))
-        return replacement && replacement.colorRootId !== entry.colorRootId
-          ? { ...entry, colorRootId: replacement.colorRootId }
+        return replacement &&
+          geographyContextKey(entry.context) === key &&
+          (replacement.colorRootId !== entry.colorRootId ||
+            replacement.branchRootId !== entry.branchRootId)
+          ? {
+              ...entry,
+              colorRootId: replacement.colorRootId,
+              branchRootId: replacement.branchRootId,
+            }
           : entry
       }),
     candidates,
@@ -130,8 +139,8 @@ export const resolveMapEntries = (
   entries: readonly MapEntry[],
   data: AtlasData,
   colors: ReadonlyMap<LanguageId, string>,
-): readonly MapArea[] =>
-  entries.flatMap((entry) => {
+): readonly MapArea[] => {
+  const areas: MapArea[] = entries.flatMap((entry) => {
     const variants = entry.variantIds.flatMap((id) => {
       const variant = data.variantById.get(id)
       return variant ? [variant] : []
@@ -145,9 +154,46 @@ export const resolveMapEntries = (
         mode: entry.mode,
         variants,
         color: entry.colorOverride ?? colors.get(entry.languageId) ?? '#777777',
+        ...(entry.branchRootId ? { branchRootId: entry.branchRootId } : {}),
       },
     ]
   })
+  // An ancestry index per intentional branch view avoids quadratic pair scans.
+  const branches = new Map<string, Map<string, MapArea[]>>()
+  const groupFor = (entry: MapEntry) =>
+    JSON.stringify([entry.branchRootId, geographyContextKey(entry.context)])
+  const entryById = new Map(entries.map((entry) => [entry.id, entry]))
+  for (const area of areas) {
+    const entry = entryById.get(area.id)
+    if (!entry?.branchRootId) continue
+    const key = groupFor(entry)
+    const branch = branches.get(key) ?? new Map<string, MapArea[]>()
+    branch.set(area.languageId, [...(branch.get(area.languageId) ?? []), area])
+    branches.set(key, branch)
+  }
+  return areas.map((area) => {
+    const entry = entryById.get(area.id)
+    if (!entry?.branchRootId) return area
+    const branch = branches.get(groupFor(entry))
+    const refines: string[] = []
+    const visited = new Set([area.languageId])
+    let parent = data.languageById.get(area.languageId)?.parentId
+    while (parent && !visited.has(parent)) {
+      visited.add(parent)
+      for (const ancestor of branch?.get(parent) ?? []) {
+        // A broad 'all periods' browse can choose different periods per node.
+        // Those representations remain comparisons, not geographic refinements.
+        if (
+          ancestor.variants[0]?.temporalCoverage.viewId ===
+          area.variants[0]?.temporalCoverage.viewId
+        )
+          refines.push(ancestor.id)
+      }
+      parent = data.languageById.get(parent)?.parentId
+    }
+    return refines.length ? { ...area, refines: refines.sort() } : area
+  })
+}
 
 export const mapEntryDescription = (entry: MapEntry, data: AtlasData) => {
   const variants = entry.variantIds.flatMap((id) => {

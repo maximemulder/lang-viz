@@ -61,6 +61,12 @@ export const PinnedMapEntries = ({
                 ? 'Own area'
                 : `Descendant areas · ${entry.variantIds.length} contributors · ${entry.uncoveredBranchIds.length} uncovered branches`}
             </small>
+            {entry.branchRootId && (
+              <p>
+                Branch view: mapped descendants replace ancestor colors where they overlap. Broader
+                coverage remains at its supplied classification level.
+              </p>
+            )}
             <div className="map-entry-card__actions">
               <label>
                 Color

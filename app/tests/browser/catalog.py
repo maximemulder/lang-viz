@@ -50,6 +50,12 @@ def search(browser, query, glottocode):
 
 
 def main():
+    catalog = json.loads((APP / "public/data/languages.json").read_text())
+    # Some local catalogs retain an additional broad Sino-Tibetan source area.
+    # Both source revisions must preserve it when present, alongside descendants.
+    sino_has_own = any(v.startswith("dlac1987china:contemporary:") for row in catalog if row["id"] == "sino1245" for v in row["geometryVariantIds"])
+    family_ids = ["ganc1239", "hakk1236", "jiny1235", "huiz1242", "wuch1236", "xian1251", "ping1245", "yuec1235", "minn1248", "mand1415"] + (["sino1245"] if sino_has_own else [])
+    family_total = len(family_ids) + 2
     output = APP / "test-results/catalog"
     output.mkdir(parents=True, exist_ok=True)
     results = {}
@@ -710,11 +716,11 @@ def main():
             """)
             wait_for(
                 lambda: browser.js("""
-                    const button = document.querySelector('.finder-detail__mapped-leaves button');
-                    return button && !button.disabled && button.textContent === 'Show mapped leaves (10)';
-                """),
+                    const button = document.querySelector('.finder-detail__branch button');
+                    return button && !button.disabled && button.textContent === arguments[0];
+                """, f"Show branch on map ({len(family_ids)})"),
                 10,
-                "DLAC mapped leaf count",
+                "DLAC mapped branch count",
             )
             browser.js("document.querySelector('.source-filter__trigger').click()")
             browser.js("""
@@ -723,25 +729,25 @@ def main():
                 select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
             before = len(browser.snapshot()["reports"])
-            browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
-            leaves_state = ready_after(before, 12)
-            assert not leaves_state["errors"], leaves_state["errors"]
+            browser.js("document.querySelector('.finder-detail__branch button').click()")
+            branch_state = ready_after(before, family_total)
+            assert not branch_state["errors"], branch_state["errors"]
             view(browser, "explore")
             wait_for(lambda: browser.js("return !!document.querySelector('.language-row input')"), 10, "return to family search")
-            assert not browser.js("return document.querySelector('.language-row input').checked")
+            assert browser.js("return document.querySelector('.language-row input').checked") == sino_has_own
             assert browser.js("return document.querySelectorAll('.language-row').length") == 1
-            assert "12 shown" in browser.js(
+            assert f"{family_total} shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
-            browser.screenshot(output / "dlac-family-leaves.png")
+            browser.screenshot(output / "dlac-family-branch.png")
             family_colors = browser.js("return window.overlapTest.colorState(['mand1415','jiny1235','yuec1235'])")
-            assert family_colors["mappedLeafRoots"] == ["sino1245"]
+            assert family_colors["branchRoots"] == ["sino1245"]
             assert set(family_colors["roots"].values()) == {"sino1245"}
 
             # Repeating the action is idempotent; filters update the count and disable empty actions.
             open_details(browser)
-            browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
-            assert "12 shown" in browser.js(
+            browser.js("document.querySelector('.finder-detail__branch button').click()")
+            assert f"{family_total} shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             browser.js("""
@@ -751,13 +757,13 @@ def main():
             """)
             wait_for(
                 lambda: browser.js("""
-                    const button = document.querySelector('.finder-detail__mapped-leaves button');
-                    return button.disabled && button.textContent === 'Show mapped leaves (0)';
+                    const button = document.querySelector('.finder-detail__branch button');
+                    return button.disabled && button.textContent === 'Show branch on map (0)';
                 """),
                 10,
-                "unavailable mapped leaves",
+                "unavailable mapped branches",
             )
-            assert "12 shown" in browser.js(
+            assert f"{family_total} shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             browser.js("""
@@ -765,12 +771,9 @@ def main():
                 select.value = 'contemporary';
                 select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            assert browser.snapshot()["selectedCount"] == 12
+            assert browser.snapshot()["selectedCount"] == family_total
             assert browser.js("return window.overlapTest.colorState(['mand1415','jiny1235','yuec1235']).colors") == family_colors["colors"]
-            leaf_ids = [
-                "ganc1239", "hakk1236", "jiny1235", "huiz1242", "wuch1236",
-                "xian1251", "ping1245", "yuec1235", "minn1248", "mand1415",
-            ]
+            leaf_ids = family_ids
             for code in leaf_ids:
                 search(browser, code, code)
                 assert browser.js("""
@@ -778,14 +781,14 @@ def main():
                     return row.querySelector('input').checked && row.dataset.areaMode === 'own';
                 """), code
             # Explore checkboxes describe the DLAC draft; Asher entries stay pinned separately.
-            for code, checked in [("beij1235", False), ("sino1245", False), ("abkh1244", False)]:
+            for code, checked in [("beij1235", False), ("abkh1244", False)]:
                 search(browser, code, code)
                 assert browser.js(
                     "return document.querySelector('.language-row input').checked"
                 ) == checked, code
-            results["dlacFamilyLeaves"] = {"ids": leaf_ids, "selectedCount": 12}
+            results["dlacFamilyBranches"] = {"ids": leaf_ids, "selectedCount": family_total}
 
-            # Bulk leaves follow the current query across multiple, overlapping branches.
+            # Bulk branches follow the current query across multiple overlapping matches.
             browser.js(
                 "window.overlapTest.configure(arguments[0])",
                 {
@@ -815,17 +818,17 @@ def main():
             browser.js("document.querySelector('.source-filter__trigger').click()")
             bulk_button = """
                 [...document.querySelectorAll('.finder-actions button')]
-                  .find(button => button.textContent.startsWith('Show mapped leaves'))
+                  .find(button => button.textContent.startsWith('Show branches on map'))
             """
             wait_for(
                 lambda: browser.js(f"""
                     const button = {bulk_button};
-                    return !button.disabled && button.textContent === 'Show mapped leaves (8)';
+                    return !button.disabled && button.textContent === 'Show branches on map (8)';
                 """),
                 10,
-                "query mapped leaf count",
+                "query mapped branch count",
             )
-            assert browser.js("return document.querySelectorAll('.finder-detail__mapped-leaves').length") == 0
+            assert browser.js("return document.querySelectorAll('.finder-detail__branch').length") == 0
             before = len(browser.snapshot()["reports"])
             browser.js(f"({bulk_button}).click()")
             ready_after(before, 10)
@@ -836,7 +839,7 @@ def main():
             assert "10 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
-            bulk_leaf_ids = [code for code in leaf_ids if code not in {"ping1245", "minn1248"}]
+            bulk_leaf_ids = [code for code in leaf_ids if code not in {"ping1245", "minn1248", "sino1245"}]
             for code in bulk_leaf_ids:
                 search(browser, code, code)
                 assert browser.js("""
@@ -857,10 +860,10 @@ def main():
             wait_for(
                 lambda: browser.js(f"""
                     const button = {bulk_button};
-                    return button.disabled && button.textContent === 'Show mapped leaves (0)';
+                    return button.disabled && button.textContent === 'Show branches on map (0)';
                 """),
                 10,
-                "unavailable query mapped leaves",
+                "unavailable query mapped branches",
             )
             browser.js("""
                 const select = document.querySelector('.finder-filters__period select');
@@ -935,7 +938,7 @@ def main():
             browser.js("document.querySelector('.on-map-actions button').click()")
             wait_for(lambda: browser.snapshot()["selectedCount"] == 0, 10, "clear all selections through filtered list")
             assert browser.js("return document.querySelector('.on-map-actions button').disabled")
-            assert browser.js("return window.overlapTest.colorState([]).mappedLeafRoots") == []
+            assert browser.js("return window.overlapTest.colorState([]).branchRoots") == []
             results["multiViewControls"] = "passed"
 
             results["comparisons"] = check_comparisons(browser, output, search, view, open_details)

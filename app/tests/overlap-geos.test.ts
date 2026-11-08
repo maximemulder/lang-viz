@@ -285,6 +285,7 @@ test('GEOS ownership is released after success, budget rejection, invalid input,
     'GEOSIntersection',
     'GEOSDifference',
     'GEOSUnion',
+    'GEOSUnaryUnion',
   ])
     track(geos, key, geometries)
   const createCollection = geos.GEOSGeom_createCollection.bind(geos)
@@ -316,6 +317,7 @@ test('GEOS ownership is released after success, budget rejection, invalid input,
   }
   for (let i = 0; i < 10; i++) {
     partition(inputs, 16, { includeSingles: true })
+    partition(inputs, 16, { includeSingles: true, refinements: { B: ['A'] } })
     clean()
     assert.throws(() => partition(inputs, 16, { maxRegions: 0 }), OverlapBudgetError)
     clean()
@@ -403,13 +405,17 @@ test('GEOS ownership is released after success, budget rejection, invalid input,
     'GEOSIntersection',
     'GEOSDifference',
     'GEOSUnion',
+    'GEOSUnaryUnion',
     'GEOSGeoJSONReader_readGeometry',
     'GEOSGeoJSONWriter_writeGeometry',
   ] as const) {
     const original = geos[key]
     geos[key] = (() => 0) as typeof original
     try {
-      assert.throws(() => partition(inputs, 16, { includeSingles: true }), OverlapGeometryError)
+      assert.throws(
+        () => partition(inputs, 16, { includeSingles: true, refinements: { B: ['A'] } }),
+        OverlapGeometryError,
+      )
       clean()
     } finally {
       geos[key] = original

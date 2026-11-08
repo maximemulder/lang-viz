@@ -226,6 +226,11 @@ test('navigation retains unique coverage, prioritizes the viewport, and resets d
 
 test('stripe images use all contributor colors, opaque alpha, and seamless power-of-two periods', () => {
   const image = stripeImage(['#ff0000', '#00ff00', '#0000ff'])
+  assert.equal(
+    patternPixels(3),
+    (image.width + 2) ** 2,
+    'Budget counts actual padded image storage',
+  )
   assert.equal(image.width & (image.width - 1), 0)
   const counts = new Map<string, number>()
   for (let i = 0; i < image.data.length; i += 4) {
@@ -276,15 +281,16 @@ test('pattern budgets count padded texels rather than rejecting many small combi
     () => checkPatternBudget(MAX_PATTERN_PIXELS + 1),
     (error: unknown) => error instanceof OverlapPatternError && error.reason === 'pattern-memory',
   )
-  assert.equal(patternSize(42), 256)
+  assert.equal(patternSize(42), 128)
   assert.throws(
     () => patternSize(43),
     (error: unknown) =>
       error instanceof OverlapPatternError && error.reason === 'pattern-contributors',
   )
-  // Same logical period as the former image at pixelRatio 2.
-  for (const count of [2, 3, 4, 8, 16, 42])
-    assert.equal(patternSize(count), 2 ** Math.ceil(Math.log2(Math.max(32, count * 12))) / 2)
+  for (const count of [2, 3, 4, 8, 16, 42]) {
+    assert.ok(patternSize(count) / count >= 3, 'Each contributor retains a visible band')
+    assert.ok(patternSize(count) <= 128, 'Texture dimensions remain bounded')
+  }
 })
 
 test('tile delivery groups disconnected faces without losing holes or reusing stale selections', async () => {

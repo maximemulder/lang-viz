@@ -8,13 +8,13 @@ export class OverlapPatternError extends Error {
   }
 }
 
-// One image pixel per logical pixel (formerly 2×), preserving the displayed
-// period while quartering stripe storage.
+// Keep two-color repeats at 16 px; tighter multi-color repeats bound atlas
+// storage while retaining at least three native pixels per color band.
 export const patternSize = (contributors: number) => {
   if (!Number.isInteger(contributors) || contributors < 2)
     throw new Error('A stripe pattern needs at least two colors')
-  const size = 2 ** Math.ceil(Math.log2(Math.max(16, contributors * 6)))
-  if (size > 256)
+  const size = 2 ** Math.ceil(Math.log2(Math.max(16, contributors * 3)))
+  if (size > 128)
     throw new OverlapPatternError(
       'pattern-contributors',
       'Too many languages overlap here for this preview. Select fewer languages.',

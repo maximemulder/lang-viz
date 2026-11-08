@@ -1,5 +1,7 @@
 import type { FeatureCollection, MultiPolygon } from 'geojson'
+import type { Refinements } from '../../../domain/refinement.ts'
 import type { DeliveryTile } from './delivery.ts'
+import type { PrecomputedBranches } from './precomputed.ts'
 
 export interface TileCoordinate {
   readonly z: number
@@ -27,12 +29,15 @@ export interface OverlapRequest {
   readonly variantIds: readonly string[]
   /** Map source polygons to selected representations before union/partition. */
   readonly variantGroups?: Readonly<Record<string, readonly string[]>>
+  readonly refinements?: Refinements
+  readonly precomputed?: PrecomputedBranches
   readonly tiles: readonly TileCoordinate[]
   /** Tiles retained by the receiver for this same selection; send only additions. */
   readonly knownTiles?: readonly string[]
 }
 
 export interface OverlapMetrics {
+  precomputedTiles?: number
   cache?: {
     decodedEntries: number
     decodedBytes: number
@@ -78,6 +83,7 @@ export const patternId = (variantIds: readonly string[]) => `overlap:${variantId
 export interface OverlapSelection {
   readonly variantIds: readonly string[]
   readonly variantGroups?: Readonly<Record<string, readonly string[]>>
+  readonly refinements?: Refinements
 }
 
 export const parseOverlapSelection = (key: string): OverlapSelection => {

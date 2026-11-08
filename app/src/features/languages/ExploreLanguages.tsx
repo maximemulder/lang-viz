@@ -12,7 +12,7 @@ import {
   areaStatus,
   areaVariants,
   isAreaAvailable,
-  mappedLeavesForLanguages,
+  mappedBranchForLanguages,
 } from '../../domain/aggregation'
 import { searchCatalog } from '../../domain/catalog'
 import { prepareExploreResults } from '../../domain/exploration'
@@ -32,8 +32,8 @@ import {
   languageQueryAtom,
   mapEntriesAtom,
   selectedDraftLanguageIdsAtom,
+  showBranchAtom,
   showLanguagesAtom,
-  showMappedLeavesAtom,
   toggleVisibleLanguageAtom,
   viewportLanguageIdsAtom,
 } from '../../state/atlasState'
@@ -173,7 +173,7 @@ export const ExploreLanguages = () => {
   const [query, setQuery] = useAtom(languageQueryAtom)
   const [scope, setScope] = useAtom(finderScopeAtom)
   const showLanguages = useSetAtom(showLanguagesAtom)
-  const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
+  const showBranch = useSetAtom(showBranchAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const hideLanguages = useSetAtom(hideLanguagesAtom)
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
@@ -208,9 +208,9 @@ export const ExploreLanguages = () => {
       }),
     [matches, hierarchy, isBrowsingRoots, searchViewportIds, availability, modes],
   )
-  const filteredMappedLeaves = useMemo(
+  const filteredBranch = useMemo(
     () =>
-      mappedLeavesForLanguages(
+      mappedBranchForLanguages(
         roots.map(({ id }) => id),
         hierarchy,
         availability,
@@ -391,11 +391,11 @@ export const ExploreLanguages = () => {
           </button>
           <button
             type="button"
-            disabled={!filteredMappedLeaves.languageIds.length}
-            onClick={() => showMappedLeaves(roots.map(({ id }) => id))}
-            title={`Show the deepest entries with polygons across all ${isBrowsingRoots ? 'roots' : 'matches'}, each with its own color. Replaces entries within these branches from the same source/period context; keeps other comparisons.`}
+            disabled={!filteredBranch.languageIds.length}
+            onClick={() => showBranch(roots.map(({ id }) => id))}
+            title={`Show mapped entries throughout these ${isBrowsingRoots ? 'branches' : 'matching branches'}. Descendants refine ancestor colors where they overlap; broader coverage remains. Replaces entries from the same source/period context; keeps other comparisons.`}
           >
-            Show mapped leaves ({filteredMappedLeaves.languageIds.length.toLocaleString()})
+            Show branches on map ({filteredBranch.languageIds.length.toLocaleString()})
           </button>
         </div>
       </div>

@@ -10,8 +10,10 @@ import { languageArchiveUrl } from '../../data/atlasRepository'
 import {
   inspectedSourceVariantIds,
   mapAreaMemberships,
+  mapAreaRefinements,
   mapAreaSelectionKey,
   mapAreaSourceColors,
+  mapAreaSourcePriorities,
 } from '../../domain/aggregation'
 import {
   atlasDataAtom,
@@ -92,11 +94,14 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
   const memberships = mapAreaMemberships(areas)
   const variantIds = Object.keys(memberships).sort()
   const sourceColors = mapAreaSourceColors(areas)
+  const sourcePriorities = mapAreaSourcePriorities(areas)
   const selectionKey = mapAreaSelectionKey(areas, overlapMode)
   const inspectedIds = inspectedSourceVariantIds(inspectedVariantIds, areas)
-  const hasAggregation = areas.some(({ mode }) => mode === 'descendants')
+  const hasComposition = areas.some(
+    ({ mode, refines }) => mode === 'descendants' || refines?.length,
+  )
   const coverageReady =
-    (overlapMode === 'hatching' || hasAggregation) && coverageKey === selectionKey
+    (overlapMode === 'hatching' || hasComposition) && coverageKey === selectionKey
   const filter: FilterSpecification = ['in', ['get', 'variant_id'], ['literal', variantIds]]
   const temporalFilter: FilterSpecification =
     temporalSelection === 'all'
@@ -130,16 +135,27 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
           source-layer={data.manifest.vectorLayer}
           type="fill"
           filter={filter}
+          layout={{
+            'fill-sort-key': [
+              'coalesce',
+              ['get', ['get', 'variant_id'], ['literal', sourcePriorities]],
+              0,
+            ],
+          }}
           paint={{
-            'fill-color': ['get', ['get', 'variant_id'], ['literal', sourceColors]],
+            'fill-color': [
+              'coalesce',
+              ['get', ['get', 'variant_id'], ['literal', sourceColors]],
+              '#777777',
+            ],
             // Once ready, coverage and its spatially clipped vector fallback
             // replace these fills. Neither draws beneath the other's interiors.
             'fill-opacity': coverageReady
               ? 0
-              : overlapMode === 'blending' && !hasAggregation
+              : overlapMode === 'blending' && !hasComposition
                 ? opacity
                 : 1,
-            'fill-layer-opacity': overlapMode === 'hatching' || hasAggregation ? opacity : 1,
+            'fill-layer-opacity': overlapMode === 'hatching' || hasComposition ? opacity : 1,
             'fill-opacity-transition': { duration: 0 },
             'fill-layer-opacity-transition': { duration: 0 },
           }}
@@ -161,6 +177,7 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
         variants={areas}
         sourceVariantIds={variantIds}
         sourceColors={sourceColors}
+        sourcePriorities={sourcePriorities}
         selectionKey={selectionKey}
         coverageReady={coverageReady}
         onCoverageReady={setCoverageKey}
@@ -188,6 +205,7 @@ export const WorldMap = () => {
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
   const [inspection, setInspection] = useState<MapInspection | null>(null)
   const inspectionSelectionKey = mapAreaSelectionKey(useAtomValue(selectedMapAreasAtom))
+  const refinements = mapAreaRefinements(useAtomValue(selectedMapAreasAtom))
   const inspectionRef = useRef<MapInspection | null>(null)
   const inspectionFilterRef = useRef({
     inspectionSelectionKey,
@@ -251,7 +269,7 @@ export const WorldMap = () => {
           if (!latestEvent || inspectionRef.current?.pinned) return
 
           const nextInspection = inspectionFromVariants(
-            visibleVariantIds(latestEvent.target, latestEvent.point),
+            visibleVariantIds(latestEvent.target, latestEvent.point, refinements),
             latestEvent.lngLat.lng,
             latestEvent.lngLat.lat,
             false,
@@ -272,7 +290,7 @@ export const WorldMap = () => {
         cancelPendingHoverQuery()
         updateInspection(
           inspectionFromVariants(
-            visibleVariantIds(event.target, event.point),
+            visibleVariantIds(event.target, event.point, refinements),
             event.lngLat.lng,
             event.lngLat.lat,
             true,

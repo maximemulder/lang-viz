@@ -56,12 +56,14 @@ Classification roots always establish world palettes, including isolates. Select
 family entries establish comparison palettes automatically. Ordinary individual
 language selections retain their genealogy's palette.
 
-`showMappedLeavesAtom` records its highest matched root on each pinned leaf.
-`mappedLeafColorRootsAtom` derives roots from surviving entries; replacing a family with its mapped leaves therefore
+`showBranchAtom` records its highest matched root on every pinned branch entry.
+`branchColorRootsAtom` derives roots from surviving entries; replacing a family with its mapped branch therefore
 preserves coloring context. Redundant ancestor/descendant search matches do not
-establish a new independent palette for every leaf. A later selection within a
+establish a new independent palette for every mapped family or leaf. Family entries
+inside a branch use that branch's palette; independently selected families can
+still establish their own comparison palettes. A later selection within a
 subtree can establish a nested root. Replacing a subtree within the same source/period
-context updates its leaf provenance; other comparison contexts and unrelated roots
+context updates its branch provenance; other comparison contexts and unrelated roots
 remain. Removing the last entry carrying a root releases it. `clearMapSelectionAtom`
 clears entries and their provenance, preserving explicit color configuration.
 `visibleLanguageIdsAtom` is a read-only projection of unique selected languoids.

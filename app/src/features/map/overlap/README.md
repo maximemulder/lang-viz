@@ -2,7 +2,44 @@
 
 `OverlapHatching` receives the resolved geometry variants already selected by
 `WorldMap`. Geometry definition, source/period selection, and stripe rendering
-remain separate. No overlap combinations are precomputed offline.
+remain separate. Complete single-dataset branch views can use optional offline
+coverage at low zoom; other selections are computed live.
+
+## Branch composition and prepared views
+
+Branch actions select mapped ancestors as well as descendants. Their pinned
+group/context and temporal view determine an explicit descendant-to-ancestor
+refinement relation. The live partitioner inserts descendants first, unions the
+relevant existing descendant regions once per ancestor polygon, and subtracts
+that footprint before handling other overlaps. This avoids redundant ancestry
+stripes and repeated differences from increasingly fragmented family polygons.
+It preserves available geographic coverage and incomparable contributors.
+
+`npm run precompute:branches` uses the same engine without interactive budgets
+offline, one dataset/temporal view at a time, at zooms 0–3. It reads the existing
+simplified archive and writes canonical coverage MVT files, including empty tiles.
+An archive hash and versioned SHA-256 selection/refinement signature identify the
+output. Tiles are written atomically and completed files can be resumed. The
+manifest is updated only after all profiles complete; normal atlas regeneration
+removes that optional manifest field until preparation is rerun.
+
+The browser uses prepared tiles only when the exact selected variants and
+refinements match; aggregate aliases, mixed-source selections and different
+policies cannot reuse them. Missing optional files fall back to bounded live
+computation. Prepared results use the existing cache, output, pattern, publication,
+and cancellation limits. Higher zooms and arbitrary branches remain live.
+
+Both stripe and blend modes consume resolved coverage. Blending composites each
+face's ordered member colors once and renders a single layer per buffer, avoiding
+one MapLibre layer per selected entry. Color/opacity changes do not recompute
+geometry. Native fallback fills sort descendants above ancestors and inspection
+applies the same refinement relation.
+
+Two-color stripe repeats retain their 16-pixel period. Larger contributor sets use
+tighter repeats with at least three native pixels per color band, reducing texture
+storage within the existing padded-texel and resident-image budgets. Images use
+integer `pixelRatio: 1`: MapLibre's data-driven pattern attributes store that value
+as Uint16, so fractional ratios truncate to zero and make shared faces disappear.
 
 See the [overlap roadmap](../../../../../OVERLAP_ROADMAP.md) for open limitations,
 proposed priorities, and completion criteria across sessions.
@@ -47,14 +84,14 @@ Color intensity defaults to 82%, adjustable between 40% and 100% without geometr
 recomputation. Each region blends with the basemap, never with another language
 fill underneath. This keeps solid areas and their stripe colors consistent.
 At 100%, stripe interiors match their contributor's exact RGB color. Color
-blending mode applies the same intensity setting as per-feature opacity, so
-overlapping language fills blend together. Both modes share one slider in the
+blending mode composites each face's ordered contributors using that intensity,
+then draws the resulting color and opacity once. Both modes share one slider in the
 collapsible Map settings panel. Map zoom fades
 remain disabled: MapLibre otherwise cross-fades between differently scaled
 copies of the stripe pattern, introducing mixed category colors during zooming.
 Texture filtering and outer boundary antialiasing soften narrow edges.
-Patterns use one texture pixel per logical pixel, preserving the previous displayed
-period at one quarter of its previous stripe image storage. Solids allocate no images.
+Patterns use one texture pixel per logical pixel and compact power-of-two repeats.
+Solids allocate no images.
 Diagonal rows reuse one cyclic color band rather than computing every pixel separately.
 
 Hover/click query only the active solid, stripe, and clipped fallback layers.

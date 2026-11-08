@@ -1,6 +1,6 @@
 # Overlap roadmap
 
-Last updated: 2026-11-05.
+Last updated: 2026-11-08.
 
 This document tracks the limitations to lift after the browser overlap-hatching
 proof of concept. Item IDs are stable so future sessions can refer to them.
@@ -25,7 +25,8 @@ Original language geometry remains available for picking. Navigation and failed
 updates retain the last valid coverage; replacements load in a second source
 before swapping into view. A clipped vector fallback streams language colors
 outside computed tile interiors. Selection changes clear obsolete memberships.
-No overlap combinations are precomputed offline.
+Complete single-dataset branch views have optional offline coverage at zooms 0–3;
+other selections are computed live.
 Geometry operations run on the CPU; MapLibre drawing runs on the GPU.
 
 See the [implementation notes](app/src/features/map/overlap/README.md) for the
@@ -442,6 +443,41 @@ inspection, error states, and cleanup. Keep real-data fixtures reproducible.
 critical browser transitions run automatically; and benchmark results can be
 compared across implementations. Extend coverage as new failure modes appear.
 
+### OVL-09 — Coverage-preserving genealogy branches
+
+**Status:** Implemented (2026-11-08).
+
+“Show branch on map” selects mapped ancestors and descendants. Within the pinned
+branch/context and temporal view, descendants replace ancestor colors locally;
+unrelated and sibling overlaps remain. Parent geometry and provenance stay pinned,
+and removing descendants restores their ancestor fill. Branch families share
+their selected root's palette instead of each becoming a separate comparison root.
+
+The live engine subtracts a batched descendant mask before processing an ancestor.
+Complete dataset/period views optionally use offline tiles at zooms 0–3, keyed by
+the exact archive and versioned selection/refinement signature. Mixed sources,
+partial branches and higher zooms remain live. Prepared data never combines datasets.
+CI builds the optional coverage after installing frontend dependencies.
+
+Firefox checks cover Halh/Dariganga in both modes and projections and restoration
+after child removal. A local software-rendered world run selected all 5,302 Asher
+contemporary entries: four prepared tiles, zero live Boolean time, 402 ms worker
+time, first coverage at 784 ms and complete publication at 1,319 ms. These are
+observations from this machine, not latency targets. All seven dataset/period
+profiles take about two minutes to prepare; repeated generation reused completed files.
+
+The first full-world stripe run exceeded the existing texture budget. Larger
+multi-color stripes now use tighter repeats with integer image pixel ratios;
+that view uses 2,550,124 padded texels and stays below the unchanged limit.
+Blending draws one composite face layer per buffer, avoiding thousands of layers.
+The navigation regression initially reached the live deadline at zoom 3; extending
+preparation through that zoom resolved it. The final Asher/DLAC navigation run
+sampled 2,097 frames across globe and Mercator with no missing coverage, including
+zooms 3–6.5. Frontend tests (120), pipeline tests (16), catalog/comparison browser
+checks, branch browser checks, lint, type checks and the production build pass.
+The renderer's other budgets remain in force. Next measure arbitrary branch
+subsets and mixed-source comparisons before extending preparation further.
+
 ## Decisions still open
 
 - GEOS/WASM is the current CPU geometry engine. Whether later workloads justify
@@ -486,6 +522,8 @@ npm run check
 npm run typecheck
 npm run build
 npm run test:browser
+npm run precompute:branches
+npm run test:branch-browser
 ```
 
 The real-archive tests require generated `app/public/data/language-areas.pmtiles`

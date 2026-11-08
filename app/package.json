@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "precompute:branches": "node scripts/precompute-branches.ts",
+    "test:branch-browser": "npm run build && python3 tests/browser/branches.py",
     "test:browser": "python3 tests/browser/run.py",
     "test:catalog-browser": "npm run build && python3 tests/browser/catalog.py",
     "test:coverage-browser": "npm run build && python3 tests/browser/coverage.py",

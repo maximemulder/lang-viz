@@ -1,4 +1,5 @@
 import type { Map as MapLibreMap, PointLike } from 'maplibre-gl'
+import { type Refinements, refinedMemberships } from '../../domain/refinement.ts'
 import {
   BUFFERS,
   blendLayerPrefix,
@@ -25,6 +26,7 @@ export const visibleVariantIds = (
   map: Pick<MapLibreMap, 'getLayer' | 'getPaintProperty' | 'queryRenderedFeatures'> &
     Partial<Pick<MapLibreMap, 'getLayersOrder'>>,
   point: PointLike,
+  refinements?: Refinements,
 ): string[] => {
   const coverage = BUFFERS.flatMap((buffer) =>
     [
@@ -41,11 +43,14 @@ export const visibleVariantIds = (
   // An empty coverage hit must stay empty: original polygons can differ in detail
   // and must not refill holes or restore contributors absent from the displayed face.
   if (!layers.length) return []
-  return [
-    ...new Set(
-      map
-        .queryRenderedFeatures(point, { layers })
-        .flatMap(({ properties }) => featureVariantIds(properties)),
-    ),
-  ].sort()
+  return refinedMemberships(
+    [
+      ...new Set(
+        map
+          .queryRenderedFeatures(point, { layers })
+          .flatMap(({ properties }) => featureVariantIds(properties)),
+      ),
+    ],
+    refinements,
+  )
 }

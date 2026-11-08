@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproduce mapped-leaf coverage losses over German (Asher) and Yue (DLAC)."""
+"""Check bulk-branch navigation coverage over German (Asher) and Yue (DLAC)."""
 
 import json
 import subprocess
@@ -10,10 +10,10 @@ from types import SimpleNamespace
 from run import APP, Browser, check_state, free_port, request, stop, stop_group, wait_for
 
 
-def select_mapped_leaves(browser, source, center):
+def select_branches(browser, source, center, zoom=4.5):
     browser.js(
-        "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:4.5})",
-        center,
+        "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:arguments[1]})",
+        center, zoom,
     )
     browser.js("""
         document.querySelector('.finder-options').open = true;
@@ -38,10 +38,10 @@ def select_mapped_leaves(browser, source, center):
     """, source)
     button = """
         [...document.querySelectorAll('.finder-actions button')]
-          .find(button => button.textContent.startsWith('Show mapped leaves'))
+          .find(button => button.textContent.startsWith('Show branches on map'))
     """
     wait_for(
-        lambda: browser.js(f"return !({button}).disabled"), 10, "mapped-leaf action"
+        lambda: browser.js(f"return !({button}).disabled"), 10, "mapped-branch action"
     )
     browser.js(f"({button}).click()")
     return browser.settled(100)
@@ -137,7 +137,7 @@ def main():
             ]:
                 browser.call("POST", "/url", {"url": origin + "/?overlap-test=1&overlap-basemap=off"})
                 wait_for(lambda: browser.js("return !!window.overlapTest"), 45, "application")
-                state = select_mapped_leaves(browser, source, center)
+                state = select_branches(browser, source, center)
                 check_state(state, require_stripes=True)
                 results[source] = {"selectedCount": state["selectedCount"]}
                 check_selection_list(browser, state["selectedCount"])
@@ -156,7 +156,7 @@ def main():
             raise
         finally:
             (output / "report.json").write_text(json.dumps(results, indent=2) + "\n")
-    print(f"Mapped-leaf coverage checks passed: {output / 'report.json'}")
+    print(f"Bulk-branch coverage checks passed: {output / 'report.json'}")
 
 
 if __name__ == "__main__":

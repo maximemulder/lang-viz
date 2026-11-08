@@ -9,6 +9,7 @@ npm run test:browser -- --runs 3 --output test-results/baseline
 npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
 npm run test:coverage-browser
+npm run test:branch-browser
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
@@ -25,13 +26,13 @@ aggregation without individually selecting children, independently selecting a
 contributor, grouped hatching and blending, single-contributor aggregation, source/
 period availability recovery, viewport discovery, tree keyboard navigation, and
 narrow layouts.
-The family-selection check selects DLAC and displays all mapped Sino-Tibetan leaves
+The family-selection check selects DLAC and displays all mapped Sino-Tibetan entries
 individually, replaces existing subtree selections while retaining unrelated ones,
 and verifies period availability, count updates, and repeated selection.
-The bulk mapped-leaf check applies the current query to multiple overlapping
-branches, deduplicates their leaves, preserves unrelated selections, and verifies
+The bulk branch check applies the current query to multiple overlapping
+branches, deduplicates their mapped entries, preserves unrelated selections, and verifies
 filter availability without opening entry details.
-Color checks verify that mapped leaves retain their family palette through period
+Color checks verify that mapped branches retain their family palette through period
 filters, custom overrides update finder swatches and actual overlap stripe pixels,
 and repeated recoloring reuses coverage URLs without issuing geometry requests.
 They also exercise the visible Language colors controls: strategy switching,
@@ -44,14 +45,20 @@ unavailable selections, removal, and clearing through a filtered selection list.
 Switching views must not trigger geometry computation.
 
 `test:coverage-browser` checks the German and Yue coverage regressions using the
-visible source filter and bulk Show mapped leaves action, with Contemporary
+visible source filter and bulk Show branches on map action, with Contemporary
 selected. It samples inland framebuffer pixels and visible memberships during
 pans and zooms 3–6.5 in globe and Mercator, including a forced final render to
-catch stationary gaps. It also checks that the large mapped-leaf selection stays
+catch stationary gaps. It also checks that the large branch selection stays
 virtualized and retains its scroll position when inspecting an entry. Reports,
 per-frame evidence, and screenshots go to
 `test-results/coverage/`. These cases caught narrow shells whose winding reversed
 during MVT rounding, causing entire mainland polygons to be read as holes.
+
+`test:branch-browser` checks Halh/Dariganga parent coverage and descendant priority,
+parent restoration after removal, both projections and rendering modes, and a
+complete Asher contemporary world view. Run `npm run precompute:branches` first:
+the world check requires prepared tiles and asserts zero live partition time.
+Screenshots and measured request reports are written to `test-results/branches/`.
 
 Each invocation builds the production app, starts a local Vite preview and
 geckodriver on available ports, opens a temporary Firefox profile, and cleans up

@@ -5,7 +5,7 @@ import {
   type AreaMode,
   buildGeographyAvailability,
   type GeographyAvailability,
-  mappedLeavesForLanguages,
+  mappedBranchForLanguages,
 } from '../domain/aggregation'
 import type {
   GeographyDatasetSelection,
@@ -82,7 +82,7 @@ export const colorConfigurationAtom = atom(
   },
 )
 /** Selection provenance, separate from explicit roots in the configuration. */
-export const mappedLeafColorRootsAtom = selectAtom(
+export const branchColorRootsAtom = selectAtom(
   atom((get) =>
     [
       ...new Set(
@@ -99,7 +99,13 @@ const semanticAnchorsAtom = atom((get) => get(colorConfigurationAtom).anchors)
 const selectedFamilyRootsAtom = selectAtom(
   atom((get) => {
     const hierarchy = get(languageHierarchyAtom)
-    return get(visibleLanguageIdsAtom)
+    return [
+      ...new Set(
+        get(mapEntriesAtom)
+          .filter((entry) => !entry.branchRootId)
+          .map((entry) => entry.languageId),
+      ),
+    ]
       .filter((id) => hierarchy.languageById.get(id)?.level === 'family')
       .sort()
   }),
@@ -110,7 +116,7 @@ export const semanticPaletteAtom = atom((get) =>
   buildSemanticPalette(
     get(languageHierarchyAtom),
     get(colorTopologyAtom),
-    [...get(semanticRootsAtom), ...get(selectedFamilyRootsAtom), ...get(mappedLeafColorRootsAtom)],
+    [...get(semanticRootsAtom), ...get(selectedFamilyRootsAtom), ...get(branchColorRootsAtom)],
     get(semanticAnchorsAtom),
   ),
 )
@@ -228,44 +234,41 @@ export const setMapEntryColorAtom = atom(
   },
 )
 
-export const showMappedLeavesAtom = atom(
-  null,
-  (get, set, roots: LanguageId | readonly LanguageId[]) => {
-    const leaves = mappedLeavesForLanguages(
-      typeof roots === 'string' ? [roots] : roots,
-      get(languageHierarchyAtom),
-      get(geographyAvailabilityAtom),
-    )
-    if (!leaves.languageIds.length) return
-    const coloringRoots = topmostColorRoots(
-      typeof roots === 'string' ? [roots] : roots,
-      get(colorTopologyAtom),
-    )
-    const rootSet = new Set(coloringRoots)
-    const hierarchy = get(languageHierarchyAtom)
-    const context = get(geographyContextAtom)
-    const availability = get(geographyAvailabilityAtom)
-    const candidates = leaves.languageIds.flatMap((id) => {
-      let ancestor: string | null = id
-      const visited = new Set<string>()
-      while (ancestor && !rootSet.has(ancestor) && !visited.has(ancestor)) {
-        visited.add(ancestor)
-        ancestor = hierarchy.languageById.get(ancestor)?.parentId ?? null
-      }
-      const colorRootId = ancestor && rootSet.has(ancestor) ? ancestor : null
-      const entry = pinMapEntry(id, availability.get(id), 'own', context, colorRootId)
-      return entry ? [entry] : []
-    })
-    set(areaModesAtom, {
-      ...get(areaModesAtom),
-      ...Object.fromEntries(leaves.languageIds.map((id) => [id, 'own' as const])),
-    })
-    set(
-      mapEntriesAtom,
-      replaceSubtreeMapEntries(get(mapEntriesAtom), candidates, leaves.subtreeIds, context),
-    )
-  },
-)
+export const showBranchAtom = atom(null, (get, set, roots: LanguageId | readonly LanguageId[]) => {
+  const branch = mappedBranchForLanguages(
+    typeof roots === 'string' ? [roots] : roots,
+    get(languageHierarchyAtom),
+    get(geographyAvailabilityAtom),
+  )
+  if (!branch.languageIds.length) return
+  const coloringRoots = topmostColorRoots(
+    typeof roots === 'string' ? [roots] : roots,
+    get(colorTopologyAtom),
+  )
+  const rootSet = new Set(coloringRoots)
+  const hierarchy = get(languageHierarchyAtom)
+  const context = get(geographyContextAtom)
+  const availability = get(geographyAvailabilityAtom)
+  const candidates = branch.languageIds.flatMap((id) => {
+    let ancestor: string | null = id
+    const visited = new Set<string>()
+    while (ancestor && !rootSet.has(ancestor) && !visited.has(ancestor)) {
+      visited.add(ancestor)
+      ancestor = hierarchy.languageById.get(ancestor)?.parentId ?? null
+    }
+    const colorRootId = ancestor && rootSet.has(ancestor) ? ancestor : null
+    const entry = pinMapEntry(id, availability.get(id), 'own', context, colorRootId)
+    return entry ? [{ ...entry, ...(colorRootId ? { branchRootId: colorRootId } : {}) }] : []
+  })
+  set(areaModesAtom, {
+    ...get(areaModesAtom),
+    ...Object.fromEntries(branch.languageIds.map((id) => [id, 'own' as const])),
+  })
+  set(
+    mapEntriesAtom,
+    replaceSubtreeMapEntries(get(mapEntriesAtom), candidates, branch.subtreeIds, context),
+  )
+})
 
 export const setGeometryOverrideAtom = atom(
   null,

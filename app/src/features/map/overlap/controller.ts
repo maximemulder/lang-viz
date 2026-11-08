@@ -3,7 +3,7 @@ import type { CoverageSnapshot } from './deliveryProtocol.ts'
 import type { overlapDiagnostics } from './diagnostics.ts'
 import { OverlapPatternError } from './patterns.ts'
 import { coverageTilesKey, retainCoverageTiles } from './tiles.ts'
-import type { OverlapResponse, TileCoordinate } from './types.ts'
+import type { OverlapRequest, OverlapResponse, TileCoordinate } from './types.ts'
 import { parseOverlapSelection } from './types.ts'
 import { type OverlapWorkerClient, PUBLICATION_TIMEOUT_MS } from './workerClient.ts'
 
@@ -59,6 +59,7 @@ export const createOverlapController = (options: {
   sourceLayer: string
   onChange(state: HatchingState): void
   onCoverageReady(key: string | null): void
+  precomputed?: OverlapRequest['precomputed']
   diagnostics?: typeof overlapDiagnostics
 }) => {
   const { worker, resources, diagnostics } = options
@@ -277,6 +278,8 @@ export const createOverlapController = (options: {
         sourceLayer: options.sourceLayer,
         variantIds,
         ...(selection.variantGroups ? { variantGroups: selection.variantGroups } : {}),
+        ...(selection.refinements ? { refinements: selection.refinements } : {}),
+        ...(options.precomputed ? { precomputed: options.precomputed } : {}),
         tiles,
         knownTiles: [...results.keys()],
         ...(diagnostics ? { profile: true } : {}),

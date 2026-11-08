@@ -7,6 +7,7 @@ import type {
 } from './atlas.ts'
 import { geographyVariantsForLanguage } from './geography.ts'
 import type { LanguageHierarchy } from './hierarchy.ts'
+import type { Refinements } from './refinement.ts'
 
 export type AreaMode = 'own' | 'descendants'
 
@@ -26,6 +27,8 @@ export interface MapArea {
   readonly mode: AreaMode
   readonly color: string
   readonly variants: readonly GeometryVariant[]
+  readonly branchRootId?: string
+  readonly refines?: readonly string[]
 }
 
 /** Resolve all branches once per filter/override change, independently of tree expansion. */
@@ -66,41 +69,32 @@ export const buildGeographyAvailability = (
   return result
 }
 
-/** Deepest mapped entries across complete subtrees, visiting shared branches only once. */
-export const mappedLeavesForLanguages = (
+/** Preserve every mapped entry across complete subtrees, including mapped ancestors. */
+export const mappedBranchForLanguages = (
   rootIds: readonly string[],
   hierarchy: LanguageHierarchy,
   availability: ReadonlyMap<string, GeographyAvailability>,
 ) => {
   const subtreeIds = new Set<string>()
-  const mappedSubtrees = new Map<string, boolean>()
   const languageIds: string[] = []
-  const visit = (id: string): boolean => {
-    const cached = mappedSubtrees.get(id)
-    if (cached !== undefined) return cached
-    if (subtreeIds.has(id) || !hierarchy.languageById.has(id)) return false
+  const visit = (id: string) => {
+    if (subtreeIds.has(id) || !hierarchy.languageById.has(id)) return
     subtreeIds.add(id)
-    let hasMappedDescendants = false
     for (const child of hierarchy.childrenById.get(id) ?? []) {
-      // Visit every branch, even after finding geography in an earlier sibling.
-      if (visit(child.id)) hasMappedDescendants = true
+      visit(child.id)
     }
-    const hasOwn = Boolean(availability.get(id)?.own)
-    if (!hasMappedDescendants && hasOwn) languageIds.push(id)
-    const hasMapped = hasMappedDescendants || hasOwn
-    mappedSubtrees.set(id, hasMapped)
-    return hasMapped
+    if (availability.get(id)?.own) languageIds.push(id)
   }
   for (const id of rootIds) visit(id)
   return { subtreeIds, languageIds }
 }
 
-/** Deepest mapped entries in a complete subtree, including its root when appropriate. */
-export const mappedLeavesForLanguage = (
+/** Available own areas in a complete branch, independently of tree expansion. */
+export const mappedBranchForLanguage = (
   languageId: string,
   hierarchy: LanguageHierarchy,
   availability: ReadonlyMap<string, GeographyAvailability>,
-) => mappedLeavesForLanguages([languageId], hierarchy, availability)
+) => mappedBranchForLanguages([languageId], hierarchy, availability)
 
 export const areaMode = (available: GeographyAvailability, preferred?: AreaMode): AreaMode =>
   preferred ?? (available.own ? 'own' : 'descendants')
@@ -127,15 +121,34 @@ export const mapAreaMemberships = (areas: readonly MapArea[]) => {
   return memberships
 }
 
-/** Retain the legacy key for ordinary selections; grouped membership is part of cache identity. */
+export const mapAreaRefinements = (areas: readonly MapArea[]): Refinements =>
+  Object.fromEntries(
+    areas
+      .filter((area) => area.refines?.length)
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((area) => [area.id, area.refines]),
+  ) as Refinements
+
+/** Ancestors draw first while exact coverage is loading or unavailable. */
+export const mapAreaSourcePriorities = (areas: readonly MapArea[]) => {
+  const priorities: Record<string, number> = {}
+  for (const area of areas)
+    for (const variant of area.variants)
+      priorities[variant.id] = Math.max(priorities[variant.id] ?? 0, area.refines?.length ?? 0)
+  return priorities
+}
+
+/** Grouping and refinement are geometry policy, independent of colors. */
 export const mapAreaSelectionKey = (areas: readonly MapArea[], presentation = 'hatching') => {
   const memberships = mapAreaMemberships(areas)
   const variantIds = Object.keys(memberships).sort()
-  return areas.some(({ mode }) => mode === 'descendants')
+  const refinements = mapAreaRefinements(areas)
+  return areas.some(({ mode }) => mode === 'descendants') || Object.keys(refinements).length
     ? JSON.stringify({
         variantIds,
         presentation,
         variantGroups: Object.fromEntries(variantIds.map((id) => [id, memberships[id]?.sort()])),
+        ...(Object.keys(refinements).length ? { refinements } : {}),
       })
     : JSON.stringify(variantIds)
 }

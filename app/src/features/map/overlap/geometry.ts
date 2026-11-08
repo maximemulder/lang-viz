@@ -1,3 +1,4 @@
+import type { Refinements } from '../../../domain/refinement.ts'
 import { lazyResource } from './lazyResource.ts'
 
 // Keep the worker/cache contract independent of the geometry engine.
@@ -24,6 +25,7 @@ export interface PartitionOptions {
   /** Absolute time, checked between synchronous operations; excludes initialization. */
   readonly deadline?: number
   readonly includeSingles?: boolean
+  readonly refinements?: Refinements
 }
 
 export type CoveragePartition = (

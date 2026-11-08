@@ -50,20 +50,35 @@ The existing `areaModesAtom`, `geometryOverridesAtom`, `temporalViewAtom`, and
 not settings on existing map entries. To change an entry's geometry, prepare
 and add the replacement, then remove the original.
 
-`showMappedLeavesAtom` captures each leaf's own geometry and color-root provenance.
+`showBranchAtom` captures every mapped entry's own geometry, color root, and
+`branchRootId`. This includes mapped ancestors. A branch root plus its pinned
+geography context identifies an intentional composition group. Descendants refine
+only ancestors in that group and temporal view; other entries remain comparisons.
 `replaceSubtreeMapEntries` replaces entries in the visited subtree only when
 their source/period filter context equals the current context. Source order and
 duplicates are ignored in this comparison. An `all` context remains distinct
 from a specific source/period context; broad browsing must not erase narrower
-comparisons. Exact replacement leaves retain their IDs/colors and acquire the
-new mapped-leaf color root. Other comparison contexts remain selected.
+comparisons. Exact replacements retain their IDs/colors and acquire the new branch
+and color root only within the replaced context. Other comparison contexts remain selected.
 
-`mappedLeafColorRootsAtom` derives roots from surviving entries, so removing the
+`branchColorRootsAtom` derives roots from surviving entries, so removing the
 last entry from a group also releases that inferred root. Explicit palette
 configuration remains independent. Entries and color configuration currently
 live until reload; persistence/import/export are not implemented.
 
 ## Rendering
+
+`resolveMapEntries` resolves selected ancestor relationships through a per-group
+classification index. These relationships are part of coverage cache identity,
+independent of colors. The worker processes descendants first and subtracts their
+combined footprint from ancestors. It preserves the union of available coverage,
+including descendants outside ancestor polygons. Siblings and other groups retain
+their overlap. Removing a descendant restores its ancestor automatically.
+Fully covered ancestors remain pinned and inspectable in Details/On map.
+
+Original and clipped fallback fills sort ancestors before descendants. Fallback
+inspection applies the same refinement rule, while stripe/blend coverage already
+contains resolved contributors. Both modes therefore use the same branch policy.
 
 Own source polygons and aggregate contributor groups feed the existing overlap
 pipeline. Aggregate IDs distinguish snapshots of the same family, including

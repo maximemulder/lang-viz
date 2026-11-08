@@ -154,6 +154,23 @@ class GeometryScope {
     return this.polygonOnly(this.own(this.geos.GEOSUnion(a, b)))
   }
 
+  unionAll(pointers: readonly number[]): number {
+    const children = pointers.map((pointer) => this.own(this.geos.GEOSGeom_clone(pointer)))
+    const buffer = this.allocate(Math.max(4, children.length * 4))
+    try {
+      this.geos.Module.HEAPU32.set(children, buffer / 4)
+      const collection = this.own(
+        this.geos.GEOSGeom_createCollection(GEOMETRY_COLLECTION, buffer, children.length),
+      )
+      for (const child of children) this.geometries.delete(child)
+      const result = this.polygonOnly(this.own(this.geos.GEOSUnaryUnion(collection)))
+      this.free(collection)
+      return result
+    } finally {
+      this.releaseBuffer(buffer)
+    }
+  }
+
   exportPolygon(pointer: number): Polygon {
     this.writer ||= this.require(this.geos.GEOSGeoJSONWriter_create())
     const text = this.require(this.geos.GEOSGeoJSONWriter_writeGeometry(this.writer, pointer, -1))
@@ -248,7 +265,16 @@ export const createGeosPartition = async (): Promise<CoveragePartition> => {
         fragments.push(input.geometry)
         grouped.set(input.id, fragments)
       }
-      for (const [id, fragments] of [...grouped].sort(([a], [b]) => a.localeCompare(b))) {
+      const refinements = options.refinements ?? {}
+      const refines = new Map(
+        Object.entries(refinements).map(([id, ancestors]) => [id, new Set(ancestors)]),
+      )
+      // Descendants first: ancestor fill can pass around their existing regions
+      // without splitting those regions or creating redundant stripe memberships.
+      for (const [id, fragments] of [...grouped].sort(
+        ([a], [b]) =>
+          (refinements[b]?.length ?? 0) - (refinements[a]?.length ?? 0) || a.localeCompare(b),
+      )) {
         budget()
         const first = fragments[0]
         if (!first) continue
@@ -267,8 +293,24 @@ export const createGeosPartition = async (): Promise<CoveragePartition> => {
           budget()
           let remaining = scope.own(geos.GEOSGeom_clone(polygon))
           const candidates = index.search(bounds(polygon))
+          const masks = new Set(
+            candidates.filter((region) =>
+              region.members.some((member) => refines.get(member)?.has(id)),
+            ),
+          )
+          if (masks.size) {
+            // Subtract the descendant footprint once. Repeated differences from
+            // a large family polygon grow increasingly expensive and fragmented.
+            const mask = scope.unionAll([...masks].map((region) => region.pointer))
+            budget()
+            const next = scope.difference(remaining, mask)
+            scope.free(remaining)
+            scope.free(mask)
+            remaining = next
+          }
           for (const region of candidates) {
             budget()
+            if (masks.has(region)) continue
             const shared = scope.intersection(region.pointer, polygon)
             if (scope.polygons(shared).length === 0) {
               scope.free(shared)
@@ -280,7 +322,7 @@ export const createGeosPartition = async (): Promise<CoveragePartition> => {
             regionCount--
             scope.free(region.pointer)
             insert(previousOnly, region.members)
-            insert(shared, [...region.members, id])
+            insert(shared, [...region.members, id].sort())
             scope.free(previousOnly)
             scope.free(shared)
             scope.free(remaining)

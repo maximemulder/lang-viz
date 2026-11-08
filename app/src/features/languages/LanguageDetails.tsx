@@ -1,6 +1,6 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useMemo, useRef } from 'react'
-import { areaMode, isAreaAvailable, mappedLeavesForLanguage } from '../../domain/aggregation'
+import { areaMode, isAreaAvailable, mappedBranchForLanguage } from '../../domain/aggregation'
 import { languageAncestors } from '../../domain/hierarchy'
 import { temporalQualityLabel } from '../../domain/temporal'
 import {
@@ -12,7 +12,7 @@ import {
   languageHierarchyAtom,
   selectedDraftLanguageIdsAtom,
   setGeometryOverrideAtom,
-  showMappedLeavesAtom,
+  showBranchAtom,
   toggleVisibleLanguageAtom,
 } from '../../state/atlasState'
 import {
@@ -33,15 +33,15 @@ export const LanguageDetails = () => {
   const visibleIds = useAtomValue(selectedDraftLanguageIdsAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
-  const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
+  const showBranch = useSetAtom(showBranchAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const reveal = useSetAtom(revealLanguageAtom)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const detailId = panel.detailId
   const detail = detailId ? data.languageById.get(detailId) : undefined
   const detailAvailability = detail ? availability.get(detail.id) : undefined
-  const mappedLeaves = useMemo(
-    () => (detailId ? mappedLeavesForLanguage(detailId, hierarchy, availability) : undefined),
+  const mappedBranch = useMemo(
+    () => (detailId ? mappedBranchForLanguage(detailId, hierarchy, availability) : undefined),
     [detailId, hierarchy, availability],
   )
   const detailMode = detailAvailability
@@ -93,19 +93,19 @@ export const LanguageDetails = () => {
           {selected ? 'Remove from map' : 'Add to map'}
         </button>
       </div>
-      {mappedLeaves && (hierarchy.childrenById.get(detail.id)?.length ?? 0) > 0 && (
-        <div className="finder-detail__mapped-leaves">
+      {mappedBranch && (hierarchy.childrenById.get(detail.id)?.length ?? 0) > 0 && (
+        <div className="finder-detail__branch">
           <button
             type="button"
-            disabled={!mappedLeaves.languageIds.length}
-            onClick={() => showMappedLeaves(detail.id)}
+            disabled={!mappedBranch.languageIds.length}
+            onClick={() => showBranch(detail.id)}
           >
-            Show mapped leaves ({mappedLeaves.languageIds.length.toLocaleString()})
+            Show branch on map ({mappedBranch.languageIds.length.toLocaleString()})
           </button>
           <p>
-            Shows the deepest entries with polygons in this entire branch, each with its own color.
-            Uses current sources and period; branches without polygons are omitted. Replaces entries
-            within this branch from the same source/period context. Other comparisons stay.
+            Shows this entry and its mapped descendants. More specific areas replace ancestor colors
+            where they overlap; broader areas remain elsewhere. Uses current sources and period.
+            Replaces entries in this branch from the same context; other comparisons stay.
           </p>
         </div>
       )}

@@ -13,6 +13,7 @@ bash ./pipeline/atlas/bootstrap-tippecanoe.sh
 uv run python -m pipeline.atlas.build
 cd app
 npm install
+npm run precompute:branches
 npm run dev
 ```
 
@@ -66,17 +67,29 @@ Expansion and map selection are independent; aggregating a family does not check
 its descendants individually. Entries without available areas remain searchable
 and expandable.
 
-To show a family's individually colored members, focus its row and choose
-**Show mapped leaves (N)** in the entry details. This traverses the entire subtree,
-including collapsed branches, and selects every deepest entry with a polygon for
-the current sources and period. It passes through unmapped groups and includes
-mapped languages or subfamilies when none of their descendants have qualifying
-areas. Branches without polygons are omitted; no coverage is inferred. Selections
-inside the subtree are replaced with these entries using their own areas and source
-choices; selections elsewhere remain. For example, select only **DLAC** under
-**Map filters**, search **Sino-Tibetan**, focus its row, and choose **Show mapped
-leaves**. This is a bulk selection at the time of the click: after changing filters,
-click it again to recompute the mapped leaves.
+To show an entry and its individually colored descendants, choose **Show branch
+on map (N)** in Details, or **Show branches on map (N)** for the current Explore
+roots/matches. The action visits collapsed branches and selects every entry with
+its own polygon for the chosen sources and period, including mapped ancestors.
+Within this branch view, descendants replace ancestor colors only where their
+areas overlap. Halh therefore retains its broader area around Dariganga. Sibling
+and unrelated-language overlaps remain stripes or blends. Broader fill identifies
+geography supplied at that classification level, not an inferred individual language.
+Unmapped branches contribute no invented coverage.
+
+The action replaces entries in these branches from the same source/period context;
+other comparison contexts stay selected. Entries retain their polygons, colors,
+and source provenance, even when descendants fully cover their displayed fill.
+Removing a descendant exposes available ancestor fill again. Repeating the action
+preserves existing entry identities and colors. Source and period choices affect
+the next action; they do not change already pinned entries.
+
+`npm run precompute:branches` optionally prepares complete **single-dataset,
+single-period** views at zooms 0–3 from the existing simplified archive. It costs
+about two minutes on the development machine and resumes completed tiles. The browser
+uses these tiles only for an exact geometry/refinement match; partial branches,
+mixed sources, other comparisons, and higher zooms use the bounded live engine.
+Run it again after regenerating atlas data. Deployment runs it automatically.
 
 Map source/period/viewport controls are under "Map filters". Viewport scope limits
 starting results, including aggregates with contributing areas in view; expanded
@@ -141,8 +154,9 @@ once over the basemap, so transparent stripes do not reveal other language fills
 underneath. Adjusting the slider does not recompute geometry.
 
 Overlap geometry is computed in a browser worker from the existing PMTiles
-archive, using its simplified vector tiles and a spatial index. There is no
-additional geometry export or server. Computation updates after navigation;
+archive, using its simplified vector tiles and a spatial index. Exact complete
+dataset views can use the optional prepared coverage described above; no server
+is required. Computation updates after navigation;
 tile geometry and overlap results are cached. Multi-language intersections are
 partitioned into disjoint regions before drawing, so triple overlaps retain all
 three colors rather than stacking pairwise patterns.

@@ -4,7 +4,7 @@ import type { DeliveryRequest, DeliveryResponse } from './deliveryStore.ts'
 import { checkTileTestFailure, delayTileTest, diagnosticsEnabled } from './diagnostics.ts'
 import { requestFallbackTile } from './fallbackProtocol.ts'
 import { serviceDiagnostics } from './serviceDiagnostics.ts'
-import type { TileCoordinate } from './types.ts'
+import type { OverlapProperties, TileCoordinate } from './types.ts'
 
 let nextId = 0
 let nextTileId = 0
@@ -80,6 +80,7 @@ export interface CoverageSnapshot {
   readonly url: string
   readonly coverageTiles: readonly TileCoordinate[]
   readonly maxzoom: number
+  readonly patterns?: readonly OverlapProperties[]
 }
 
 /** Snapshots share immutable encoded tile buffers; they never copy the geometry. */
@@ -96,6 +97,11 @@ export const registerCoverage = (
     url: `language-overlap://${id}/{z}/{x}/{y}?archive=${encodeURIComponent(archiveUrl.replace(/^pmtiles:\/\//, ''))}`,
     coverageTiles: [...tiles.values()].map(({ tile }) => tile),
     maxzoom: tiles.values().next().value?.tile.z ?? 0,
+    patterns: [
+      ...new Map(
+        [...tiles.values()].flatMap((tile) => tile.patterns).map((p) => [p.pattern, p]),
+      ).values(),
+    ],
   }
 }
 

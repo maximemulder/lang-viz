@@ -76,6 +76,11 @@ export interface AtlasManifest {
   readonly geometryVariantCount: number
   readonly vectorLayer: string
   readonly archive: string
+  readonly branchCoverage?: {
+    readonly directory: string
+    readonly maxZoom: number
+    readonly signatures: readonly string[]
+  }
 }
 
 export interface AtlasData {

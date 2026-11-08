@@ -9,6 +9,7 @@ import {
   type MultiPolygon,
   OverlapBudgetError,
 } from './geometry.ts'
+import { branchCoverageSignature, decodePrecomputedTile } from './precomputed.ts'
 import { tilePositionToLngLat } from './tiles.ts'
 import type {
   OverlapCollection,
@@ -75,6 +76,7 @@ const inputsFromFeatures = (
   features: readonly VectorTileFeature[],
   metrics?: OverlapMetrics,
   groups?: OverlapRequest['variantGroups'],
+  offline = false,
 ): CoverageInput[] => {
   const inputs: CoverageInput[] = []
   let vertexCount = 0
@@ -87,7 +89,8 @@ const inputsFromFeatures = (
         ring.map(({ x, y }) => {
           vertexCount++
           if (metrics) metrics.inputVertices++
-          if (vertexCount > MAX_TILE_VERTICES) throw new OverlapBudgetError('input-vertices')
+          if (!offline && vertexCount > MAX_TILE_VERTICES)
+            throw new OverlapBudgetError('input-vertices')
           return [x, y]
         }),
       ),
@@ -99,6 +102,11 @@ const inputsFromFeatures = (
 
 /** Independent of React and worker messaging so real PMTiles can be tested in Node. */
 export class OverlapComputer {
+  /** Offline generation has no interactive deadline; browser requests cannot enable it. */
+  private readonly offline: boolean
+  constructor(offline = false) {
+    this.offline = offline
+  }
   private readonly tiles = new Map<
     string,
     {
@@ -165,9 +173,52 @@ export class OverlapComputer {
     signal?: AbortSignal,
   ): AsyncGenerator<CoverageTile> {
     const selected = new Set(request.variantIds)
+    const signature = request.precomputed ? await branchCoverageSignature(request) : null
+    const prepared =
+      signature && request.precomputed?.signatures.includes(signature)
+        ? new URL(`${signature}/`, new URL(request.precomputed.directory, request.archiveUrl))
+        : null
     let outputVertices = 0
     for (const tile of request.tiles) {
       if (!isCurrent()) return
+      if (prepared && tile.z <= (request.precomputed?.maxZoom ?? -1)) {
+        const preparedKey = `${prepared}${tile.z}-${tile.x}-${tile.y}`
+        let result = this.results.get(preparedKey)
+        if (!result) {
+          const started = performance.now()
+          try {
+            const response = await fetch(`${preparedKey}.pbf`, signal ? { signal } : {})
+            if (!response.ok) throw new Error(`Prepared coverage HTTP ${response.status}`)
+            const data = new Uint8Array(await response.arrayBuffer())
+            if (metrics) metrics.fetchMs += performance.now() - started
+            const decodeStart = performance.now()
+            const decoded = decodePrecomputedTile(data, tile)
+            if (metrics) metrics.decodeMs += performance.now() - decodeStart
+            if (!isCurrent()) return
+            result = { features: decoded.features, vertices: decoded.vertices }
+            this.cacheResult(preparedKey, result)
+          } catch {
+            signal?.throwIfAborted()
+            // Optional assets may be absent in a local or interrupted data build.
+            // Fall through to the bounded live engine, preserving coverage on failure.
+          }
+        } else {
+          if (metrics) metrics.partitionCacheHits++
+          this.results.delete(preparedKey)
+          this.results.set(preparedKey, result)
+        }
+        if (result) {
+          outputVertices += result.vertices
+          if (outputVertices > MAX_OUTPUT_VERTICES) throw new OverlapBudgetError('output-vertices')
+          if (metrics) {
+            metrics.precomputedTiles = (metrics.precomputedTiles ?? 0) + 1
+            metrics.completedTiles++
+            metrics.outputVertices += result.vertices
+          }
+          yield { tile, extent: 8192, ...result }
+          continue
+        }
+      }
       const key = JSON.stringify([request.archiveUrl, request.sourceLayer, tile.z, tile.x, tile.y])
       let cached = this.tiles.get(key)
       if (cached) {
@@ -226,7 +277,17 @@ export class OverlapComputer {
         yield { tile, extent: layer.extent, features: [], vertices: 0 }
         continue
       }
-      const resultKey = `${key}:${JSON.stringify(localIds.map((id) => [id, request.variantGroups?.[id] ?? [id]]))}`
+      const localMembers = new Set(localIds.flatMap((id) => request.variantGroups?.[id] ?? [id]))
+      const localRefinements = Object.fromEntries(
+        [...localMembers].sort().flatMap((id) => {
+          const ancestors = request.refinements?.[id]?.filter((id) => localMembers.has(id)).sort()
+          return ancestors?.length ? [[id, ancestors]] : []
+        }),
+      )
+      const resultKey = `${key}:${JSON.stringify([
+        localIds.map((id) => [id, request.variantGroups?.[id] ?? [id]]),
+        localRefinements,
+      ])}`
       let result = this.results.get(resultKey)
       if (result) {
         if (metrics) metrics.partitionCacheHits++
@@ -241,7 +302,7 @@ export class OverlapComputer {
         const decodeStart = performance.now()
         let inputs: CoverageInput[]
         try {
-          inputs = inputsFromFeatures(features, metrics, request.variantGroups)
+          inputs = inputsFromFeatures(features, metrics, request.variantGroups, this.offline)
         } finally {
           if (metrics) metrics.decodeMs += performance.now() - decodeStart
         }
@@ -249,8 +310,10 @@ export class OverlapComputer {
         let regions: CoverageRegion[]
         try {
           regions = partitionCoverage(inputs, layer.extent, {
-            deadline: performance.now() + 1_500,
+            deadline: this.offline ? Number.POSITIVE_INFINITY : performance.now() + 1_500,
+            ...(this.offline ? { maxRegions: Number.POSITIVE_INFINITY } : {}),
             includeSingles: true,
+            refinements: localRefinements,
           })
         } finally {
           if (metrics) metrics.partitionMs += performance.now() - partitionStart
@@ -265,29 +328,20 @@ export class OverlapComputer {
             ),
           0,
         )
-        if (outputVertices + vertices > MAX_OUTPUT_VERTICES)
+        if (!this.offline && outputVertices + vertices > MAX_OUTPUT_VERTICES)
           throw new OverlapBudgetError('output-vertices')
         const outputStart = performance.now()
         // Keep tile coordinates: delivery can encode MVT without reprojection
         // or asking MapLibre to construct another GeoJSON tile index.
         result = { features: deliveryFeatures(regions), vertices }
         if (metrics) metrics.outputMs += performance.now() - outputStart
-        this.results.set(resultKey, result)
-        this.cachedResultVertices += vertices
-        while (
-          this.results.size > MAX_CACHED_TILES ||
-          this.cachedResultVertices > MAX_CACHED_RESULT_VERTICES
-        ) {
-          const oldestKey = this.results.keys().next().value
-          if (oldestKey === undefined) break
-          this.cachedResultVertices -= this.results.get(oldestKey)?.vertices ?? 0
-          this.results.delete(oldestKey)
-        }
+        this.cacheResult(resultKey, result)
       }
       const outputStart = performance.now()
       outputVertices += result.vertices
       if (metrics) metrics.outputVertices += result.vertices
-      if (outputVertices > MAX_OUTPUT_VERTICES) throw new OverlapBudgetError('output-vertices')
+      if (!this.offline && outputVertices > MAX_OUTPUT_VERTICES)
+        throw new OverlapBudgetError('output-vertices')
       if (metrics) {
         metrics.outputMs += performance.now() - outputStart
         metrics.completedTiles++
@@ -295,6 +349,23 @@ export class OverlapComputer {
       yield { tile, extent: layer.extent, ...result }
       // Allow newer selections to cancel between tiles instead of queueing jobs.
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    }
+  }
+
+  private cacheResult(
+    key: string,
+    result: { features: NativeCoverageFeature[]; vertices: number },
+  ) {
+    this.results.set(key, result)
+    this.cachedResultVertices += result.vertices
+    while (
+      this.results.size > MAX_CACHED_TILES ||
+      this.cachedResultVertices > MAX_CACHED_RESULT_VERTICES
+    ) {
+      const oldest = this.results.keys().next().value
+      if (oldest === undefined) break
+      this.cachedResultVertices -= this.results.get(oldest)?.vertices ?? 0
+      this.results.delete(oldest)
     }
   }
 }

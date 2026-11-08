@@ -94,7 +94,7 @@ export const OnMapLanguages = () => {
             <p>
               {entries.length
                 ? 'Try another name, identifier, source or period.'
-                : 'Use Explore to add languages, families, or mapped leaves.'}
+                : 'Use Explore to add languages, families, or entire mapped branches.'}
             </p>
           </div>
         )}
@@ -137,7 +137,9 @@ export const OnMapLanguages = () => {
                   <small className={displayed ? '' : 'on-map-row__unavailable'}>
                     {displayed
                       ? entry.mode === 'own'
-                        ? 'Own area'
+                        ? entry.branchRootId
+                          ? 'Branch area · descendants refine overlaps'
+                          : 'Own area'
                         : `Descendant areas · ${entry.variantIds.length} contributors · ${entry.uncoveredBranchIds.length} uncovered branches`
                       : 'Pinned geometry unavailable in this catalog'}
                   </small>

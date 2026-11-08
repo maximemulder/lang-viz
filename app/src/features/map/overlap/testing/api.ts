@@ -14,7 +14,7 @@ export interface OverlapTestApi {
   colorState(ids: readonly string[]): {
     colors: Record<string, string | undefined>
     roots: Record<string, string | undefined>
-    mappedLeafRoots: readonly string[]
+    branchRoots: readonly string[]
     configuration: ColorConfiguration
   }
   camera(center: [number, number], zoom: number, duration?: number): void

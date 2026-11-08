@@ -157,16 +157,16 @@ def check_comparisons(browser, output, search, view, open_details):
     asher_aggregate = next(e for e in state() if e['id'] == asher_aggregate['id'])
     # Replacing DLAC's aggregate with leaves retains the complete Asher comparison.
     source('DLAC')
-    browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
+    browser.js("document.querySelector('.finder-detail__branch button').click()")
     after_leaves = state()
     assert dlac_aggregate['id'] not in {e['id'] for e in after_leaves}
     assert asher_aggregate in after_leaves
     assert any(e['languageId']=='mand1415' and e['variantIds'][0].startswith('asher2007world:') for e in after_leaves)
-    browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
+    browser.js("document.querySelector('.finder-detail__branch button').click()")
     assert state() == after_leaves, 'Repeating mapped leaves preserves identities and styles'
-    assert browser.js("return window.overlapTest.colorState([]).mappedLeafRoots") == ['sino1245']
+    assert browser.js("return window.overlapTest.colorState([]).branchRoots") == ['sino1245']
     view(browser, 'map')
     browser.js("document.querySelector('.on-map-actions button').click()")
     wait_for(lambda: not state(), 10, 'clear all comparison entries')
-    assert browser.js("return window.overlapTest.colorState([]).mappedLeafRoots") == []
+    assert browser.js("return window.overlapTest.colorState([]).branchRoots") == []
     return {'germanEntries': 3, 'samePeriodSources': 2, 'pinnedAggregates': 2, 'independentColors': 'passed', 'contextReplacement': 'passed'}

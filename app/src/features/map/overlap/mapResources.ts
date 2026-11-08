@@ -91,7 +91,10 @@ export const createMapResources = (
     return stripeImage(memberColors)
   }
   const addPattern = (id: string, members: readonly string[]) => {
-    map.addImage(id, patternImage(members), { pixelRatio: 1 })
+    const image = patternImage(members)
+    // Data-driven pattern ratios are Uint16 in MapLibre; fractional ratios
+    // truncate to zero and make whole overlap faces disappear.
+    map.addImage(id, image, { pixelRatio: 1 })
   }
   const restorePattern = ({ id }: { id: string }) => {
     const members = ownedPatterns.get(id)

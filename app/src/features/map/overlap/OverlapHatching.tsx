@@ -10,6 +10,7 @@ import {
   overlapModeAtom,
   overlapStatusAtom,
 } from '../../../state/atlasState'
+import { blendedFace } from './blending'
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
 import { COVERAGE_LAYER } from './delivery'
 import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
@@ -32,6 +33,7 @@ export const OverlapHatching = ({
   variants,
   sourceVariantIds,
   sourceColors,
+  sourcePriorities,
   selectionKey,
   coverageReady,
   onCoverageReady,
@@ -39,6 +41,7 @@ export const OverlapHatching = ({
   readonly variants: readonly Pick<GeometryVariant, 'id' | 'color'>[]
   readonly sourceVariantIds: readonly string[]
   readonly sourceColors: Readonly<Record<string, string>>
+  readonly sourcePriorities: Readonly<Record<string, number>>
   readonly selectionKey: string
   readonly coverageReady: boolean
   readonly onCoverageReady: (key: string | null) => void
@@ -59,6 +62,22 @@ export const OverlapHatching = ({
     return colors
   }, [data, languageColors, variants])
   const colorsRef = useRef(colors)
+  const blendStyles = useMemo(() => {
+    const order = new Map(variants.map((variant, index) => [variant.id, index]))
+    return state.snapshots.map((snapshot) =>
+      Object.fromEntries(
+        (snapshot?.patterns ?? []).map((pattern) => [
+          pattern.pattern,
+          blendedFace(
+            [...pattern.variantIds]
+              .sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0))
+              .map((id) => colors.get(id) ?? '#777777'),
+            opacity,
+          ),
+        ]),
+      ),
+    )
+  }, [state.snapshots, variants, colors, opacity])
   const resourcesRef = useRef<ReturnType<typeof createMapResources> | null>(null)
   const configRef = useRef({ selectionKey, mode })
   const controllerRef = useRef<ReturnType<typeof createOverlapController> | null>(null)
@@ -89,6 +108,7 @@ export const OverlapHatching = ({
       sourceLayer: data.manifest.vectorLayer,
       onChange: setState,
       onCoverageReady,
+      ...(data.manifest.branchCoverage ? { precomputed: data.manifest.branchCoverage } : {}),
       ...(diagnosticsEnabled ? { diagnostics: overlapDiagnostics } : {}),
     })
     controllerRef.current = controller
@@ -242,8 +262,19 @@ export const OverlapHatching = ({
                   source-layer={data.manifest.vectorLayer}
                   type="fill"
                   filter={['in', ['get', 'variant_id'], ['literal', sourceVariantIds]]}
+                  layout={{
+                    'fill-sort-key': [
+                      'coalesce',
+                      ['get', ['get', 'variant_id'], ['literal', sourcePriorities]],
+                      0,
+                    ],
+                  }}
                   paint={{
-                    'fill-color': ['get', ['get', 'variant_id'], ['literal', sourceColors]],
+                    'fill-color': [
+                      'coalesce',
+                      ['get', ['get', 'variant_id'], ['literal', sourceColors]],
+                      '#777777',
+                    ],
                     'fill-opacity': 1,
                     'fill-layer-opacity':
                       coverageReady && state.activeBuffer === buffer ? opacity : 0,
@@ -251,34 +282,46 @@ export const OverlapHatching = ({
                     'fill-antialias': false,
                   }}
                 />
-                {mode === 'blending' &&
-                  variants.map((variant, index) => (
-                    <Layer
-                      key={variant.id}
-                      id={blendLayerId(buffer, index)}
-                      source={coverageSourceId(buffer)}
-                      source-layer={COVERAGE_LAYER}
-                      type="fill"
-                      filter={[
-                        'any',
-                        ['==', ['get', 'variantId'], variant.id],
+                {mode === 'blending' && (
+                  <Layer
+                    id={blendLayerId(buffer, 0)}
+                    source={coverageSourceId(buffer)}
+                    source-layer={COVERAGE_LAYER}
+                    type="fill"
+                    paint={{
+                      'fill-color': [
+                        'get',
+                        ['get', 'pattern'],
                         [
-                          'in',
-                          JSON.stringify(variant.id),
-                          ['coalesce', ['get', 'variantIds'], '[]'],
+                          'literal',
+                          Object.fromEntries(
+                            Object.entries(blendStyles[buffer] ?? {}).map(([id, style]) => [
+                              id,
+                              style.color,
+                            ]),
+                          ),
                         ],
-                      ]}
-                      paint={{
-                        'fill-color': variant.color,
-                        'fill-opacity': opacity,
-                        'fill-layer-opacity':
-                          coverageReady && state.activeBuffer === buffer ? 1 : 0,
-                        'fill-layer-opacity-transition': { duration: 0 },
-                        'fill-opacity-transition': { duration: 0 },
-                        'fill-antialias': false,
-                      }}
-                    />
-                  ))}
+                      ],
+                      'fill-opacity': [
+                        'get',
+                        ['get', 'pattern'],
+                        [
+                          'literal',
+                          Object.fromEntries(
+                            Object.entries(blendStyles[buffer] ?? {}).map(([id, style]) => [
+                              id,
+                              style.opacity,
+                            ]),
+                          ),
+                        ],
+                      ],
+                      'fill-layer-opacity': coverageReady && state.activeBuffer === buffer ? 1 : 0,
+                      'fill-layer-opacity-transition': { duration: 0 },
+                      'fill-opacity-transition': { duration: 0 },
+                      'fill-antialias': false,
+                    }}
+                  />
+                )}
               </Source>
             </Fragment>
           )

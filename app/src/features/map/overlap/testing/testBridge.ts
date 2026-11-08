@@ -155,23 +155,24 @@ export const installOverlapTestApi = (
       else blankLayerFrames++
     }
     for (const report of overlapDiagnostics.reports) {
+      const displayed =
+        report.buffer !== undefined &&
+        [
+          solidLayerId(report.buffer),
+          stripeLayerId(report.buffer),
+          ...layers.filter((id) => id.startsWith(blendLayerPrefix(report.buffer ?? 0))),
+        ].some(
+          (id) => map.getLayer(id) && Number(map.getPaintProperty(id, 'fill-layer-opacity')) > 0,
+        )
       if (
         (report.outcome === 'pending' || report.outcome === 'ready') &&
         report.firstCoverageRenderMs === undefined &&
-        report.buffer !== undefined &&
-        map.getLayer(stripeLayerId(report.buffer)) &&
-        Number(map.getPaintProperty(stripeLayerId(report.buffer), 'fill-layer-opacity')) > 0
+        displayed
       )
         overlapDiagnostics.update(report.requestId, {
           firstCoverageRenderMs: now - report.startedAt,
         })
-      if (
-        report.outcome === 'ready' &&
-        report.firstRenderMs === undefined &&
-        report.buffer !== undefined &&
-        map.getLayer(stripeLayerId(report.buffer)) &&
-        Number(map.getPaintProperty(stripeLayerId(report.buffer), 'fill-layer-opacity')) > 0
-      ) {
+      if (report.outcome === 'ready' && report.firstRenderMs === undefined && displayed) {
         overlapDiagnostics.update(report.requestId, { firstRenderMs: now - report.startedAt })
       }
     }
@@ -205,7 +206,11 @@ export const installOverlapTestApi = (
       const point = map.project(center)
       const bounds = map.getCanvas().getBoundingClientRect()
       return {
-        variantIds: visibleVariantIds(map, point),
+        variantIds: visibleVariantIds(
+          map,
+          point,
+          parseOverlapSelection(selectionKey()).refinements,
+        ),
         point: [Math.round(point.x + bounds.left), Math.round(point.y + bounds.top)] as [
           number,
           number,
@@ -310,11 +315,18 @@ export const installOverlapTestApi = (
           debug && gl
             ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)
             : gl?.getParameter(gl.RENDERER),
-        activeBuffers: BUFFERS.filter(
-          (buffer) =>
-            map.getLayer(stripeLayerId(buffer)) &&
-            Number(map.getPaintProperty(stripeLayerId(buffer), 'fill-layer-opacity')) > 0,
+        activeBuffers: BUFFERS.filter((buffer) =>
+          [
+            solidLayerId(buffer),
+            stripeLayerId(buffer),
+            ...map.getLayersOrder().filter((id) => id.startsWith(blendLayerPrefix(buffer))),
+          ].some(
+            (id) => map.getLayer(id) && Number(map.getPaintProperty(id, 'fill-layer-opacity')) > 0,
+          ),
         ),
+        blendLayerCount: map
+          .getLayersOrder()
+          .filter((id) => BUFFERS.some((buffer) => id.startsWith(blendLayerPrefix(buffer)))).length,
         coverageSourceTypes: BUFFERS.flatMap((buffer) => {
           const source = map.getSource(coverageSourceId(buffer))
           return source ? [source.type] : []
