@@ -10,10 +10,25 @@ from types import SimpleNamespace
 from run import APP, Browser, check_state, free_port, request, stop, stop_group, wait_for
 
 
+def view(browser, name):
+    browser.js("document.querySelector('#language-tab-'+arguments[0]).click()", name)
+    wait_for(lambda: browser.js("return !document.querySelector('#language-panel-'+arguments[0]).hidden", name), 10, f"{name} view")
+    if name in ("explore", "map"):
+        # ResizeObserver repopulates a virtual list after its panel becomes visible.
+        selector = ".language-row" if name == "explore" else ".on-map-row"
+        wait_for(lambda: browser.js("return !!document.querySelector('#language-panel-'+arguments[0]+' '+arguments[1]+', #language-panel-'+arguments[0]+' .finder-empty')", name, selector), 10, f"{name} list")
+
+
+def open_details(browser):
+    browser.js("document.querySelector('.language-row__identity').click()")
+    wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "entry details")
+
+
 def search(browser, query, glottocode):
+    view(browser, "explore")
     browser.js(
         """
-        const input = document.querySelector('input[type=search]');
+        const input = document.querySelector('#language-panel-explore input[type=search]');
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, arguments[0]);
         input.dispatchEvent(new Event('input', {bubbles:true}));
         """,
@@ -174,13 +189,13 @@ def main():
 
             # A search hit can be revealed in its complete classification, including deep ancestors.
             search(browser, "上海", "shan1293")
-            browser.js("document.querySelector('.language-row').click();")
+            open_details(browser)
             browser.js("document.querySelector('.finder-detail__reveal').click()")
             revealed = wait_for(
                 lambda: browser.js("""
                 const row = document.activeElement;
                 return row?.dataset.languageId === 'shan1293' && Number(row.getAttribute('aria-level')) > 1
-                    ? {key: row.dataset.treeKey, level: row.getAttribute('aria-level'), query: document.querySelector('input[type=search]').value} : null;
+                    ? {key: row.dataset.treeKey, level: row.getAttribute('aria-level'), query: document.querySelector('#language-panel-explore input[type=search]').value} : null;
                 """),
                 15,
                 "reveal in classification",
@@ -281,6 +296,11 @@ def main():
                 results[level] = {"row": row, "inspection": inspection}
                 browser.call("DELETE", "/actions")
                 browser.screenshot(output / f"{level}.png")
+                browser.js("document.querySelector('.language-inspector__details').click()")
+                wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "details from map popup")
+                assert code in browser.js("return document.querySelector('.finder-detail').textContent")
+                assert browser.snapshot()["selectedCount"] == 1
+                assert not browser.js("return !!document.querySelector('.language-inspector--pinned')")
 
             before = len(browser.snapshot()["reports"])
             browser.js(
@@ -320,17 +340,20 @@ def main():
                 {"languageIds": [], "center": center, "zoom": 5},
             )
             search(browser, "abkh1242", "abkh1242")
-            browser.js("document.querySelector('.language-row').click()")
+            open_details(browser)
 
             def choose_mode(mode):
+                view(browser, "explore")
+                open_details(browser)
                 browser.js(
                     """
-                    const select = document.querySelector('.language-row__area-mode');
+                    const select = document.querySelector('.finder-detail__mode select');
                     select.value = arguments[0];
                     select.dispatchEvent(new Event('change', {bubbles:true}));
                 """,
                     mode,
                 )
+                view(browser, "explore")
 
             def ready_after(before, count):
                 return wait_for(
@@ -388,9 +411,11 @@ def main():
             )
             assert "Abkhaz-Adyge" in popup and "abkh1242" in popup
             assert "Descendant areas" in popup and "3 contributing entries" in popup
+            open_details(browser)
             assert "3 contributing entries" in browser.js(
                 "return document.querySelector('.finder-detail').textContent"
             )
+            view(browser, "explore")
             browser.js("document.querySelector('.language-row__disclosure').click()")
             assert browser.js(
                 "return [...document.querySelectorAll('.language-row[aria-level=\"2\"] input')].every(input => !input.checked)"
@@ -529,9 +554,8 @@ def main():
                 20,
                 "own representation",
             )
-            browser.js(
-                "[...document.querySelectorAll('.finder-actions button')].find(button => button.textContent === 'Clear map').click()"
-            )
+            view(browser, "map")
+            browser.js("document.querySelector('.on-map-actions button').click()")
 
             # An entry with no own polygons can be selected through a single mapped descendant.
             row = search(browser, "abkh1243", "abkh1243")
@@ -565,7 +589,7 @@ def main():
             """)
             ready_after(before, 1)
             browser.js("""
-                const select = document.querySelector('.finder-filters select:not(.finder-filters__period select)');
+                const select = document.querySelector('.finder-scope select');
                 select.value = 'viewport'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
             wait_for(
@@ -576,7 +600,7 @@ def main():
                 "aggregate in viewport search",
             )
             browser.js("""
-                const select = document.querySelector('.finder-filters select:not(.finder-filters__period select)');
+                const select = document.querySelector('.finder-scope select');
                 select.value = 'world'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
             browser.screenshot(output / "aggregate-only.png")
@@ -594,11 +618,11 @@ def main():
             search(browser, "sino1245", "sino1245")
             browser.js("""
                 const row = document.querySelector('.language-row');
-                row.click();
                 if (row.getAttribute('aria-expanded') === 'true') {
                     row.querySelector('.language-row__disclosure').click();
                 }
             """)
+            open_details(browser)
             browser.js("""
                 const filters = document.querySelector('.finder-options');
                 filters.open = true;
@@ -638,6 +662,8 @@ def main():
             browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
             leaves_state = ready_after(before, 10)
             assert not leaves_state["errors"], leaves_state["errors"]
+            view(browser, "explore")
+            wait_for(lambda: browser.js("return !!document.querySelector('.language-row input')"), 10, "return to family search")
             assert not browser.js("return document.querySelector('.language-row input').checked")
             assert browser.js("return document.querySelectorAll('.language-row').length") == 1
             assert "10 of 11 shown" in browser.js(
@@ -649,6 +675,7 @@ def main():
             assert set(family_colors["roots"].values()) == {"sino1245"}
 
             # Repeating the action is idempotent; filters update the count and disable empty actions.
+            open_details(browser)
             browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
             assert "10 of 11 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
@@ -778,16 +805,87 @@ def main():
             """)
             results["queryMappedLeaves"] = {"ids": bulk_leaf_ids, "selectedCount": 8}
 
-            # The tree keeps useful space on narrow screens, including with entry details open.
+            # The three views share selection and details, while keeping independent searches.
+            browser.settled(60)
+            search(browser, "Chinese", "mand1415")
+            explore_before = browser.js("""
+                return {query: document.querySelector('#language-panel-explore input').value,
+                    scroll: document.querySelector('.language-list').scrollTop,
+                    rows: [...document.querySelectorAll('.language-row')].map(row => row.dataset.treeKey)};
+            """)
+            reports_before_views = len(browser.snapshot()["reports"])
+            view(browser, "map")
+            assert browser.js("return document.querySelectorAll('.on-map-row').length") == 9
+            assert browser.js("""
+                const row = document.querySelector('.on-map-row[data-language-id="abkh1244"]');
+                return row.dataset.displayed === 'false' && row.textContent.includes('Unavailable');
+            """), "Selections unavailable from DLAC remain manageable"
+            browser.screenshot(output / "on-map.png")
+            browser.js("""
+                const input = document.querySelector('#language-panel-map input');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'yuec1235');
+                input.dispatchEvent(new Event('input', {bubbles:true}));
+            """)
+            wait_for(lambda: browser.js("return document.querySelectorAll('.on-map-row').length === 1 && document.querySelector('.on-map-row').dataset.languageId === 'yuec1235'"), 10, "selection search")
+            browser.js("document.querySelector('.on-map-row__identity').click()")
+            wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "selection details")
+            assert browser.js("""
+                return document.querySelector('.finder-detail').textContent.includes('yuec1235') &&
+                    document.querySelector('.language-back').textContent.includes('On map') &&
+                    document.activeElement === document.querySelector('.finder-detail h3') &&
+                    [...document.querySelectorAll('.language-panel')].filter(panel => !panel.hidden).length === 1 &&
+                    document.querySelector('#language-panel-explore input').getClientRects().length === 0;
+            """), "Details replaces the lists and receives focus"
+            browser.screenshot(output / "details.png")
+            browser.js("document.querySelector('.language-back').click()")
+            view(browser, "map")
+            assert browser.js("return document.querySelector('#language-panel-map input').value") == 'yuec1235'
+            view(browser, "explore")
+            assert browser.js("""
+                return {query: document.querySelector('#language-panel-explore input').value,
+                    scroll: document.querySelector('.language-list').scrollTop,
+                    rows: [...document.querySelectorAll('.language-row')].map(row => row.dataset.treeKey)};
+            """) == explore_before, "Explore context survives inspection"
+            assert len(browser.snapshot()["reports"]) == reports_before_views, "Navigation must not recompute map geometry"
+            # Tabs support arrow navigation; a query on the selection list survives switching.
+            browser.js("document.querySelector('#language-tab-explore').focus()")
+            key("\ue014")
+            assert browser.js("return document.activeElement.id") == 'language-tab-map'
+            view(browser, "map")
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'year-1750'; select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            wait_for(lambda: browser.js("return document.querySelector('.on-map-row').dataset.displayed === 'false'"), 10, "unavailable selected entry")
+            assert browser.snapshot()["selectedCount"] == 0
+            assert "9 selected" in browser.js("return document.querySelector('.on-map-actions').textContent")
+            browser.screenshot(output / "on-map-unavailable.png")
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'contemporary'; select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            wait_for(lambda: browser.snapshot()["selectedCount"] == 8, 10, "selection recovery")
+            browser.js("document.querySelector('.on-map-row__remove').click()")
+            wait_for(lambda: browser.snapshot()["selectedCount"] == 7, 10, "remove selected language")
+            assert browser.js("return !!document.querySelector('#language-panel-map .finder-empty')")
+            browser.js("document.querySelector('.on-map-actions button').click()")
+            wait_for(lambda: browser.snapshot()["selectedCount"] == 0, 10, "clear all selections through filtered list")
+            assert browser.js("return document.querySelector('.on-map-actions button').disabled")
+            assert browser.js("return window.overlapTest.colorState([]).mappedLeafRoots") == []
+            results["multiViewControls"] = "passed"
+
+            # Details uses the full available height on narrow screens.
+
             browser.call("POST", "/window/rect", {"width": 390, "height": 844})
             search(browser, "abkh1242", "abkh1242")
-            browser.js("document.querySelector('.language-row').click()")
+            open_details(browser)
             narrow = browser.js("""
-                const list = document.querySelector('.language-list');
-                return {height: list.clientHeight, width: innerWidth,
-                    documentWidth: document.documentElement.scrollWidth};
+                const panel = document.querySelector('#language-panel-details');
+                return {height: panel.clientHeight, width: innerWidth,
+                    documentWidth: document.documentElement.scrollWidth,
+                    visiblePanels: [...document.querySelectorAll('.language-panel')].filter(panel => !panel.hidden).length};
                 """)
-            assert narrow["height"] >= 88, narrow
+            assert narrow["height"] >= 200 and narrow["visiblePanels"] == 1, narrow
             assert narrow["documentWidth"] <= narrow["width"], narrow
             results["narrowLayout"] = narrow
             browser.js("document.querySelector('.language-finder').scrollIntoView({block:'end'})")

@@ -1,0 +1,213 @@
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { useEffect, useMemo, useRef } from 'react'
+import { areaMode, isAreaAvailable, mappedLeavesForLanguage } from '../../domain/aggregation'
+import { languageAncestors } from '../../domain/hierarchy'
+import { temporalQualityLabel } from '../../domain/temporal'
+import {
+  areaModesAtom,
+  atlasDataAtom,
+  geographyAvailabilityAtom,
+  geometryOverridesAtom,
+  languageColorsAtom,
+  languageHierarchyAtom,
+  setGeometryOverrideAtom,
+  showMappedLeavesAtom,
+  toggleVisibleLanguageAtom,
+  visibleLanguageIdsAtom,
+} from '../../state/atlasState'
+import {
+  languagePanelAtom,
+  openLanguageDetailsAtom,
+  revealLanguageAtom,
+} from '../../state/languageControls'
+
+export const LanguageDetails = () => {
+  const panel = useAtomValue(languagePanelAtom)
+  const data = useAtomValue(atlasDataAtom)
+  const hierarchy = useAtomValue(languageHierarchyAtom)
+  const availability = useAtomValue(geographyAvailabilityAtom)
+  const [modes, setModes] = useAtom(areaModesAtom)
+  const overrides = useAtomValue(geometryOverridesAtom)
+  const colors = useAtomValue(languageColorsAtom)
+  const visibleIds = useAtomValue(visibleLanguageIdsAtom)
+  const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
+  const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
+  const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
+  const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const reveal = useSetAtom(revealLanguageAtom)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const detailId = panel.detailId
+  const detail = detailId ? data.languageById.get(detailId) : undefined
+  const detailAvailability = detail ? availability.get(detail.id) : undefined
+  const mappedLeaves = useMemo(
+    () => (detailId ? mappedLeavesForLanguage(detailId, hierarchy, availability) : undefined),
+    [detailId, hierarchy, availability],
+  )
+  const detailMode = detailAvailability
+    ? areaMode(detailAvailability, modes[detailId ?? ''])
+    : 'own'
+  const detailVariants = detailAvailability?.ownVariants ?? []
+  const activeVariant =
+    detailVariants.find((variant) => variant.id === overrides[detailId ?? '']) ?? detailVariants[0]
+  const selected = detailId !== null && visibleIds.includes(detailId)
+  useEffect(() => {
+    if (detailId) headingRef.current?.focus({ preventScroll: true })
+  }, [detailId])
+  if (!detail)
+    return <p className="finder-empty">Choose an entry in Explore or On map to see its details.</p>
+  return (
+    <section className="finder-detail" aria-label="Entry details">
+      <div className="detail-selection">
+        <span
+          className="language-swatch"
+          style={{ backgroundColor: colors.get(detail.id) }}
+          aria-hidden="true"
+        />
+        <span>{selected ? 'Selected for the map' : 'Not selected for the map'}</span>
+        <button
+          type="button"
+          disabled={!selected && !isAreaAvailable(detailAvailability, modes[detail.id])}
+          onClick={() => toggleVisible(detail.id)}
+        >
+          {selected ? 'Remove from map' : 'Add to map'}
+        </button>
+      </div>
+      {selected && !isAreaAvailable(detailAvailability, modes[detail.id]) && (
+        <p>
+          This selection has no areas for its chosen representation with the current sources /
+          period.
+        </p>
+      )}
+      <div className="finder-detail__heading">
+        <h3 ref={headingRef} tabIndex={-1}>
+          {detail.name}
+        </h3>
+        <small>
+          {detail.level} · {detail.id}
+          {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
+        </small>
+      </div>
+      <nav className="finder-detail__path" aria-label="Classification ancestors">
+        {languageAncestors(hierarchy, detail).map((ancestor) => (
+          <button type="button" key={ancestor.id} onClick={() => openDetails(ancestor.id)}>
+            {ancestor.name}
+            <span aria-hidden="true"> ›</span>
+          </button>
+        ))}
+      </nav>
+      {mappedLeaves && (hierarchy.childrenById.get(detail.id)?.length ?? 0) > 0 && (
+        <div className="finder-detail__mapped-leaves">
+          <button
+            type="button"
+            disabled={!mappedLeaves.languageIds.length}
+            onClick={() => showMappedLeaves(detail.id)}
+          >
+            Show mapped leaves ({mappedLeaves.languageIds.length.toLocaleString()})
+          </button>
+          <p>
+            Shows the deepest entries with polygons in this entire branch, each with its own color.
+            Uses current sources and period; branches without polygons are omitted. Replaces
+            selections within this branch.
+          </p>
+        </div>
+      )}
+      {detailAvailability && (
+        <label className="finder-detail__mode">
+          <span>Map representation</span>
+          <select
+            aria-label={`Map representation for ${detail.name}`}
+            value={detailMode}
+            onChange={(event) =>
+              setModes({
+                ...modes,
+                [detail.id]: event.currentTarget.value === 'own' ? 'own' : 'descendants',
+              })
+            }
+            disabled={!detailAvailability.own && !detailAvailability.descendants.length}
+          >
+            <option value="own" disabled={!detailAvailability.own}>
+              Own area{!detailAvailability.own ? ' (unavailable)' : ''}
+            </option>
+            <option value="descendants" disabled={!detailAvailability.descendants.length}>
+              Descendant areas{!detailAvailability.descendants.length ? ' (unavailable)' : ''}
+            </option>
+          </select>
+        </label>
+      )}
+      {detailMode === 'descendants' && detailAvailability ? (
+        <div className="finder-detail__aggregation">
+          <p>
+            {detailAvailability.descendants.length.toLocaleString()} contributing entries ·{' '}
+            {detailAvailability.uncoveredBranches.length.toLocaleString()} uncovered branches with
+            these filters.
+          </p>
+          <p>Uses the first available area down each branch. Coverage may be incomplete.</p>
+          <details>
+            <summary>Contributors and sources</summary>
+            <ul>
+              {detailAvailability.descendants.map((variant) => (
+                <li key={variant.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const contributor = data.languageById.get(variant.languageId)
+                      if (contributor) openDetails(contributor.id)
+                    }}
+                  >
+                    {data.languageById.get(variant.languageId)?.name}
+                  </button>
+                  <small>
+                    {variant.label} · {temporalQualityLabel(variant.temporalCoverage.quality)}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </details>
+          {detailAvailability.uncoveredBranches.length > 0 && (
+            <details>
+              <summary>Uncovered branches</summary>
+              <ul>
+                {detailAvailability.uncoveredBranches.map((entry) => (
+                  <li key={entry.id}>
+                    <button type="button" onClick={() => openDetails(entry.id)}>
+                      {entry.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      ) : detailVariants.length > 1 ? (
+        <select
+          className="language-row__variant"
+          aria-label={`Geographic source for ${detail.name}`}
+          value={activeVariant?.id}
+          onChange={(event) =>
+            setGeometryOverride({
+              languageId: detail.id,
+              variantId: event.currentTarget.value,
+            })
+          }
+        >
+          {detailVariants.map((variant) => (
+            <option key={variant.id} value={variant.id}>
+              {variant.label} · {temporalQualityLabel(variant.temporalCoverage.quality)}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <p>
+          {activeVariant
+            ? `${activeVariant.label} · ${temporalQualityLabel(activeVariant.temporalCoverage.quality)}`
+            : detail.geometryVariantIds.length
+              ? 'No polygon for selected sources / period'
+              : 'No polygon available'}
+        </p>
+      )}
+      <button type="button" className="finder-detail__reveal" onClick={() => reveal(detail.id)}>
+        Show in classification
+      </button>
+    </section>
+  )
+}

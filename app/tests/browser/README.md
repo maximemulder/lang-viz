@@ -38,12 +38,18 @@ They also exercise the visible Language colors controls: strategy switching,
 setting/removing exact colors and subtree anchors, comparison roots, invalid input,
 and resetting the configuration while retaining map selections.
 Its screenshots, report, and server logs are written to `test-results/catalog/`.
+The sidebar checks cover exclusive Explore / On map / Details views, independent
+searches, context restoration, keyboard tab navigation, shared entry details,
+unavailable selections, removal, and clearing through a filtered selection list.
+Switching views must not trigger geometry computation.
 
 `test:coverage-browser` checks the German and Yue coverage regressions using the
 visible source filter and bulk Show mapped leaves action, with Contemporary
 selected. It samples inland framebuffer pixels and visible memberships during
 pans and zooms 3–6.5 in globe and Mercator, including a forced final render to
-catch stationary gaps. Reports, per-frame evidence, and screenshots go to
+catch stationary gaps. It also checks that the large mapped-leaf selection stays
+virtualized and retains its scroll position when inspecting an entry. Reports,
+per-frame evidence, and screenshots go to
 `test-results/coverage/`. These cases caught narrow shells whose winding reversed
 during MVT rounding, causing entire mainland polygons to be read as holes.
 

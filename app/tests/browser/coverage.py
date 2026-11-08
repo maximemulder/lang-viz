@@ -86,6 +86,23 @@ def check_navigation(browser, output, source, projection, center, points, langua
     return result
 
 
+def check_selection_list(browser, count):
+    browser.js("document.querySelector('#language-tab-map').click()")
+    wait_for(lambda: browser.js("return !!document.querySelector('.on-map-row')"), 10, "selection list")
+    assert browser.js("return document.querySelectorAll('.on-map-row').length") < 100
+    browser.js("const list=document.querySelector('.on-map-list');list.scrollTop=list.scrollHeight")
+    wait_for(lambda: browser.js("return Number(document.querySelector('.on-map-row:last-child')?.getAttribute('aria-posinset')) === arguments[0]", count), 10, "last selected entry")
+    before = browser.js("return document.querySelector('.on-map-list').scrollTop")
+    browser.js("document.querySelector('.on-map-row:last-child .on-map-row__identity').click()")
+    wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "last entry details")
+    browser.js("document.querySelector('.language-back').click()")
+    wait_for(lambda: browser.js("return !!document.querySelector('.on-map-row')"), 10, "return to selection list")
+    assert browser.js("return document.querySelector('.on-map-list').scrollTop") == before
+    assert browser.js("return document.querySelectorAll('.on-map-row').length") < 100
+    browser.js("document.querySelector('#language-tab-explore').click()")
+    print(f"Selection list: {count} entries, virtualized, scroll preserved", flush=True)
+
+
 def main():
     output = APP / "test-results/coverage"
     output.mkdir(parents=True, exist_ok=True)
@@ -123,6 +140,7 @@ def main():
                 state = select_mapped_leaves(browser, source, center)
                 check_state(state, require_stripes=True)
                 results[source] = {"selectedCount": state["selectedCount"]}
+                check_selection_list(browser, state["selectedCount"])
                 for projection in ("globe", "mercator"):
                     browser.js("""
                         document.querySelector('input[name=map-projection][value='+arguments[0]+']').click();

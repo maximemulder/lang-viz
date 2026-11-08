@@ -1,8 +1,9 @@
-import { useAtomValue } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
 import { Popup } from 'react-map-gl/maplibre'
 import { inspectedMapAreaIds } from '../../domain/aggregation'
 import { temporalQualityLabel } from '../../domain/temporal'
 import { atlasDataAtom, languageColorsAtom, selectedMapAreasAtom } from '../../state/atlasState'
+import { openLanguageDetailsAtom } from '../../state/languageControls'
 
 export interface MapInspection {
   readonly longitude: number
@@ -20,6 +21,7 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
   const data = useAtomValue(atlasDataAtom)
   const areas = useAtomValue(selectedMapAreasAtom)
   const colors = useAtomValue(languageColorsAtom)
+  const openDetails = useSetAtom(openLanguageDetailsAtom)
   const datasetsById = new Map(data.datasets.map((dataset) => [dataset.id, dataset]))
   const entries = inspectedMapAreaIds(inspection.variantIds, areas).flatMap((variantId) => {
     const area = areas.find(({ id }) => id === variantId)
@@ -102,6 +104,19 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                         : 'Area supplied by the dataset'}
                     </small>
                   </>
+                )}
+                {inspection.pinned && (
+                  <button
+                    type="button"
+                    className="language-inspector__details"
+                    aria-label={`Details for ${language.name}`}
+                    onClick={() => {
+                      openDetails(language.id)
+                      onClose()
+                    }}
+                  >
+                    View details
+                  </button>
                 )}
               </div>
             </article>
