@@ -71,45 +71,43 @@ export const CoverageLayers = ({
                 maxzoom={snapshot.maxzoom}
               >
                 {mode === 'hatching' && (
-                  <>
-                    <Layer
-                      id={solidLayerId(buffer)}
-                      source={coverageSourceId(buffer)}
-                      source-layer={COVERAGE_LAYER}
-                      type="fill"
-                      filter={['has', 'variantId']}
-                      paint={{
-                        'fill-color': [
-                          'get',
-                          ['get', 'variantId'],
-                          [
-                            'literal',
-                            Object.fromEntries(variants.map(({ id, color }) => [id, color])),
-                          ],
+                  <Layer
+                    id={solidLayerId(buffer)}
+                    source={coverageSourceId(buffer)}
+                    source-layer={COVERAGE_LAYER}
+                    type="fill"
+                    filter={['has', 'variantId']}
+                    paint={{
+                      'fill-color': [
+                        'get',
+                        ['get', 'variantId'],
+                        [
+                          'literal',
+                          Object.fromEntries(variants.map(({ id, color }) => [id, color])),
                         ],
-                        'fill-opacity': 1,
-                        'fill-layer-opacity':
-                          coverageReady && activeBuffer === buffer ? opacity : 0,
-                        'fill-layer-opacity-transition': { duration: 0 },
-                        'fill-antialias': true,
-                      }}
-                    />
-                    <Layer
-                      id={stripeLayerId(buffer)}
-                      source={coverageSourceId(buffer)}
-                      source-layer={COVERAGE_LAYER}
-                      type="fill"
-                      filter={['!', ['has', 'variantId']]}
-                      paint={{
-                        'fill-pattern': ['get', 'pattern'],
-                        'fill-opacity': 1,
-                        'fill-layer-opacity':
-                          coverageReady && activeBuffer === buffer ? opacity : 0,
-                        'fill-layer-opacity-transition': { duration: 0 },
-                        'fill-antialias': true,
-                      }}
-                    />
-                  </>
+                      ],
+                      'fill-opacity': 1,
+                      'fill-layer-opacity': coverageReady && activeBuffer === buffer ? opacity : 0,
+                      'fill-layer-opacity-transition': { duration: 0 },
+                      'fill-antialias': true,
+                    }}
+                  />
+                )}
+                {mode === 'hatching' && (
+                  <Layer
+                    id={stripeLayerId(buffer)}
+                    source={coverageSourceId(buffer)}
+                    source-layer={COVERAGE_LAYER}
+                    type="fill"
+                    filter={['!', ['has', 'variantId']]}
+                    paint={{
+                      'fill-pattern': ['get', 'pattern'],
+                      'fill-opacity': 1,
+                      'fill-layer-opacity': coverageReady && activeBuffer === buffer ? opacity : 0,
+                      'fill-layer-opacity-transition': { duration: 0 },
+                      'fill-antialias': true,
+                    }}
+                  />
                 )}
                 <Layer
                   id={fallbackLayerId(buffer)}
