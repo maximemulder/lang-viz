@@ -5,6 +5,7 @@ import { languageArchiveUrl } from '../../../data/atlasRepository'
 import type { GeometryVariant } from '../../../domain/atlas'
 import {
   atlasDataAtom,
+  languageColorsAtom,
   languageOpacityAtom,
   overlapModeAtom,
   overlapStatusAtom,
@@ -45,14 +46,20 @@ export const OverlapHatching = ({
   const { current } = useMap()
   const map = current?.getMap()
   const data = useAtomValue(atlasDataAtom)
+  const languageColors = useAtomValue(languageColorsAtom)
   const mode = useAtomValue(overlapModeAtom)
   const opacity = useAtomValue(languageOpacityAtom)
   const setOverlapStatus = useSetAtom(overlapStatusAtom)
   const [state, setState] = useState<HatchingState>(idleHatchingState)
-  const colors = useMemo(() => new Map(data.variants.map(({ id, color }) => [id, color])), [data])
-  useEffect(() => {
+  const colors = useMemo(() => {
+    const colors = new Map(
+      data.variants.map(({ id, languageId }) => [id, languageColors.get(languageId) ?? '#777777']),
+    )
     for (const { id, color } of variants) colors.set(id, color)
-  }, [colors, variants])
+    return colors
+  }, [data, languageColors, variants])
+  const colorsRef = useRef(colors)
+  const resourcesRef = useRef<ReturnType<typeof createMapResources> | null>(null)
   const configRef = useRef({ selectionKey, mode })
   const controllerRef = useRef<ReturnType<typeof createOverlapController> | null>(null)
   const refreshRef = useRef<(() => void) | null>(null)
@@ -70,10 +77,11 @@ export const OverlapHatching = ({
     const resources = createMapResources(
       map,
       languageArchiveUrl(),
-      colors,
+      colorsRef.current,
       (id) => controller.sourceFailed(id),
       () => configRef.current.mode === 'hatching',
     )
+    resourcesRef.current = resources
     const controller = createOverlapController({
       worker,
       resources,
@@ -135,8 +143,14 @@ export const OverlapHatching = ({
       map.off('idle', controller.publish)
       controller.dispose()
       resources.dispose()
+      resourcesRef.current = null
     }
-  }, [map, data, colors, onCoverageReady])
+  }, [map, data, onCoverageReady])
+
+  useEffect(() => {
+    colorsRef.current = colors
+    resourcesRef.current?.updateColors(colors)
+  }, [colors])
 
   useEffect(() => {
     configRef.current = { selectionKey, mode }

@@ -2,7 +2,7 @@ import { useAtomValue } from 'jotai'
 import { Popup } from 'react-map-gl/maplibre'
 import { inspectedMapAreaIds } from '../../domain/aggregation'
 import { temporalQualityLabel } from '../../domain/temporal'
-import { atlasDataAtom, selectedMapAreasAtom } from '../../state/atlasState'
+import { atlasDataAtom, languageColorsAtom, selectedMapAreasAtom } from '../../state/atlasState'
 
 export interface MapInspection {
   readonly longitude: number
@@ -19,6 +19,7 @@ interface LanguageInspectorProps {
 export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProps) => {
   const data = useAtomValue(atlasDataAtom)
   const areas = useAtomValue(selectedMapAreasAtom)
+  const colors = useAtomValue(languageColorsAtom)
   const datasetsById = new Map(data.datasets.map((dataset) => [dataset.id, dataset]))
   const entries = inspectedMapAreaIds(inspection.variantIds, areas).flatMap((variantId) => {
     const area = areas.find(({ id }) => id === variantId)
@@ -58,7 +59,7 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
             <article className="language-inspector__entry" key={area?.id ?? variant.id}>
               <span
                 className="language-inspector__swatch"
-                style={{ backgroundColor: area?.color ?? variant.color }}
+                style={{ backgroundColor: area?.color ?? colors.get(language.id) }}
                 aria-hidden="true"
               />
               <div>

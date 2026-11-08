@@ -28,7 +28,12 @@ export const createMapResources = (
   colors: ReadonlyMap<string, string>,
   onSourceFailed: (snapshotId: number) => void,
   drawPatterns: () => boolean = () => true,
-): CoverageResources & { prune(): void; dispose(): void } => {
+): CoverageResources & {
+  updateColors(colors: ReadonlyMap<string, string>): void
+  prune(): void
+  dispose(): void
+} => {
+  let currentColors = colors
   const ownedPatterns = new Map<string, readonly string[]>()
   const snapshots = new Map<
     number,
@@ -77,13 +82,16 @@ export const createMapResources = (
       ])
         if (layers.indexOf(id) > inspection) map.moveLayer(id, 'inspected-language-areas')
   }
-  const addPattern = (id: string, members: readonly string[]) => {
+  const patternImage = (members: readonly string[]) => {
     const memberColors = members.map((member) => {
-      const color = colors.get(member)
+      const color = currentColors.get(member)
       if (!color) throw new Error(`Missing language color for ${member}`)
       return color
     })
-    map.addImage(id, stripeImage(memberColors), { pixelRatio: 1 })
+    return stripeImage(memberColors)
+  }
+  const addPattern = (id: string, members: readonly string[]) => {
+    map.addImage(id, patternImage(members), { pixelRatio: 1 })
   }
   const restorePattern = ({ id }: { id: string }) => {
     const members = ownedPatterns.get(id)
@@ -109,6 +117,22 @@ export const createMapResources = (
   map.on('styleimagemissing', restorePattern)
   syncLayerOrder()
   return {
+    updateColors(nextColors) {
+      const previousColors = currentColors
+      // Retiring snapshots can still contain an aggregate removed by the new
+      // selection. Retain its last color until its image is released.
+      currentColors = new Map([...currentColors, ...nextColors])
+      for (const [id, members] of ownedPatterns) {
+        if (
+          !map.hasImage(id) ||
+          members.every((member) => previousColors.get(member) === currentColors.get(member))
+        )
+          continue
+        // Memberships and image dimensions are unchanged. Refresh pixels in place,
+        // keeping delivery snapshots, tile bytes and geometry worker caches intact.
+        map.updateImage(id, patternImage(members))
+      }
+    },
     stage(tiles, buffer) {
       const unique = new Map(
         [...tiles.values()]

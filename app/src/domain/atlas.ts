@@ -53,6 +53,7 @@ export interface GeometryVariant {
   readonly geometryKind: 'source' | 'dataset-family' | 'dataset-language' | 'dataset-dialect'
   readonly sourceFile: string
   readonly sourceFeatureIds: readonly string[]
+  /** Legacy categorical seed. Runtime presentation uses the languoid color resolver. */
   readonly color: string
   readonly temporalCoverage: TemporalCoverage
   readonly sourceYear: number

@@ -1,5 +1,5 @@
 import { atom } from 'jotai'
-import { unwrap } from 'jotai/utils'
+import { selectAtom, unwrap } from 'jotai/utils'
 import { loadAtlasData } from '../data/atlasRepository'
 import {
   type AreaMode,
@@ -15,6 +15,15 @@ import type {
   LanguageId,
   TemporalViewSelection,
 } from '../domain/atlas'
+import {
+  buildColorTopology,
+  buildSemanticPalette,
+  type ColorConfiguration,
+  DEFAULT_COLOR_CONFIGURATION,
+  resolveLanguageColors,
+  topmostColorRoots,
+  validateColorConfiguration,
+} from '../domain/colors'
 import { buildLanguageHierarchy } from '../domain/hierarchy'
 
 export const atlasDataAtom = atom(async () => loadAtlasData())
@@ -31,6 +40,61 @@ const resolvedAtlasDataAtom = unwrap(atlasDataAtom)
 export const languageHierarchyAtom = atom((get) =>
   buildLanguageHierarchy(get(resolvedAtlasDataAtom)?.languages ?? []),
 )
+const colorConfigurationStateAtom = atom<ColorConfiguration>(DEFAULT_COLOR_CONFIGURATION)
+/** Public, validated configuration API; no dependency on the current controls. */
+export const colorConfigurationAtom = atom(
+  (get) => get(colorConfigurationStateAtom),
+  (get, set, config: ColorConfiguration) => {
+    const previous = get(colorConfigurationStateAtom)
+    const validated = validateColorConfiguration(config)
+    const sameRecord = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>>) =>
+      Object.keys(a).length === Object.keys(b).length &&
+      Object.entries(a).every(([id, color]) => b[id] === color)
+    set(colorConfigurationStateAtom, {
+      ...validated,
+      rootIds:
+        validated.rootIds.length === previous.rootIds.length &&
+        validated.rootIds.every((id, i) => id === previous.rootIds[i])
+          ? previous.rootIds
+          : validated.rootIds,
+      anchors: sameRecord(validated.anchors, previous.anchors)
+        ? previous.anchors
+        : validated.anchors,
+      overrides: sameRecord(validated.overrides, previous.overrides)
+        ? previous.overrides
+        : validated.overrides,
+    })
+  },
+)
+/** Selection provenance, separate from explicit roots in the configuration. */
+export const mappedLeafColorRootsAtom = atom<readonly LanguageId[]>([])
+export const colorTopologyAtom = atom((get) => buildColorTopology(get(languageHierarchyAtom)))
+const semanticRootsAtom = atom((get) => get(colorConfigurationAtom).rootIds)
+const semanticAnchorsAtom = atom((get) => get(colorConfigurationAtom).anchors)
+const selectedFamilyRootsAtom = selectAtom(
+  atom((get) => {
+    const hierarchy = get(languageHierarchyAtom)
+    return get(visibleLanguageIdsAtom)
+      .filter((id) => hierarchy.languageById.get(id)?.level === 'family')
+      .sort()
+  }),
+  (roots) => roots,
+  (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
+)
+export const semanticPaletteAtom = atom((get) =>
+  buildSemanticPalette(
+    get(languageHierarchyAtom),
+    get(colorTopologyAtom),
+    [...get(semanticRootsAtom), ...get(selectedFamilyRootsAtom), ...get(mappedLeafColorRootsAtom)],
+    get(semanticAnchorsAtom),
+  ),
+)
+export const languageColorsAtom = atom((get) => {
+  const data = get(resolvedAtlasDataAtom)
+  return data
+    ? resolveLanguageColors(data, get(colorConfigurationAtom), get(semanticPaletteAtom))
+    : new Map<string, string>()
+})
 export const geographyAvailabilityAtom = atom((get) => {
   const data = get(resolvedAtlasDataAtom)
   return data
@@ -44,7 +108,12 @@ export const geographyAvailabilityAtom = atom((get) => {
     : new Map<string, GeographyAvailability>()
 })
 export const selectedMapAreasAtom = atom((get) =>
-  resolveMapAreas(get(visibleLanguageIdsAtom), get(geographyAvailabilityAtom), get(areaModesAtom)),
+  resolveMapAreas(
+    get(visibleLanguageIdsAtom),
+    get(geographyAvailabilityAtom),
+    get(areaModesAtom),
+    get(languageColorsAtom),
+  ),
 )
 export const overlapModeAtom = atom<'hatching' | 'blending'>('hatching')
 export const languageOpacityAtom = atom(0.82)
@@ -52,6 +121,11 @@ export const overlapStatusAtom = atom<{
   readonly status: 'idle' | 'loading' | 'ready' | 'error'
   readonly message: string
 }>({ status: 'idle', message: '' })
+
+export const clearMapSelectionAtom = atom(null, (_get, set) => {
+  set(visibleLanguageIdsAtom, [])
+  set(mappedLeafColorRootsAtom, [])
+})
 
 export const toggleVisibleLanguageAtom = atom(null, (get, set, languageId: LanguageId) => {
   const current = get(visibleLanguageIdsAtom)
@@ -88,6 +162,23 @@ export const showMappedLeavesAtom = atom(
       get(geographyAvailabilityAtom),
     )
     if (!leaves.languageIds.length) return
+    const coloringRoots = topmostColorRoots(
+      typeof roots === 'string' ? [roots] : roots,
+      get(colorTopologyAtom),
+    )
+    const nextRoots = [
+      ...new Set([
+        ...get(mappedLeafColorRootsAtom).filter((id) => !leaves.subtreeIds.has(id)),
+        ...coloringRoots,
+      ]),
+    ].sort()
+    const previousRoots = get(mappedLeafColorRootsAtom)
+    if (
+      nextRoots.length !== previousRoots.length ||
+      nextRoots.some((id, i) => previousRoots[i] !== id)
+    ) {
+      set(mappedLeafColorRootsAtom, nextRoots)
+    }
     const modes = { ...get(areaModesAtom) }
     for (const id of leaves.languageIds) modes[id] = 'own'
     set(areaModesAtom, modes)

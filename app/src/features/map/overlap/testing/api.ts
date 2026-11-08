@@ -1,3 +1,5 @@
+import type { ColorConfiguration } from '../../../../domain/colors'
+
 type TileService = 'coverage' | 'fallback'
 
 export interface OverlapTestApi {
@@ -6,6 +8,13 @@ export interface OverlapTestApi {
     center: [number, number]
     zoom: number
   }): void
+  configureColors(config: ColorConfiguration): void
+  colorState(ids: readonly string[]): {
+    colors: Record<string, string | undefined>
+    roots: Record<string, string | undefined>
+    mappedLeafRoots: readonly string[]
+    configuration: ColorConfiguration
+  }
   camera(center: [number, number], zoom: number, duration?: number): void
   recompute(): void
   failNextPublication(service: TileService): void

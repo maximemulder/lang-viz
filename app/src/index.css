@@ -866,6 +866,70 @@ h2 {
   color: #a23d26;
 }
 
+.color-controls,
+.color-controls__custom[open],
+.color-controls label {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.color-controls label,
+.color-controls summary {
+  font-size: 0.72rem;
+}
+
+.color-controls summary {
+  cursor: pointer;
+}
+
+.color-controls input,
+.color-controls select,
+.color-controls textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.35rem;
+  border: 1px solid rgb(29 43 39 / 22%);
+  border-radius: 0.3rem;
+  color: var(--ink);
+  background: var(--paper);
+  font: inherit;
+}
+
+.color-controls__value,
+.color-controls__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.color-controls__value input[type="color"] {
+  width: 2.25rem;
+  height: 2rem;
+  padding: 0.15rem;
+}
+
+.color-controls__value input[type="text"] {
+  flex: 1;
+  width: 5rem;
+}
+
+.color-controls button {
+  padding: 0.4rem;
+  font-size: 0.68rem;
+}
+
+.color-controls__swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid rgb(29 43 39 / 22%);
+  border-radius: 0.15rem;
+}
+
+.color-controls .color-controls__error {
+  color: #a23d26;
+}
+
 .map-hint {
   position: absolute;
   bottom: 1.5rem;

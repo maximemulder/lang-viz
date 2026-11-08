@@ -30,6 +30,12 @@ and verifies period availability, count updates, and repeated selection.
 The bulk mapped-leaf check applies the current query to multiple overlapping
 branches, deduplicates their leaves, preserves unrelated selections, and verifies
 filter availability without opening entry details.
+Color checks verify that mapped leaves retain their family palette through period
+filters, custom overrides update finder swatches and actual overlap stripe pixels,
+and repeated recoloring reuses coverage URLs without issuing geometry requests.
+They also exercise the visible Language colors controls: strategy switching,
+setting/removing exact colors and subtree anchors, comparison roots, invalid input,
+and resetting the configuration while retaining map selections.
 Its screenshots, report, and server logs are written to `test-results/catalog/`.
 
 Each invocation builds the production app, starts a local Vite preview and

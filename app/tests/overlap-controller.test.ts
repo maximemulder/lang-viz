@@ -455,6 +455,7 @@ test('style replacement restores owned stripe images without recomputing and rel
   const images = new Map<string, { width: number; height: number; data: Uint8Array }>()
   const failures: number[] = []
   const sources = new Map<string, string>()
+  let imageUpdates = 0
   const map = {
     on: (event: string, callback: (event: unknown) => void) => listeners.set(event, callback),
     off: (event: string) => listeners.delete(event),
@@ -462,11 +463,16 @@ test('style replacement restores owned stripe images without recomputing and rel
     getSource: (id: string) =>
       sources.has(id) ? { serialize: () => ({ tiles: [sources.get(id)] }) } : undefined,
     isSourceLoaded: () => true,
+    isMoving: () => false,
     querySourceFeatures: () => [],
     getImage: (id: string) => (images.has(id) ? { data: images.get(id) } : undefined),
     hasImage: (id: string) => images.has(id),
     addImage: (id: string, image: { width: number; height: number; data: Uint8Array }) =>
       images.set(id, image),
+    updateImage: (id: string, image: { width: number; height: number; data: Uint8Array }) => {
+      imageUpdates++
+      images.set(id, image)
+    },
     removeImage: (id: string) => images.delete(id),
   } as unknown as MapLibreMap
   const resources = createMapResources(
@@ -480,10 +486,29 @@ test('style replacement restores owned stripe images without recomputing and rel
   )
   const { snapshot } = resources.stage(new Map([['2/0/0', tile(0)]]), 0)
   const original = required(images.get('overlap:A|B'))
+  resources.updateColors(
+    new Map([
+      ['A', '#00ff00'],
+      ['B', '#0000ff'],
+    ]),
+  )
+  const recolored = required(images.get('overlap:A|B'))
+  assert.notDeepEqual(recolored.data, original.data)
+  assert.equal(recolored.width, original.width)
+  assert.equal(recolored.height, original.height)
+  assert.equal(imageUpdates, 1)
+  assert.deepEqual([...recolored.data.slice(0, 4)], [0, 255, 0, 255])
+  resources.updateColors(new Map([['A', '#00ff00']]))
+  assert.equal(imageUpdates, 1, 'retiring members retain their previous colors')
+  assert.equal(
+    resources.isReady(snapshot, 0),
+    false,
+    'palette updates do not change source identity/readiness',
+  )
   images.clear()
   const restore = required(listeners.get('styleimagemissing'))
   restore({ id: 'overlap:A|B' })
-  assert.deepEqual(images.get('overlap:A|B'), original)
+  assert.deepEqual(images.get('overlap:A|B'), recolored)
   restore({ id: 'unrelated-image' })
   assert.equal(images.size, 1)
   assert.deepEqual(failures, [])

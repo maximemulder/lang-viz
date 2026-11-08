@@ -36,10 +36,12 @@ import {
 import {
   areaModesAtom,
   atlasDataAtom,
+  clearMapSelectionAtom,
   finderScopeAtom,
   geographyAvailabilityAtom,
   geographyDatasetFilterAtom,
   geometryOverridesAtom,
+  languageColorsAtom,
   languageHierarchyAtom,
   languageQueryAtom,
   selectedMapAreasAtom,
@@ -74,6 +76,7 @@ const LanguageRow = ({
   const { language } = row
   const visibleIds = useAtomValue(visibleLanguageIdsAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
+  const colors = useAtomValue(languageColorsAtom)
   const [modes, setModes] = useAtom(areaModesAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const available = availability.get(language.id)
@@ -180,7 +183,7 @@ const LanguageRow = ({
         title={availabilityLabel}
         checked={isVisible}
         disabled={!variants.length && !isVisible}
-        style={{ accentColor: mode === 'own' ? available.own?.color : available.color }}
+        style={{ accentColor: colors.get(language.id) }}
         onChange={() => toggleVisible(language.id)}
       />
     </div>
@@ -313,6 +316,7 @@ export const LanguageFinder = () => {
   const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
+  const clearMapSelection = useSetAtom(clearMapSelectionAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
@@ -603,7 +607,7 @@ export const LanguageFinder = () => {
           >
             Show mapped leaves ({filteredMappedLeaves.languageIds.length.toLocaleString()})
           </button>
-          <button type="button" className="button-secondary" onClick={() => setVisibleIds([])}>
+          <button type="button" className="button-secondary" onClick={() => clearMapSelection()}>
             Clear map
           </button>
         </div>

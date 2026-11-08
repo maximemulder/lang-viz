@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { languageOpacityAtom, overlapModeAtom } from '../../state/atlasState'
 
 import { BIOMES } from './biomes'
+import { ColorControls } from './ColorControls'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
 import { globeLandPath, mercatorLandPath } from './projectionIcons'
 
@@ -218,6 +219,7 @@ export const MapSettings = ({
             ))}
           </div>
         </fieldset>
+        <ColorControls />
         <label className="map-opacity-control" htmlFor="language-opacity">
           <span>
             Color intensity

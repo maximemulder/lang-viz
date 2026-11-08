@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  aggregateColor,
   areaMode,
   areaStatus,
   buildGeographyAvailability,
@@ -13,9 +12,16 @@ import {
   mapAreaSourceColors,
   mappedLeavesForLanguage,
   mappedLeavesForLanguages,
-  resolveMapAreas,
+  resolveMapAreas as resolveAreas,
 } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
+import {
+  aggregateColor,
+  buildColorTopology,
+  buildSemanticPalette,
+  DEFAULT_COLOR_CONFIGURATION,
+  resolveLanguageColors,
+} from '../src/domain/colors.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
 
 const entry = (
@@ -98,6 +104,18 @@ const data: AtlasData = {
   searchTextByLanguageId: new Map(),
 }
 const hierarchy = buildLanguageHierarchy(languages)
+const colors = resolveLanguageColors(
+  data,
+  { ...DEFAULT_COLOR_CONFIGURATION, strategy: 'categorical' },
+  buildSemanticPalette(hierarchy, buildColorTopology(hierarchy)),
+)
+const resolveMapAreas = (
+  ...args: [
+    Parameters<typeof resolveAreas>[0],
+    Parameters<typeof resolveAreas>[1],
+    Parameters<typeof resolveAreas>[2],
+  ]
+) => resolveAreas(...args, colors)
 const availability = (
   period: Parameters<typeof buildGeographyAvailability>[2] = 'all',
   sources: Parameters<typeof buildGeographyAvailability>[3] = 'all',
@@ -337,10 +355,7 @@ test('an aggregate is one selection and can coexist with an independently select
     'modern:other-dialect',
   ])
   assert.equal(mapAreaSourceColors(areas)['historic:language'], '#123456')
-  assert.equal(
-    mapAreaSourceColors(areas)['modern:other-dialect'],
-    required(availability().get('family')).color,
-  )
+  assert.equal(mapAreaSourceColors(areas)['modern:other-dialect'], colors.get('family'))
 })
 
 test('cache keys include membership and presentation, independent of selection order', () => {

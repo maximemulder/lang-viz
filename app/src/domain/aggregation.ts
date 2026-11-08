@@ -11,7 +11,6 @@ import type { LanguageHierarchy } from './hierarchy.ts'
 export type AreaMode = 'own' | 'descendants'
 
 export interface GeographyAvailability {
-  readonly color: string
   readonly ownVariants: readonly GeometryVariant[]
   readonly own: GeometryVariant | undefined
   /** First available geometry on each descendant branch, excluding this entry. */
@@ -59,10 +58,7 @@ export const buildGeographyAvailability = (
       } else uncoveredBranches.push(child)
     }
     visiting.delete(language.id)
-    const color =
-      language.geometryVariantIds.map((id) => data.variantById.get(id)?.color).find(Boolean) ??
-      aggregateColor(language.id)
-    const available = { ownVariants, own, descendants, uncoveredBranches, hasAnyAreas, color }
+    const available = { ownVariants, own, descendants, uncoveredBranches, hasAnyAreas }
     result.set(language.id, available)
     return available
   }
@@ -119,38 +115,11 @@ export const areaStatus = (available: GeographyAvailability, mode: AreaMode) => 
   return available.hasAnyAreas ? 'Filtered out' : 'No areas'
 }
 
-/** Stable per-entry color, including entries without directly supplied polygons. */
-export const aggregateColor = (languageId: string) => {
-  let hash = 0
-  for (const character of languageId) hash = (Math.imul(hash, 31) + character.charCodeAt(0)) | 0
-  const hue = ((hash >>> 0) % 360) / 60
-  const chroma = 0.5
-  const x = chroma * (1 - Math.abs((hue % 2) - 1))
-  const channels =
-    hue < 1
-      ? [chroma, x, 0]
-      : hue < 2
-        ? [x, chroma, 0]
-        : hue < 3
-          ? [0, chroma, x]
-          : hue < 4
-            ? [0, x, chroma]
-            : hue < 5
-              ? [x, 0, chroma]
-              : [chroma, 0, x]
-  return `#${channels
-    .map((channel) =>
-      Math.round((channel + 0.22) * 255)
-        .toString(16)
-        .padStart(2, '0'),
-    )
-    .join('')}`
-}
-
 export const resolveMapAreas = (
   ids: readonly string[],
   availability: ReadonlyMap<string, GeographyAvailability>,
   modes: Readonly<Record<string, AreaMode>>,
+  colors: ReadonlyMap<string, string>,
 ): readonly MapArea[] =>
   ids.flatMap((languageId) => {
     const available = availability.get(languageId)
@@ -164,7 +133,7 @@ export const resolveMapAreas = (
         id: mode === 'own' ? first.id : `descendants:${languageId}`,
         languageId,
         mode,
-        color: mode === 'own' ? first.color : available.color,
+        color: colors.get(languageId) ?? '#777777',
         variants,
       },
     ]

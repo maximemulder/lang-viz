@@ -410,6 +410,105 @@ def main():
             assert grouped_child["reports"][-1]["sharedPatterns"] > 0
             results["aggregationWithChild"] = inspect_at_center()
 
+            # Exact custom colors update live stripe pixels without replacing geometry.
+            browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
+            element = browser.call(
+                "POST", "/element", {"using": "css selector", "value": "#language-opacity"}
+            )["element-6066-11e4-a52e-4f735466cecf"]
+            browser.call("POST", f"/element/{element}/value", {"text": "\ue010"})
+            wait_for(lambda: browser.js("return document.querySelector('#language-opacity').value==='100'"), 10, "opaque custom colors")
+            browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
+            color_before = browser.snapshot()
+            browser.js("""
+                window.overlapTest.configureColors({strategy:'semantic',rootIds:[],anchors:{},
+                    overrides:{abkh1242:'#ff0000', abkh1244:'#0000ff'}});
+            """)
+            wait_for(lambda: browser.js("return window.overlapTest.colorState(['abkh1242']).colors.abkh1242 === '#ff0000'"), 10, "color configuration")
+
+            def sample_colors():
+                pixels = browser.call("POST", "/execute/async", {
+                    "script": "const done=arguments[arguments.length-1];window.overlapTest.samplePixels(arguments[0],4).then(done)",
+                    # The inspection fixture is near a coast. Move the pixel patch
+                    # inward so antialiased polygon edges cannot mix in the ocean.
+                    "args": [[center[0], center[1] - 0.1]],
+                })
+                colors = {tuple(pixels[i:i + 4]) for i in range(0, len(pixels), 4)}
+                results["lastCustomColorPixels"] = sorted(colors)
+                return colors
+
+            # Stripe interiors retain exact colors; filtered boundaries may mix them.
+            wait_for(lambda: {(255, 0, 0, 255), (0, 0, 255, 255)} <= sample_colors(), 10, "custom stripe pixels")
+            color_after = browser.snapshot()
+            assert color_after["coverageUrls"] == color_before["coverageUrls"]
+            assert len(color_after["reports"]) == len(color_before["reports"])
+            assert browser.js("return getComputedStyle(document.querySelector('.language-row input')).accentColor") == "rgb(0, 0, 255)"
+            # An override can be replaced repeatedly; the existing texture must refresh again.
+            browser.js("""
+                window.overlapTest.configureColors({strategy:'semantic',rootIds:[],anchors:{},
+                    overrides:{abkh1242:'#00ff00', abkh1244:'#0000ff'}});
+            """)
+            wait_for(lambda: {(0, 255, 0, 255), (0, 0, 255, 255)} <= sample_colors(), 10, "updated custom stripe pixels")
+            results["customColors"] = {"geometryReused": True, "stripePixels": "passed"}
+
+            # The visible testing controls exercise the same configuration API.
+            browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
+            browser.js("document.querySelector('.color-controls__custom').open = true")
+
+            def color_text(selector, value):
+                browser.js("""
+                    const input = document.querySelector(arguments[0]);
+                    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value').set.call(input, arguments[1]);
+                    input.dispatchEvent(new Event('input', {bubbles:true}));
+                """, selector, value)
+
+            def color_button(text):
+                browser.js("""
+                    [...document.querySelectorAll('.color-controls button')]
+                        .find(button => button.textContent === arguments[0]).click();
+                """, text)
+
+            def color_strategy(value):
+                browser.js("""
+                    const select = document.querySelector('.color-controls select');
+                    select.value = arguments[0];
+                    select.dispatchEvent(new Event('change', {bubbles:true}));
+                """, value)
+
+            color_strategy('categorical')
+            wait_for(lambda: browser.js("return window.overlapTest.colorState([]).configuration.strategy === 'categorical'"), 10, 'categorical UI strategy')
+            color_text('.color-controls input[list]', 'abkh1244')
+            color_text('.color-controls input[aria-label="Custom color value"]', 'invalid')
+            color_button('Set exact color')
+            assert browser.js("return document.querySelector('.color-controls [role=alert]').textContent.includes('opaque color')")
+            assert browser.js("return window.overlapTest.colorState([]).configuration.overrides.abkh1244") == '#0000ff'
+            color_text('.color-controls input[aria-label="Custom color value"]', '#00ff00')
+            color_button('Set exact color')
+            wait_for(lambda: browser.js("return window.overlapTest.colorState(['abkh1244']).colors.abkh1244 === '#00ff00'"), 10, 'exact UI color')
+            color_button('Remove exact color')
+            assert not browser.js("return window.overlapTest.colorState([]).configuration.overrides.abkh1244")
+            color_strategy('semantic')
+            color_text('.color-controls input[list]', 'abkh1243')
+            color_text('.color-controls input[aria-label="Custom color value"]', '#ff0000')
+            color_button('Set subtree color')
+            wait_for(lambda: browser.js("return window.overlapTest.colorState(['abkh1244']).roots.abkh1244 === 'abkh1243'"), 10, 'subtree UI anchor')
+            assert browser.js("return window.overlapTest.colorState(['abkh1244']).colors.abkh1244") == '#ff0000'
+            color_button('Remove subtree color')
+            assert not browser.js("return window.overlapTest.colorState([]).configuration.anchors.abkh1243")
+            color_text('.color-controls textarea', 'abkh1243')
+            color_button('Apply comparison roots')
+            wait_for(lambda: browser.js("return window.overlapTest.colorState(['abkh1244']).roots.abkh1244 === 'abkh1243'"), 10, 'comparison UI roots')
+            color_text('.color-controls textarea', 'unknown-id')
+            color_button('Apply comparison roots')
+            assert browser.js("return document.querySelector('.color-controls [role=alert]').textContent.includes('Unknown languoid IDs')")
+            assert browser.js("return window.overlapTest.colorState([]).configuration.rootIds") == ['abkh1243']
+            browser.screenshot(output / 'color-controls.png')
+            color_button('Reset color settings')
+            configuration = browser.js("return window.overlapTest.colorState([]).configuration")
+            assert configuration == {'strategy': 'semantic', 'rootIds': [], 'anchors': {}, 'overrides': {}}
+            assert len(browser.snapshot()['reports']) == len(color_before['reports'])
+            browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
+            results['colorControls'] = 'passed'
+
             # Blending uses the same unioned coverage, so contributor overlap isn't applied twice.
             before = len(browser.snapshot()["reports"])
             browser.js("document.querySelector('input[aria-label=\"Color blending\"]').click()")
@@ -545,6 +644,9 @@ def main():
                 "return document.querySelector('.selection-count').textContent"
             )
             browser.screenshot(output / "dlac-family-leaves.png")
+            family_colors = browser.js("return window.overlapTest.colorState(['mand1415','jiny1235','yuec1235'])")
+            assert family_colors["mappedLeafRoots"] == ["sino1245"]
+            assert set(family_colors["roots"].values()) == {"sino1245"}
 
             # Repeating the action is idempotent; filters update the count and disable empty actions.
             browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
@@ -573,6 +675,7 @@ def main():
                 select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
             wait_for(lambda: browser.snapshot()["selectedCount"] == 10, 10, "mapped leaf recovery")
+            assert browser.js("return window.overlapTest.colorState(['mand1415','jiny1235','yuec1235']).colors") == family_colors["colors"]
             leaf_ids = [
                 "ganc1239", "hakk1236", "jiny1235", "huiz1242", "wuch1236",
                 "xian1251", "ping1245", "yuec1235", "minn1248", "mand1415",
@@ -689,6 +792,15 @@ def main():
             results["narrowLayout"] = narrow
             browser.js("document.querySelector('.language-finder').scrollIntoView({block:'end'})")
             browser.screenshot(output / "narrow.png")
+            browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
+            color_panel = browser.js("""
+                const panel = document.querySelector('.map-settings__panel');
+                const bounds = panel.getBoundingClientRect();
+                return {right:bounds.right, bottom:bounds.bottom, width:innerWidth, height:innerHeight};
+            """)
+            assert color_panel['right'] <= color_panel['width'], color_panel
+            assert color_panel['bottom'] <= color_panel['height'], color_panel
+            results['narrowColorControls'] = color_panel
         except Exception:
             results["failureSnapshot"] = browser.snapshot()
             browser.screenshot(output / "failure.png")

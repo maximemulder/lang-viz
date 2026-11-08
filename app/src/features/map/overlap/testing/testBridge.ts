@@ -17,6 +17,8 @@ export const installOverlapTestApi = (
   configure: OverlapTestApi['configure'],
   recompute: () => void,
   selectionKey: () => string,
+  colorControls: Pick<OverlapTestApi, 'configureColors' | 'colorState'>,
+  readStatus: () => { readonly status: string; readonly message: string },
 ) => {
   const selectedIds = () => {
     const selection = parseOverlapSelection(selectionKey())
@@ -168,6 +170,7 @@ export const installOverlapTestApi = (
   }
   map.on('idle', onIdle)
   const api = {
+    ...colorControls,
     configure,
     camera: (center: [number, number], zoom: number, duration = 0) =>
       map.easeTo({ center, zoom, duration }),
@@ -249,12 +252,12 @@ export const installOverlapTestApi = (
       ]
     },
     snapshot: () => {
-      const status = document.querySelector('[data-overlap-status]')
+      const status = readStatus()
       const gl = map.getCanvas().getContext('webgl2')
       const debug = gl?.getExtension('WEBGL_debug_renderer_info')
       return {
-        status: status?.getAttribute('data-overlap-status'),
-        message: status?.textContent,
+        status: status.status,
+        message: status.message,
         selectedCount: selectedIds().length,
         camera: { center: map.getCenter().toArray(), zoom: map.getZoom() },
         moving: map.isMoving(),

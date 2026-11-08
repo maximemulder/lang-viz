@@ -231,6 +231,8 @@ def check_pixels(browser):
         "100% color intensity",
     )
     samples = {}
+    language_color = browser.js("return window.overlapTest.colorState(['stan1293']).colors.stan1293")
+    expected = tuple(int(language_color[i:i + 2], 16) for i in (1, 3, 5)) + (255,)
     for projection in ("globe", "mercator"):
         browser.js(
             "document.querySelector('input[name=map-projection][value='+arguments[0]+']').click()",
@@ -246,7 +248,7 @@ def check_pixels(browser):
             },
         )
         colors = {tuple(pixels[i : i + 4]) for i in range(0, len(pixels), 4)}
-        assert colors == {(59, 206, 135, 255)}, (
+        assert colors == {expected}, (
             f"Solid-fill texture/color artifact in {projection}: {colors}"
         )
         samples[projection] = {"pixels": len(pixels) // 4, "rgba": list(next(iter(colors)))}
