@@ -227,4 +227,23 @@ test('exact prepared views bypass Boolean computation, cache geometry, and missi
   t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 404 }))
   await Array.fromAsync(new OverlapComputer().computeTiles(archive, request, () => true))
   assert.equal(archiveReads, 2, 'Optional missing prepared assets must use live geometry')
+  const cancellation = new AbortController()
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    cancellation.abort()
+    options?.signal?.throwIfAborted()
+    return new Response(bytes)
+  })
+  await assert.rejects(
+    Array.fromAsync(
+      new OverlapComputer().computeTiles(
+        archive,
+        request,
+        () => true,
+        undefined,
+        cancellation.signal,
+      ),
+    ),
+    { name: 'AbortError' },
+  )
+  assert.equal(archiveReads, 2, 'Cancelling prepared coverage must not start live computation')
 })

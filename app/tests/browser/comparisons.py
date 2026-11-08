@@ -1,9 +1,10 @@
 """Exercise independent source/period entries through the actual sidebar controls."""
 
 from run import check_state, wait_for
+from sidebar import open_details, search, view
 
 
-def check_comparisons(browser, output, search, view, open_details):
+def check_comparisons(browser, output):
     def state():
         return browser.js("return window.overlapTest.mapEntryState()")
 
@@ -155,15 +156,15 @@ def check_comparisons(browser, output, search, view, open_details):
     assert browser.snapshot()['coverageUrls'] == aggregates_ready['coverageUrls']
     assert len(browser.snapshot()['reports']) == len(aggregates_ready['reports'])
     asher_aggregate = next(e for e in state() if e['id'] == asher_aggregate['id'])
-    # Replacing DLAC's aggregate with leaves retains the complete Asher comparison.
+    # Replacing DLAC's aggregate with branch entries retains the complete Asher comparison.
     source('DLAC')
     browser.js("document.querySelector('.finder-detail__branch button').click()")
-    after_leaves = state()
-    assert dlac_aggregate['id'] not in {e['id'] for e in after_leaves}
-    assert asher_aggregate in after_leaves
-    assert any(e['languageId']=='mand1415' and e['variantIds'][0].startswith('asher2007world:') for e in after_leaves)
+    after_branch = state()
+    assert dlac_aggregate['id'] not in {e['id'] for e in after_branch}
+    assert asher_aggregate in after_branch
+    assert any(e['languageId']=='mand1415' and e['variantIds'][0].startswith('asher2007world:') for e in after_branch)
     browser.js("document.querySelector('.finder-detail__branch button').click()")
-    assert state() == after_leaves, 'Repeating mapped leaves preserves identities and styles'
+    assert state() == after_branch, 'Repeating branch selection preserves identities and styles'
     assert browser.js("return window.overlapTest.colorState([]).branchRoots") == ['sino1245']
     view(browser, 'map')
     browser.js("document.querySelector('.on-map-actions button').click()")

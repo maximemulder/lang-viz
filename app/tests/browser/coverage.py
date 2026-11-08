@@ -2,49 +2,9 @@
 """Check bulk-branch navigation coverage over German (Asher) and Yue (DLAC)."""
 
 import json
-import subprocess
-import urllib.request
-from contextlib import ExitStack
-from types import SimpleNamespace
 
-from run import APP, Browser, check_state, free_port, request, stop, stop_group, wait_for
-
-
-def select_branches(browser, source, center, zoom=4.5):
-    browser.js(
-        "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:arguments[1]})",
-        center, zoom,
-    )
-    browser.js("""
-        document.querySelector('.finder-options').open = true;
-        document.querySelector('.source-filter__trigger').click();
-    """)
-    browser.js("""
-        [...document.querySelectorAll('.source-filter__actions button')]
-          .find(button => button.textContent === 'Clear').click();
-    """)
-    wait_for(
-        lambda: browser.js(
-            "return document.querySelector('.source-filter__trigger').textContent.includes('No sources')"
-        ),
-        10,
-        "cleared source filter",
-    )
-    browser.js("""
-        [...document.querySelectorAll('.source-filter__option')]
-          .find(label => label.querySelector('strong').textContent === arguments[0])
-          .querySelector('input').click();
-        document.querySelector('.source-filter__trigger').click();
-    """, source)
-    button = """
-        [...document.querySelectorAll('.finder-actions button')]
-          .find(button => button.textContent.startsWith('Show branches on map'))
-    """
-    wait_for(
-        lambda: browser.js(f"return !({button}).disabled"), 10, "mapped-branch action"
-    )
-    browser.js(f"({button}).click()")
-    return browser.settled(100)
+from run import APP, browser_session, check_state, open_atlas, wait_for
+from sidebar import select_branches
 
 
 def check_navigation(browser, output, source, projection, center, points, language):
@@ -107,36 +67,13 @@ def main():
     output = APP / "test-results/coverage"
     output.mkdir(parents=True, exist_ok=True)
     results = {}
-    with ExitStack() as stack:
-        preview_port, driver_port = free_port(), free_port()
-        while driver_port == preview_port:
-            driver_port = free_port()
-        preview_log = stack.enter_context((output / "preview.log").open("w"))
-        driver_log = stack.enter_context((output / "geckodriver.log").open("w"))
-        preview = subprocess.Popen(
-            ["npm", "run", "preview", "--", "--host", "127.0.0.1",
-             "--port", str(preview_port), "--strictPort"],
-            cwd=APP, stdout=preview_log, stderr=subprocess.STDOUT, start_new_session=True,
-        )
-        stack.callback(stop_group, preview)
-        driver = subprocess.Popen(
-            ["geckodriver", "--host", "127.0.0.1", "--port", str(driver_port), "--log", "warn"],
-            stdout=driver_log, stderr=subprocess.STDOUT,
-        )
-        stack.callback(stop, driver)
-        origin = f"http://127.0.0.1:{preview_port}"
-        webdriver = f"http://127.0.0.1:{driver_port}"
-        wait_for(lambda: urllib.request.urlopen(origin, timeout=2).status == 200, 20, "preview")
-        wait_for(lambda: request(webdriver, "GET", "/status"), 20, "geckodriver")
-        browser = Browser(webdriver, SimpleNamespace(headed=False, hardware=False))
-        stack.callback(browser.close)
+    with browser_session(output) as (browser, origin):
         try:
             for source, center, points, language in [
                 ("Asher", [10, 51], [[9, 50], [10, 51], [11, 52], [12, 51]], "stan1295"),
                 ("DLAC", [111, 23], [[110, 23], [111, 23], [112, 23], [112, 24]], "yuec1235"),
             ]:
-                browser.call("POST", "/url", {"url": origin + "/?overlap-test=1&overlap-basemap=off"})
-                wait_for(lambda: browser.js("return !!window.overlapTest"), 45, "application")
+                open_atlas(browser, origin)
                 state = select_branches(browser, source, center)
                 check_state(state, require_stripes=True)
                 results[source] = {"selectedCount": state["selectedCount"]}

@@ -2,51 +2,10 @@
 """Check hierarchy browsing, ranked search, keyboard navigation and map selection."""
 
 import json
-import subprocess
-import urllib.request
-from contextlib import ExitStack
-from types import SimpleNamespace
 
-from run import APP, Browser, check_state, free_port, request, stop, stop_group, wait_for
 from comparisons import check_comparisons
-
-
-def view(browser, name):
-    browser.js("document.querySelector('#language-tab-'+arguments[0]).click()", name)
-    wait_for(lambda: browser.js("return !document.querySelector('#language-panel-'+arguments[0]).hidden", name), 10, f"{name} view")
-    if name in ("explore", "map"):
-        # ResizeObserver repopulates a virtual list after its panel becomes visible.
-        selector = ".language-row" if name == "explore" else ".on-map-row"
-        wait_for(lambda: browser.js("return !!document.querySelector('#language-panel-'+arguments[0]+' '+arguments[1]+', #language-panel-'+arguments[0]+' .finder-empty')", name, selector), 10, f"{name} list")
-
-
-def open_details(browser):
-    browser.js("document.querySelector('.language-row__identity').click()")
-    wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "entry details")
-
-
-def search(browser, query, glottocode):
-    view(browser, "explore")
-    browser.js(
-        """
-        const input = document.querySelector('#language-panel-explore input[type=search]');
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, arguments[0]);
-        input.dispatchEvent(new Event('input', {bubbles:true}));
-        """,
-        query,
-    )
-    return wait_for(
-        lambda: browser.js(
-            """
-            const row = [...document.querySelectorAll('.language-row')]
-              .find(row => row.dataset.languageId === arguments[0]);
-            return row ? {text: row.textContent, disabled: row.querySelector('input').disabled, level: row.getAttribute('aria-level')} : null;
-            """,
-            glottocode,
-        ),
-        20,
-        f"search result {glottocode}",
-    )
+from run import APP, browser_session, check_state, open_atlas, wait_for
+from sidebar import open_details, search, view
 
 
 def main():
@@ -59,44 +18,8 @@ def main():
     output = APP / "test-results/catalog"
     output.mkdir(parents=True, exist_ok=True)
     results = {}
-    with ExitStack() as stack:
-        preview_port, driver_port = free_port(), free_port()
-        while driver_port == preview_port:
-            driver_port = free_port()
-        preview_log = stack.enter_context((output / "preview.log").open("w"))
-        driver_log = stack.enter_context((output / "geckodriver.log").open("w"))
-        preview = subprocess.Popen(
-            [
-                "npm",
-                "run",
-                "preview",
-                "--",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(preview_port),
-                "--strictPort",
-            ],
-            cwd=APP,
-            stdout=preview_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        stack.callback(stop_group, preview)
-        driver = subprocess.Popen(
-            ["geckodriver", "--host", "127.0.0.1", "--port", str(driver_port), "--log", "warn"],
-            stdout=driver_log,
-            stderr=subprocess.STDOUT,
-        )
-        stack.callback(stop, driver)
-        origin = f"http://127.0.0.1:{preview_port}"
-        webdriver = f"http://127.0.0.1:{driver_port}"
-        wait_for(lambda: urllib.request.urlopen(origin, timeout=2).status == 200, 20, "preview")
-        wait_for(lambda: request(webdriver, "GET", "/status"), 20, "geckodriver")
-        browser = Browser(webdriver, SimpleNamespace(headed=False, hardware=False))
-        stack.callback(browser.close)
-        browser.call("POST", "/url", {"url": origin + "/?overlap-test=1&overlap-basemap=off"})
-        wait_for(lambda: browser.js("return !!window.overlapTest"), 45, "application")
+    with browser_session(output) as (browser, origin):
+        open_atlas(browser, origin)
         try:
             wait_for(
                 lambda: browser.js("return document.querySelectorAll('.language-row').length"),
@@ -773,8 +696,8 @@ def main():
             """)
             assert browser.snapshot()["selectedCount"] == family_total
             assert browser.js("return window.overlapTest.colorState(['mand1415','jiny1235','yuec1235']).colors") == family_colors["colors"]
-            leaf_ids = family_ids
-            for code in leaf_ids:
+            branch_ids = family_ids
+            for code in branch_ids:
                 search(browser, code, code)
                 assert browser.js("""
                     const row = document.querySelector('.language-row');
@@ -786,7 +709,7 @@ def main():
                 assert browser.js(
                     "return document.querySelector('.language-row input').checked"
                 ) == checked, code
-            results["dlacFamilyBranches"] = {"ids": leaf_ids, "selectedCount": family_total}
+            results["dlacFamilyBranches"] = {"ids": branch_ids, "selectedCount": family_total}
 
             # Bulk branches follow the current query across multiple overlapping matches.
             browser.js(
@@ -839,8 +762,8 @@ def main():
             assert "10 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
-            bulk_leaf_ids = [code for code in leaf_ids if code not in {"ping1245", "minn1248", "sino1245"}]
-            for code in bulk_leaf_ids:
+            query_branch_ids = [code for code in branch_ids if code not in {"ping1245", "minn1248", "sino1245"}]
+            for code in query_branch_ids:
                 search(browser, code, code)
                 assert browser.js("""
                     const row = document.querySelector('.language-row');
@@ -870,7 +793,7 @@ def main():
                 select.value = 'contemporary';
                 select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            results["queryMappedLeaves"] = {"ids": bulk_leaf_ids, "selectedCount": 10}
+            results["queryBranches"] = {"ids": query_branch_ids, "selectedCount": 10}
 
             # The three views share selection and details, while keeping independent searches.
             browser.settled(60)
@@ -941,7 +864,7 @@ def main():
             assert browser.js("return window.overlapTest.colorState([]).branchRoots") == []
             results["multiViewControls"] = "passed"
 
-            results["comparisons"] = check_comparisons(browser, output, search, view, open_details)
+            results["comparisons"] = check_comparisons(browser, output)
 
             # Details uses the full available height on narrow screens.
 

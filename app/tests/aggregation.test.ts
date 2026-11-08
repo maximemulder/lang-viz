@@ -15,6 +15,7 @@ import {
   mappedBranchForLanguages,
 } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
+import { buildBranchMapEntries } from '../src/domain/branches.ts'
 import { buildLanguageSearchIndex, searchCatalog } from '../src/domain/catalog.ts'
 import {
   aggregateColor,
@@ -157,6 +158,43 @@ const explore = (
     modes: {},
     ...overrides,
   })
+
+test('branch plans pin mapped ancestors and descendants under topmost requested roots across gaps', () => {
+  const context = { sources: ['modern', 'historic', 'modern'], period: 'all' as const }
+  const available = availability('all', 'all', { language: 'historic:language' })
+  const plan = buildBranchMapEntries(
+    ['dialect', 'family', 'other-dialect', 'family', 'unknown'],
+    hierarchy,
+    available,
+    context,
+  )
+  assert.deepEqual(plan.languageIds, ['nested', 'dialect', 'language', 'other-dialect', 'family'])
+  assert.ok(plan.subtreeIds.has('gap-leaf'), 'Unmapped descendants are part of the replacement')
+  assert.ok(!plan.subtreeIds.has('isolate'))
+  assert.deepEqual(
+    plan.entries.map(({ languageId, mode, branchRootId, colorRootId, context }) => ({
+      languageId,
+      mode,
+      branchRootId,
+      colorRootId,
+      context,
+    })),
+    plan.languageIds.map((languageId) => ({
+      languageId,
+      mode: 'own',
+      branchRootId: 'family',
+      colorRootId: 'family',
+      context: { sources: ['historic', 'modern'], period: 'all' },
+    })),
+  )
+  assert.deepEqual(plan.entries.find(({ languageId }) => languageId === 'language')?.variantIds, [
+    'historic:language',
+  ])
+  const focused = buildBranchMapEntries(['dialect'], hierarchy, available, context)
+  assert.deepEqual(focused.languageIds, ['nested', 'dialect'])
+  assert.ok(focused.entries.every(({ branchRootId }) => branchRootId === 'dialect'))
+  assert.deepEqual(buildBranchMapEntries(['isolate'], hierarchy, available, context).entries, [])
+})
 
 test('Explore groups available representations stably without erasing unavailable text matches', () => {
   const matches = searchCatalog(data.languageSearchIndex, '')

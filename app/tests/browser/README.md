@@ -257,7 +257,11 @@ branch expansion, ranked search, deep classification reveal, and keyboard
 navigation across virtualized rows. It includes `comparisons.py`: multiple German
 source/period snapshots, different datasets in the same period, independent colors
 and stripe pixels, source/period searching, pinned-card focus, single-entry removal,
-and context-scoped aggregate-to-leaf replacement. Geography changes must preserve
+and context-scoped aggregate-to-branch replacement. Geography changes must preserve
 existing entries and coverage URLs/request counts. The test-only `mapEntryState()`
 API reads pinned entries and their resolved colors. Screenshots are saved in
 `test-results/catalog/` alongside the report.
+
+All browser suites share `browser_session()` and `open_atlas()` from `run.py` for
+server/Firefox lifecycle and navigation. Sidebar actions live in `sidebar.py`;
+each suite keeps its scenario assertions and reports.

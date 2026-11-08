@@ -5,6 +5,12 @@
 remain separate. Complete single-dataset branch views can use optional offline
 coverage at low zoom; other selections are computed live.
 
+`OverlapHatching` owns the worker/controller lifecycle; `CoverageLayers` renders
+the solid, stripe, blended, and fallback layers. `precomputed.ts` matches prepared
+policies and loads their tiles, while `OverlapComputer` retains the shared result
+cache and enforces computation/output budgets. Interactive and offline branch
+selection both use `buildBranchMapEntries` in `domain/branches.ts`.
+
 ## Branch composition and prepared views
 
 Branch actions select mapped ancestors as well as descendants. Their pinned

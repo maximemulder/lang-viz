@@ -9,7 +9,7 @@ import {
   type MultiPolygon,
   OverlapBudgetError,
 } from './geometry.ts'
-import { branchCoverageSignature, decodePrecomputedTile } from './precomputed.ts'
+import { loadPrecomputedTile, prepareBranchCoverage } from './precomputed.ts'
 import { tilePositionToLngLat } from './tiles.ts'
 import type {
   OverlapCollection,
@@ -173,34 +173,19 @@ export class OverlapComputer {
     signal?: AbortSignal,
   ): AsyncGenerator<CoverageTile> {
     const selected = new Set(request.variantIds)
-    const signature = request.precomputed ? await branchCoverageSignature(request) : null
-    const prepared =
-      signature && request.precomputed?.signatures.includes(signature)
-        ? new URL(`${signature}/`, new URL(request.precomputed.directory, request.archiveUrl))
-        : null
+    const prepared = await prepareBranchCoverage(request)
     let outputVertices = 0
     for (const tile of request.tiles) {
       if (!isCurrent()) return
-      if (prepared && tile.z <= (request.precomputed?.maxZoom ?? -1)) {
-        const preparedKey = `${prepared}${tile.z}-${tile.x}-${tile.y}`
+      const preparedKey = prepared?.(tile)
+      if (preparedKey) {
         let result = this.results.get(preparedKey)
         if (!result) {
-          const started = performance.now()
-          try {
-            const response = await fetch(`${preparedKey}.pbf`, signal ? { signal } : {})
-            if (!response.ok) throw new Error(`Prepared coverage HTTP ${response.status}`)
-            const data = new Uint8Array(await response.arrayBuffer())
-            if (metrics) metrics.fetchMs += performance.now() - started
-            const decodeStart = performance.now()
-            const decoded = decodePrecomputedTile(data, tile)
-            if (metrics) metrics.decodeMs += performance.now() - decodeStart
-            if (!isCurrent()) return
+          const decoded = await loadPrecomputedTile(preparedKey, tile, metrics, signal)
+          if (!isCurrent()) return
+          if (decoded) {
             result = { features: decoded.features, vertices: decoded.vertices }
             this.cacheResult(preparedKey, result)
-          } catch {
-            signal?.throwIfAborted()
-            // Optional assets may be absent in a local or interrupted data build.
-            // Fall through to the bounded live engine, preserving coverage on failure.
           }
         } else {
           if (metrics) metrics.partitionCacheHits++

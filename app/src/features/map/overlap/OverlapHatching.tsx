@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Layer, Source, useMap } from 'react-map-gl/maplibre'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useMap } from 'react-map-gl/maplibre'
 import { languageArchiveUrl } from '../../../data/atlasRepository'
 import type { GeometryVariant } from '../../../domain/atlas'
 import {
@@ -10,19 +10,10 @@ import {
   overlapModeAtom,
   overlapStatusAtom,
 } from '../../../state/atlasState'
-import { blendedFace } from './blending'
+import { CoverageLayers } from './CoverageLayers'
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
-import { COVERAGE_LAYER } from './delivery'
 import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
-import { blendLayerId } from './layerIds'
-import {
-  BUFFERS,
-  coverageSourceId,
-  createMapResources,
-  fallbackLayerId,
-  solidLayerId,
-  stripeLayerId,
-} from './mapResources'
+import { createMapResources } from './mapResources'
 import { tilesForBounds } from './tiles'
 import { parseOverlapSelection } from './types'
 import { OverlapWorkerClient } from './workerClient'
@@ -62,22 +53,6 @@ export const OverlapHatching = ({
     return colors
   }, [data, languageColors, variants])
   const colorsRef = useRef(colors)
-  const blendStyles = useMemo(() => {
-    const order = new Map(variants.map((variant, index) => [variant.id, index]))
-    return state.snapshots.map((snapshot) =>
-      Object.fromEntries(
-        (snapshot?.patterns ?? []).map((pattern) => [
-          pattern.pattern,
-          blendedFace(
-            [...pattern.variantIds]
-              .sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0))
-              .map((id) => colors.get(id) ?? '#777777'),
-            opacity,
-          ),
-        ]),
-      ),
-    )
-  }, [state.snapshots, variants, colors, opacity])
   const resourcesRef = useRef<ReturnType<typeof createMapResources> | null>(null)
   const configRef = useRef({ selectionKey, mode })
   const controllerRef = useRef<ReturnType<typeof createOverlapController> | null>(null)
@@ -203,130 +178,19 @@ export const OverlapHatching = ({
           )}
         </div>
       )}
-      {BUFFERS.map((buffer) => {
-        const snapshot = state.snapshots[buffer]
-        return (
-          snapshot && (
-            <Fragment key={buffer}>
-              <Source
-                key={`${buffer}-${snapshot.maxzoom}`}
-                id={coverageSourceId(buffer)}
-                type="vector"
-                tiles={[snapshot.url]}
-                minzoom={0}
-                maxzoom={snapshot.maxzoom}
-              >
-                {mode === 'hatching' && (
-                  <>
-                    <Layer
-                      id={solidLayerId(buffer)}
-                      source={coverageSourceId(buffer)}
-                      source-layer={COVERAGE_LAYER}
-                      type="fill"
-                      filter={['has', 'variantId']}
-                      paint={{
-                        'fill-color': [
-                          'get',
-                          ['get', 'variantId'],
-                          [
-                            'literal',
-                            Object.fromEntries(variants.map(({ id, color }) => [id, color])),
-                          ],
-                        ],
-                        'fill-opacity': 1,
-                        'fill-layer-opacity':
-                          coverageReady && state.activeBuffer === buffer ? opacity : 0,
-                        'fill-layer-opacity-transition': { duration: 0 },
-                        'fill-antialias': true,
-                      }}
-                    />
-                    <Layer
-                      id={stripeLayerId(buffer)}
-                      source={coverageSourceId(buffer)}
-                      source-layer={COVERAGE_LAYER}
-                      type="fill"
-                      filter={['!', ['has', 'variantId']]}
-                      paint={{
-                        'fill-pattern': ['get', 'pattern'],
-                        'fill-opacity': 1,
-                        'fill-layer-opacity':
-                          coverageReady && state.activeBuffer === buffer ? opacity : 0,
-                        'fill-layer-opacity-transition': { duration: 0 },
-                        'fill-antialias': true,
-                      }}
-                    />
-                  </>
-                )}
-                <Layer
-                  id={fallbackLayerId(buffer)}
-                  source-layer={data.manifest.vectorLayer}
-                  type="fill"
-                  filter={['in', ['get', 'variant_id'], ['literal', sourceVariantIds]]}
-                  layout={{
-                    'fill-sort-key': [
-                      'coalesce',
-                      ['get', ['get', 'variant_id'], ['literal', sourcePriorities]],
-                      0,
-                    ],
-                  }}
-                  paint={{
-                    'fill-color': [
-                      'coalesce',
-                      ['get', ['get', 'variant_id'], ['literal', sourceColors]],
-                      '#777777',
-                    ],
-                    'fill-opacity': 1,
-                    'fill-layer-opacity':
-                      coverageReady && state.activeBuffer === buffer ? opacity : 0,
-                    'fill-layer-opacity-transition': { duration: 0 },
-                    'fill-antialias': false,
-                  }}
-                />
-                {mode === 'blending' && (
-                  <Layer
-                    id={blendLayerId(buffer, 0)}
-                    source={coverageSourceId(buffer)}
-                    source-layer={COVERAGE_LAYER}
-                    type="fill"
-                    paint={{
-                      'fill-color': [
-                        'get',
-                        ['get', 'pattern'],
-                        [
-                          'literal',
-                          Object.fromEntries(
-                            Object.entries(blendStyles[buffer] ?? {}).map(([id, style]) => [
-                              id,
-                              style.color,
-                            ]),
-                          ),
-                        ],
-                      ],
-                      'fill-opacity': [
-                        'get',
-                        ['get', 'pattern'],
-                        [
-                          'literal',
-                          Object.fromEntries(
-                            Object.entries(blendStyles[buffer] ?? {}).map(([id, style]) => [
-                              id,
-                              style.opacity,
-                            ]),
-                          ),
-                        ],
-                      ],
-                      'fill-layer-opacity': coverageReady && state.activeBuffer === buffer ? 1 : 0,
-                      'fill-layer-opacity-transition': { duration: 0 },
-                      'fill-opacity-transition': { duration: 0 },
-                      'fill-antialias': false,
-                    }}
-                  />
-                )}
-              </Source>
-            </Fragment>
-          )
-        )
-      })}
+      <CoverageLayers
+        snapshots={state.snapshots}
+        activeBuffer={state.activeBuffer}
+        variants={variants}
+        colors={colors}
+        sourceLayer={data.manifest.vectorLayer}
+        sourceVariantIds={sourceVariantIds}
+        sourceColors={sourceColors}
+        sourcePriorities={sourcePriorities}
+        mode={mode}
+        opacity={opacity}
+        coverageReady={coverageReady}
+      />
     </>
   )
 }

@@ -1,14 +1,11 @@
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { PbfReader } from 'pbf'
+import type { AtlasManifest } from '../../../domain/atlas.ts'
 import type { CoverageTile } from './compute.ts'
 import { COVERAGE_LAYER } from './delivery.ts'
-import type { OverlapSelection, TileCoordinate } from './types.ts'
+import type { OverlapMetrics, OverlapRequest, OverlapSelection, TileCoordinate } from './types.ts'
 
-export interface PrecomputedBranches {
-  readonly directory: string
-  readonly maxZoom: number
-  readonly signatures: readonly string[]
-}
+export type PrecomputedBranches = NonNullable<AtlasManifest['branchCoverage']>
 
 /** Exact geometry policy, excluding colors, presentation, and browsing context. */
 export const branchCoverageSignature = async (selection: OverlapSelection) => {
@@ -26,6 +23,40 @@ export const branchCoverageSignature = async (selection: OverlapSelection) => {
   const bytes = new TextEncoder().encode(JSON.stringify(['branch-v1', policy]))
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/** Resolve optional assets once per selection, before visiting individual tiles. */
+export const prepareBranchCoverage = async (request: OverlapRequest) => {
+  const config = request.precomputed
+  if (!config) return null
+  const signature = await branchCoverageSignature(request)
+  if (!signature || !config.signatures.includes(signature)) return null
+  const directory = new URL(`${signature}/`, new URL(config.directory, request.archiveUrl))
+  return (tile: TileCoordinate) =>
+    tile.z <= config.maxZoom ? `${directory}${tile.z}-${tile.x}-${tile.y}.pbf` : null
+}
+
+/** Missing optional assets fall back live; cancellation still stops the request. */
+export const loadPrecomputedTile = async (
+  url: string,
+  tile: TileCoordinate,
+  metrics?: OverlapMetrics,
+  signal?: AbortSignal,
+): Promise<CoverageTile | null> => {
+  const started = performance.now()
+  try {
+    const response = await fetch(url, signal ? { signal } : {})
+    if (!response.ok) throw new Error(`Prepared coverage HTTP ${response.status}`)
+    const data = new Uint8Array(await response.arrayBuffer())
+    if (metrics) metrics.fetchMs += performance.now() - started
+    const decodeStart = performance.now()
+    const decoded = decodePrecomputedTile(data, tile)
+    if (metrics) metrics.decodeMs += performance.now() - decodeStart
+    return decoded
+  } catch {
+    signal?.throwIfAborted()
+    return null
+  }
 }
 
 /** Prepared tiles use the same canonical MVT representation as live coverage. */

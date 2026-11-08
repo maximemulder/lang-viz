@@ -18,7 +18,8 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
+from types import SimpleNamespace
 
 APP = pathlib.Path(__file__).resolve().parents[2]
 SCENARIOS = json.loads((pathlib.Path(__file__).parent / "scenarios.json").read_text())
@@ -256,11 +257,10 @@ def check_pixels(browser):
     return samples
 
 
-def check_failure_recovery(browser, url, args):
+def check_failure_recovery(browser, origin, args):
     results = []
     for service in ("coverage", "fallback"):
-        browser.call("POST", "/url", {"url": url})
-        wait_for(lambda: browser.js("return !!window.overlapTest"), args.timeout, "test interface")
+        open_atlas(browser, origin, terrain=args.terrain, timeout=args.timeout)
         browser.js("window.overlapTest.configure(arguments[0])", SCENARIOS[0])
         previous = browser.terminal(0, args.timeout)
         check_state(previous, require_stripes=True)
@@ -496,6 +496,59 @@ def check_area_continuity(browser, args, projection):
     return results
 
 
+@contextmanager
+def browser_session(output, *, dev=False, options=None):
+    """Own the application server, WebDriver, browser, and their cleanup."""
+    output.mkdir(parents=True, exist_ok=True)
+    with ExitStack() as stack:
+        preview_port, driver_port = free_port(), free_port()
+        while driver_port == preview_port:
+            driver_port = free_port()
+        preview_log = stack.enter_context((output / "preview.log").open("w"))
+        driver_log = stack.enter_context((output / "geckodriver.log").open("w"))
+        preview = subprocess.Popen(
+            [
+                "npm",
+                "run",
+                "dev" if dev else "preview",
+                "--",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(preview_port),
+                "--strictPort",
+            ],
+            cwd=APP,
+            stdout=preview_log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        stack.callback(stop_group, preview)
+        driver = subprocess.Popen(
+            ["geckodriver", "--host", "127.0.0.1", "--port", str(driver_port), "--log", "warn"],
+            stdout=driver_log,
+            stderr=subprocess.STDOUT,
+        )
+        stack.callback(stop, driver)
+        origin = f"http://127.0.0.1:{preview_port}"
+        webdriver = f"http://127.0.0.1:{driver_port}"
+        wait_for(
+            lambda: urllib.request.urlopen(origin, timeout=2).status == 200,
+            20,
+            "application server",
+        )
+        wait_for(lambda: request(webdriver, "GET", "/status"), 20, "geckodriver")
+        browser = Browser(webdriver, options or SimpleNamespace(headed=False, hardware=False))
+        stack.callback(browser.close)
+        yield browser, origin
+
+
+def open_atlas(browser, origin, *, terrain=False, timeout=45):
+    url = origin + "/?overlap-test=1" + ("" if terrain else "&overlap-basemap=off")
+    browser.call("POST", "/url", {"url": url})
+    wait_for(lambda: browser.js("return !!window.overlapTest"), timeout, "application")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -558,48 +611,8 @@ def main():
         (args.output / "report.json").write_text(json.dumps(result, indent=2) + "\n")
 
     failed = False
-    with ExitStack() as stack:
-        preview_port, driver_port = free_port(), free_port()
-        while driver_port == preview_port:
-            driver_port = free_port()
-        preview_log = stack.enter_context((args.output / "preview.log").open("w"))
-        driver_log = stack.enter_context((args.output / "geckodriver.log").open("w"))
-        preview = subprocess.Popen(
-            [
-                "npm",
-                "run",
-                "dev" if args.dev else "preview",
-                "--",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(preview_port),
-                "--strictPort",
-            ],
-            cwd=APP,
-            stdout=preview_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        stack.callback(stop_group, preview)
-        driver = subprocess.Popen(
-            ["geckodriver", "--host", "127.0.0.1", "--port", str(driver_port), "--log", "warn"],
-            stdout=driver_log,
-            stderr=subprocess.STDOUT,
-        )
-        stack.callback(stop, driver)
-        origin = f"http://127.0.0.1:{preview_port}"
-        webdriver = f"http://127.0.0.1:{driver_port}"
-        wait_for(
-            lambda: urllib.request.urlopen(origin, timeout=2).status == 200,
-            20,
-            "production preview",
-        )
-        wait_for(lambda: request(webdriver, "GET", "/status"), 20, "geckodriver")
-        browser = Browser(webdriver, args)
-        stack.callback(browser.close)
+    with browser_session(args.output, dev=args.dev, options=args) as (browser, origin):
         result["environment"]["browser"] = browser.capabilities
-        url = origin + "/?overlap-test=1" + ("" if args.terrain else "&overlap-basemap=off")
         for run in range(args.runs):
             for scenario in SCENARIOS:
                 if args.scenario and scenario["name"] not in args.scenario:
@@ -607,12 +620,7 @@ def main():
                 case = {"name": scenario["name"], "run": run + 1, "scenario": scenario}
                 result["cases"].append(case)
                 try:
-                    browser.call("POST", "/url", {"url": url})
-                    wait_for(
-                        lambda: browser.js("return !!window.overlapTest"),
-                        args.timeout,
-                        "test interface",
-                    )
+                    open_atlas(browser, origin, terrain=args.terrain, timeout=args.timeout)
                     browser.js("window.overlapTest.configure(arguments[0])", scenario)
                     for phase in ("cold", "warm"):
                         after = 0 if phase == "cold" else len(browser.snapshot()["reports"])
@@ -779,7 +787,7 @@ def main():
                 finally:
                     save()
         try:
-            result["failureRecovery"] = check_failure_recovery(browser, url, args)
+            result["failureRecovery"] = check_failure_recovery(browser, origin, args)
         except Exception as error:  # noqa: BLE001 -- persist failure diagnostics before browser cleanup
             failed = True
             result["failureRecoveryError"] = str(error)

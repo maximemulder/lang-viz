@@ -5,7 +5,6 @@ import {
   type AreaMode,
   buildGeographyAvailability,
   type GeographyAvailability,
-  mappedBranchForLanguages,
 } from '../domain/aggregation'
 import type {
   GeographyDatasetSelection,
@@ -13,6 +12,7 @@ import type {
   LanguageId,
   TemporalViewSelection,
 } from '../domain/atlas'
+import { buildBranchMapEntries } from '../domain/branches'
 import {
   buildColorTopology,
   buildSemanticPalette,
@@ -20,7 +20,6 @@ import {
   DEFAULT_COLOR_CONFIGURATION,
   normalizeColor,
   resolveLanguageColors,
-  topmostColorRoots,
   validateColorConfiguration,
 } from '../domain/colors'
 import { buildLanguageHierarchy } from '../domain/hierarchy'
@@ -235,38 +234,22 @@ export const setMapEntryColorAtom = atom(
 )
 
 export const showBranchAtom = atom(null, (get, set, roots: LanguageId | readonly LanguageId[]) => {
-  const branch = mappedBranchForLanguages(
+  const context = get(geographyContextAtom)
+  const branch = buildBranchMapEntries(
     typeof roots === 'string' ? [roots] : roots,
     get(languageHierarchyAtom),
     get(geographyAvailabilityAtom),
-  )
-  if (!branch.languageIds.length) return
-  const coloringRoots = topmostColorRoots(
-    typeof roots === 'string' ? [roots] : roots,
+    context,
     get(colorTopologyAtom),
   )
-  const rootSet = new Set(coloringRoots)
-  const hierarchy = get(languageHierarchyAtom)
-  const context = get(geographyContextAtom)
-  const availability = get(geographyAvailabilityAtom)
-  const candidates = branch.languageIds.flatMap((id) => {
-    let ancestor: string | null = id
-    const visited = new Set<string>()
-    while (ancestor && !rootSet.has(ancestor) && !visited.has(ancestor)) {
-      visited.add(ancestor)
-      ancestor = hierarchy.languageById.get(ancestor)?.parentId ?? null
-    }
-    const colorRootId = ancestor && rootSet.has(ancestor) ? ancestor : null
-    const entry = pinMapEntry(id, availability.get(id), 'own', context, colorRootId)
-    return entry ? [{ ...entry, ...(colorRootId ? { branchRootId: colorRootId } : {}) }] : []
-  })
+  if (!branch.languageIds.length) return
   set(areaModesAtom, {
     ...get(areaModesAtom),
     ...Object.fromEntries(branch.languageIds.map((id) => [id, 'own' as const])),
   })
   set(
     mapEntriesAtom,
-    replaceSubtreeMapEntries(get(mapEntriesAtom), candidates, branch.subtreeIds, context),
+    replaceSubtreeMapEntries(get(mapEntriesAtom), branch.entries, branch.subtreeIds, context),
   )
 })
 

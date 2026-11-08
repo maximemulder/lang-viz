@@ -3,14 +3,12 @@ import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { FileSource, PMTiles } from 'pmtiles'
-import {
-  buildGeographyAvailability,
-  mapAreaSelectionKey,
-  mappedBranchForLanguages,
-} from '../src/domain/aggregation.ts'
+import { buildGeographyAvailability, mapAreaSelectionKey } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
+import { buildBranchMapEntries } from '../src/domain/branches.ts'
+import { buildColorTopology } from '../src/domain/colors.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
-import { pinMapEntry, resolveMapEntries } from '../src/domain/mapEntries.ts'
+import { resolveMapEntries } from '../src/domain/mapEntries.ts'
 import { OverlapComputer } from '../src/features/map/overlap/compute.ts'
 import { encodeCoverageTile } from '../src/features/map/overlap/delivery.ts'
 import { branchCoverageSignature } from '../src/features/map/overlap/precomputed.ts'
@@ -31,16 +29,7 @@ const data = {
   variantById: new Map(variants.map((x) => [x.id, x])),
 } as AtlasData
 const hierarchy = buildLanguageHierarchy(languages)
-const rootById = new Map<string, string>()
-for (const root of hierarchy.roots) {
-  const stack = [root.id]
-  while (stack.length) {
-    const id = stack.pop()
-    if (!id || rootById.has(id)) continue
-    rootById.set(id, root.id)
-    stack.push(...(hierarchy.childrenById.get(id) ?? []).map((x) => x.id))
-  }
-}
+const topology = buildColorTopology(hierarchy)
 const bytes = await readFile(new URL(manifest.archive, directory))
 const archiveHash = createHash('sha256').update(bytes).digest('hex').slice(0, 20)
 const archive = new PMTiles(new FileSource(new File([bytes], manifest.archive)))
@@ -59,15 +48,13 @@ for (const [label, variant] of profiles) {
     context.sources,
     {},
   )
-  const branch = mappedBranchForLanguages(
+  const { entries } = buildBranchMapEntries(
     hierarchy.roots.map((x) => x.id),
     hierarchy,
     availability,
+    context,
+    topology,
   )
-  const entries = branch.languageIds.flatMap((id) => {
-    const entry = pinMapEntry(id, availability.get(id), 'own', context)
-    return entry ? [{ ...entry, branchRootId: rootById.get(id) }] : []
-  })
   const selection = parseOverlapSelection(
     mapAreaSelectionKey(resolveMapEntries(entries, data, new Map())),
   )

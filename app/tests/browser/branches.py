@@ -1,40 +1,17 @@
 #!/usr/bin/env python3
 """Exercise branch refinement and complete-dataset acceleration in the production browser."""
 import json
-import subprocess
-import urllib.request
-from contextlib import ExitStack
-from types import SimpleNamespace
 
-from catalog import open_details, search, view
-from coverage import select_branches
-from run import APP, Browser, check_state, free_port, request, stop, stop_group, wait_for
+from run import APP, browser_session, check_state, open_atlas, wait_for
+from sidebar import open_details, search, select_branches, view
 
 
 def main():
     output = APP / "test-results/branches"
     output.mkdir(parents=True, exist_ok=True)
     results = {}
-    with ExitStack() as stack:
-        preview_port, driver_port = free_port(), free_port()
-        while driver_port == preview_port:
-            driver_port = free_port()
-        preview_log = stack.enter_context((output / "preview.log").open("w"))
-        driver_log = stack.enter_context((output / "geckodriver.log").open("w"))
-        preview = subprocess.Popen(
-            ["npm", "run", "preview", "--", "--host", "127.0.0.1", "--port", str(preview_port), "--strictPort"],
-            cwd=APP, stdout=preview_log, stderr=subprocess.STDOUT, start_new_session=True,
-        )
-        stack.callback(stop_group, preview)
-        driver = subprocess.Popen(["geckodriver", "--host", "127.0.0.1", "--port", str(driver_port), "--log", "warn"], stdout=driver_log, stderr=subprocess.STDOUT)
-        stack.callback(stop, driver)
-        origin, webdriver = f"http://127.0.0.1:{preview_port}", f"http://127.0.0.1:{driver_port}"
-        wait_for(lambda: urllib.request.urlopen(origin, timeout=2).status == 200, 20, "preview")
-        wait_for(lambda: request(webdriver, "GET", "/status"), 20, "geckodriver")
-        browser = Browser(webdriver, SimpleNamespace(headed=False, hardware=False))
-        stack.callback(browser.close)
-        browser.call("POST", "/url", {"url": origin + "/?overlap-test=1&overlap-basemap=off"})
-        wait_for(lambda: browser.js("return !!window.overlapTest"), 45, "application")
+    with browser_session(output) as (browser, origin):
+        open_atlas(browser, origin)
         try:
             browser.js("window.overlapTest.configure({languageIds:[],center:[108,47],zoom:4.5})")
             search(browser, "halh1238", "halh1238")
