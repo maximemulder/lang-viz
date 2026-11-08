@@ -330,7 +330,7 @@ h2 {
 
 .finder-actions div {
   display: flex;
-  flex-shrink: 0;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 

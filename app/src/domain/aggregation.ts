@@ -70,15 +70,18 @@ export const buildGeographyAvailability = (
   return result
 }
 
-/** Deepest mapped entries in a complete subtree, including its root when appropriate. */
-export const mappedLeavesForLanguage = (
-  languageId: string,
+/** Deepest mapped entries across complete subtrees, visiting shared branches only once. */
+export const mappedLeavesForLanguages = (
+  rootIds: readonly string[],
   hierarchy: LanguageHierarchy,
   availability: ReadonlyMap<string, GeographyAvailability>,
 ) => {
   const subtreeIds = new Set<string>()
+  const mappedSubtrees = new Map<string, boolean>()
   const languageIds: string[] = []
   const visit = (id: string): boolean => {
+    const cached = mappedSubtrees.get(id)
+    if (cached !== undefined) return cached
     if (subtreeIds.has(id) || !hierarchy.languageById.has(id)) return false
     subtreeIds.add(id)
     let hasMappedDescendants = false
@@ -86,14 +89,22 @@ export const mappedLeavesForLanguage = (
       // Visit every branch, even after finding geography in an earlier sibling.
       if (visit(child.id)) hasMappedDescendants = true
     }
-    if (hasMappedDescendants) return true
-    if (!availability.get(id)?.own) return false
-    languageIds.push(id)
-    return true
+    const hasOwn = Boolean(availability.get(id)?.own)
+    if (!hasMappedDescendants && hasOwn) languageIds.push(id)
+    const hasMapped = hasMappedDescendants || hasOwn
+    mappedSubtrees.set(id, hasMapped)
+    return hasMapped
   }
-  visit(languageId)
+  for (const id of rootIds) visit(id)
   return { subtreeIds, languageIds }
 }
+
+/** Deepest mapped entries in a complete subtree, including its root when appropriate. */
+export const mappedLeavesForLanguage = (
+  languageId: string,
+  hierarchy: LanguageHierarchy,
+  availability: ReadonlyMap<string, GeographyAvailability>,
+) => mappedLeavesForLanguages([languageId], hierarchy, availability)
 
 export const areaMode = (available: GeographyAvailability, preferred?: AreaMode): AreaMode =>
   preferred ?? (available.own ? 'own' : 'descendants')

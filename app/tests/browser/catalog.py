@@ -591,6 +591,90 @@ def main():
                 ) == checked, code
             results["dlacFamilyLeaves"] = {"ids": leaf_ids, "selectedCount": 10}
 
+            # Bulk leaves follow the current query across multiple, overlapping branches.
+            browser.js(
+                "window.overlapTest.configure(arguments[0])",
+                {
+                    "languageIds": ["mand1415", "beij1235", "jiny1235", "abkh1244"],
+                    "center": [112, 28],
+                    "zoom": 4,
+                },
+            )
+            search(browser, "Chinese", "mand1415")
+            browser.js("document.querySelector('.source-filter__trigger').click()")
+            browser.js("""
+                [...document.querySelectorAll('.source-filter__actions button')]
+                  .find(button => button.textContent === 'Clear').click();
+            """)
+            wait_for(
+                lambda: browser.js(
+                    "return document.querySelector('.source-filter__trigger').textContent.includes('No sources')"
+                ),
+                10,
+                "cleared bulk fixture sources",
+            )
+            browser.js("""
+                [...document.querySelectorAll('.source-filter__option')]
+                  .find(label => label.querySelector('strong').textContent === 'DLAC')
+                  .querySelector('input').click();
+            """)
+            browser.js("document.querySelector('.source-filter__trigger').click()")
+            bulk_button = """
+                [...document.querySelectorAll('.finder-actions button')]
+                  .find(button => button.textContent.startsWith('Show mapped leaves'))
+            """
+            wait_for(
+                lambda: browser.js(f"""
+                    const button = {bulk_button};
+                    return !button.disabled && button.textContent === 'Show mapped leaves (8)';
+                """),
+                10,
+                "query mapped leaf count",
+            )
+            assert browser.js("return document.querySelectorAll('.finder-detail__mapped-leaves').length") == 0
+            before = len(browser.snapshot()["reports"])
+            browser.js(f"({bulk_button}).click()")
+            ready_after(before, 8)
+            assert "8 of 9 shown" in browser.js(
+                "return document.querySelector('.selection-count').textContent"
+            )
+            browser.js(f"({bulk_button}).click()")
+            assert "8 of 9 shown" in browser.js(
+                "return document.querySelector('.selection-count').textContent"
+            )
+            bulk_leaf_ids = [code for code in leaf_ids if code not in {"ping1245", "minn1248"}]
+            for code in bulk_leaf_ids:
+                search(browser, code, code)
+                assert browser.js("""
+                    const row = document.querySelector('.language-row');
+                    return row.querySelector('input').checked && row.dataset.areaMode === 'own';
+                """), code
+            for code, checked in [("beij1235", False), ("abkh1244", True), ("ping1245", False)]:
+                search(browser, code, code)
+                assert browser.js(
+                    "return document.querySelector('.language-row input').checked"
+                ) == checked, code
+            search(browser, "Chinese", "mand1415")
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'year-1750';
+                select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            wait_for(
+                lambda: browser.js(f"""
+                    const button = {bulk_button};
+                    return button.disabled && button.textContent === 'Show mapped leaves (0)';
+                """),
+                10,
+                "unavailable query mapped leaves",
+            )
+            browser.js("""
+                const select = document.querySelector('.finder-filters__period select');
+                select.value = 'contemporary';
+                select.dispatchEvent(new Event('change', {bubbles:true}));
+            """)
+            results["queryMappedLeaves"] = {"ids": bulk_leaf_ids, "selectedCount": 8}
+
             # The tree keeps useful space on narrow screens, including with entry details open.
             browser.call("POST", "/window/rect", {"width": 390, "height": 844})
             search(browser, "abkh1242", "abkh1242")

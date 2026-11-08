@@ -12,6 +12,7 @@ import {
   mapAreaSelectionKey,
   mapAreaSourceColors,
   mappedLeavesForLanguage,
+  mappedLeavesForLanguages,
   resolveMapAreas,
 } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
@@ -145,6 +146,42 @@ test('mapped leaves apply source and period filters before determining the front
     mappedLeavesForLanguage('family', hierarchy, availability('all', [])).languageIds,
     [],
   )
+})
+
+test('bulk mapped leaves deduplicate overlapping matches in any order', () => {
+  for (const roots of [
+    ['family', 'language', 'nested', 'family'],
+    ['nested', 'language', 'family'],
+  ]) {
+    const leaves = mappedLeavesForLanguages(roots, hierarchy, availability())
+    assert.deepEqual(leaves.languageIds, ['nested', 'other-dialect'])
+    assert.deepEqual(
+      leaves.subtreeIds,
+      mappedLeavesForLanguage('family', hierarchy, availability()).subtreeIds,
+    )
+  }
+})
+
+test('bulk mapped leaves include only matched branches and respect geography filters', () => {
+  assert.deepEqual(
+    mappedLeavesForLanguages(['language', 'gap', 'unknown'], hierarchy, availability()).languageIds,
+    ['nested'],
+  )
+  assert.deepEqual(
+    mappedLeavesForLanguages(['language', 'unmapped'], hierarchy, availability()).languageIds,
+    ['nested', 'other-dialect'],
+  )
+  assert.deepEqual(
+    mappedLeavesForLanguages(['nested', 'family'], hierarchy, availability('time-of-contact'))
+      .languageIds,
+    ['language'],
+  )
+  assert.deepEqual(
+    mappedLeavesForLanguages(['family', 'language'], hierarchy, availability('all', []))
+      .languageIds,
+    [],
+  )
+  assert.deepEqual(mappedLeavesForLanguages([], hierarchy, availability()).languageIds, [])
 })
 
 test('mapped leaves handle subgroups, mapped roots with unmapped children, and missing geography', () => {

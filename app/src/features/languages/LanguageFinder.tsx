@@ -13,6 +13,7 @@ import {
   areaVariants,
   isAreaAvailable,
   mappedLeavesForLanguage,
+  mappedLeavesForLanguages,
 } from '../../domain/aggregation'
 import type {
   AtlasData,
@@ -343,6 +344,15 @@ export const LanguageFinder = () => {
     [data, query, viewportSearchIds, temporalSelection, datasetFilter],
   )
   const roots = isBrowsingRoots ? hierarchy.roots : search.languages
+  const filteredMappedLeaves = useMemo(
+    () =>
+      mappedLeavesForLanguages(
+        roots.map(({ id }) => id),
+        hierarchy,
+        availability,
+      ),
+    [roots, hierarchy, availability],
+  )
   const rows = useMemo(
     () => flattenLanguageHierarchy(hierarchy, roots, expandedKeys),
     [hierarchy, roots, expandedKeys],
@@ -584,6 +594,14 @@ export const LanguageFinder = () => {
             title="Show these starting entries using their chosen representations. Descendant areas remain one selection."
           >
             {areAllFilteredSelected ? 'Deselect' : 'Select'} {isBrowsingRoots ? 'roots' : 'matches'}
+          </button>
+          <button
+            type="button"
+            disabled={!filteredMappedLeaves.languageIds.length}
+            onClick={() => showMappedLeaves(roots.map(({ id }) => id))}
+            title={`Show the deepest entries with polygons across all ${isBrowsingRoots ? 'roots' : 'matches'}, each with its own color. Uses current sources and period; replaces selections within these branches.`}
+          >
+            Show mapped leaves ({filteredMappedLeaves.languageIds.length.toLocaleString()})
           </button>
           <button type="button" className="button-secondary" onClick={() => setVisibleIds([])}>
             Clear map

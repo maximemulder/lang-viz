@@ -27,6 +27,9 @@ narrow layouts.
 The family-selection check selects DLAC and displays all mapped Sino-Tibetan leaves
 individually, replaces existing subtree selections while retaining unrelated ones,
 and verifies period availability, count updates, and repeated selection.
+The bulk mapped-leaf check applies the current query to multiple overlapping
+branches, deduplicates their leaves, preserves unrelated selections, and verifies
+filter availability without opening entry details.
 Its screenshots, report, and server logs are written to `test-results/catalog/`.
 
 Each invocation builds the production app, starts a local Vite preview and
