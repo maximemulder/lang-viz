@@ -25,7 +25,10 @@ proposed priorities, and completion criteria across sessions.
    remaining viewport. Group disconnected faces with identical membership within
    that tile. Cache native tile-space coordinates under the existing result bounds;
    the worker encodes a separate `overlap_coverage` MVT layer at extent 8192.
-   Encoding normalizes shell/hole winding and quantizes the display coordinates;
+   Encoding quantizes display coordinates before normalizing shell/hole winding;
+   rounding can reverse tiny slivers or collapse rings. Collapsed shells discard
+   their holes. Parent assembly and clipped fallback use the same conversion so
+   slivers cannot make the tile reader interpret large islands as holes.
    GEOS itself still uses its original robust floating-point overlay. Cache encoded
    tiles weakly against their native feature arrays. Only tiles absent from the
    browser's retained set cross the worker boundary. No full GeoJSON collection

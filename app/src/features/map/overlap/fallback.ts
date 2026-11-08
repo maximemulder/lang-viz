@@ -4,6 +4,7 @@ import { PbfReader } from 'pbf'
 import { type MultiPolygon, OverlapInitializationError } from './geometry.ts'
 import { lazyResource } from './lazyResource.ts'
 import { bufferTileEdges } from './tileBuffer.ts'
+import { quantizeTilePolygon } from './tileGeometry.ts'
 import { coverageRectangles } from './tiles.ts'
 import type { TileCoordinate } from './types.ts'
 
@@ -107,19 +108,8 @@ export const clipFallbackTile = async (
       for (const [i, polygons] of clipped.entries()) {
         const candidate = candidates[i]
         if (!candidate || !polygons.length) continue
-        // MVT requires clockwise exterior rings in its downward-growing Y axis.
         const geometry = polygons.flatMap((polygon) =>
-          polygon.map((ring, index) => {
-            let area = 0
-            for (let j = 1; j < ring.length; j++) {
-              const a = ring[j - 1]
-              const b = ring[j]
-              if (a && b) area += a[0] * b[1] - b[0] * a[1]
-            }
-            return (area > 0 === (index === 0) ? ring : [...ring].reverse()).map(
-              ([x, y]): [number, number] => [Math.round(x), Math.round(y)],
-            )
-          }),
+          quantizeTilePolygon(polygon, (point) => point),
         )
         geometries.set(candidate.index, geometry)
       }

@@ -1,8 +1,9 @@
-import { VectorTile } from '@mapbox/vector-tile'
+import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { type Feature, fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
 import { PbfReader } from 'pbf'
 import type { CoverageTile } from './compute.ts'
 import { bufferTileEdges } from './tileBuffer.ts'
+import { quantizeTilePolygon } from './tileGeometry.ts'
 import type { OverlapProperties, TileCoordinate } from './types.ts'
 
 export const COVERAGE_LAYER = 'overlap_coverage'
@@ -58,20 +59,10 @@ export const encodeCoverageTile = (result: CoverageTile): DeliveryTile => {
         : { variantIds: JSON.stringify(feature.properties.variantIds) }),
     },
     geometry: feature.geometry.coordinates.flatMap((polygon) =>
-      polygon.map((ring, index) => {
-        let area = 0
-        for (let i = 1; i < ring.length; i++) {
-          const a = ring[i - 1]
-          const b = ring[i]
-          if (a && b) area += a[0] * b[1] - b[0] * a[1]
-        }
-        return (area > 0 === (index === 0) ? ring : [...ring].reverse()).map(
-          (point): [number, number] => [
-            Math.round((point[0] * EXTENT) / result.extent),
-            Math.round((point[1] * EXTENT) / result.extent),
-          ],
-        )
-      }),
+      quantizeTilePolygon(polygon, ([x, y]) => [
+        (x * EXTENT) / result.extent,
+        (y * EXTENT) / result.extent,
+      ]),
     ),
   }))
   const data = encode(features)
@@ -118,14 +109,12 @@ export const deliveryTile = (
       features.push({
         type: 3,
         tags: feature.properties,
-        geometry: feature
-          .loadGeometry()
-          .map((ring) =>
-            ring.map(({ x, y }): [number, number] => [
-              Math.round(offsetX * EXTENT + x / scale),
-              Math.round(offsetY * EXTENT + y / scale),
-            ]),
+        geometry: classifyRings(feature.loadGeometry()).flatMap((polygon) =>
+          quantizeTilePolygon(
+            polygon.map((ring) => ring.map(({ x, y }): [number, number] => [x, y])),
+            ([x, y]) => [offsetX * EXTENT + x / scale, offsetY * EXTENT + y / scale],
           ),
+        ),
       })
     }
   }

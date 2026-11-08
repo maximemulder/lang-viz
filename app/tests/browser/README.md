@@ -8,6 +8,7 @@ npm run test:browser -- --scenario britain-small
 npm run test:browser -- --runs 3 --output test-results/baseline
 npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
+npm run test:coverage-browser
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
@@ -37,6 +38,14 @@ They also exercise the visible Language colors controls: strategy switching,
 setting/removing exact colors and subtree anchors, comparison roots, invalid input,
 and resetting the configuration while retaining map selections.
 Its screenshots, report, and server logs are written to `test-results/catalog/`.
+
+`test:coverage-browser` checks the German and Yue coverage regressions using the
+visible source filter and bulk Show mapped leaves action, with Contemporary
+selected. It samples inland framebuffer pixels and visible memberships during
+pans and zooms 3–6.5 in globe and Mercator, including a forced final render to
+catch stationary gaps. Reports, per-frame evidence, and screenshots go to
+`test-results/coverage/`. These cases caught narrow shells whose winding reversed
+during MVT rounding, causing entire mainland polygons to be read as holes.
 
 Each invocation builds the production app, starts a local Vite preview and
 geckodriver on available ports, opens a temporary Firefox profile, and cleans up
