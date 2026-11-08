@@ -2,7 +2,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useMemo, useRef, useState } from 'react'
 import { areaMode, areaStatus, isAreaAvailable } from '../../domain/aggregation'
-import { normalizeLanguageQuery } from '../../domain/catalog'
+import { matchesLanguageQuery, normalizeLanguageQuery } from '../../domain/catalog'
 import {
   areaModesAtom,
   atlasDataAtom,
@@ -32,8 +32,7 @@ export const OnMapLanguages = () => {
     return ids
       .flatMap((id) => {
         const language = data.languageById.get(id)
-        return language &&
-          (!normalized || data.searchTextByLanguageId.get(id)?.includes(normalized))
+        return language && matchesLanguageQuery(data.languageSearchIndex.get(id), normalized)
           ? [language]
           : []
       })

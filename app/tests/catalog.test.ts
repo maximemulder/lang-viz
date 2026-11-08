@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
-import { languageSearchText, searchCatalog } from '../src/domain/catalog.ts'
+import type { Language } from '../src/domain/atlas.ts'
+import { buildLanguageSearchIndex, searchCatalog } from '../src/domain/catalog.ts'
 
 const entry = (id: string, level: Language['level'], mapped: boolean): Language => ({
   id,
@@ -26,88 +26,24 @@ const languages = [
   entry('dialect', 'dialect', false),
   entry('mapped dialect', 'dialect', true),
 ]
-const variants: GeometryVariant[] = languages.flatMap((language) =>
-  language.geometryVariantIds.map((id) => ({
-    id,
-    languageId: language.id,
-    datasetId: 'example',
-    layer: 'contemporary',
-    label: 'Example contemporary areas',
-    featureId: 1,
-    featureCount: 2,
-    geometryKind: 'source',
-    sourceFile: 'features.geojson',
-    sourceFeatureIds: ['a', 'b'],
-    color: '#abcdef',
-    temporalCoverage: {
-      kind: 'named-period',
-      viewId: 'contemporary',
-      label: 'Contemporary',
-      quality: 'approximate',
-    },
-    sourceYear: 2007,
-  })),
-)
-const data: AtlasData = {
-  manifest: {
-    schemaVersion: 4,
-    languoidCount: 4,
-    languoidWithGeometryCount: 3,
-    geometryVariantCount: 3,
-    vectorLayer: 'language_areas',
-    archive: 'language-areas.pmtiles',
-  },
-  languages,
-  variants,
-  datasets: [],
-  languageById: new Map(languages.map((language) => [language.id, language])),
-  variantById: new Map(variants.map((variant) => [variant.id, variant])),
-  searchTextByLanguageId: new Map(
-    languages.map((language) => [language.id, languageSearchText(language)]),
-  ),
-}
+const index = buildLanguageSearchIndex(languages)
 
-test('all levels and unmappable entries are discoverable; bulk selection uses polygons only', () => {
-  const result = searchCatalog(data, '', null, 'all', 'all')
-  assert.equal(result.languages.length, 4)
-  assert.deepEqual(result.showableIds, ['family', 'language', 'mapped dialect'])
+test('empty and whitespace queries retain every level and unmappable entry in catalog order', () => {
+  for (const query of ['', '  ']) assert.deepEqual(searchCatalog(index, query), languages)
 })
 
 test('alternative names find an unmapped dialect in Latin and original scripts', () => {
-  for (const query of [' shanghai ', '上海']) {
-    const result = searchCatalog(data, query, null, 'all', 'all')
+  for (const query of [' SHANGHAI ', 'shànghǎi', '上海']) {
+    const result = searchCatalog(index, query)
     assert.deepEqual(
-      result.languages.map(({ id }) => id),
+      result.map(({ id }) => id),
       ['dialect'],
     )
-    assert.deepEqual(result.showableIds, [])
   }
-})
-
-test('source and period selections affect mappability without erasing search results', () => {
-  for (const [period, sources] of [
-    ['year-1750', 'all'],
-    ['all', []],
-    ['all', ['other-source']],
-  ] as const) {
-    const result = searchCatalog(data, '', null, period, sources)
-    assert.equal(result.languages.length, 4)
-    assert.deepEqual(result.showableIds, [])
-  }
-})
-
-test('the explicitly selected viewport scope still limits the catalog', () => {
-  const result = searchCatalog(data, '', new Set(['mapped dialect']), 'all', 'all')
-  assert.deepEqual(
-    result.languages.map(({ id }) => id),
-    ['mapped dialect'],
-  )
-  assert.deepEqual(result.showableIds, ['mapped dialect'])
 })
 
 test('ancestor names do not turn every descendant into a direct match', () => {
-  const result = searchCatalog(data, 'Example family', null, 'all', 'all')
-  assert.deepEqual(result.languages, [])
+  assert.deepEqual(searchCatalog(index, 'Example family'), [])
 })
 
 test('exact names and identifiers rank before prefixes and incidental alias matches', () => {
@@ -117,18 +53,44 @@ test('exact names and identifiers rank before prefixes and incidental alias matc
       name: 'A language',
       alternativeNames: ['Old English variety'],
     },
+    { ...entry('word', 'language', false), name: 'Old English' },
+    {
+      ...entry('alias-prefix', 'language', false),
+      name: 'Creole',
+      alternativeNames: ['English creole'],
+    },
     { ...entry('prefix', 'language', false), name: 'English-based creole' },
     { ...entry('eng', 'language', false), name: 'English' },
     { ...entry('alias', 'dialect', false), name: 'Another name', alternativeNames: ['English'] },
   ]
-  const fixture = {
-    ...data,
-    languages: entries,
-    searchTextByLanguageId: new Map(entries.map((entry) => [entry.id, languageSearchText(entry)])),
-  }
+  const fixture = buildLanguageSearchIndex(entries)
   assert.deepEqual(
-    searchCatalog(fixture, 'english', null, 'all', 'all').languages.map(({ id }) => id),
-    ['eng', 'alias', 'prefix', 'incidental'],
+    searchCatalog(fixture, 'english').map(({ id }) => id),
+    ['eng', 'alias', 'prefix', 'alias-prefix', 'word', 'incidental'],
   )
-  assert.equal(searchCatalog(fixture, 'eng', null, 'all', 'all').languages[0]?.id, 'eng')
+  assert.equal(searchCatalog(fixture, 'eng')[0]?.id, 'eng')
+})
+
+test('Glottocode and ISO matches rank first even when names do not match', () => {
+  const entries = [
+    { ...entry('prefix', 'language', false), name: 'Abc lang1234' },
+    { ...entry('lang1234', 'language', false), name: 'Example', iso6393: 'abc' },
+  ]
+  const fixture = buildLanguageSearchIndex(entries)
+  for (const query of [' ABC ', 'LANG1234'])
+    assert.equal(searchCatalog(fixture, query)[0]?.id, 'lang1234')
+})
+
+test('relevance ties retain catalog order across queries without mutating the index', () => {
+  const entries = [
+    { ...entry('a', 'language', false), name: 'Old English' },
+    { ...entry('b', 'language', false), name: 'Middle English' },
+    { ...entry('c', 'language', false), name: 'English' },
+  ]
+  const fixture = buildLanguageSearchIndex(entries)
+  for (let i = 0; i < 2; i++) {
+    assert.deepEqual(searchCatalog(fixture, 'english'), [entries[2], entries[0], entries[1]])
+    assert.deepEqual(searchCatalog(fixture, ''), entries)
+    assert.deepEqual(searchCatalog(fixture, 'no such name'), [])
+  }
 })

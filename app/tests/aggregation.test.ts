@@ -15,6 +15,7 @@ import {
   resolveMapAreas as resolveAreas,
 } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
+import { buildLanguageSearchIndex, searchCatalog } from '../src/domain/catalog.ts'
 import {
   aggregateColor,
   buildColorTopology,
@@ -22,7 +23,8 @@ import {
   DEFAULT_COLOR_CONFIGURATION,
   resolveLanguageColors,
 } from '../src/domain/colors.ts'
-import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
+import { prepareExploreResults } from '../src/domain/exploration.ts'
+import { buildLanguageHierarchy, flattenLanguageHierarchy } from '../src/domain/hierarchy.ts'
 
 const entry = (
   id: string,
@@ -101,7 +103,7 @@ const data: AtlasData = {
   datasets: [],
   languageById: new Map(languages.map((language) => [language.id, language])),
   variantById: new Map(variants.map((variant) => [variant.id, variant])),
-  searchTextByLanguageId: new Map(),
+  languageSearchIndex: buildLanguageSearchIndex(languages),
 }
 const hierarchy = buildLanguageHierarchy(languages)
 const colors = resolveLanguageColors(
@@ -125,6 +127,85 @@ const required = <T>(value: T | undefined): T => {
   assert.ok(value)
   return value
 }
+
+const explore = (
+  matches: readonly Language[],
+  overrides: Partial<Parameters<typeof prepareExploreResults>[0]> = {},
+) =>
+  prepareExploreResults({
+    matches,
+    hierarchy,
+    browseRoots: false,
+    viewportLanguageIds: null,
+    availability: availability(),
+    modes: {},
+    ...overrides,
+  })
+
+test('Explore groups available representations stably without erasing unavailable text matches', () => {
+  const matches = searchCatalog(data.languageSearchIndex, '')
+  const result = explore(matches)
+  assert.deepEqual(result.showableIds, [
+    'family',
+    'language',
+    'dialect',
+    'nested',
+    'unmapped',
+    'other-dialect',
+  ])
+  assert.deepEqual(
+    result.roots.map(({ id }) => id),
+    [...result.showableIds, 'gap', 'gap-leaf', 'isolate'],
+  )
+  assert.equal(matches.length, languages.length)
+  for (const available of [availability('year-1750'), availability('all', [])]) {
+    const filtered = explore(matches, { availability: available })
+    assert.deepEqual(filtered.roots, matches)
+    assert.deepEqual(filtered.showableIds, [])
+  }
+  const ownOnly = explore(matches, { modes: { unmapped: 'own' } })
+  assert.ok(!ownOnly.showableIds.includes('unmapped'))
+  assert.equal(ownOnly.roots.length, languages.length)
+})
+
+test('empty world search groups classification roots and preserves expanded branches', () => {
+  // Put the unavailable isolate before the family in catalog order to exercise grouping.
+  const reversed = buildLanguageHierarchy([...languages].reverse())
+  const result = explore([], { hierarchy: reversed, browseRoots: true })
+  assert.deepEqual(
+    result.roots.map(({ id }) => id),
+    ['family', 'isolate'],
+  )
+  assert.deepEqual(result.showableIds, ['family'])
+  const rows = flattenLanguageHierarchy(reversed, result.roots, new Set(['family']))
+  assert.deepEqual(
+    rows.map(({ language }) => language.id),
+    ['family', 'gap', 'unmapped', 'language', 'isolate'],
+  )
+})
+
+test('viewport scope follows chosen own or descendant geometry, including empty viewports', () => {
+  const matches = searchCatalog(data.languageSearchIndex, '')
+  const visible = new Set(['other-dialect'])
+  assert.deepEqual(
+    explore(matches, { viewportLanguageIds: visible }).roots.map(({ id }) => id),
+    ['unmapped', 'other-dialect'],
+  )
+  assert.deepEqual(
+    explore(matches, {
+      viewportLanguageIds: visible,
+      modes: { family: 'descendants', unmapped: 'own' },
+    }).roots.map(({ id }) => id),
+    ['family', 'other-dialect'],
+  )
+  assert.deepEqual(explore(matches, { viewportLanguageIds: new Set() }).roots, [])
+  assert.deepEqual(
+    explore(searchCatalog(data.languageSearchIndex, 'nested'), { viewportLanguageIds: visible })
+      .roots,
+    [],
+    'Geographic scope intersects text matches rather than introducing nonmatching entries',
+  )
+})
 
 test('mapped leaves traverse every branch to its deepest available geography', () => {
   const leaves = mappedLeavesForLanguage('family', hierarchy, availability())

@@ -5,7 +5,7 @@ import type {
   GeometryVariant,
   Language,
 } from '../domain/atlas'
-import { languageSearchText } from '../domain/catalog'
+import { buildLanguageSearchIndex } from '../domain/catalog'
 
 const dataUrl = (fileName: string) => `${import.meta.env.BASE_URL}data/${fileName}`
 
@@ -43,9 +43,7 @@ export const loadAtlasData = (): Promise<AtlasData> => {
       datasets,
       languageById: new Map(languages.map((language) => [language.id, language])),
       variantById: new Map(variants.map((variant) => [variant.id, variant])),
-      searchTextByLanguageId: new Map(
-        languages.map((language) => [language.id, languageSearchText(language)]),
-      ),
+      languageSearchIndex: buildLanguageSearchIndex(languages),
     }
   })
 

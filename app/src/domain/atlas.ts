@@ -1,3 +1,5 @@
+import type { LanguageSearchIndex } from './catalog.ts'
+
 export type LanguageId = string
 export type LanguoidLevel = 'family' | 'language' | 'dialect'
 export type GeometryVariantId = string
@@ -83,5 +85,5 @@ export interface AtlasData {
   readonly datasets: readonly GeographyDataset[]
   readonly languageById: ReadonlyMap<LanguageId, Language>
   readonly variantById: ReadonlyMap<GeometryVariantId, GeometryVariant>
-  readonly searchTextByLanguageId: ReadonlyMap<LanguageId, string>
+  readonly languageSearchIndex: LanguageSearchIndex
 }

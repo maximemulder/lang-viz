@@ -15,6 +15,7 @@ import {
   mappedLeavesForLanguages,
 } from '../../domain/aggregation'
 import { searchCatalog } from '../../domain/catalog'
+import { prepareExploreResults } from '../../domain/exploration'
 import {
   flattenLanguageHierarchy,
   type HierarchyRow,
@@ -25,13 +26,11 @@ import {
   atlasDataAtom,
   finderScopeAtom,
   geographyAvailabilityAtom,
-  geographyDatasetFilterAtom,
   languageColorsAtom,
   languageHierarchyAtom,
   languageQueryAtom,
   showLanguagesAtom,
   showMappedLeavesAtom,
-  temporalViewAtom,
   toggleVisibleLanguageAtom,
   viewportLanguageIdsAtom,
   visibleLanguageIdsAtom,
@@ -165,9 +164,7 @@ export const ExploreLanguages = () => {
   const viewportIds = useAtomValue(viewportLanguageIdsAtom)
   const visibleIds = useAtomValue(visibleLanguageIdsAtom)
   const [query, setQuery] = useAtom(languageQueryAtom)
-  const datasetFilter = useAtomValue(geographyDatasetFilterAtom)
   const [scope, setScope] = useAtom(finderScopeAtom)
-  const temporalSelection = useAtomValue(temporalViewAtom)
   const showLanguages = useSetAtom(showLanguagesAtom)
   const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
@@ -184,31 +181,25 @@ export const ExploreLanguages = () => {
   const panel = useAtomValue(languagePanelAtom)
   const isSearching = Boolean(query.trim())
   const isBrowsingRoots = !isSearching && scope === 'world'
-  const viewportSearchIds = useMemo(() => {
-    if (scope !== 'viewport') return null
-    const visible = new Set(viewportIds)
-    return new Set(
-      [...availability]
-        .filter(([id, available]) =>
-          areaVariants(available, areaMode(available, modes[id])).some((variant) =>
-            visible.has(variant.languageId),
-          ),
-        )
-        .map(([id]) => id),
-    )
-  }, [scope, viewportIds, availability, modes])
-  const search = useMemo(
-    () => searchCatalog(data, query, viewportSearchIds, temporalSelection, datasetFilter),
-    [data, query, viewportSearchIds, temporalSelection, datasetFilter],
+  const matches = useMemo(
+    () => searchCatalog(data.languageSearchIndex, query),
+    [data.languageSearchIndex, query],
   )
-  const roots = useMemo(
+  const searchViewportIds = useMemo(
+    () => (scope === 'viewport' ? new Set(viewportIds) : null),
+    [scope, viewportIds],
+  )
+  const { roots, showableIds } = useMemo(
     () =>
-      (isBrowsingRoots ? hierarchy.roots : search.languages).toSorted(
-        (a, b) =>
-          Number(isAreaAvailable(availability.get(b.id), modes[b.id])) -
-          Number(isAreaAvailable(availability.get(a.id), modes[a.id])),
-      ),
-    [isBrowsingRoots, hierarchy.roots, search.languages, availability, modes],
+      prepareExploreResults({
+        matches,
+        hierarchy,
+        browseRoots: isBrowsingRoots,
+        viewportLanguageIds: searchViewportIds,
+        availability,
+        modes,
+      }),
+    [matches, hierarchy, isBrowsingRoots, searchViewportIds, availability, modes],
   )
   const filteredMappedLeaves = useMemo(
     () =>
@@ -223,9 +214,6 @@ export const ExploreLanguages = () => {
     () => flattenLanguageHierarchy(hierarchy, roots, expandedKeys),
     [hierarchy, roots, expandedKeys],
   )
-  const showableIds = roots
-    .filter((language) => isAreaAvailable(availability.get(language.id), modes[language.id]))
-    .map(({ id }) => id)
   const activeKey = rows.some((row) => row.key === focusedKey) ? focusedKey : rows[0]?.key
   const virtualizer = useVirtualizer({
     count: rows.length,
