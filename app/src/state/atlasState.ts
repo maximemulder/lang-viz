@@ -37,9 +37,9 @@ import {
 export const atlasDataAtom = atom(async () => loadAtlasData())
 
 export const languageQueryAtom = atom('')
-export const geographyDatasetFilterAtom = atom<GeographyDatasetSelection>('all')
+export const geographyDatasetFilterAtom = atom<GeographyDatasetSelection>(['asher2007world'])
 export const finderScopeAtom = atom<'world' | 'viewport'>('world')
-export const temporalViewAtom = atom<TemporalViewSelection>('all')
+export const temporalViewAtom = atom<TemporalViewSelection>('contemporary')
 export const viewportLanguageIdsAtom = atom<readonly LanguageId[]>([])
 export const mapEntriesAtom = atom<readonly MapEntry[]>([])
 /** Languoid identities for genealogy/presentation, never map-entry identities. */
