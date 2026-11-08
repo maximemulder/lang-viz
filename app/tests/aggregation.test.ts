@@ -42,6 +42,7 @@ const entry = (
   level: Language['level'] = 'family',
 ): Language => ({
   id,
+  classification: { kind: 'glottolog', glottocode: id },
   name: id,
   parentId,
   level,
@@ -101,7 +102,7 @@ const languages = [
 }))
 const data: AtlasData = {
   manifest: {
-    schemaVersion: 4,
+    schemaVersion: 5,
     languoidCount: languages.length,
     languoidWithGeometryCount: 5,
     geometryVariantCount: variants.length,
@@ -158,6 +159,66 @@ const explore = (
     modes: {},
     ...overrides,
   })
+
+test('source-defined groups participate in ancestor aggregation and branch selection', () => {
+  const id = 'dlac1987china:tibeto-burman'
+  const variant: GeometryVariant = {
+    ...required(variants[2]),
+    id: `dlac1987china:contemporary:${id}`,
+    languageId: id,
+    datasetId: 'dlac1987china',
+  }
+  const source: Language = {
+    ...entry(id, 'family', 'group'),
+    classification: {
+      kind: 'source',
+      datasetId: 'dlac1987china',
+      label: 'Tibeto-Burman Languages',
+      note: 'No equivalent classification node.',
+    },
+    geometryVariantIds: [variant.id],
+  }
+  const catalog: AtlasData = {
+    ...data,
+    languages: [...data.languages, source],
+    variants: [...data.variants, variant],
+    languageById: new Map([...data.languageById, [id, source]]),
+    variantById: new Map([...data.variantById, [variant.id, variant]]),
+    languageSearchIndex: buildLanguageSearchIndex([...data.languages, source]),
+  }
+  const tree = buildLanguageHierarchy(catalog.languages)
+  assert.deepEqual(
+    tree.childrenById.get('family')?.filter(({ id: child }) => child === id),
+    [source],
+  )
+  const available = buildGeographyAvailability(catalog, tree, 'contemporary', ['dlac1987china'], {})
+  assert.equal(available.get(id)?.own, variant)
+  assert.deepEqual(available.get(id)?.descendants, [])
+  assert.deepEqual(available.get('family')?.descendants, [variant])
+  const familyPlan = buildBranchMapEntries(['family'], tree, available, {
+    sources: ['dlac1987china'],
+    period: 'contemporary',
+  })
+  assert.deepEqual(familyPlan.languageIds, [id])
+  assert.equal(familyPlan.entries[0]?.branchRootId, 'family')
+  for (const [period, sources] of [
+    ['year-1750', ['dlac1987china']],
+    ['contemporary', ['modern']],
+  ] as const) {
+    const filtered = buildGeographyAvailability(catalog, tree, period, sources, {})
+    assert.equal(areaStatus(required(filtered.get(id)), 'own'), 'Filtered out')
+  }
+  const plan = buildBranchMapEntries([id], tree, available, {
+    sources: ['dlac1987china'],
+    period: 'contemporary',
+  })
+  assert.deepEqual(plan.languageIds, [id])
+  const areas = resolveMapEntries(plan.entries, catalog, new Map([[id, '#123456']]))
+  assert.equal(areas[0]?.languageId, id)
+  assert.deepEqual(inspectedMapAreaIds([variant.id], areas), [variant.id])
+  assert.deepEqual(JSON.parse(mapAreaSelectionKey(areas)), [variant.id])
+  assert.deepEqual(areas[0]?.refines ?? [], [])
+})
 
 test('branch plans pin mapped ancestors and descendants under topmost requested roots across gaps', () => {
   const context = { sources: ['modern', 'historic', 'modern'], period: 'all' as const }

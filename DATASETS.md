@@ -427,20 +427,34 @@ The standard `bash pipeline/atlas/fetch-sources.sh` also runs
 `pipeline/dlac/fetch.sh`. It fetches the shapefile ZIP (file 2423709) and Word
 dictionary (2423710) into `datasets/dlac/raw/`, verifying pinned SHA-256 hashes.
 `uv run python -m pipeline.atlas.build` then converts the shapefile with PyShp,
-links it to the pinned Glottolog classification, and includes the mapped polygons
-in the existing catalogs and PMTiles. No additional frontend build step is needed.
+links reviewed correspondences to the pinned Glottolog classification, registers
+source-defined entries for groups without equivalent Glottocodes, and includes
+the polygons in the existing catalogs and PMTiles. No additional frontend build
+step is needed.
 
-`pipeline/dlac/candidates.csv` is the explicit crosswalk. Only rows marked
-`candidate` are imported. These are project correspondences, not source-provided
-identifiers. The reviewed mappings include Mandarin Supergroup → Mandarin Chinese
+`pipeline/dlac/candidates.csv` is the explicit crosswalk. Rows marked
+`candidate` or `source-defined` are imported. These are project correspondences,
+not source-provided identifiers. The reviewed mappings include Mandarin Supergroup → Mandarin Chinese
 (`mand1415`), Mongolian Languages → Mongolic (`mong1329`), Korean Languages →
-Korean (`kore1280`), and Kam-Tai Languages → Tai-Kadai (`taik1256`). Rows marked
-`unresolved` (Tibeto-Burman, Shaozhou Tuhua, and Danzhou) remain unassigned; no
-source-only groups or inferred descendant areas are created. The source record
-whose Chinese-group label contradicts its broad group is also excluded.
+Korean (`kore1280`), and Kam-Tai Languages → Tai-Kadai (`taik1256`). The three
+groups without reviewed equivalents use catalog IDs `dlac1987china:tibeto-burman`,
+`dlac1987china:shaozhou-tuhua`, and `dlac1987china:danzhou`, registered in
+`pipeline/atlas/source_languoids.json`. Tibeto-Burman and Shaozhou Tuhua have level
+`group`; Danzhou retains the source's `dialect` label. Their `classification`
+records the source dataset, original label, and explanation of the missing
+correspondence. Reviewed broader parent links place Tibeto-Burman under
+Sino-Tibetan (`sino1245`) and Shaozhou Tuhua/Danzhou under Sinitic (`sini1245`).
+DLAC supplies both latter labels in `CHINESE_GR` alongside Han Chinese in
+`LANGUAGE_F`; their narrower subgroup affiliations remain unresolved. Family
+metadata is derived from the combined parent tree, giving all three the
+Sino-Tibetan family. Danzhou retains no individual `parentLanguageId`, since the
+source identifies no equivalent parent language. Existing Glottolog branches
+keep their parents; none are moved under the source-defined Tibeto-Burman group.
+The source record whose Chinese-group label contradicts its broad group is excluded.
 Recognized components of partially mapped shared areas are retained; uninhabited
 areas have no language assignment. Unexpected labels,
-unknown Glottocodes, duplicate source IDs, and checksum mismatches fail the build.
+unknown Glottocodes or unregistered source IDs, duplicate source IDs, and checksum
+mismatches fail the build.
 
 The mapping choices preserve the source's level and regional scope:
 
@@ -456,12 +470,14 @@ The mapping choices preserve the source's level and regional scope:
   rather than Glottolog's narrower Kam-Tai subgroup. See the original atlas's
   classification discussion in [LaPolla's review](https://www.randylapolla.info/Papers/LaPolla_1997_Review_of_Language_Atlas_of_China.pdf).
 
-294 of the 307 polygons have at least one accepted assignment, producing 17
-variants (shared polygons occur in each relevant variant): 279 records are fully
-mapped, 15 partially mapped, 5 unmapped, 7 uninhabited, and 1 excluded for
-inconsistent labels. Mandarin has 117 polygons, Mongolic 28, Korean 6, and
-Tai-Kadai 41. These counts include shared regions and must not be summed as
-distinct source records. DLAC alone now supplies ten mapped Sino-Tibetan nodes.
+299 of the 307 polygons have accepted assignments, producing 20
+variants (17 Glottolog entries and three source-defined entries; shared polygons
+occur in each relevant variant). All 299 are fully assigned; seven are uninhabited
+and one is excluded for inconsistent labels. Mandarin has 117 polygons, Mongolic
+28, Korean 6, and Tai-Kadai 41. Tibeto-Burman has 15 polygons, Shaozhou Tuhua four,
+and Danzhou one. These counts include shared regions and must not be summed as
+distinct source records. DLAC alone now supplies 13 mapped Sino-Tibetan entries:
+ten Glottolog nodes and three source-defined entries.
 The imported nodes include direct Jin and Hui language areas and Min/Pinghua
 family areas. Family polygons represent regional group coverage, not each
 individual descendant or a complete worldwide extent. Original polygons stay
@@ -472,9 +488,12 @@ approximately contemporary view with an explicit **China, 1985–1987** label;
 
 The ignored `data/processed/dlac/features.geojson` retains all source records,
 raw labels, unique `CH_LANGS_` IDs, original geometry, and component decisions.
-`mapping-report.json` records accepted and excluded assignments, mapping counts,
-regional scope, represented years, and source/crosswalk hashes. The selectable
-catalog variants refer to the stable `dlac:<CH_LANGS_>` feature IDs. The legacy
+`atlas:languageReference` retains all catalog assignments; `cldf:languageReference`
+contains only actual Glottocodes. `mapping-report.json` records all `languoidIds`,
+the separate `glottocodes` and `sourceLanguoidIds`, accepted and excluded
+assignments, mapping counts, regional scope, represented years, and source/crosswalk
+hashes. The selectable catalog variants refer to the stable `dlac:<CH_LANGS_>`
+feature IDs. The legacy
 `CH_LANGS_I` field is not unique and is retained only as provenance.
 
 **License and attribution:** Dataverse metadata declares **CC0 1.0**, while the

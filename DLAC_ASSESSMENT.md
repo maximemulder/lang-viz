@@ -2,9 +2,14 @@
 
 **Integration update:** the production pipeline now includes the reviewed DLAC
 correspondences, documented in [DATASETS.md](DATASETS.md#44-language-atlas-of-china).
-It enables 17 nodes, including the subsequently reviewed Mandarin, Mongolic,
-Korean, and broad Tai-Kadai correspondences. The three groups without equivalent
-Glottocodes and the inconsistent record remain excluded. It distributes
+It enables 17 Glottolog nodes, including the subsequently reviewed Mandarin,
+Mongolic, Korean, and broad Tai-Kadai correspondences. Catalog schema v5 also
+retains Tibeto-Burman, Shaozhou Tuhua, and Danzhou as three source-defined entries
+with stable dataset-namespaced IDs and explicit provenance. Reviewed broader
+parent links place Tibeto-Burman under Sino-Tibetan and Shaozhou Tuhua/Danzhou
+under Sinitic; these links assert inclusion, not exact Glottolog equivalence.
+Only the inconsistent record and uninhabited areas are
+excluded. It distributes
 [a source notice](pipeline/dlac/NOTICE.md) under the conservative BY-NC-SA policy.
 The assessment below records the initial hypotheses and scope questions before
 integration; the current production decisions and counts are in DATASETS.md.
@@ -127,9 +132,12 @@ compared with `mand1415`, but its scope must be checked against Mandarinic
 Mongolian here should not automatically mean the narrower Mongolian macrolanguage
 or the broader Mongolic-Khitan root.
 
-Three components remain unassigned: **Tibeto-Burman, Shaozhou Tuhua, and Danzhou**.
-The pinned tree has no equivalent Tibeto-Burman node; mapping it to Sino-Tibetan
-would also imply Sinitic. `quji1234` Qujiang Hakka-Shibei Shaoguan Tuhua is a
+At the initial assessment, three components remained unassigned:
+**Tibeto-Burman, Shaozhou Tuhua, and Danzhou**. They now have source-defined
+catalog entries, without asserting a Glottolog correspondence.
+The pinned tree has no equivalent Tibeto-Burman node; equating its source area
+with Sino-Tibetan would also include Sinitic. The broader parent relationship
+is recorded separately. `quji1234` Qujiang Hakka-Shibei Shaoguan Tuhua is a
 possible partial Shaozhou match, not sufficient grounds to assign the whole
 source region. Kam-Tai's scope also needs review against Tai-Kadai and the
 narrower Kam-Tai node.

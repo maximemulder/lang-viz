@@ -1,7 +1,8 @@
 import type { LanguageSearchIndex } from './catalog.ts'
 
+/** Opaque catalog key: a Glottocode or a stable dataset-namespaced ID. */
 export type LanguageId = string
-export type LanguoidLevel = 'family' | 'language' | 'dialect'
+export type LanguoidLevel = 'family' | 'language' | 'dialect' | 'group'
 export type GeometryVariantId = string
 export type GeographyDatasetId = string
 export type GeographyDatasetSelection = 'all' | readonly GeographyDatasetId[]
@@ -24,9 +25,19 @@ export type TemporalCoverage =
       readonly year: number
     }
 
-/** A Glottolog languoid of any level; the legacy catalog name is retained. */
+export type LanguageClassification =
+  | { readonly kind: 'glottolog'; readonly glottocode: string }
+  | {
+      readonly kind: 'source'
+      readonly datasetId: GeographyDatasetId
+      readonly label: string
+      readonly note: string
+    }
+
+/** A languoid from Glottolog or a source-defined entry; the legacy name is retained. */
 export interface Language {
   readonly id: LanguageId
+  readonly classification: LanguageClassification
   readonly name: string
   readonly level: LanguoidLevel
   /** Immediate classification parent, including intermediate groups and dialects. */

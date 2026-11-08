@@ -74,6 +74,9 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                   {language.iso6393 ? `${language.iso6393} · ` : ''}
                   {language.id}
                 </small>
+                {language.classification.kind === 'source' && (
+                  <small>Source-defined entry · no matched Glottocode</small>
+                )}
                 {area?.mode === 'descendants' ? (
                   <>
                     <small>Descendant areas · {area.variants.length} contributing entries</small>

@@ -23,6 +23,7 @@ const entry = (
   longitude: number | null = 10,
 ): Language => ({
   id,
+  classification: { kind: 'glottolog', glottocode: id },
   name: id,
   level: 'language',
   parentId,
@@ -215,4 +216,7 @@ test('real catalog palettes cover all languoids and retain variation in deep Sin
   const chinese = ['mand1415', 'jiny1235', 'yuec1235', 'ganc1239', 'hakk1236']
   assert.equal(new Set(chinese.map((id) => p.colors.get(id))).size, chinese.length)
   for (const id of chinese) assert.equal(p.rootById.get(id), 'sino1245')
+  for (const id of ['tibeto-burman', 'shaozhou-tuhua', 'danzhou']) {
+    assert.equal(p.rootById.get(`dlac1987china:${id}`), 'sino1245')
+  }
 })

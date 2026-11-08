@@ -8,7 +8,7 @@ How the data is prepared and how the app is organised. See [OVERVIEW.md](OVERVIE
 
 ```
 raw datasets ──► converters (Python, offline) ──► internal schema ──► small JSON / TopoJSON ──► web app
- (CLDF, ini,       one per dataset                Glottocode-keyed                            shared state + views
+ (CLDF, ini,       one per dataset                catalog-ID-keyed                            shared state + views
   XML, GeoJSON)
 ```
 
@@ -28,7 +28,7 @@ The datasets share a format (CLDF) and a key (Glottocode), so format conversion 
 1. **Features with similar meaning are not directly comparable.** WALS and Grambank ask similar but not identical questions, with different value sets. We use one main source per topic and do not merge them.
 2. **Level mismatches.** Datasets record dialects, languages or groups of varieties. Data is rolled up to language level via the Glottolog tree (dialect → parent language). If two dialects of one language disagree, we keep both values and flag the conflict.
 3. **Disagreeing sources.** A language may have several polygons or coordinates. We pick a default (Glottolog coordinates; asher2007world polygons where available) and keep the alternatives for the "compare sources" view. Never merge them silently.
-4. **Languages outside Glottolog.** Proto-languages and some historical varieties (51 in DiACL) get a hand-made mapping table to Glottolog family nodes, or an internal ID if no match exists.
+4. **Entries outside Glottolog.** Reviewed equivalents keep Glottocodes. Entries without equivalents use stable dataset-namespaced IDs and explicit source classification provenance. The atlas registry is `pipeline/atlas/source_languoids.json`; reviewed parent links place Tibeto-Burman under Sino-Tibetan and Shaozhou Tuhua/Danzhou under Sinitic. Family and parent-language metadata follow the combined ancestry. Existing Glottolog branches keep their parents; only entries with unresolved broader affiliations remain roots.
 5. **Time.** Each dataset has its own notion of time (DiACL date ranges, Glottography map years, *contemporary* / *traditional*). We keep a simple model: every geometry or variety gets an optional start / end year and a layer label. A finer time axis only if a view needs it.
 6. **Provenance.** Every row keeps a `source` column, so any value shown in the app can be traced back to its dataset.
 
@@ -38,11 +38,15 @@ The datasets share a format (CLDF) and a key (Glottocode), so format conversion 
 
 ### 3.1 Internal schema
 
-Everything keyed by Glottocode (or internal ID, rule 4). Tables:
+Everything uses an opaque catalog ID (existing Glottocodes or dataset-namespaced
+IDs, rule 4). Catalog schema v5 records `classification` as either
+`{kind: "glottolog", glottocode}` or `{kind: "source", datasetId, label, note}`.
+External identifier joins must use the explicit Glottocode, not assume every
+catalog ID is one. Tables:
 
 | Table | Content |
 |---|---|
-| `languages` | Glottocode, name, level (family / language / dialect), parent, top-level family, macroarea, countries, coordinates, endangerment, ISO code, time range |
+| `languages` | Catalog ID, classification provenance, name, level (family / language / dialect / group), parent, top-level family, macroarea, countries, coordinates, endangerment, ISO code, time range |
 | `names` | Alternative names (for search) |
 | `features` | Feature definitions: ID, name, area, possible values, source (WALS / Grambank / …) |
 | `values` | Language × feature → value, source |
@@ -89,7 +93,7 @@ Target: a first load of a few MB; everything else loaded when needed.
 
 One central store holds:
 
-- selected languages (set of Glottocodes)
+- selected entries (catalog IDs)
 - active filters (family, macroarea, country, endangerment, "has data in…")
 - active feature (and second feature for the heatmap)
 - time / map layer

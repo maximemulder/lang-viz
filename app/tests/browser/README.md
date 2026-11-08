@@ -8,6 +8,7 @@ npm run test:browser -- --scenario britain-small
 npm run test:browser -- --runs 3 --output test-results/baseline
 npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
+npm run test:source-browser
 npm run test:coverage-browser
 npm run test:branch-browser
 npm run test:parts-browser
@@ -18,6 +19,12 @@ dependencies, and generated atlas data under `public/data/`. The runner uses
 Python's standard library and geckodriver's W3C WebDriver API. It installs and
 downloads nothing. Firefox/geckodriver setup is described in
 [Mozilla's documentation](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html).
+
+`test:source-browser` checks DLAC's Tibeto-Burman, Shaozhou Tuhua, and Danzhou
+entries against the real catalog and tiles: source-label and namespaced-ID search,
+family placement and ancestry reveal, classification provenance, selection, map inspection,
+removal, and source/period availability. Screenshots and a report go to
+`test-results/source-languoids/`.
 
 `test:catalog-browser` builds the production app and checks family, language,
 and dialect discovery, alternative-name searches for unmapped entries, selection

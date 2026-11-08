@@ -10,10 +10,11 @@ from sidebar import open_details, search, view
 
 def main():
     catalog = json.loads((APP / "public/data/languages.json").read_text())
+    root_count = sum(row["parentId"] is None for row in catalog)
     # Some local catalogs retain an additional broad Sino-Tibetan source area.
     # Both source revisions must preserve it when present, alongside descendants.
     sino_has_own = any(v.startswith("dlac1987china:contemporary:") for row in catalog if row["id"] == "sino1245" for v in row["geometryVariantIds"])
-    family_ids = ["ganc1239", "hakk1236", "jiny1235", "huiz1242", "wuch1236", "xian1251", "ping1245", "yuec1235", "minn1248", "mand1415"] + (["sino1245"] if sino_has_own else [])
+    family_ids = ["ganc1239", "hakk1236", "jiny1235", "huiz1242", "wuch1236", "xian1251", "ping1245", "yuec1235", "minn1248", "mand1415", "dlac1987china:tibeto-burman", "dlac1987china:shaozhou-tuhua", "dlac1987china:danzhou"] + (["sino1245"] if sino_has_own else [])
     family_total = len(family_ids) + 2
     output = APP / "test-results/catalog"
     output.mkdir(parents=True, exist_ok=True)
@@ -30,7 +31,7 @@ def main():
                 return {count: document.querySelector('.finder-actions p').textContent,
                     rows: [...document.querySelectorAll('.language-row')].map(row => ({name: row.textContent, level: row.getAttribute('aria-level')}))};
                 """)
-            assert "429 roots" in results["initialBrowse"]["count"]
+            assert f"{root_count} roots" in results["initialBrowse"]["count"]
             assert all(row["level"] == "1" for row in results["initialBrowse"]["rows"])
             # Check every virtualized root, including the boundary between availability groups.
             roots_by_position = {}
@@ -54,7 +55,7 @@ def main():
                 })
                 roots_by_position.update((row["position"], row["unavailable"]) for row in root_rows)
             availability_order = [roots_by_position[position] for position in sorted(roots_by_position)]
-            assert len(availability_order) == 429, "Every classification root must remain discoverable"
+            assert len(availability_order) == root_count, "Every classification root must remain discoverable"
             assert any(availability_order) and not all(availability_order)
             assert availability_order == sorted(availability_order), "Empty search must put roots with areas first"
             results["emptySearchAreaGroups"] = {"withAreas": availability_order.count(False), "withoutAreas": availability_order.count(True)}
@@ -164,7 +165,8 @@ def main():
             key("\ue010")  # End: focus reaches a virtualized, initially unmounted root.
             wait_for(
                 lambda: browser.js(
-                    "return document.activeElement?.getAttribute('aria-posinset') === '429'"
+                    "return Number(document.activeElement?.getAttribute('aria-posinset')) === arguments[0]",
+                    root_count,
                 ),
                 10,
                 "virtualized end navigation",
@@ -762,7 +764,7 @@ def main():
             assert "10 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
-            query_branch_ids = [code for code in branch_ids if code not in {"ping1245", "minn1248", "sino1245"}]
+            query_branch_ids = [code for code in branch_ids if code not in {"ping1245", "minn1248", "sino1245"} and not code.startswith("dlac1987china:")]
             for code in query_branch_ids:
                 search(browser, code, code)
                 assert browser.js("""

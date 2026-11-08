@@ -139,6 +139,14 @@ const LanguageRow = ({
           <small className={`language-row__level language-row__level--${language.level}`}>
             {language.level}
           </small>
+          {language.classification.kind === 'source' && (
+            <small
+              className="language-row__children"
+              title="Defined by the source; no matched Glottocode"
+            >
+              source-defined
+            </small>
+          )}
           {row.childCount > 0 && <small className="language-row__children">{row.childCount}</small>}
           {selectedCount > 0 && (
             <small className="language-row__children">{selectedCount} on map</small>
@@ -345,7 +353,7 @@ export const ExploreLanguages = () => {
         <input
           type="search"
           value={query}
-          placeholder="Name, alternative name, ISO or Glottocode…"
+          placeholder="Name, alternative name, ISO or catalog ID…"
           onChange={(event) => {
             setQuery(event.currentTarget.value)
             pendingFocus.current = null

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Convert the pinned DLAC shapefile into original, classification-linked polygons.
 
-Only candidate correspondences are enabled. Scope-review and unresolved labels
-remain in the intermediate GeoJSON and report, without selectable assignments.
+Reviewed Glottolog correspondences and registered source-defined entries are
+selectable. Scope-review and unresolved labels remain available for audit.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from zipfile import ZipFile
@@ -54,13 +55,23 @@ def read_crosswalk(path: Path, known_languoids: set[str]) -> dict:
         key = row["field"], row["label"]
         if key in lookup:
             raise ValueError(f"Duplicate DLAC crosswalk label: {key}")
-        if row["status"] not in {"candidate", "scope-review", "unresolved"}:
+        if row["status"] not in {"candidate", "source-defined", "scope-review", "unresolved"}:
             raise ValueError(f"Unknown DLAC mapping status: {row}")
         code = row["glottocode"]
-        if code and code not in known_languoids:
+        source_id = row["source_languoid_id"]
+        if code and (code not in known_languoids or not re.fullmatch(r"[a-z]{4}[0-9]{4}", code)):
             raise ValueError(f"Unknown DLAC Glottocode: {code}")
-        if row["status"] == "candidate" and not code:
+        if row["status"] == "candidate" and (not code or source_id):
             raise ValueError(f"Missing DLAC candidate Glottocode: {key}")
+        if source_id and (
+            source_id not in known_languoids or not source_id.startswith("dlac1987china:")
+        ):
+            raise ValueError(f"Unknown DLAC source languoid: {source_id}")
+        if row["status"] == "source-defined" and (not source_id or code):
+            raise ValueError(f"Invalid DLAC source-defined assignment: {key}")
+        if row["status"] != "source-defined" and source_id:
+            raise ValueError(f"Unexpected DLAC source languoid assignment: {key}")
+        row["languageId"] = source_id or code
         lookup[key] = row
     return lookup
 
@@ -72,8 +83,18 @@ def convert_record(record: dict, geometry: dict, lookup: dict) -> dict:
         if key not in lookup:
             raise ValueError(f"Unexpected DLAC label: {key}")
         row = lookup[key]
-        assignments.append({**row, "included": row["status"] == "candidate" and not inconsistent})
-    codes = list(dict.fromkeys(row["glottocode"] for row in assignments if row["included"]))
+        assignments.append(
+            {
+                **row,
+                "included": row["status"] in {"candidate", "source-defined"} and not inconsistent,
+            }
+        )
+    ids = list(dict.fromkeys(row["languageId"] for row in assignments if row["included"]))
+    codes = list(
+        dict.fromkeys(
+            row["glottocode"] for row in assignments if row["included"] and row["glottocode"]
+        )
+    )
     status = (
         "inconsistent"
         if inconsistent
@@ -82,7 +103,7 @@ def convert_record(record: dict, geometry: dict, lookup: dict) -> dict:
         else "mapped"
         if all(row["included"] for row in assignments)
         else "partial"
-        if codes
+        if ids
         else "unmapped"
     )
     return {
@@ -90,6 +111,7 @@ def convert_record(record: dict, geometry: dict, lookup: dict) -> dict:
         "properties": {
             **record,
             "id": f"dlac:{record['CH_LANGS_']}",
+            "atlas:languageReference": "|".join(ids) or None,
             "cldf:languageReference": "|".join(codes) or None,
             "mappingStatus": status,
             "assignments": assignments,
@@ -139,10 +161,18 @@ def prepare(
         "crosswalkSha256": hashlib.sha256(crosswalk_path.read_bytes()).hexdigest(),
         "representedYears": [1985, 1987],
         "regionalCoverageOnly": True,
-        "includedMappingStatuses": ["candidate"],
+        "includedMappingStatuses": ["candidate", "source-defined"],
         "featureCount": len(features),
-        "mappedFeatureCount": sum(bool(p["cldf:languageReference"]) for p in properties),
+        "mappedFeatureCount": sum(bool(p["atlas:languageReference"]) for p in properties),
         "statusCounts": dict(Counter(p["mappingStatus"] for p in properties)),
+        "languoidIds": sorted(
+            {code for p in properties for code in (p["atlas:languageReference"] or "").split("|")}
+            - {""}
+        ),
+        "sourceLanguoidIds": sorted(
+            {r["source_languoid_id"] for p in properties for r in p["assignments"] if r["included"]}
+            - {""}
+        ),
         "glottocodes": sorted(
             {code for p in properties for code in (p["cldf:languageReference"] or "").split("|")}
             - {""}
@@ -160,6 +190,6 @@ def prepare(
         )
     print(
         f"DLAC: {report['mappedFeatureCount']}/{len(features)} polygons assigned to "
-        f"{len(report['glottocodes'])} languoids; details in {output_dir / 'mapping-report.json'}"
+        f"{len(report['languoidIds'])} languoids; details in {output_dir / 'mapping-report.json'}"
     )
     return output_dir / "features.geojson"

@@ -5,6 +5,7 @@ import { buildLanguageSearchIndex, searchCatalog } from '../src/domain/catalog.t
 
 const entry = (id: string, level: Language['level'], mapped: boolean): Language => ({
   id,
+  classification: { kind: 'glottolog', glottocode: id },
   name: id,
   level,
   parentId: level === 'family' ? null : level === 'language' ? 'family' : 'language',
@@ -79,6 +80,36 @@ test('Glottocode and ISO matches rank first even when names do not match', () =>
   const fixture = buildLanguageSearchIndex(entries)
   for (const query of [' ABC ', 'LANG1234'])
     assert.equal(searchCatalog(fixture, query)[0]?.id, 'lang1234')
+})
+
+test('source-defined names, labels and namespaced IDs are searchable without Glottocodes', () => {
+  const source: Language = {
+    ...entry('dlac1987china:danzhou', 'dialect', true),
+    name: 'Danzhou',
+    parentId: null,
+    parentLanguageId: null,
+    classification: {
+      kind: 'source',
+      datasetId: 'dlac1987china',
+      label: 'Danzhou Dialect (Unclassified)',
+      note: 'No reviewed equivalent.',
+    },
+  }
+  const fixture = buildLanguageSearchIndex([...languages, source])
+  for (const query of ['danzhou', 'DLAC1987CHINA:DANZHOU', 'Dialect (Unclassified)']) {
+    assert.deepEqual(searchCatalog(fixture, query), [source])
+  }
+  assert.deepEqual(searchCatalog(fixture, 'no reviewed equivalent'), [])
+})
+
+test('Glottocode lookup is independent of the opaque catalog key', () => {
+  const fixture = buildLanguageSearchIndex([
+    {
+      ...entry('catalog-key', 'language', true),
+      classification: { kind: 'glottolog', glottocode: 'lang1234' },
+    },
+  ])
+  assert.equal(searchCatalog(fixture, 'LANG1234')[0]?.id, 'catalog-key')
 })
 
 test('relevance ties retain catalog order across queries without mutating the index', () => {

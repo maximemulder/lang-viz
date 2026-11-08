@@ -9,6 +9,7 @@ import {
 
 const entry = (id: string, parentId: string | null, level: Language['level']): Language => ({
   id,
+  classification: { kind: 'glottolog', glottocode: id },
   parentId,
   level,
   name: id,

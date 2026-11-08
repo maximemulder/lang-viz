@@ -477,7 +477,8 @@ h2 {
   background: #e7ebe4;
   font-size: 0.55rem;
 }
-.language-row__level--family {
+.language-row__level--family,
+.language-row__level--group {
   color: #72572c;
   background: #eee8d8;
 }

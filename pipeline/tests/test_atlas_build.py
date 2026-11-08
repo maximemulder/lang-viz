@@ -86,7 +86,7 @@ def test_all_levels_and_source_parts_without_aggregation(source):
 
 def test_unmatched_references_are_reported_and_not_assigned_to_other_entries(source):
     source, _ = source
-    with pytest.warns(UserWarning, match="Unmatched Glottocodes"):
+    with pytest.warns(UserWarning, match="Unmatched languoid IDs"):
         groups = list(atlas.source_geometries(source, {"lang1234"}))
     assert [(languoid, file) for languoid, file, _ in groups] == [("lang1234", "languages.geojson")]
 
@@ -124,14 +124,16 @@ def test_catalog_exports_unmappable_entries_and_aliases_at_every_level(tmp_path,
         atlas, "read_parent_ids", lambda ids: {"lang1234": "root1234", "dial1234": "lang1234"}
     )
     monkeypatch.setattr(atlas, "normalize_geometries", lambda *args: ([], {}))
+    monkeypatch.setattr(atlas, "read_source_languoids", lambda *args: [])
     atlas.build(skip_tiles=True)
     exported = {r["id"]: r for r in json.loads((tmp_path / "languages.json").read_text())}
     assert len(exported) == 3
+    assert exported["lang1234"]["classification"] == {"kind": "glottolog", "glottocode": "lang1234"}
     assert exported["dial1234"]["parentLanguageId"] == "lang1234"
     assert exported["dial1234"]["parentId"] == "lang1234"
     assert exported["lang1234"]["parentId"] == "root1234"
     assert exported["root1234"]["parentId"] is None
-    assert json.loads((tmp_path / "manifest.json").read_text())["schemaVersion"] == 4
+    assert json.loads((tmp_path / "manifest.json").read_text())["schemaVersion"] == 5
     assert exported["dial1234"]["alternativeNames"] == ["上海", "Shànghǎi"]
     assert all(r["geometryVariantIds"] == [] for r in exported.values())
     assert json.loads((tmp_path / "manifest.json").read_text())["languoidCount"] == 3

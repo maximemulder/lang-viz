@@ -14,6 +14,7 @@ from typing import Any
 
 import polars as pl
 
+from pipeline.atlas.catalog import read_source_languoids, resolve_source_ancestry
 from pipeline.dlac.prepare import prepare as prepare_dlac
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -368,7 +369,10 @@ def source_geometries(source: GeographySource, known_languoids: set[str]):
         by_languoid: dict[str, list[dict[str, Any]]] = defaultdict(list)
         unknown: set[str] = set()
         for feature in collection["features"]:
-            reference = feature["properties"].get("cldf:languageReference")
+            properties = feature["properties"]
+            reference = properties.get(
+                "atlas:languageReference", properties.get("cldf:languageReference")
+            )
             # Asher uses pipes for explicitly shared source polygons; empty segments
             # denote an unassigned component, not an extra language.
             references = reference.split("|") if reference else []
@@ -382,7 +386,7 @@ def source_geometries(source: GeographySource, known_languoids: set[str]):
                     by_languoid[languoid_id].append(feature)
         if unknown:
             warnings.warn(
-                f"Unmatched Glottocodes in {path}: {', '.join(sorted(unknown))}",
+                f"Unmatched languoid IDs in {path}: {', '.join(sorted(unknown))}",
                 stacklevel=2,
             )
         for languoid_id, features in by_languoid.items():
@@ -535,6 +539,17 @@ def build(skip_tiles: bool) -> None:
         for row in rows
     }
 
+    source_languoids = resolve_source_ancestry(
+        read_source_languoids(known_languoids, {d["id"] for d in DATASETS}),
+        parent_ids,
+        names,
+        level_by_languoid,
+    )
+    for entry in source_languoids:
+        known_languoids.add(entry["id"])
+        level_by_languoid[entry["id"]] = entry["level"]
+        family_by_languoid[entry["id"]] = entry["familyName"]
+
     variants, variants_by_languoid = normalize_geometries(
         known_languoids, family_by_languoid, level_by_languoid
     )
@@ -545,6 +560,7 @@ def build(skip_tiles: bool) -> None:
         languages.append(
             {
                 "id": language_id,
+                "classification": {"kind": "glottolog", "glottocode": language_id},
                 "name": row["Name"],
                 "iso6393": row["ISO639P3code"],
                 "familyId": row["Family_ID"],
@@ -561,6 +577,9 @@ def build(skip_tiles: bool) -> None:
             }
         )
 
+    for entry in source_languoids:
+        languages.append({**entry, "geometryVariantIds": variants_by_languoid.get(entry["id"], [])})
+
     languages.sort(key=lambda language: (str(language["name"]).casefold(), language["id"]))
     write_json(PUBLIC_DATA_DIR / "languages.json", languages)
     write_json(PUBLIC_DATA_DIR / "geometry-variants.json", variants)
@@ -569,7 +588,7 @@ def build(skip_tiles: bool) -> None:
     write_json(
         PUBLIC_DATA_DIR / "manifest.json",
         {
-            "schemaVersion": 4,
+            "schemaVersion": 5,
             "languoidCount": len(languages),
             "languoidWithGeometryCount": sum(
                 bool(language["geometryVariantIds"]) for language in languages

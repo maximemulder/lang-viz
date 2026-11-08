@@ -28,8 +28,9 @@ obtaining an appropriate separate grant from the relevant rights holders.
 
 Project changes: read the WGS84 shapefile into GeoJSON without dissolving source
 polygons; normalize observed label typos and truncations; attach selected
-Glottocodes through an explicit crosswalk; omit ambiguous, inconsistent, and
-uninhabited assignments; retain recognized components of shared areas; and
+Glottocodes through an explicit crosswalk; retain Tibeto-Burman, Shaozhou Tuhua,
+and Danzhou as source-defined entries without asserted Glottolog equivalents;
+omit inconsistent and uninhabited assignments; retain all assigned components of shared areas; and
 simplify/clip geometry into zoom-dependent vector tiles with Tippecanoe.
 Group polygons retain regional coverage and are not assigned to each descendant.
 The intermediate GeoJSON and mapping report preserve all 307 source records.

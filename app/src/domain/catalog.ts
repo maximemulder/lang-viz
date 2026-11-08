@@ -23,9 +23,16 @@ export const buildLanguageSearchIndex = (languages: readonly Language[]): Langua
     languages.map((language) => {
       const name = normalizeLanguageQuery(language.name)
       const aliases = language.alternativeNames.map(normalizeLanguageQuery)
+      const classification = language.classification
       // An ancestor's name provides context, not a direct match for every descendant.
       const text = normalizeLanguageQuery(
-        [language.name, ...language.alternativeNames, language.id, language.iso6393]
+        [
+          language.name,
+          ...language.alternativeNames,
+          language.id,
+          language.iso6393,
+          classification.kind === 'glottolog' ? classification.glottocode : classification.label,
+        ]
           .filter(Boolean)
           .join(' '),
       )
@@ -40,7 +47,14 @@ export const matchesLanguageQuery = (
 ) => Boolean(entry && (!normalizedQuery || entry.text.includes(normalizedQuery)))
 
 const matchRank = ({ language, name, aliases, words }: LanguageSearchEntry, query: string) => {
-  if (language.id === query || language.iso6393 === query || name === query) return 0
+  if (
+    language.id === query ||
+    language.iso6393 === query ||
+    (language.classification.kind === 'glottolog' &&
+      language.classification.glottocode === query) ||
+    name === query
+  )
+    return 0
   if (aliases.includes(query)) return 1
   if (name.startsWith(query)) return 2
   if (aliases.some((alias) => alias.startsWith(query))) return 3

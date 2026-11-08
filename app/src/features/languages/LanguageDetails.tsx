@@ -56,6 +56,7 @@ export const LanguageDetails = () => {
   }, [detailId, panel.detailEntryId])
   if (!detail)
     return <p className="finder-empty">Choose an entry in Explore or On map to see its details.</p>
+  const classification = detail.classification
   return (
     <section className="finder-detail" aria-label="Entry details">
       <div className="finder-detail__heading">
@@ -67,6 +68,17 @@ export const LanguageDetails = () => {
           {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
         </small>
       </div>
+      {classification.kind === 'source' && (
+        <div className="finder-detail__classification">
+          <h4>Source-defined entry</h4>
+          <p>
+            {data.datasets.find(({ id }) => id === classification.datasetId)?.name ??
+              classification.datasetId}{' '}
+            · {classification.label}
+          </p>
+          <p>No matched Glottocode. {classification.note}</p>
+        </div>
+      )}
       <nav className="finder-detail__path" aria-label="Classification ancestors">
         {languageAncestors(hierarchy, detail).map((ancestor) => (
           <button type="button" key={ancestor.id} onClick={() => openDetails(ancestor.id)}>

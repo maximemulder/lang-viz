@@ -29,8 +29,15 @@ the conflicting CC0/BY-NC-SA metadata and the conservative noncommercial terms
 used for its contribution. The build distributes a source notice beside the data.
 
 The searchable catalog includes every Glottolog languoid: families and subfamilies,
-languages, and dialects. Search accepts primary and alternative names, ISO codes,
-and Glottocodes. Without a query, the compact tree starts at top-level families,
+languages, and dialects. It also includes source-defined entries without an
+equivalent Glottocode, currently DLAC's Tibeto-Burman, Shaozhou Tuhua, and Danzhou.
+These have stable dataset-namespaced IDs, retain the source's labels and scope,
+and are identified in Explore, Details, and map inspection. Reviewed parent links
+place Tibeto-Burman under Sino-Tibetan, and Shaozhou Tuhua and Danzhou under
+Sinitic. Family metadata follows this ancestry. Entries with unresolved broader
+affiliations remain roots; existing Glottolog branches keep their parents.
+Search accepts primary and alternative names, ISO codes, Glottocodes, and catalog
+IDs. Without a query, the compact tree starts at top-level families,
 isolates, and other parentless entries. Search ranks direct names and identifiers
 before partial matches and lets any languoid start an expandable subtree. An
 ancestor's name supplies context rather than matching all its descendants.
@@ -115,10 +122,16 @@ shared source polygons retain each referenced languoid. The pipeline preserves
 source geometry; optional descendant aggregation happens in the browser rather
 than creating new dataset records. Geometry variants record their input
 file, source feature IDs, and whether they use original or dataset-prepared areas.
-Unassigned features are omitted; identifiers absent from the pinned Glottolog
-catalog are reported as build warnings. Existing file and vector-layer names
-(`languages.json`, `language_areas`) also cover families and dialects; catalog
-schema version 4 adds immediate `parentId` links and uses `languoidCount` and `languoidWithGeometryCount`.
+Unassigned features are omitted; identifiers absent from the atlas catalog are
+reported as build warnings. Existing file and vector-layer names
+(`languages.json`, `language_areas`) also cover families, dialects, and source
+groups. Catalog schema version 5 adds explicit `classification` provenance:
+`{kind: "glottolog", glottocode}` or `{kind: "source", datasetId, label, note}`.
+`id` is an opaque catalog key, independent of external identifiers. The schema
+retains immediate `parentId` links, `languoidCount`, and `languoidWithGeometryCount`.
+Source entries are registered in `pipeline/atlas/source_languoids.json`; adding
+one requires a reviewed registry entry and importer assignment. Registry checks
+reject duplicate IDs, unknown datasets/parents, and classification cycles.
 
 The generated geometry catalog preserves four temporal source views:
 
