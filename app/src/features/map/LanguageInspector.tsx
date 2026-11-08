@@ -111,7 +111,9 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                     className="language-inspector__details"
                     aria-label={`Details for ${language.name}`}
                     onClick={() => {
-                      openDetails(language.id)
+                      openDetails(
+                        area ? { languageId: language.id, entryId: area.id } : language.id,
+                      )
                       onClose()
                     }}
                   >

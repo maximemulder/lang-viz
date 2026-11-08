@@ -56,14 +56,15 @@ Classification roots always establish world palettes, including isolates. Select
 family entries establish comparison palettes automatically. Ordinary individual
 language selections retain their genealogy's palette.
 
-`showMappedLeavesAtom` remembers its highest matched roots separately in
-`mappedLeafColorRootsAtom`; replacing a family with its mapped leaves therefore
+`showMappedLeavesAtom` records its highest matched root on each pinned leaf.
+`mappedLeafColorRootsAtom` derives roots from surviving entries; replacing a family with its mapped leaves therefore
 preserves coloring context. Redundant ancestor/descendant search matches do not
 establish a new independent palette for every leaf. A later selection within a
-subtree can establish a nested root. Replacing a subtree removes its old inferred
-roots; unrelated roots remain. `clearMapSelectionAtom` clears selections and this
-provenance, preserving explicit configuration and custom colors. Direct consumers
-of `visibleLanguageIdsAtom` should use the clear action when resetting a workspace.
+subtree can establish a nested root. Replacing a subtree within the same source/period
+context updates its leaf provenance; other comparison contexts and unrelated roots
+remain. Removing the last entry carrying a root releases it. `clearMapSelectionAtom`
+clears entries and their provenance, preserving explicit color configuration.
+`visibleLanguageIdsAtom` is a read-only projection of unique selected languoids.
 
 Searches, row expansion, panning, period/source filters, and individual language
 selection do not redistribute palettes. Explicit changes to comparison roots or
@@ -123,9 +124,11 @@ approximation without modifying hierarchy subdivision or the renderer.
 
 ## Rendering contract
 
-`resolveMapAreas` applies the selected languoid's resolved color to own or grouped
-descendant geometry. Fills, stripes, blending, finder checkboxes, and inspector
-swatches consume this same value. Geometry availability has no color dependency.
+`resolveMapEntries` applies the selected languoid's resolved color to pinned own or
+grouped descendant geometry, followed by an optional per-entry override. Details
+offers an entry color picker and a “Use languoid color” reset. Fills, stripes,
+blending, On map swatches, and inspector swatches use the entry's final color.
+Explore checkboxes show the base languoid color. Geometry availability has no color dependency.
 
 Colors are excluded from coverage selection keys. `createMapResources.updateColors`
 updates existing stripe images in place with `MapLibre.updateImage`, retaining

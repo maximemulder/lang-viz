@@ -6,7 +6,14 @@ import {
   overlapDiagnostics,
   setTileDelay,
 } from '../diagnostics'
-import { BUFFERS, coverageSourceId, fallbackLayerId, stripeLayerId } from '../layerIds'
+import {
+  BUFFERS,
+  blendLayerPrefix,
+  coverageSourceId,
+  fallbackLayerId,
+  solidLayerId,
+  stripeLayerId,
+} from '../layerIds'
 import { serviceDiagnostics } from '../serviceDiagnostics'
 import { parseOverlapSelection } from '../types.ts'
 import type { OverlapTestApi } from './api'
@@ -17,7 +24,7 @@ export const installOverlapTestApi = (
   configure: OverlapTestApi['configure'],
   recompute: () => void,
   selectionKey: () => string,
-  colorControls: Pick<OverlapTestApi, 'configureColors' | 'colorState'>,
+  colorControls: Pick<OverlapTestApi, 'configureColors' | 'colorState' | 'mapEntryState'>,
   readStatus: () => { readonly status: string; readonly message: string },
 ) => {
   const selectedIds = () => {
@@ -132,10 +139,16 @@ export const installOverlapTestApi = (
     const original = map.getLayer('selected-language-areas')
       ? Number(map.getPaintProperty('selected-language-areas', 'fill-opacity'))
       : 0
+    const layers = map.getLayersOrder()
     const active = BUFFERS.some((buffer) =>
-      map.getLayer(stripeLayerId(buffer))
-        ? Number(map.getPaintProperty(stripeLayerId(buffer), 'fill-layer-opacity')) > 0
-        : false,
+      [
+        solidLayerId(buffer),
+        stripeLayerId(buffer),
+        fallbackLayerId(buffer),
+        ...layers.filter((id) => id.startsWith(blendLayerPrefix(buffer))),
+      ].some(
+        (id) => map.getLayer(id) && Number(map.getPaintProperty(id, 'fill-layer-opacity')) > 0,
+      ),
     )
     if (selectedIds().length > 1 && !original && !active) {
       if (styleReloading) styleReloadBlankFrames++

@@ -26,14 +26,16 @@ import {
   atlasDataAtom,
   finderScopeAtom,
   geographyAvailabilityAtom,
+  hideLanguagesAtom,
   languageColorsAtom,
   languageHierarchyAtom,
   languageQueryAtom,
+  mapEntriesAtom,
+  selectedDraftLanguageIdsAtom,
   showLanguagesAtom,
   showMappedLeavesAtom,
   toggleVisibleLanguageAtom,
   viewportLanguageIdsAtom,
-  visibleLanguageIdsAtom,
 } from '../../state/atlasState'
 
 import {
@@ -64,7 +66,8 @@ const LanguageRow = ({
   onKeyDown,
 }: LanguageRowProps) => {
   const { language } = row
-  const visibleIds = useAtomValue(visibleLanguageIdsAtom)
+  const visibleIds = useAtomValue(selectedDraftLanguageIdsAtom)
+  const entries = useAtomValue(mapEntriesAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
   const colors = useAtomValue(languageColorsAtom)
   const modes = useAtomValue(areaModesAtom)
@@ -74,6 +77,7 @@ const LanguageRow = ({
   const mode = areaMode(available, modes[language.id])
   const variants = areaVariants(available, mode)
   const isVisible = visibleIds.includes(language.id)
+  const selectedCount = entries.filter(({ languageId }) => languageId === language.id).length
   const status = variants.length ? areaStatus(available, mode) : 'No area'
   const availabilityLabel = variants.length
     ? `${status}${mode === 'descendants' ? `, ${variants.length} contributors, ${available.uncoveredBranches.length} uncovered branches` : ''}`
@@ -136,12 +140,15 @@ const LanguageRow = ({
             {language.level}
           </small>
           {row.childCount > 0 && <small className="language-row__children">{row.childCount}</small>}
+          {selectedCount > 0 && (
+            <small className="language-row__children">{selectedCount} on map</small>
+          )}
         </span>
         {context && <small className="language-row__context">{context}</small>}
       </button>
       <span
         className={`language-row__area-status${variants.length ? '' : ' language-row__area-status--unavailable'}`}
-        title={availabilityLabel}
+        title={`${availabilityLabel}. This checkbox applies to the current representation only.`}
       >
         {status}
       </span>
@@ -162,13 +169,13 @@ const LanguageRow = ({
 export const ExploreLanguages = () => {
   const data = useAtomValue(atlasDataAtom)
   const viewportIds = useAtomValue(viewportLanguageIdsAtom)
-  const visibleIds = useAtomValue(visibleLanguageIdsAtom)
+  const visibleIds = useAtomValue(selectedDraftLanguageIdsAtom)
   const [query, setQuery] = useAtom(languageQueryAtom)
   const [scope, setScope] = useAtom(finderScopeAtom)
   const showLanguages = useSetAtom(showLanguagesAtom)
   const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
-  const setVisibleIds = useSetAtom(visibleLanguageIdsAtom)
+  const hideLanguages = useSetAtom(hideLanguagesAtom)
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -249,8 +256,7 @@ export const ExploreLanguages = () => {
     showableIds.length > 0 && showableIds.every((id) => visibleIdSet.has(id))
   const toggleFilteredLanguages = () => {
     if (areAllFilteredSelected) {
-      const filteredIdSet = new Set(showableIds)
-      setVisibleIds(visibleIds.filter((id) => !filteredIdSet.has(id)))
+      hideLanguages(showableIds)
     } else showLanguages(showableIds)
   }
   const toggleExpanded = (key: string) =>
@@ -387,7 +393,7 @@ export const ExploreLanguages = () => {
             type="button"
             disabled={!filteredMappedLeaves.languageIds.length}
             onClick={() => showMappedLeaves(roots.map(({ id }) => id))}
-            title={`Show the deepest entries with polygons across all ${isBrowsingRoots ? 'roots' : 'matches'}, each with its own color. Uses current sources and period; replaces selections within these branches.`}
+            title={`Show the deepest entries with polygons across all ${isBrowsingRoots ? 'roots' : 'matches'}, each with its own color. Replaces entries within these branches from the same source/period context; keeps other comparisons.`}
           >
             Show mapped leaves ({filteredMappedLeaves.languageIds.length.toLocaleString()})
           </button>

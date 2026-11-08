@@ -1328,6 +1328,83 @@ h2 {
   cursor: default;
 }
 
+.pinned-map-entries {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.pinned-map-entries h4,
+.pinned-map-entries p {
+  margin: 0;
+}
+
+.map-entry-card {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid rgb(29 43 39 / 18%);
+  border-radius: 0.4rem;
+  background: #fffdf7;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.map-entry-card:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.map-entry-card small {
+  display: block;
+  color: var(--muted-ink);
+  font-size: 0.68rem;
+}
+
+.map-entry-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.map-entry-card__actions label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.map-entry-card__actions input {
+  width: 2rem;
+  height: 1.6rem;
+  padding: 0.1rem;
+}
+
+.map-entry-card button {
+  padding: 0.25rem;
+  border: 1px solid rgb(29 43 39 / 16%);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.map-entry-card button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.map-entry-card summary {
+  cursor: pointer;
+}
+
+.map-entry-card ul {
+  margin: 0.4rem 0;
+  padding-left: 1rem;
+}
+
 .language-swatch {
   display: inline-block;
   flex-shrink: 0;

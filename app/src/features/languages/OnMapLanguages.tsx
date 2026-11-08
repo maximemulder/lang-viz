@@ -1,48 +1,51 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useMemo, useRef, useState } from 'react'
-import { areaMode, areaStatus, isAreaAvailable } from '../../domain/aggregation'
 import { matchesLanguageQuery, normalizeLanguageQuery } from '../../domain/catalog'
+import { mapEntryDescription } from '../../domain/mapEntries'
 import {
-  areaModesAtom,
   atlasDataAtom,
   clearMapSelectionAtom,
-  geographyAvailabilityAtom,
-  languageColorsAtom,
+  mapEntriesAtom,
+  removeMapEntryAtom,
   selectedMapAreasAtom,
-  toggleVisibleLanguageAtom,
-  visibleLanguageIdsAtom,
 } from '../../state/atlasState'
 import { openLanguageDetailsAtom } from '../../state/languageControls'
 
 export const OnMapLanguages = () => {
   const data = useAtomValue(atlasDataAtom)
-  const ids = useAtomValue(visibleLanguageIdsAtom)
+  const entries = useAtomValue(mapEntriesAtom)
   const areas = useAtomValue(selectedMapAreasAtom)
-  const availability = useAtomValue(geographyAvailabilityAtom)
-  const modes = useAtomValue(areaModesAtom)
-  const colors = useAtomValue(languageColorsAtom)
-  const remove = useSetAtom(toggleVisibleLanguageAtom)
+  const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas])
+  const remove = useSetAtom(removeMapEntryAtom)
   const clear = useSetAtom(clearMapSelectionAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const [query, setQuery] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
-  const languages = useMemo(() => {
+  const rows = useMemo(() => {
     const normalized = normalizeLanguageQuery(query.trim())
-    return ids
-      .flatMap((id) => {
-        const language = data.languageById.get(id)
-        return language && matchesLanguageQuery(data.languageSearchIndex.get(id), normalized)
-          ? [language]
+    return entries
+      .flatMap((entry) => {
+        const language = data.languageById.get(entry.languageId)
+        const description = mapEntryDescription(entry, data)
+        return language &&
+          (matchesLanguageQuery(data.languageSearchIndex.get(language.id), normalized) ||
+            normalizeLanguageQuery(description).includes(normalized))
+          ? [{ entry, language, description }]
           : []
       })
-      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-  }, [ids, data, query])
+      .sort(
+        (a, b) =>
+          a.language.name.localeCompare(b.language.name) ||
+          a.description.localeCompare(b.description) ||
+          a.entry.id.localeCompare(b.entry.id),
+      )
+  }, [entries, data, query])
   const virtualizer = useVirtualizer({
-    count: languages.length,
+    count: rows.length,
     getScrollElement: () => listRef.current,
     estimateSize: () => 68,
-    getItemKey: (index) => languages[index]?.id ?? index,
+    getItemKey: (index) => rows[index]?.entry.id ?? index,
     overscan: 5,
   })
 
@@ -53,7 +56,7 @@ export const OnMapLanguages = () => {
         <input
           type="search"
           value={query}
-          placeholder="Find in your map selection…"
+          placeholder="Find a language, source or period…"
           onChange={(event) => {
             setQuery(event.currentTarget.value)
             virtualizer.scrollToOffset(0)
@@ -62,35 +65,35 @@ export const OnMapLanguages = () => {
       </label>
       <div className="finder-actions on-map-actions">
         <p aria-live="polite">
-          <strong>{ids.length.toLocaleString()}</strong> selected · {areas.length.toLocaleString()}{' '}
-          displayed
+          <strong>{entries.length.toLocaleString()}</strong> selected ·{' '}
+          {areas.length.toLocaleString()} displayed
           <small>
-            {ids.length - areas.length > 0
-              ? `${(ids.length - areas.length).toLocaleString()} unavailable with the current geography settings`
-              : 'Independent of your Explore search and map position'}
-            {query.trim() && ` · ${languages.length.toLocaleString()} matches`}
+            {entries.length - areas.length > 0
+              ? `${(entries.length - areas.length).toLocaleString()} missing pinned geometry in this catalog`
+              : 'Sources and periods are pinned independently of Explore'}
+            {query.trim() && ` · ${rows.length.toLocaleString()} matches`}
           </small>
         </p>
         <button
           type="button"
           className="button-secondary"
-          disabled={!ids.length}
+          disabled={!entries.length}
           onClick={() => clear()}
         >
           Clear map
         </button>
       </div>
       <div ref={listRef} className="on-map-list">
-        {!languages.length && (
+        {!rows.length && (
           <div className="finder-empty">
             <p>
-              {ids.length
+              {entries.length
                 ? 'No selected entries match this search.'
                 : 'Your map selection is empty.'}
             </p>
             <p>
-              {ids.length
-                ? 'Try another name or identifier.'
+              {entries.length
+                ? 'Try another name, identifier, source or period.'
                 : 'Use Explore to add languages, families, or mapped leaves.'}
             </p>
           </div>
@@ -101,43 +104,42 @@ export const OnMapLanguages = () => {
           style={{ height: virtualizer.getTotalSize() }}
         >
           {virtualizer.getVirtualItems().map((item) => {
-            const language = languages[item.index]
-            if (!language) return null
-            const available = availability.get(language.id)
-            const mode = available ? areaMode(available, modes[language.id]) : 'own'
-            const displayed = isAreaAvailable(available, mode)
-            const status = available ? areaStatus(available, mode) : 'No areas'
+            const row = rows[item.index]
+            if (!row) return null
+            const { entry, language, description } = row
+            const area = areaById.get(entry.id)
+            const displayed = Boolean(area)
             return (
               <li
-                key={language.id}
+                key={entry.id}
                 aria-posinset={item.index + 1}
-                aria-setsize={languages.length}
+                aria-setsize={rows.length}
                 className="on-map-row"
                 data-language-id={language.id}
+                data-entry-id={entry.id}
                 data-displayed={displayed}
                 style={{ transform: `translateY(${item.start}px)` }}
               >
                 <span
                   className="language-swatch"
-                  style={{ backgroundColor: colors.get(language.id) }}
+                  style={{ backgroundColor: area?.color ?? '#777777' }}
                   aria-hidden="true"
                 />
                 <button
                   type="button"
                   className="on-map-row__identity"
                   aria-label={`Details for ${language.name}`}
-                  onClick={() => openDetails(language.id)}
+                  title={`${language.name} · ${description}`}
+                  onClick={() => openDetails({ languageId: language.id, entryId: entry.id })}
                 >
                   <strong>{language.name}</strong>
-                  <small>
-                    {language.level} · {language.id}
-                  </small>
+                  <small>{description}</small>
                   <small className={displayed ? '' : 'on-map-row__unavailable'}>
                     {displayed
-                      ? status
-                      : status === 'Filtered out'
-                        ? 'Unavailable with current sources / period'
-                        : `${status} for this representation`}
+                      ? entry.mode === 'own'
+                        ? 'Own area'
+                        : `Descendant areas · ${entry.variantIds.length} contributors · ${entry.uncoveredBranchIds.length} uncovered branches`
+                      : 'Pinned geometry unavailable in this catalog'}
                   </small>
                 </button>
                 <button
@@ -145,7 +147,7 @@ export const OnMapLanguages = () => {
                   className="on-map-row__remove"
                   aria-label={`Remove ${language.name} from map`}
                   title="Remove from map"
-                  onClick={() => remove(language.id)}
+                  onClick={() => remove(entry.id)}
                 >
                   ×
                 </button>

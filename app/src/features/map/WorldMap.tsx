@@ -13,16 +13,15 @@ import {
   mapAreaSelectionKey,
   mapAreaSourceColors,
 } from '../../domain/aggregation'
-import { temporalView } from '../../domain/temporal'
 import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
   languageOpacityAtom,
+  mapEntriesAtom,
   overlapModeAtom,
   selectedMapAreasAtom,
   temporalViewAtom,
   viewportLanguageIdsAtom,
-  visibleLanguageIdsAtom,
 } from '../../state/atlasState'
 import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { visibleVariantIds } from './inspection'
@@ -171,15 +170,14 @@ const LanguageLayers = memo(({ inspectedVariantIds }: LanguageLayersProps) => {
 })
 
 const MapHint = () => {
-  const visibleLanguageIds = useAtomValue(visibleLanguageIdsAtom)
-  const temporalSelection = useAtomValue(temporalViewAtom)
+  const entries = useAtomValue(mapEntriesAtom)
   const visibleInPeriodCount = useAtomValue(selectedMapAreasAtom).length
 
   return (
     <div className={`map-hint${visibleInPeriodCount ? ' map-hint--active' : ''}`} role="status">
       <span className="map-hint__marker" aria-hidden="true" />
-      {visibleLanguageIds.length
-        ? `${visibleInPeriodCount.toLocaleString()} of ${visibleLanguageIds.length.toLocaleString()} shown · ${temporalView(temporalSelection).shortLabel}`
+      {entries.length
+        ? `${visibleInPeriodCount.toLocaleString()} of ${entries.length.toLocaleString()} map entries shown`
         : 'Choose languages from the finder'}
     </div>
   )
@@ -189,13 +187,9 @@ export const WorldMap = () => {
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('terrain')
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
   const [inspection, setInspection] = useState<MapInspection | null>(null)
-  const temporalSelection = useAtomValue(temporalViewAtom)
-  const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const inspectionSelectionKey = mapAreaSelectionKey(useAtomValue(selectedMapAreasAtom))
   const inspectionRef = useRef<MapInspection | null>(null)
   const inspectionFilterRef = useRef({
-    datasetSelection,
-    temporalSelection,
     inspectionSelectionKey,
   })
   const pendingHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
@@ -209,12 +203,8 @@ export const WorldMap = () => {
 
   useEffect(() => {
     const previousFilters = inspectionFilterRef.current
-    if (
-      previousFilters.datasetSelection !== datasetSelection ||
-      previousFilters.temporalSelection !== temporalSelection ||
-      previousFilters.inspectionSelectionKey !== inspectionSelectionKey
-    ) {
-      inspectionFilterRef.current = { datasetSelection, temporalSelection, inspectionSelectionKey }
+    if (previousFilters.inspectionSelectionKey !== inspectionSelectionKey) {
+      inspectionFilterRef.current = { inspectionSelectionKey }
       updateInspection(null)
     }
   })

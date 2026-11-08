@@ -1,6 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai'
 import { type KeyboardEvent, useRef } from 'react'
-import { selectedMapAreasAtom, visibleLanguageIdsAtom } from '../../state/atlasState'
+import { mapEntriesAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { type LanguagePanelView, languagePanelAtom } from '../../state/languageControls'
 import { ExploreLanguages } from './ExploreLanguages'
 import { GeographyFilters } from './GeographyFilters'
@@ -12,7 +12,7 @@ const LABELS = { explore: 'Explore', map: 'On map', details: 'Details' }
 
 export const LanguageFinder = () => {
   const [panel, setPanel] = useAtom(languagePanelAtom)
-  const selected = useAtomValue(visibleLanguageIdsAtom)
+  const selected = useAtomValue(mapEntriesAtom)
   const displayed = useAtomValue(selectedMapAreasAtom)
   const tabRefs = useRef<Partial<Record<LanguagePanelView, HTMLButtonElement | null>>>({})
   const selectView = (view: LanguagePanelView) => setPanel({ ...panel, view })

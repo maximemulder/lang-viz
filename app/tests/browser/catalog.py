@@ -8,6 +8,7 @@ from contextlib import ExitStack
 from types import SimpleNamespace
 
 from run import APP, Browser, check_state, free_port, request, stop, stop_group, wait_for
+from comparisons import check_comparisons
 
 
 def view(browser, name):
@@ -430,9 +431,8 @@ def main():
             grouped = ready_after(before, 1)
             assert not grouped["errors"], grouped["errors"]
             assert grouped["reports"][-1]["sharedPatterns"] == 0
-            assert inspect_at_center()["variantIds"] == ["descendants:abkh1242"], (
-                inspect_at_center()
-            )
+            aggregate_id = inspect_at_center()["variantIds"][0]
+            assert aggregate_id.startswith("descendants:abkh1242:"), inspect_at_center()
             x, y = inspect_at_center()["point"]
             browser.call(
                 "POST",
@@ -481,7 +481,7 @@ def main():
             assert not browser.js(
                 "return !!document.querySelector('.language-inspector--pinned')"
             ), "Selection changes close stale inspection"
-            expected = {"descendants:abkh1242", "asher2007world:contemporary:abkh1244"}
+            expected = {aggregate_id, "asher2007world:contemporary:abkh1244"}
             assert set(inspect_at_center()["variantIds"]) == expected, inspect_at_center()
             assert grouped_child["reports"][-1]["sharedPatterns"] > 0
             results["aggregationWithChild"] = inspect_at_center()
@@ -599,7 +599,12 @@ def main():
             ready_after(before, 2)
 
             search(browser, "abkh1242", "abkh1242")
+            before = len(browser.snapshot()["reports"])
             choose_mode("own")
+            assert set(inspect_at_center()["variantIds"]) == expected
+            assert len(browser.snapshot()["reports"]) == before, "Draft changes preserve pinned geometry"
+            browser.js("document.querySelector('.language-row input').click()")
+            ready_after(before, 3)
             wait_for(
                 lambda: "asher2007world:contemporary:abkh1242" in inspect_at_center()["variantIds"],
                 20,
@@ -614,18 +619,19 @@ def main():
             before = len(browser.snapshot()["reports"])
             browser.js("document.querySelector('.language-row input').click()")
             ready_after(before, 1)
-            assert inspect_at_center()["variantIds"] == ["descendants:abkh1243"], (
-                inspect_at_center()
-            )
+            assert len(inspect_at_center()["variantIds"]) == 1
+            assert inspect_at_center()["variantIds"][0].startswith("descendants:abkh1243:")
             results["previouslyUnmappedAggregate"] = row
 
-            # Filters hide the selected representation without unchecking it; restoration recovers it.
+            # Filters affect the draft, while pinned geometry remains displayed without recomputation.
+            pinned_before = browser.snapshot()
             browser.js("""
                 const select = document.querySelector('.finder-filters__period select');
                 select.value = 'year-1750'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            wait_for(lambda: browser.snapshot()["selectedCount"] == 0, 10, "filtered aggregation")
-            assert browser.js("return document.querySelector('.language-row input').checked")
+            wait_for(lambda: browser.js("return document.querySelector('.language-row input').disabled"), 10, "unavailable draft")
+            assert browser.snapshot()["selectedCount"] == 1
+            assert not browser.js("return document.querySelector('.language-row input').checked")
             assert (
                 browser.js("return document.querySelector('.language-row').dataset.areaStatus")
                 == "No area"
@@ -635,7 +641,7 @@ def main():
                 return row.classList.contains('language-row--unavailable') &&
                     row.querySelector('.language-row__area-status').title.includes('sources / period');
             """), "Period-constrained results explain why they have no area"
-            assert "0 of 1 shown" in browser.js(
+            assert "1 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             before = len(browser.snapshot()["reports"])
@@ -643,7 +649,9 @@ def main():
                 const select = document.querySelector('.finder-filters__period select');
                 select.value = 'contemporary'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            ready_after(before, 1)
+            wait_for(lambda: browser.js("return document.querySelector('.language-row input').checked"), 10, "restore pinned draft")
+            assert len(browser.snapshot()["reports"]) == before
+            assert browser.snapshot()["coverageUrls"] == pinned_before["coverageUrls"]
             browser.js("""
                 const select = document.querySelector('.finder-scope select');
                 select.value = 'viewport'; select.dispatchEvent(new Event('change', {bubbles:true}));
@@ -716,13 +724,13 @@ def main():
             """)
             before = len(browser.snapshot()["reports"])
             browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
-            leaves_state = ready_after(before, 10)
+            leaves_state = ready_after(before, 12)
             assert not leaves_state["errors"], leaves_state["errors"]
             view(browser, "explore")
             wait_for(lambda: browser.js("return !!document.querySelector('.language-row input')"), 10, "return to family search")
             assert not browser.js("return document.querySelector('.language-row input').checked")
             assert browser.js("return document.querySelectorAll('.language-row').length") == 1
-            assert "10 of 11 shown" in browser.js(
+            assert "12 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             browser.screenshot(output / "dlac-family-leaves.png")
@@ -733,7 +741,7 @@ def main():
             # Repeating the action is idempotent; filters update the count and disable empty actions.
             open_details(browser)
             browser.js("document.querySelector('.finder-detail__mapped-leaves button').click()")
-            assert "10 of 11 shown" in browser.js(
+            assert "12 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             browser.js("""
@@ -749,7 +757,7 @@ def main():
                 10,
                 "unavailable mapped leaves",
             )
-            assert "0 of 11 shown" in browser.js(
+            assert "12 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             browser.js("""
@@ -757,7 +765,7 @@ def main():
                 select.value = 'contemporary';
                 select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            wait_for(lambda: browser.snapshot()["selectedCount"] == 10, 10, "mapped leaf recovery")
+            assert browser.snapshot()["selectedCount"] == 12
             assert browser.js("return window.overlapTest.colorState(['mand1415','jiny1235','yuec1235']).colors") == family_colors["colors"]
             leaf_ids = [
                 "ganc1239", "hakk1236", "jiny1235", "huiz1242", "wuch1236",
@@ -769,13 +777,13 @@ def main():
                     const row = document.querySelector('.language-row');
                     return row.querySelector('input').checked && row.dataset.areaMode === 'own';
                 """), code
-            # Replace all selections in the subtree, including previously selected unavailable nodes.
-            for code, checked in [("beij1235", False), ("sino1245", False), ("abkh1244", True)]:
+            # Explore checkboxes describe the DLAC draft; Asher entries stay pinned separately.
+            for code, checked in [("beij1235", False), ("sino1245", False), ("abkh1244", False)]:
                 search(browser, code, code)
                 assert browser.js(
                     "return document.querySelector('.language-row input').checked"
                 ) == checked, code
-            results["dlacFamilyLeaves"] = {"ids": leaf_ids, "selectedCount": 10}
+            results["dlacFamilyLeaves"] = {"ids": leaf_ids, "selectedCount": 12}
 
             # Bulk leaves follow the current query across multiple, overlapping branches.
             browser.js(
@@ -820,12 +828,12 @@ def main():
             assert browser.js("return document.querySelectorAll('.finder-detail__mapped-leaves').length") == 0
             before = len(browser.snapshot()["reports"])
             browser.js(f"({bulk_button}).click()")
-            ready_after(before, 8)
-            assert "8 of 9 shown" in browser.js(
+            ready_after(before, 10)
+            assert "10 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             browser.js(f"({bulk_button}).click()")
-            assert "8 of 9 shown" in browser.js(
+            assert "10 shown" in browser.js(
                 "return document.querySelector('.selection-count').textContent"
             )
             bulk_leaf_ids = [code for code in leaf_ids if code not in {"ping1245", "minn1248"}]
@@ -835,7 +843,7 @@ def main():
                     const row = document.querySelector('.language-row');
                     return row.querySelector('input').checked && row.dataset.areaMode === 'own';
                 """), code
-            for code, checked in [("beij1235", False), ("abkh1244", True), ("ping1245", False)]:
+            for code, checked in [("beij1235", False), ("abkh1244", False), ("ping1245", False)]:
                 search(browser, code, code)
                 assert browser.js(
                     "return document.querySelector('.language-row input').checked"
@@ -859,7 +867,7 @@ def main():
                 select.value = 'contemporary';
                 select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            results["queryMappedLeaves"] = {"ids": bulk_leaf_ids, "selectedCount": 8}
+            results["queryMappedLeaves"] = {"ids": bulk_leaf_ids, "selectedCount": 10}
 
             # The three views share selection and details, while keeping independent searches.
             browser.settled(60)
@@ -871,11 +879,11 @@ def main():
             """)
             reports_before_views = len(browser.snapshot()["reports"])
             view(browser, "map")
-            assert browser.js("return document.querySelectorAll('.on-map-row').length") == 9
+            assert browser.js("return document.querySelectorAll('.on-map-row').length") == 10
             assert browser.js("""
                 const row = document.querySelector('.on-map-row[data-language-id="abkh1244"]');
-                return row.dataset.displayed === 'false' && row.textContent.includes('Unavailable');
-            """), "Selections unavailable from DLAC remain manageable"
+                return row.dataset.displayed === 'true' && row.textContent.includes('Asher');
+            """), "Pinned Asher selections survive browsing DLAC"
             browser.screenshot(output / "on-map.png")
             browser.js("""
                 const input = document.querySelector('#language-panel-map input');
@@ -888,7 +896,7 @@ def main():
             assert browser.js("""
                 return document.querySelector('.finder-detail').textContent.includes('yuec1235') &&
                     document.querySelector('.language-back').textContent.includes('On map') &&
-                    document.activeElement === document.querySelector('.finder-detail h3') &&
+                    document.activeElement.classList.contains('map-entry-card') &&
                     [...document.querySelectorAll('.language-panel')].filter(panel => !panel.hidden).length === 1 &&
                     document.querySelector('#language-panel-explore input').getClientRects().length === 0;
             """), "Details replaces the lists and receives focus"
@@ -912,23 +920,25 @@ def main():
                 const select = document.querySelector('.finder-filters__period select');
                 select.value = 'year-1750'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            wait_for(lambda: browser.js("return document.querySelector('.on-map-row').dataset.displayed === 'false'"), 10, "unavailable selected entry")
-            assert browser.snapshot()["selectedCount"] == 0
-            assert "9 selected" in browser.js("return document.querySelector('.on-map-actions').textContent")
-            browser.screenshot(output / "on-map-unavailable.png")
+            assert browser.js("return document.querySelector('.on-map-row').dataset.displayed === 'true'")
+            assert browser.snapshot()["selectedCount"] == 10
+            assert "10 selected" in browser.js("return document.querySelector('.on-map-actions').textContent")
+            browser.screenshot(output / "on-map-pinned.png")
             browser.js("""
                 const select = document.querySelector('.finder-filters__period select');
                 select.value = 'contemporary'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
-            wait_for(lambda: browser.snapshot()["selectedCount"] == 8, 10, "selection recovery")
+            assert browser.snapshot()["selectedCount"] == 10
             browser.js("document.querySelector('.on-map-row__remove').click()")
-            wait_for(lambda: browser.snapshot()["selectedCount"] == 7, 10, "remove selected language")
+            wait_for(lambda: browser.snapshot()["selectedCount"] == 9, 10, "remove selected entry")
             assert browser.js("return !!document.querySelector('#language-panel-map .finder-empty')")
             browser.js("document.querySelector('.on-map-actions button').click()")
             wait_for(lambda: browser.snapshot()["selectedCount"] == 0, 10, "clear all selections through filtered list")
             assert browser.js("return document.querySelector('.on-map-actions button').disabled")
             assert browser.js("return window.overlapTest.colorState([]).mappedLeafRoots") == []
             results["multiViewControls"] = "passed"
+
+            results["comparisons"] = check_comparisons(browser, output, search, view, open_details)
 
             # Details uses the full available height on narrow screens.
 

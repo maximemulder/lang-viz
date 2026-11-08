@@ -10,16 +10,17 @@ import {
   geometryOverridesAtom,
   languageColorsAtom,
   languageHierarchyAtom,
+  selectedDraftLanguageIdsAtom,
   setGeometryOverrideAtom,
   showMappedLeavesAtom,
   toggleVisibleLanguageAtom,
-  visibleLanguageIdsAtom,
 } from '../../state/atlasState'
 import {
   languagePanelAtom,
   openLanguageDetailsAtom,
   revealLanguageAtom,
 } from '../../state/languageControls'
+import { PinnedMapEntries } from './PinnedMapEntries'
 
 export const LanguageDetails = () => {
   const panel = useAtomValue(languagePanelAtom)
@@ -29,7 +30,7 @@ export const LanguageDetails = () => {
   const [modes, setModes] = useAtom(areaModesAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
   const colors = useAtomValue(languageColorsAtom)
-  const visibleIds = useAtomValue(visibleLanguageIdsAtom)
+  const visibleIds = useAtomValue(selectedDraftLanguageIdsAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
   const showMappedLeaves = useSetAtom(showMappedLeavesAtom)
@@ -51,33 +52,12 @@ export const LanguageDetails = () => {
     detailVariants.find((variant) => variant.id === overrides[detailId ?? '']) ?? detailVariants[0]
   const selected = detailId !== null && visibleIds.includes(detailId)
   useEffect(() => {
-    if (detailId) headingRef.current?.focus({ preventScroll: true })
-  }, [detailId])
+    if (detailId && !panel.detailEntryId) headingRef.current?.focus({ preventScroll: true })
+  }, [detailId, panel.detailEntryId])
   if (!detail)
     return <p className="finder-empty">Choose an entry in Explore or On map to see its details.</p>
   return (
     <section className="finder-detail" aria-label="Entry details">
-      <div className="detail-selection">
-        <span
-          className="language-swatch"
-          style={{ backgroundColor: colors.get(detail.id) }}
-          aria-hidden="true"
-        />
-        <span>{selected ? 'Selected for the map' : 'Not selected for the map'}</span>
-        <button
-          type="button"
-          disabled={!selected && !isAreaAvailable(detailAvailability, modes[detail.id])}
-          onClick={() => toggleVisible(detail.id)}
-        >
-          {selected ? 'Remove from map' : 'Add to map'}
-        </button>
-      </div>
-      {selected && !isAreaAvailable(detailAvailability, modes[detail.id]) && (
-        <p>
-          This selection has no areas for its chosen representation with the current sources /
-          period.
-        </p>
-      )}
       <div className="finder-detail__heading">
         <h3 ref={headingRef} tabIndex={-1}>
           {detail.name}
@@ -95,6 +75,24 @@ export const LanguageDetails = () => {
           </button>
         ))}
       </nav>
+      <PinnedMapEntries languageId={detail.id} focusedEntryId={panel.detailEntryId} />
+      <h4>Representation to add</h4>
+      <p>Uses Geography to add above. Changing these choices leaves existing map entries intact.</p>
+      <div className="detail-selection">
+        <span
+          className="language-swatch"
+          style={{ backgroundColor: colors.get(detail.id) }}
+          aria-hidden="true"
+        />
+        <span>{selected ? 'This representation is on the map' : 'Add this representation'}</span>
+        <button
+          type="button"
+          disabled={!selected && !isAreaAvailable(detailAvailability, modes[detail.id])}
+          onClick={() => toggleVisible(detail.id)}
+        >
+          {selected ? 'Remove from map' : 'Add to map'}
+        </button>
+      </div>
       {mappedLeaves && (hierarchy.childrenById.get(detail.id)?.length ?? 0) > 0 && (
         <div className="finder-detail__mapped-leaves">
           <button
@@ -106,8 +104,8 @@ export const LanguageDetails = () => {
           </button>
           <p>
             Shows the deepest entries with polygons in this entire branch, each with its own color.
-            Uses current sources and period; branches without polygons are omitted. Replaces
-            selections within this branch.
+            Uses current sources and period; branches without polygons are omitted. Replaces entries
+            within this branch from the same source/period context. Other comparisons stay.
           </p>
         </div>
       )}

@@ -1,4 +1,5 @@
 import type { ColorConfiguration } from '../../../../domain/colors'
+import type { MapEntry } from '../../../../domain/mapEntries'
 
 type TileService = 'coverage' | 'fallback'
 
@@ -9,6 +10,7 @@ export interface OverlapTestApi {
     zoom: number
   }): void
   configureColors(config: ColorConfiguration): void
+  mapEntryState(): readonly (MapEntry & { color: string | undefined })[]
   colorState(ids: readonly string[]): {
     colors: Record<string, string | undefined>
     roots: Record<string, string | undefined>

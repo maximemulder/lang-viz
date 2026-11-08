@@ -115,30 +115,6 @@ export const areaStatus = (available: GeographyAvailability, mode: AreaMode) => 
   return available.hasAnyAreas ? 'Filtered out' : 'No areas'
 }
 
-export const resolveMapAreas = (
-  ids: readonly string[],
-  availability: ReadonlyMap<string, GeographyAvailability>,
-  modes: Readonly<Record<string, AreaMode>>,
-  colors: ReadonlyMap<string, string>,
-): readonly MapArea[] =>
-  ids.flatMap((languageId) => {
-    const available = availability.get(languageId)
-    if (!available) return []
-    const mode = areaMode(available, modes[languageId])
-    const variants = areaVariants(available, mode)
-    const first = variants[0]
-    if (!first) return []
-    return [
-      {
-        id: mode === 'own' ? first.id : `descendants:${languageId}`,
-        languageId,
-        mode,
-        color: colors.get(languageId) ?? '#777777',
-        variants,
-      },
-    ]
-  })
-
 /** One source polygon may belong to a selected aggregate and an independently selected child. */
 export const mapAreaMemberships = (areas: readonly MapArea[]) => {
   const memberships: Record<string, string[]> = {}

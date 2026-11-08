@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  type AreaMode,
   areaMode,
   areaStatus,
   buildGeographyAvailability,
@@ -12,7 +13,6 @@ import {
   mapAreaSourceColors,
   mappedLeavesForLanguage,
   mappedLeavesForLanguages,
-  resolveMapAreas as resolveAreas,
 } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
 import { buildLanguageSearchIndex, searchCatalog } from '../src/domain/catalog.ts'
@@ -25,6 +25,15 @@ import {
 } from '../src/domain/colors.ts'
 import { prepareExploreResults } from '../src/domain/exploration.ts'
 import { buildLanguageHierarchy, flattenLanguageHierarchy } from '../src/domain/hierarchy.ts'
+import {
+  addMapEntries,
+  draftRepresentationKey,
+  geographyContextKey,
+  mapEntryKey,
+  pinMapEntry,
+  replaceSubtreeMapEntries,
+  resolveMapEntries,
+} from '../src/domain/mapEntries.ts'
 
 const entry = (
   id: string,
@@ -112,12 +121,19 @@ const colors = resolveLanguageColors(
   buildSemanticPalette(hierarchy, buildColorTopology(hierarchy)),
 )
 const resolveMapAreas = (
-  ...args: [
-    Parameters<typeof resolveAreas>[0],
-    Parameters<typeof resolveAreas>[1],
-    Parameters<typeof resolveAreas>[2],
-  ]
-) => resolveAreas(...args, colors)
+  ids: readonly string[],
+  available: ReturnType<typeof buildGeographyAvailability>,
+  modes: Readonly<Record<string, AreaMode>>,
+  catalog: AtlasData = data,
+) =>
+  resolveMapEntries(
+    ids.flatMap((id) => {
+      const entry = pinMapEntry(id, available.get(id), modes[id], { sources: 'all', period: 'all' })
+      return entry ? [entry] : []
+    }),
+    catalog,
+    colors,
+  )
 const availability = (
   period: Parameters<typeof buildGeographyAvailability>[2] = 'all',
   sources: Parameters<typeof buildGeographyAvailability>[3] = 'all',
@@ -320,7 +336,7 @@ test('mapped leaves preserve contributor source overrides', () => {
   const leaves = mappedLeavesForLanguage('family', hierarchy, available)
   assert.deepEqual(leaves.languageIds, ['nested', 'other-dialect'])
   assert.equal(
-    resolveMapAreas(leaves.languageIds, available, { nested: 'own' })[0]?.id,
+    resolveMapAreas(leaves.languageIds, available, { nested: 'own' }, withAlternate)[0]?.id,
     alternate.id,
   )
 })
@@ -422,16 +438,17 @@ test('no geography anywhere is distinct from geography hidden by source or perio
 test('an aggregate is one selection and can coexist with an independently selected contributor', () => {
   const areas = resolveMapAreas(['family', 'language'], availability(), { family: 'descendants' })
   assert.equal(areas.length, 2)
-  assert.equal(areas[0]?.id, 'descendants:family')
+  const familyId = required(areas[0]).id
+  assert.match(familyId, /^descendants:family:/)
   assert.deepEqual(mapAreaMemberships(areas), {
-    'historic:language': ['descendants:family', 'historic:language'],
-    'modern:other-dialect': ['descendants:family'],
+    'historic:language': [familyId, 'historic:language'],
+    'modern:other-dialect': [familyId],
   })
-  assert.deepEqual(inspectedMapAreaIds(['historic:language', 'descendants:family'], areas), [
-    'descendants:family',
+  assert.deepEqual(inspectedMapAreaIds(['historic:language', familyId], areas), [
+    familyId,
     'historic:language',
   ])
-  assert.deepEqual(inspectedSourceVariantIds(['descendants:family'], areas), [
+  assert.deepEqual(inspectedSourceVariantIds([familyId], areas), [
     'historic:language',
     'modern:other-dialect',
   ])
@@ -477,4 +494,182 @@ test('switching representation and sources preserves the entry color', () => {
   assert.equal(filtered.color, combined.color)
   const unmapped = required(resolveMapAreas(['unmapped'], availability(), {})[0])
   assert.match(unmapped.color, /^#[a-f0-9]{6}$/)
+})
+
+test('one languoid has independently pinned sources and periods; identical additions deduplicate', () => {
+  const historic = required(
+    pinMapEntry('language', availability('time-of-contact').get('language'), 'own', {
+      sources: ['historic'],
+      period: 'time-of-contact',
+    }),
+  )
+  const modern = required(
+    pinMapEntry('language', availability('contemporary').get('language'), 'own', {
+      sources: ['modern'],
+      period: 'contemporary',
+    }),
+  )
+  const selected = addMapEntries([], [historic, modern, historic])
+  assert.equal(selected.length, 2)
+  assert.notEqual(historic.id, modern.id)
+  assert.equal(
+    draftRepresentationKey('language', availability('contemporary').get('language'), 'own'),
+    mapEntryKey(modern),
+  )
+  assert.deepEqual(
+    resolveMapEntries(selected, data, colors).map(({ variants }) => variants[0]?.id),
+    ['historic:language', 'modern:language'],
+  )
+  const styled = { ...modern, colorOverride: '#ff0000' }
+  assert.deepEqual(
+    addMapEntries([styled], [{ ...modern, context: { sources: 'all', period: 'all' } }]),
+    [styled],
+  )
+  assert.equal(
+    pinMapEntry('isolate', availability().get('isolate'), 'own', { sources: 'all', period: 'all' }),
+    null,
+  )
+  assert.equal(
+    pinMapEntry('language', availability('all', []).get('language'), 'own', {
+      sources: [],
+      period: 'all',
+    }),
+    null,
+  )
+})
+
+test('different sources for the same period remain distinct representations', () => {
+  const base = required(availability('contemporary').get('language'))
+  const variant = required(base.own)
+  const alternate = { ...variant, id: 'alternate:language', datasetId: 'alternate' }
+  const own = required(
+    pinMapEntry('language', base, 'own', { sources: ['modern'], period: 'contemporary' }),
+  )
+  const other = required(
+    pinMapEntry('language', { ...base, own: alternate, ownVariants: [alternate] }, 'own', {
+      sources: ['alternate'],
+      period: 'contemporary',
+    }),
+  )
+  const selected = addMapEntries([], [own, other])
+  assert.equal(selected.length, 2)
+  assert.notEqual(mapEntryKey(own), mapEntryKey(other))
+})
+
+test('aggregate comparisons pin contributor variants and gaps and carry independent overlap memberships', () => {
+  const all = required(
+    pinMapEntry('family', availability().get('family'), 'descendants', {
+      sources: 'all',
+      period: 'all',
+    }),
+  )
+  const modern = required(
+    pinMapEntry('family', availability('contemporary').get('family'), 'descendants', {
+      sources: ['modern'],
+      period: 'contemporary',
+    }),
+  )
+  assert.notEqual(all.id, modern.id)
+  assert.deepEqual(all.variantIds, ['historic:language', 'modern:other-dialect'])
+  assert.deepEqual(modern.variantIds, ['modern:language', 'modern:other-dialect'])
+  assert.deepEqual(all.uncoveredBranchIds, ['gap'])
+  const areas = resolveMapEntries([all, modern], data, colors)
+  assert.deepEqual(mapAreaMemberships(areas)['modern:other-dialect'], [all.id, modern.id])
+  assert.deepEqual(inspectedMapAreaIds(['modern:other-dialect'], areas), [all.id, modern.id].sort())
+  assert.notEqual(mapAreaSelectionKey(areas), mapAreaSelectionKey([required(areas[0])]))
+  const reordered = { ...all, id: 'another-id', variantIds: [...all.variantIds].reverse() }
+  assert.deepEqual(
+    addMapEntries([all], [reordered]),
+    [all],
+    'Contributor ordering does not make a new representation',
+  )
+  availability('all', [], { language: 'modern:language' })
+  assert.deepEqual(
+    resolveMapEntries([all], data, colors)[0]?.variants.map(({ id }) => id),
+    all.variantIds,
+    'Later filter/override changes cannot alter pinned contributors',
+  )
+})
+
+test('mapped-leaf replacement preserves other comparison contexts and individual color overrides', () => {
+  const historicContext = { sources: ['historic'], period: 'time-of-contact' } as const
+  const modernContext = { sources: ['modern'], period: 'contemporary' } as const
+  const historic = required(
+    pinMapEntry(
+      'family',
+      availability('time-of-contact').get('family'),
+      'descendants',
+      historicContext,
+    ),
+  )
+  const modern = required(
+    pinMapEntry('family', availability('contemporary').get('family'), 'descendants', modernContext),
+  )
+  const unrelated = required(
+    pinMapEntry('language', availability().get('language'), 'own', {
+      sources: 'all',
+      period: 'all',
+    }),
+  )
+  const leaves = mappedLeavesForLanguage('family', hierarchy, availability('contemporary'))
+  const candidates = leaves.languageIds.map((id) =>
+    required(pinMapEntry(id, availability('contemporary').get(id), 'own', modernContext, 'family')),
+  )
+  const manual = { ...required(candidates[0]), colorRootId: null, colorOverride: '#ff0000' }
+  const replaced = replaceSubtreeMapEntries(
+    [historic, modern, unrelated, manual],
+    candidates,
+    leaves.subtreeIds,
+    modernContext,
+  )
+  assert.ok(replaced.includes(historic) && replaced.includes(unrelated))
+  assert.ok(!replaced.some(({ id }) => id === modern.id))
+  assert.equal(replaced.find(({ id }) => id === manual.id)?.colorOverride, '#ff0000')
+  assert.equal(replaced.find(({ id }) => id === manual.id)?.colorRootId, 'family')
+  assert.deepEqual(
+    replaceSubtreeMapEntries(replaced, candidates, leaves.subtreeIds, modernContext),
+    replaced,
+  )
+  assert.equal(
+    geographyContextKey({ sources: ['a', 'b', 'a'], period: 'all' }),
+    geographyContextKey({ sources: ['b', 'a'], period: 'all' }),
+  )
+})
+
+test('per-entry colors override genealogy independently and never enter geometry cache identity', () => {
+  const historic = required(
+    pinMapEntry('language', availability('time-of-contact').get('language'), 'own', {
+      sources: 'all',
+      period: 'all',
+    }),
+  )
+  const modern = required(
+    pinMapEntry('language', availability('contemporary').get('language'), 'own', {
+      sources: 'all',
+      period: 'all',
+    }),
+  )
+  const initial = resolveMapEntries([historic, modern], data, colors)
+  const styled = resolveMapEntries(
+    [{ ...historic, colorOverride: '#ff0000' }, modern],
+    data,
+    new Map([['language', '#0000ff']]),
+  )
+  assert.deepEqual(
+    styled.map(({ color }) => color),
+    ['#ff0000', '#0000ff'],
+  )
+  assert.equal(mapAreaSelectionKey(initial), mapAreaSelectionKey(styled))
+})
+
+test('missing pinned geometry hides a complete entry rather than displaying a partial aggregate', () => {
+  const entry = required(
+    pinMapEntry('family', availability().get('family'), 'descendants', {
+      sources: 'all',
+      period: 'all',
+    }),
+  )
+  const missing = { ...data, variantById: new Map(data.variantById) }
+  missing.variantById.delete(required(entry.variantIds[0]))
+  assert.deepEqual(resolveMapEntries([entry], missing, colors), [])
 })

@@ -137,7 +137,7 @@ export const GeographyFilters = () => {
   return (
     <details className="finder-options">
       <summary>
-        Geography{' '}
+        Geography to add{' '}
         <span>
           {summary} · {temporalView(period).shortLabel}
         </span>
@@ -167,7 +167,8 @@ export const GeographyFilters = () => {
         />
       </div>
       <p className="temporal-note">
-        Applies to the map and available areas in every view. {temporalView(period).description}
+        Filters areas to browse and add. Existing map entries keep their sources and periods.{' '}
+        {temporalView(period).description}
       </p>
     </details>
   )

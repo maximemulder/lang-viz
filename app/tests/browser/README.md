@@ -247,5 +247,10 @@ boundaries are covered separately by the fully loaded synthetic seam probe.
 
 The catalog browser check also covers compact root browsing, family and unmapped
 branch expansion, ranked search, deep classification reveal, and keyboard
-navigation across virtualized rows. Screenshots are saved in
+navigation across virtualized rows. It includes `comparisons.py`: multiple German
+source/period snapshots, different datasets in the same period, independent colors
+and stripe pixels, source/period searching, pinned-card focus, single-entry removal,
+and context-scoped aggregate-to-leaf replacement. Geography changes must preserve
+existing entries and coverage URLs/request counts. The test-only `mapEntryState()`
+API reads pinned entries and their resolved colors. Screenshots are saved in
 `test-results/catalog/` alongside the report.
