@@ -12,6 +12,7 @@ import {
 } from '../../../state/atlasState'
 import { CoverageLayers } from './CoverageLayers'
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
+import { createPartsResolver } from './coverageParts'
 import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
 import { createMapResources } from './mapResources'
 import { tilesForBounds } from './tiles'
@@ -76,6 +77,10 @@ export const OverlapHatching = ({
       () => configRef.current.mode === 'hatching',
     )
     resourcesRef.current = resources
+    // Diagnostics can compare identical selections through the real delivery path.
+    const engine = diagnosticsEnabled
+      ? new URLSearchParams(location.search).get('overlap-engine')
+      : null
     const controller = createOverlapController({
       worker,
       resources,
@@ -83,7 +88,12 @@ export const OverlapHatching = ({
       sourceLayer: data.manifest.vectorLayer,
       onChange: setState,
       onCoverageReady,
-      ...(data.manifest.branchCoverage ? { precomputed: data.manifest.branchCoverage } : {}),
+      ...(engine !== 'live' && engine !== 'parts' && data.manifest.branchCoverage
+        ? { precomputed: data.manifest.branchCoverage }
+        : {}),
+      ...(engine !== 'live' && data.manifest.coverageParts
+        ? { parts: createPartsResolver(data.manifest.coverageParts, data.variants) }
+        : {}),
       ...(diagnosticsEnabled ? { diagnostics: overlapDiagnostics } : {}),
     })
     controllerRef.current = controller

@@ -2,6 +2,7 @@ import type { VectorTileFeature, VectorTileLayer } from '@mapbox/vector-tile'
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { PbfReader } from 'pbf'
 import type { PMTiles } from 'pmtiles'
+import { CoverageParts } from './coverageParts.ts'
 import {
   type CoverageInput,
   type CoverageRegion,
@@ -121,9 +122,11 @@ export class OverlapComputer {
   >()
   private cachedBytes = 0
   private cachedResultVertices = 0
+  private readonly parts = new CoverageParts()
 
   stats() {
     return {
+      ...this.parts.stats(),
       decodedEntries: this.tiles.size,
       decodedBytes: this.cachedBytes,
       partitionEntries: this.results.size,
@@ -174,6 +177,16 @@ export class OverlapComputer {
   ): AsyncGenerator<CoverageTile> {
     const selected = new Set(request.variantIds)
     const prepared = await prepareBranchCoverage(request)
+    const partsSelectionKey = request.parts
+      ? JSON.stringify([
+          'parts',
+          request.archiveUrl,
+          request.parts,
+          request.variantIds,
+          request.variantGroups,
+          request.refinements,
+        ])
+      : null
     let outputVertices = 0
     for (const tile of request.tiles) {
       if (!isCurrent()) return
@@ -203,6 +216,35 @@ export class OverlapComputer {
           yield { tile, extent: 8192, ...result }
           continue
         }
+      }
+      const partsKey = `${partsSelectionKey}:${tile.z}/${tile.x}/${tile.y}`
+      let composed = partsSelectionKey ? this.results.get(partsKey) : undefined
+      if (composed) {
+        this.results.delete(partsKey)
+        this.results.set(partsKey, composed)
+        if (metrics) {
+          metrics.partitionCacheHits++
+          metrics.partsTiles = (metrics.partsTiles ?? 0) + 1
+        }
+      } else if (request.parts) {
+        const result = await this.parts.resolve(request, tile, metrics, signal)
+        if (!isCurrent()) return
+        if (result) {
+          composed = result
+          this.cacheResult(partsKey, result)
+        }
+      }
+      if (composed) {
+        outputVertices += composed.vertices
+        if (!this.offline && outputVertices > MAX_OUTPUT_VERTICES)
+          throw new OverlapBudgetError('output-vertices')
+        if (metrics) {
+          metrics.completedTiles++
+          metrics.outputVertices += composed.vertices
+        }
+        yield { tile, extent: 8192, ...composed }
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        continue
       }
       const key = JSON.stringify([request.archiveUrl, request.sourceLayer, tile.z, tile.x, tile.y])
       let cached = this.tiles.get(key)

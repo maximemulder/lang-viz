@@ -10,6 +10,7 @@ npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
 npm run test:coverage-browser
 npm run test:branch-browser
+npm run test:parts-browser
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
@@ -59,6 +60,28 @@ parent restoration after removal, both projections and rendering modes, and a
 complete Asher contemporary world view. Run `npm run precompute:branches` first:
 the world check requires prepared tiles and asserts zero live partition time.
 Screenshots and measured request reports are written to `test-results/branches/`.
+
+`test:parts-browser` compares live overlay with reusable same-dataset/period
+parts in the production app. Run `npm run precompute:parts` first. Three runs
+exercise complete regional views, a partial Sinitic branch, a descendant aggregate,
+Halh/Dariganga refinement and restoration, and whole-world selection/removal in
+both projections and rendering modes. Displayed memberships are compared at
+fixed geographic probes. Parts requests must report zero GEOS partition and
+initialization time; selection changes must reuse the parts metadata cache.
+Single-language selections retain their existing native-fill shortcut. Live
+budget errors are recorded explicitly, rather than counted as successful coverage.
+Reports and screenshots go to `test-results/coverage-parts/browser.json`.
+
+`npm run benchmark:parts` separately measures engine work and MVT encoding against
+the local archive, with production geometry budgets and no browser/GPU. Each case
+uses a fresh result cache, then two repeats; GEOS initialization is lazy and shared
+within that Node process. Filesystem loading replaces HTTP only in this runner.
+Results go to `test-results/coverage-parts/engine.json`. Browser comparisons use
+fresh pages per engine/run (HTTP/OS caches may be warm) and include source
+publication and first rendered coverage. Diagnostic URLs accept
+`overlap-engine=live` or `overlap-engine=parts`; ordinary URLs prefer exact prepared
+branches, then reusable parts, then live overlay. These overrides are active only
+with `overlap-test`.
 
 Each invocation builds the production app, starts a local Vite preview and
 geckodriver on available ports, opens a temporary Firefox profile, and cleans up

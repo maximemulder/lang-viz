@@ -2,8 +2,8 @@
 
 `OverlapHatching` receives the resolved geometry variants already selected by
 `WorldMap`. Geometry definition, source/period selection, and stripe rendering
-remain separate. Complete single-dataset branch views can use optional offline
-coverage at low zoom; other selections are computed live.
+remain separate. Single-dataset/period selections can use optional offline
+coverage at low zoom; unsupported selections are computed live.
 
 `OverlapHatching` owns the worker/controller lifecycle; `CoverageLayers` renders
 the solid, stripe, blended, and fallback layers. `precomputed.ts` matches prepared
@@ -29,11 +29,43 @@ output. Tiles are written atomically and completed files can be resumed. The
 manifest is updated only after all profiles complete; normal atlas regeneration
 removes that optional manifest field until preparation is rerun.
 
-The browser uses prepared tiles only when the exact selected variants and
+The browser uses prepared branch tiles only when the exact selected variants and
 refinements match; aggregate aliases, mixed-source selections and different
 policies cannot reuse them. Missing optional files fall back to bounded live
 computation. Prepared results use the existing cache, output, pattern, publication,
-and cancellation limits. Higher zooms and arbitrary branches remain live.
+and cancellation limits. Higher zooms remain live.
+
+`npm run precompute:parts` creates a separate selection-independent partition for
+each dataset/period at zooms 0–3. It uses the same simplified source archive, with
+no refinement policy: every face retains all original memberships. The assets
+are versioned by format and archive hash, resumable, and published atomically in
+`manifest.coverageParts` after all requested profiles complete. The generator
+accepts repeated `--dataset` options and `--max-zoom` (0–8); a filtered run publishes
+only its requested profiles. Generation never combines datasets or periods.
+
+`coverageParts.ts` resolves a profile from actual variant metadata and indexes
+its MVT memberships. Selection changes filter original contributors, map them to
+selected entries/aggregate aliases, deduplicate, then apply the current refinement
+relation. Hidden ancestors therefore reappear when a child is removed. The
+selection-independent cache retains at most 48 tiles/16 MiB of encoded payload;
+metadata adds JS object overhead. Decoded selected coordinates use the existing
+result/output budgets. Diagnostics expose `partsTiles`, `partsCacheHits`,
+`membershipMs`, `partsEntries`, and `partsBytes`.
+
+`joinParts.ts` cancels identical opposite edges between selected pieces with the
+same membership and removes collinear boundary vertices. It traces shells/holes
+without general geometric overlay or new coordinates. Point contacts retain
+separate islands. Unmatched subdivisions may remain separate; ambiguous input
+keeps its original pieces. This reduces internal boundaries and output size while
+preserving the existing precision and resource policy.
+
+Exact full branch tiles remain the first choice. Reusable parts handle partial
+branches, independently selected entries and aggregates from one dataset/period.
+Mixed selections, higher zooms and missing/malformed optional assets fall back
+live. Existing source outlines, fallback clipping, inspection, render modes,
+cancellation and output/pattern/publication limits still apply. Prepared parts
+remove partition overlay work; they do not remove fallback clipping, MVT encoding,
+stripe preparation or MapLibre source preparation.
 
 Both stripe and blend modes consume resolved coverage. Blending composites each
 face's ordered member colors once and renders a single layer per buffer, avoiding

@@ -41,7 +41,7 @@ def search(browser, query, glottocode):
     )
 
 
-def select_branches(browser, source, center, zoom=4.5):
+def select_branches(browser, source, center, zoom=4.5, *, settle=True):
     browser.js(
         "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:arguments[1]})",
         center, zoom,
@@ -75,4 +75,4 @@ def select_branches(browser, source, center, zoom=4.5):
         lambda: browser.js(f"return !({button}).disabled"), 10, "mapped-branch action"
     )
     browser.js(f"({button}).click()")
-    return browser.settled(100)
+    return browser.settled(100) if settle else None

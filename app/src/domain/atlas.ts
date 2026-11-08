@@ -81,6 +81,15 @@ export interface AtlasManifest {
     readonly maxZoom: number
     readonly signatures: readonly string[]
   }
+  readonly coverageParts?: {
+    readonly directory: string
+    readonly maxZoom: number
+    readonly profiles: readonly {
+      readonly id: string
+      readonly datasetId: GeographyDatasetId
+      readonly viewId: TemporalViewId
+    }[]
+  }
 }
 
 export interface AtlasData {

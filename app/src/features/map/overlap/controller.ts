@@ -60,6 +60,7 @@ export const createOverlapController = (options: {
   onChange(state: HatchingState): void
   onCoverageReady(key: string | null): void
   precomputed?: OverlapRequest['precomputed']
+  parts?: (variantIds: readonly string[]) => OverlapRequest['parts']
   diagnostics?: typeof overlapDiagnostics
 }) => {
   const { worker, resources, diagnostics } = options
@@ -272,6 +273,7 @@ export const createOverlapController = (options: {
         PUBLICATION_TIMEOUT_MS,
       )
       emit()
+      const parts = options.parts?.(variantIds)
       worker.postMessage({
         requestId: request.id,
         archiveUrl: options.archiveUrl,
@@ -280,6 +282,7 @@ export const createOverlapController = (options: {
         ...(selection.variantGroups ? { variantGroups: selection.variantGroups } : {}),
         ...(selection.refinements ? { refinements: selection.refinements } : {}),
         ...(options.precomputed ? { precomputed: options.precomputed } : {}),
+        ...(parts ? { parts } : {}),
         tiles,
         knownTiles: [...results.keys()],
         ...(diagnostics ? { profile: true } : {}),

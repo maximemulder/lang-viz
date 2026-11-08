@@ -14,6 +14,7 @@ uv run python -m pipeline.atlas.build
 cd app
 npm install
 npm run precompute:branches
+npm run precompute:parts
 npm run dev
 ```
 
@@ -87,9 +88,19 @@ the next action; they do not change already pinned entries.
 `npm run precompute:branches` optionally prepares complete **single-dataset,
 single-period** views at zooms 0–3 from the existing simplified archive. It costs
 about two minutes on the development machine and resumes completed tiles. The browser
-uses these tiles only for an exact geometry/refinement match; partial branches,
-mixed sources, other comparisons, and higher zooms use the bounded live engine.
-Run it again after regenerating atlas data. Deployment runs it automatically.
+uses these tiles only for an exact geometry/refinement match.
+
+`npm run precompute:parts` additionally prepares reusable disjoint coverage at
+zooms 0–3 for each dataset/period. Each piece retains every original contributor,
+including ancestors hidden in a branch view. Partial branches, child removal,
+independent entries and descendant aggregates can therefore reuse the same
+geometry: runtime work selects memberships and joins matching shared edges,
+without general polygon unions, intersections or differences. Exact full branch
+views still prefer the more compact prepared branch tiles. Mixed datasets or
+periods, higher zooms and missing optional assets use the bounded live engine.
+Run both preparation commands again after regenerating atlas data; deployment
+runs them automatically. To limit generation, use e.g.
+`npm run precompute:parts -- --dataset asher2007world --max-zoom 3`.
 
 Map source/period/viewport controls are under "Map filters". Viewport scope limits
 starting results, including aggregates with contributing areas in view; expanded
@@ -155,7 +166,7 @@ underneath. Adjusting the slider does not recompute geometry.
 
 Overlap geometry is computed in a browser worker from the existing PMTiles
 archive, using its simplified vector tiles and a spatial index. Exact complete
-dataset views can use the optional prepared coverage described above; no server
+dataset views and same-dataset/period subsets can use the optional prepared coverage described above; no server
 is required. Computation updates after navigation;
 tile geometry and overlap results are cached. Multi-language intersections are
 partitioned into disjoint regions before drawing, so triple overlaps retain all

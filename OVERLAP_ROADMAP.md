@@ -475,8 +475,43 @@ preparation through that zoom resolved it. The final Asher/DLAC navigation run
 sampled 2,097 frames across globe and Mercator with no missing coverage, including
 zooms 3–6.5. Frontend tests (120), pipeline tests (16), catalog/comparison browser
 checks, branch browser checks, lint, type checks and the production build pass.
-The renderer's other budgets remain in force. Next measure arbitrary branch
-subsets and mixed-source comparisons before extending preparation further.
+The renderer's other budgets remain in force. Reusable coverage parts now also
+accelerate same-dataset/period subsets at low zoom, as described below;
+mixed-source comparisons and higher zooms stay live.
+
+Reusable coverage parts (2026-11-08) preserve every original membership, including
+hidden ancestors, in a dataset/period partition at zooms 0–3. Runtime selection,
+aggregation and refinement only remap memberships; identical shared edges can
+cancel without general Boolean geometry. Exact full branch tiles remain preferred
+for compactness. All seven profiles total 51,441,777 bytes locally, in addition to
+the existing branch assets. Preparation is atomic/resumable and runs in deployment.
+
+Production Firefox with software rendering, three runs on the development machine:
+
+| Selection | Live worker median | Parts worker median | Live / parts first rendered coverage |
+| --- | --- | --- | --- |
+| DLAC regional full view | 389 ms | 72 ms | 465 / 141 ms |
+| DLAC partial Sinitic branch | 143 ms | 54 ms | 200 / 100 ms |
+| DLAC descendant aggregate | 246 ms | 55 ms | 275 / 81 ms |
+| Halh and Dariganga | 40 ms | 90 ms | 98 / 138 ms |
+| Asher European full view, zoom 3.5 | Tile deadline in all runs | 741 ms | No complete live view / 1,332 ms |
+| Asher world with Dariganga removed | Engine benchmark hits tile deadline | 443 ms | 1,346 ms with parts |
+
+Parts requests report zero partition and GEOS initialization time. Probe memberships
+match between engines for tested branches and aggregates; child removal restores
+parent fill. Changing selection reuses the prepared metadata cache. The world
+subset passes both projections and render modes within existing geometry/texture
+budgets. A single remaining language still uses native fills with no partition.
+Tiny selections can be slower because loading a full prepared tile outweighs a
+cheap live overlay. Cached results are already fast in both engines; gains concern
+uncached selections and avoiding live geometry failures. HTTP/OS caches may be warm.
+
+Reproduce with `npm run precompute:parts`, `npm run benchmark:parts`, and
+`npm run test:parts-browser`. Reports live under `app/test-results/coverage-parts/`.
+Further work: extend detail levels based on storage/runtime measurements, reduce
+prepared tile transfer overhead for tiny selections, and measure remaining encoding,
+MapLibre preparation and fallback costs. Existing display-accuracy and memory
+limitations still apply.
 
 ## Decisions still open
 

@@ -31,6 +31,11 @@ export interface OverlapRequest {
   readonly variantGroups?: Readonly<Record<string, readonly string[]>>
   readonly refinements?: Refinements
   readonly precomputed?: PrecomputedBranches
+  readonly parts?: {
+    readonly directory: string
+    readonly profile: string
+    readonly maxZoom: number
+  }
   readonly tiles: readonly TileCoordinate[]
   /** Tiles retained by the receiver for this same selection; send only additions. */
   readonly knownTiles?: readonly string[]
@@ -38,12 +43,17 @@ export interface OverlapRequest {
 
 export interface OverlapMetrics {
   precomputedTiles?: number
+  partsTiles?: number
+  partsCacheHits?: number
+  membershipMs?: number
   cache?: {
     decodedEntries: number
     decodedBytes: number
     partitionEntries: number
     partitionVertices: number
     indexedFeatures: number
+    partsEntries?: number
+    partsBytes?: number
   }
   fetchMs: number
   decodeMs: number
