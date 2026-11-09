@@ -1,9 +1,9 @@
 import { useAtomValue } from 'jotai'
 import { useLayoutEffect, useRef } from 'react'
 import { useMap } from 'react-map-gl/maplibre'
-import { inspectedSourceVariantIds } from '../../domain/aggregation'
 import { atlasDataAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { createInspectionHighlight } from './inspectionHighlight'
+import { UnionOutline } from './UnionOutline'
 
 /** Hover updates stay outside the large, memoized language/coverage layer tree. */
 export const InspectionHighlight = ({ variantIds }: { readonly variantIds: readonly string[] }) => {
@@ -11,6 +11,11 @@ export const InspectionHighlight = ({ variantIds }: { readonly variantIds: reado
   const map = current?.getMap()
   const sourceLayer = useAtomValue(atlasDataAtom).manifest.vectorLayer
   const areas = useAtomValue(selectedMapAreasAtom)
+  const contributors = variantIds.map(
+    (id) => areas.find((area) => area.id === id)?.variants.map((variant) => variant.id) ?? [id],
+  )
+  const directIds = contributors.flatMap((ids) => (ids.length === 1 ? ids : []))
+  const aggregates = contributors.filter((ids) => ids.length > 1)
   const highlightRef = useRef<ReturnType<typeof createInspectionHighlight> | null>(null)
 
   useLayoutEffect(() => {
@@ -25,8 +30,8 @@ export const InspectionHighlight = ({ variantIds }: { readonly variantIds: reado
 
   useLayoutEffect(() => {
     if (!map || !sourceLayer) return
-    highlightRef.current?.set(inspectedSourceVariantIds(variantIds, areas))
-  }, [map, sourceLayer, variantIds, areas])
+    highlightRef.current?.set(directIds)
+  }, [map, sourceLayer, directIds])
 
-  return null
+  return <UnionOutline id="language-inspection" groups={aggregates} />
 }

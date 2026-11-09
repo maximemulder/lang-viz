@@ -46,7 +46,9 @@ map intact. More details exposes exact pinned areas, individual color overrides,
 source records, available mapped descendants, and a source-variant picker.
 
 Hovering a result, map group, map row, or pinned entry card previews its source
-areas with a contrasting outline and halo. Keyboard focus provides the same preview.
+areas with a contrasting outline and halo. Families and other entries with descendants
+outline their combined footprint, hiding internal contributor borders while keeping
+islands and genuine holes. Keyboard focus provides the same preview.
 On an empty map, previews also receive a faint fill. Existing map fills keep their colors.
 An open profile keeps its outline until it is closed. Temporary sidebar or map hover
 supersedes profile highlighting and leaving restores it. Previewing never adds an

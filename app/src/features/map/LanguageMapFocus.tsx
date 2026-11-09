@@ -1,10 +1,7 @@
 import { useAtomValue, useStore } from 'jotai'
-import type { ExpressionSpecification } from 'maplibre-gl'
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import { Layer, Source, useMap } from 'react-map-gl/maplibre'
-import { languageArchiveUrl, loadGeometryBounds } from '../../data/atlasRepository'
-import { selectGeometryArchives } from '../../data/geometryArchives'
-import { geometryTileUrl } from '../../data/geometryProtocol'
+import { useEffect } from 'react'
+import { useMap } from 'react-map-gl/maplibre'
+import { loadGeometryBounds } from '../../data/atlasRepository'
 import { combinedBounds, targetGeometry } from '../../domain/languageFocus'
 import {
   atlasDataAtom,
@@ -20,15 +17,10 @@ import {
   languagePointerPreviewAtom,
 } from '../../state/languageControls'
 import { searchCoverageAtom } from '../../state/searchSelection'
-import { createInspectionHighlight } from './inspectionHighlight'
-
-export const LANGUAGE_PREVIEW_SOURCE = 'language-sidebar-preview'
-const INSPECTED: ExpressionSpecification = ['boolean', ['feature-state', 'inspected'], false]
+import { UnionOutline } from './UnionOutline'
 
 /** Independent tiles and paint keep previews out of selected coverage/cache identities. */
 export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActive: boolean }) => {
-  const { current } = useMap()
-  const map = current?.getMap()
   const data = useAtomValue(atlasDataAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
   const coverage = useAtomValue(searchCoverageAtom)
@@ -52,70 +44,13 @@ export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActiv
           : null)))
   const variants = targetGeometry(target, data, availability, coverage, hierarchy, entries)
   const ids = [...new Set(variants.map(({ id }) => id))].sort()
-  const key = JSON.stringify(ids)
-  const sourceLayer = data.manifest.vectorLayer
-  const highlightRef = useRef<ReturnType<typeof createInspectionHighlight> | null>(null)
-  useLayoutEffect(() => {
-    if (!map) return
-    const highlight = createInspectionHighlight(map, LANGUAGE_PREVIEW_SOURCE, sourceLayer)
-    highlightRef.current = highlight
-    return () => {
-      highlight.dispose()
-      highlightRef.current = null
-    }
-  }, [map, sourceLayer])
-  useLayoutEffect(() => {
-    if (map && sourceLayer) highlightRef.current?.set(JSON.parse(key) as string[])
-  }, [map, sourceLayer, key])
-  if (!ids.length) return null
-  const archiveUrl = languageArchiveUrl(
-    selectGeometryArchives(data.manifest, data.variants, [], 'all', ids),
-  ).replace(/^pmtiles:\/\//, '')
   return (
-    <Source
-      id={LANGUAGE_PREVIEW_SOURCE}
-      type="vector"
-      promoteId="variant_id"
-      tiles={[geometryTileUrl(archiveUrl)]}
-      minzoom={0}
-      maxzoom={8}
-    >
-      <Layer
-        id="language-preview-fill"
-        type="fill"
-        source={LANGUAGE_PREVIEW_SOURCE}
-        source-layer={sourceLayer}
-        paint={{
-          'fill-color': '#cb5d3e',
-          'fill-opacity': ['case', INSPECTED, selected.length ? 0 : 0.12, 0],
-          'fill-opacity-transition': { duration: 0 },
-        }}
-      />
-      <Layer
-        id="language-preview-halo"
-        type="line"
-        source={LANGUAGE_PREVIEW_SOURCE}
-        source-layer={sourceLayer}
-        paint={{
-          'line-color': '#fffdf7',
-          'line-width': 5,
-          'line-opacity': ['case', INSPECTED, 0.95, 0],
-          'line-opacity-transition': { duration: 0 },
-        }}
-      />
-      <Layer
-        id="language-preview-outline"
-        type="line"
-        source={LANGUAGE_PREVIEW_SOURCE}
-        source-layer={sourceLayer}
-        paint={{
-          'line-color': '#392a20',
-          'line-width': 2.5,
-          'line-opacity': ['case', INSPECTED, 1, 0],
-          'line-opacity-transition': { duration: 0 },
-        }}
-      />
-    </Source>
+    <UnionOutline
+      id="language-preview"
+      groups={[ids]}
+      halo
+      fillOpacity={selected.length ? 0 : 0.12}
+    />
   )
 }
 

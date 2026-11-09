@@ -7,6 +7,11 @@ export interface FallbackRequest {
   readonly archiveUrl: string
   readonly tile: TileCoordinate
   readonly coverage: readonly TileCoordinate[]
+  /** Optional geometry-only outline job, handled by the independent outline worker. */
+  readonly outline?: {
+    readonly sourceLayer: string
+    readonly groups: readonly (readonly string[])[]
+  }
 }
 
 export type FallbackInput = FallbackRequest | { cancel: number }

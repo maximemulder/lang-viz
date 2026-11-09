@@ -157,12 +157,17 @@ coverage never fall back to hidden original polygons. Before coverage is availab
 in blending mode, or after an error restores original fills, inspection uses the
 original selected-language layer.
 Fallback inspection retains all source contributors, although its source-order
-solid colors may hide some of them. Hover and pinned outlines use source geometry.
-The source promotes `variant_id` to a stable feature ID. Outline geometry is built
-for the selection once; entering/leaving contributors toggle the `inspected`
-feature state through a zero-transition line opacity. Hover never changes a layer
-filter or rebuilds the shared source's tile buckets. Aggregates expand back to
-their source contributors, and source/style replacement restores the current state.
+solid colors may hide some of them. Single-contributor map inspection still toggles
+source feature state without rebuilding selected tile buckets. Multi-contributor
+inspection and sidebar/profile previews use a separate `language-outline` tile
+protocol and worker. It unions the requested source polygons into each highlighted
+footprint before drawing the boundary, removing internal descendant edges. Separate
+inspected representations retain independent outlines. Original tile buffers keep
+tile-cut edges outside the visible tile; islands and genuine holes remain intact.
+The worker loads GEOS lazily, caches source/result bytes with bounded memory, and
+uses the existing supervised request cancellation/deadline lifecycle. These jobs
+never alter selected coverage keys, colors, or overlap computation. Source/style
+replacement restores the current highlight through React's source lifecycle.
 Picking reuses MapLibre's rendered-feature spatial index and the same displayed
 coverage memberships, including holes and refinement rules; no separate geographic
 index or offline asset is needed. Pointer moves coalesce to the latest event per

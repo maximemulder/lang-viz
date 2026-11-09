@@ -41,7 +41,10 @@ no movement on hover, profile/Enter camera movement without stealing list focus,
 persistent outlines, temporary preview precedence, repeated name clicks and rapid
 profile switching. It verifies exact pinned sources despite incompatible search
 filters, unavailable geometry, style restoration, and multi-contributor family
-framing. Hover must leave selections and coverage request identities unchanged;
+framing. Sidebar diagnostics read the dissolved outline tiles rather than raw contributor
+feature state. Geometry tests cover contained, adjacent and overlapping descendants,
+holes, islands, independent comparison outlines, tile buffers and cancellation.
+Hover must leave selections and coverage request identities unchanged;
 camera bounds must load only on explicit profile actions. Reports/screenshots go to
 `test-results/sidebar-focus/`.
 

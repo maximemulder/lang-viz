@@ -189,17 +189,15 @@ export const installOverlapTestApi = (
     probeInspection: (center: [number, number]) => probeInspection(map, center, selectionKey()),
     sidebarHighlight: () => {
       const layer = map.getLayer('language-preview-outline')
-      if (!layer || !('sourceLayer' in layer)) return { variantIds: [] }
-      const source = 'language-sidebar-preview'
-      const highlighted = (id: string) =>
-        map.getFeatureState({ source, sourceLayer: layer.sourceLayer, id }).inspected
+      if (!layer || !('sourceLayer' in layer) || typeof layer.source !== 'string')
+        return { variantIds: [] }
       const variantIds = [
         ...new Set(
           map
-            .querySourceFeatures(source, { sourceLayer: layer.sourceLayer })
+            .querySourceFeatures(layer.source, { sourceLayer: layer.sourceLayer })
             .flatMap(({ properties }) =>
-              typeof properties.variant_id === 'string' && highlighted(properties.variant_id)
-                ? [properties.variant_id]
+              typeof properties.variant_ids === 'string'
+                ? (JSON.parse(properties.variant_ids) as string[])
                 : [],
             ),
         ),

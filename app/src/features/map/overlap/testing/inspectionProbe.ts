@@ -12,9 +12,23 @@ export interface InspectionProbe {
 
 export const inspectionHighlightState = (map: MapLibreMap, sourceIds: readonly string[]) => {
   const sourceLayer = map.getLayer('inspected-language-areas')?.sourceLayer ?? ''
+  const outline = map.getLayer('language-inspection-outline')
+  const merged = new Set<string>(
+    outline && 'sourceLayer' in outline && typeof outline.source === 'string'
+      ? map
+          .querySourceFeatures(outline.source, { sourceLayer: outline.sourceLayer })
+          .flatMap(({ properties }) =>
+            typeof properties.variant_ids === 'string'
+              ? (JSON.parse(properties.variant_ids) as string[])
+              : [],
+          )
+      : [],
+  )
   return {
     variantIds: sourceIds.filter(
-      (id) => map.getFeatureState({ source: 'language-areas', sourceLayer, id }).inspected,
+      (id) =>
+        merged.has(id) ||
+        map.getFeatureState({ source: 'language-areas', sourceLayer, id }).inspected,
     ),
     filter: map.getFilter('inspected-language-areas'),
   }
