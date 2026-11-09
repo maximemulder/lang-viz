@@ -32,7 +32,7 @@ export const UnionOutline = ({
       type="vector"
       tiles={[outlineTileUrl(archiveUrl, data.manifest.vectorLayer, groups)]}
       minzoom={0}
-      maxzoom={8}
+      maxzoom={data.manifest.geometryMaxZoom ?? 8}
     >
       {halo && (
         <Layer

@@ -5,3 +5,4 @@ __pycache__/
 *.py[cod]
 data/processed/
 app/public/data/
+.data-releases/

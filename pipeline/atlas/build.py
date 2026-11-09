@@ -6,7 +6,6 @@ import hashlib
 import json
 import math
 import shutil
-import subprocess
 import warnings
 from collections import defaultdict
 from dataclasses import dataclass
@@ -25,7 +24,6 @@ GLOTTOLOG_VALUES = GLOTTOLOG_LANGUAGES.with_name("values.csv")
 PROCESSED_DIR = PROJECT_ROOT / "data/processed"
 PUBLIC_DATA_DIR = PROJECT_ROOT / "app/public/data"
 NORMALIZED_GEOMETRIES = PROCESSED_DIR / "language-areas.geojsonl"
-PMTILES_ARCHIVE = PUBLIC_DATA_DIR / "language-areas.pmtiles"
 
 
 @dataclass(frozen=True)
@@ -528,90 +526,16 @@ def find_tippecanoe() -> str | None:
     return shutil.which("tippecanoe")
 
 
-def build_tiles() -> None:
-    tippecanoe = find_tippecanoe()
-    if tippecanoe is None:
-        raise RuntimeError(
-            "tippecanoe was not found. Run pipeline/atlas/bootstrap-tippecanoe.sh, "
-            "or rerun with --skip-tiles."
-        )
-
-    PMTILES_ARCHIVE.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        [
-            tippecanoe,
-            "--force",
-            f"--output={PMTILES_ARCHIVE}",
-            "--layer=language_areas",
-            "--minimum-zoom=0",
-            "--maximum-zoom=8",
-            "--no-feature-limit",
-            "--no-tile-size-limit",
-            "--no-progress-indicator",
-            "--simplification=10",
-            "--include=variant_id",
-            "--include=language_id",
-            "--include=level",
-            "--include=dataset_id",
-            "--include=layer",
-            "--include=temporal_view",
-            "--include=temporal_quality",
-            "--include=source_year",
-            "--include=focal_year",
-            "--include=color",
-            "--include=family",
-            str(NORMALIZED_GEOMETRIES),
-        ],
-        check=True,
-    )
-    build_geometry_profiles()
+def find_tile_join() -> str | None:
+    local_binary = PROJECT_ROOT / ".tools/tippecanoe-src/tile-join"
+    if local_binary.is_file():
+        return str(local_binary)
+    return shutil.which("tile-join")
 
 
-def build_geometry_profiles() -> None:
-    """Filter existing display tiles without re-simplifying or re-tiling polygons."""
-    tippecanoe = find_tippecanoe()
-    tile_join = Path(tippecanoe).with_name("tile-join") if tippecanoe else None
-    binary = str(tile_join) if tile_join and tile_join.is_file() else shutil.which("tile-join")
-    if not binary:
-        raise RuntimeError("tile-join was not found. Run pipeline/atlas/bootstrap-tippecanoe.sh.")
-    digest = hashlib.sha256(PMTILES_ARCHIVE.read_bytes()).hexdigest()[:20]
-    directory = f"geometry/v1-{digest}"
-    variants = json.loads((PUBLIC_DATA_DIR / "geometry-variants.json").read_text())
-    profiles = []
-    for dataset_id, view_id in sorted(
-        {(v["datasetId"], v["temporalCoverage"]["viewId"]) for v in variants}
-    ):
-        relative = f"{directory}/{dataset_id}/{view_id}.pmtiles"
-        output = PUBLIC_DATA_DIR / relative
-        output.parent.mkdir(parents=True, exist_ok=True)
-        if not output.exists():
-            temporary = output.with_name(f"{view_id}.tmp.pmtiles")
-            predicate = {
-                "*": ["all", ["==", "dataset_id", dataset_id], ["==", "temporal_view", view_id]]
-            }
-            subprocess.run(
-                [
-                    binary,
-                    "--force",
-                    "--no-tile-size-limit",
-                    "--quiet",
-                    f"--output={temporary}",
-                    f"--feature-filter={json.dumps(predicate)}",
-                    str(PMTILES_ARCHIVE),
-                ],
-                check=True,
-            )
-            temporary.replace(output)
-        profiles.append({"datasetId": dataset_id, "viewId": view_id, "archive": relative})
-    manifest_path = PUBLIC_DATA_DIR / "manifest.json"
-    manifest = json.loads(manifest_path.read_text())
-    manifest["geometryProfiles"] = profiles
-    temporary_manifest = manifest_path.with_suffix(".tmp")
-    write_json(temporary_manifest, manifest)
-    temporary_manifest.replace(manifest_path)
-
-
-def build(skip_tiles: bool) -> None:
+def build(skip_tiles: bool = False, *, jobs: int | None = None) -> None:
+    if jobs is not None and jobs < 1:
+        raise ValueError("jobs must be a positive integer")
     rows, names = read_glottolog()
     known_languoids = {str(row["Glottocode"]) for row in rows}
     level_by_languoid = {str(row["Glottocode"]): str(row["Level"]) for row in rows}
@@ -693,25 +617,46 @@ def build(skip_tiles: bool) -> None:
         )
     write_json(PUBLIC_DATA_DIR / "geography-datasets.json", DATASETS)
     shutil.copyfile(PROJECT_ROOT / "pipeline/dlac/NOTICE.md", PUBLIC_DATA_DIR / "DLAC-NOTICE.md")
-    write_json(
-        PUBLIC_DATA_DIR / "manifest.json",
-        {
-            "schemaVersion": 5,
-            "languoidCount": len(languages),
-            "languoidWithGeometryCount": sum(
-                bool(language["geometryVariantIds"]) for language in languages
-            ),
-            "geometryVariantCount": len(variants),
-            "vectorLayer": "language_areas",
-            "archive": "language-areas.pmtiles",
-            "geometryIndex": "geometry-index.json",
-            "geometryBounds": "geometry-bounds.json",
-            "geometryProvenance": "provenance/",
-        },
-    )
-
+    manifest = {
+        "schemaVersion": 5,
+        "languoidCount": len(languages),
+        "languoidWithGeometryCount": sum(
+            bool(language["geometryVariantIds"]) for language in languages
+        ),
+        "geometryVariantCount": len(variants),
+        "vectorLayer": "language_areas",
+        "archive": "language-areas.pmtiles",
+        "geometryIndex": "geometry-index.json",
+        "geometryBounds": "geometry-bounds.json",
+        "geometryProvenance": "provenance/",
+    }
     if not skip_tiles:
-        build_tiles()
+        from pipeline.atlas.topology_build import atomic_json
+        from pipeline.atlas.topology_build import build as build_topology
+
+        binary = find_tile_join()
+        if not binary:
+            raise RuntimeError("Run pipeline/atlas/bootstrap-tippecanoe.sh first")
+        geometry = build_topology(
+            NORMALIZED_GEOMETRIES,
+            PUBLIC_DATA_DIR,
+            PROCESSED_DIR / "topology",
+            binary,
+            jobs=jobs,
+        )
+        previous_path = PUBLIC_DATA_DIR / "manifest.json"
+        if previous_path.exists():
+            previous = json.loads(previous_path.read_text())
+            if (
+                previous.get("geometryBuild", {}).get("fingerprint")
+                == geometry["geometryBuild"]["fingerprint"]
+                and "branchCoverage" in previous
+            ):
+                manifest["branchCoverage"] = previous["branchCoverage"]
+        # Keep the previous geometry manifest usable until every product is ready.
+        atomic_json(PUBLIC_DATA_DIR / "manifest.json", {**manifest, **geometry})
+    else:
+        write_json(PUBLIC_DATA_DIR / "manifest.json", manifest)
 
     print(
         f"Exported {len(languages):,} languoids and {len(variants):,} geometry variants "
@@ -724,10 +669,15 @@ def main() -> None:
     parser.add_argument(
         "--skip-tiles",
         action="store_true",
-        help="Build catalogs and normalized GeoJSONL without invoking tippecanoe.",
+        help="Build catalogs and normalized GeoJSONL without generating coverage LODs or tiles.",
+    )
+    parser.add_argument(
+        "--jobs", type=int, help="Concurrent profiles (default: up to 2; 1 is serial)"
     )
     args = parser.parse_args()
-    build(skip_tiles=args.skip_tiles)
+    if args.jobs is not None and args.jobs < 1:
+        parser.error("--jobs must be a positive integer")
+    build(skip_tiles=args.skip_tiles, jobs=args.jobs)
 
 
 if __name__ == "__main__":

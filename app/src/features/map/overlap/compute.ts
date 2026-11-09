@@ -10,6 +10,7 @@ import {
   type MultiPolygon,
   OverlapBudgetError,
 } from './geometry.ts'
+import { MAX_COVERAGE_VERTICES } from './limits.ts'
 import { loadPrecomputedTile, prepareBranchCoverage } from './precomputed.ts'
 import { tilePositionToLngLat } from './tiles.ts'
 import type {
@@ -25,7 +26,6 @@ const MAX_CACHED_TILES = 48
 const MAX_CACHED_BYTES = 16 * 1024 * 1024
 const MAX_CACHED_RESULT_VERTICES = 150_000
 const MAX_TILE_VERTICES = 100_000
-const MAX_OUTPUT_VERTICES = 200_000
 
 const deliveryFeatures = (regions: readonly CoverageRegion[]) => {
   // Keep bounds local to a computation tile, but share properties across islands.
@@ -207,7 +207,8 @@ export class OverlapComputer {
         }
         if (result) {
           outputVertices += result.vertices
-          if (outputVertices > MAX_OUTPUT_VERTICES) throw new OverlapBudgetError('output-vertices')
+          if (outputVertices > MAX_COVERAGE_VERTICES)
+            throw new OverlapBudgetError('output-vertices')
           if (metrics) {
             metrics.precomputedTiles = (metrics.precomputedTiles ?? 0) + 1
             metrics.completedTiles++
@@ -236,7 +237,7 @@ export class OverlapComputer {
       }
       if (composed) {
         outputVertices += composed.vertices
-        if (!this.offline && outputVertices > MAX_OUTPUT_VERTICES)
+        if (!this.offline && outputVertices > MAX_COVERAGE_VERTICES)
           throw new OverlapBudgetError('output-vertices')
         if (metrics) {
           metrics.completedTiles++
@@ -355,7 +356,7 @@ export class OverlapComputer {
             ),
           0,
         )
-        if (!this.offline && outputVertices + vertices > MAX_OUTPUT_VERTICES)
+        if (!this.offline && outputVertices + vertices > MAX_COVERAGE_VERTICES)
           throw new OverlapBudgetError('output-vertices')
         const outputStart = performance.now()
         // Keep tile coordinates: delivery can encode MVT without reprojection
@@ -367,7 +368,7 @@ export class OverlapComputer {
       const outputStart = performance.now()
       outputVertices += result.vertices
       if (metrics) metrics.outputVertices += result.vertices
-      if (!this.offline && outputVertices > MAX_OUTPUT_VERTICES)
+      if (!this.offline && outputVertices > MAX_COVERAGE_VERTICES)
         throw new OverlapBudgetError('output-vertices')
       if (metrics) {
         metrics.outputMs += performance.now() - outputStart

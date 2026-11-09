@@ -127,7 +127,7 @@ const LanguageLayers = memo(() => {
         promoteId="variant_id"
         tiles={[geometryTileUrl(archiveUrl)]}
         minzoom={0}
-        maxzoom={8}
+        maxzoom={data.manifest.geometryMaxZoom ?? 8}
         attribution="Language areas: Asher & Moseley (2007), Bouckaert et al. (2012), Carling et al. (2025)"
       >
         <Layer

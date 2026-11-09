@@ -6,7 +6,6 @@ import { fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
 import { PbfReader } from 'pbf'
 import { FileSource, PMTiles } from 'pmtiles'
 import { archiveTiles } from '../scripts/lib/archiveTiles.ts'
-import { mergePartsManifest } from '../scripts/lib/partsManifest.ts'
 import {
   geometryArchiveUrl,
   mergeGeometryTiles,
@@ -114,36 +113,6 @@ test('source routing never fetches the combined archive and preserves membership
   abort.abort()
   await assert.rejects(empty.getZxy(0, 0, 0, abort.signal), { name: 'AbortError' })
   assert.deepEqual(mergeGeometryTiles([]), new Uint8Array())
-})
-
-test('incremental profile publication preserves other periods and never downgrades completed detail', () => {
-  const previous = {
-    directory: 'v1/',
-    maxZoom: 5,
-    profiles: [
-      {
-        id: 'a/now',
-        datasetId: 'a',
-        viewId: 'contemporary' as const,
-        maxZoom: 5,
-        tiles: { '5': ['1-2'] },
-      },
-      { id: 'b/now', datasetId: 'b', viewId: 'contemporary' as const, maxZoom: 3 },
-    ],
-  }
-  assert.ok(previous.profiles[0])
-  const lower = { ...previous.profiles[0], maxZoom: 3 }
-  assert.deepEqual(mergePartsManifest(previous, 'v1/', [lower]), previous)
-  const added = { id: 'a/then', datasetId: 'a', viewId: 'time-of-contact' as const, maxZoom: 6 }
-  const merged = mergePartsManifest(previous, 'v1/', [added])
-  assert.equal(merged.maxZoom, 6)
-  assert.equal(merged.profiles.length, 3)
-  assert.equal(merged.profiles.find((p) => p.id === 'a/now')?.maxZoom, 5)
-  assert.deepEqual(
-    mergePartsManifest(previous, 'v2/', [added]).profiles,
-    [added],
-    'An archive revision cannot inherit stale preparation',
-  )
 })
 
 const data = new URL('../public/data/', import.meta.url)

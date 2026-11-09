@@ -92,6 +92,80 @@ def test_camera_bounds_cross_dateline_and_reject_empty_geometry():
         atlas.geometry_bounds([{"geometry": {"type": "Polygon", "coordinates": []}}])
 
 
+def test_default_build_publishes_shared_lods_parts_and_camera_metadata(tmp_path, monkeypatch):
+    from shapely import box
+
+    from pipeline.tests.test_coverage_topology import feature as source_feature
+
+    if not atlas.find_tile_join():
+        pytest.skip("Build tile-join to exercise the default atlas entry point")
+    public, processed = tmp_path / "public", tmp_path / "processed"
+    normalized = processed / "areas.geojsonl"
+    variant_id = "test:contemporary:lang1234"
+    row = dict.fromkeys(
+        [
+            "ISO639P3code",
+            "Family_ID",
+            "Language_ID",
+            "Macroarea",
+            "Countries",
+            "Latitude",
+            "Longitude",
+        ]
+    )
+    row.update(Glottocode="lang1234", Name="Language", Level="language")
+    monkeypatch.setattr(atlas, "PUBLIC_DATA_DIR", public)
+    monkeypatch.setattr(atlas, "PROCESSED_DIR", processed)
+    monkeypatch.setattr(atlas, "NORMALIZED_GEOMETRIES", normalized)
+    monkeypatch.setattr(atlas, "read_glottolog", lambda: ([row], {"lang1234": "Language"}))
+    monkeypatch.setattr(atlas, "read_alternative_names", dict)
+    monkeypatch.setattr(atlas, "read_parent_ids", lambda _: {})
+    monkeypatch.setattr(atlas, "read_source_languoids", lambda *_: [])
+
+    def normalize(*_):
+        record = source_feature(variant_id, box(0.48, 0.48, 0.52, 0.52))
+        record["properties"].update(
+            language_id="lang1234", dataset_id="test", temporal_view="contemporary"
+        )
+        processed.mkdir(exist_ok=True)
+        normalized.write_text(json.dumps(record) + "\n")
+        return [
+            {
+                "id": variant_id,
+                "languageId": "lang1234",
+                "datasetId": "test",
+                "temporalCoverage": {"viewId": "contemporary"},
+                "sourceFile": "fixture.geojson",
+                "sourceFeatureIds": ["1"],
+                "bounds": [-7.2, -7.2, 7.2, 7.2],
+            }
+        ], {"lang1234": [variant_id]}
+
+    monkeypatch.setattr(atlas, "normalize_geometries", normalize)
+    atlas.build(jobs=1)
+    manifest = json.loads((public / "manifest.json").read_text())
+    assert manifest["geometryBuild"]["kind"] == "shared-coverage"
+    assert manifest["geometryMaxZoom"] == 8
+    assert (public / manifest["geometryProfiles"][0]["archive"]).is_file()
+    assert json.loads((public / manifest["geometryBounds"]).read_text()) == {
+        variant_id: [-7.2, -7.2, 7.2, 7.2]
+    }
+    profile = manifest["coverageParts"]["profiles"][0]
+    parts = public / manifest["coverageParts"]["directory"]
+    index = json.loads((parts / profile["tileIndex"]).read_text())
+    assert set(index) == {str(z) for z in range(9)}
+    assert all(
+        (parts / profile["id"] / f"{z}-{xy}.pbf").is_file() for z in index for xy in index[z]
+    )
+    assert len(list((processed / "topology" / "canonical").rglob("*.jsonl.gz"))) == 1
+
+    # Catalog refreshes must keep valid prepared branches and publish the same LODs.
+    manifest["branchCoverage"] = {"directory": "branches/", "maxZoom": 0, "signatures": []}
+    atlas.write_json(public / "manifest.json", manifest)
+    atlas.build(jobs=1)
+    assert json.loads((public / "manifest.json").read_text()) == manifest
+
+
 def test_unmatched_references_are_reported_and_not_assigned_to_other_entries(source):
     source, _ = source
     with pytest.warns(UserWarning, match="Unmatched languoid IDs"):

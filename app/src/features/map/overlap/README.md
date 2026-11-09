@@ -21,9 +21,10 @@ that footprint before handling other overlaps. This avoids redundant ancestry
 stripes and repeated differences from increasingly fragmented family polygons.
 It preserves available geographic coverage and incomparable contributors.
 
-`npm run precompute:branches` uses the same engine without interactive budgets
-offline, one dataset/temporal view at a time, at zooms 0–3. It reads the existing
-simplified archive and writes canonical coverage MVT files, including empty tiles.
+`npm run precompute:branches` materializes one dataset/temporal branch policy at
+zooms 0–3. It composes prepared parts through the same membership/refinement
+resolver as the browser. Canonical parts are required; missing assets fail with a
+restoration instruction. It writes coverage MVT files, including empty tiles.
 An archive hash and versioned SHA-256 selection/refinement signature identify the
 output. Tiles are written atomically and completed files can be resumed. The
 manifest is updated only after all profiles complete; normal atlas regeneration
@@ -35,22 +36,64 @@ policies cannot reuse them. Missing optional files fall back to bounded live
 computation. Prepared results use the existing cache, output, pattern, publication,
 and cancellation limits. Higher zooms try reusable parts before live calculation.
 
-`npm run precompute:parts` creates a separate selection-independent partition for
-each dataset/period at every source level supported by the client (currently
-zooms 0–8). The same default applies to all datasets, including both Asher periods.
-It uses the same simplified source tiles, with
-no refinement policy: every face retains all original memberships. The assets
-are versioned by format and archive hash and resumable. Each completed zoom
-is published atomically in `manifest.coverageParts`; interrupted later levels
-cannot remove intermediate coverage. The generator accepts repeated `--dataset` and `--period`
-options and `--max-zoom` (0–8). Filtered runs preserve other profiles and do not
-downgrade completed zoom levels. Generation never combines datasets or periods.
-It traverses the actual PMTiles directory, including run-length entries, rather
-than iterating the world grid. Only nonempty coverage gets an MVT file. A versioned,
+The atlas build generates selection-independent coverage for each dataset/period
+at every native source level (currently zooms 0–8). Every face retains all original
+memberships, with no selection/refinement policy applied. `npm run precompute:parts`
+restores missing files from cached canonical/LOD geometry. It accepts repeated
+`--dataset` and `--period` options, `--max-zoom` (0–8), and `--data-dir`.
+Filtered restoration preserves other profiles and higher completed zooms. Each
+restored level's index is published atomically. Only nonempty coverage gets an MVT file. A versioned,
 lazy profile index lists its nonempty tiles at each complete level. Omitted tiles
 at indexed levels are known empty; unindexed levels or unavailable assets fall
 back live. Availability indexes stay out of the startup manifest and are cached
 for at most eight profiles. The old dense and inline-index manifest shapes remain readable.
+
+`pipeline.atlas.build` constructs the authoritative partition upstream of LOD
+generation. `pipeline/atlas/topology.py` builds a
+high-precision, labelled boundary network separately for each dataset/period.
+Each LOD resolves rounding in that shared network and includes native tile cuts
+before GEOS coverage simplification. Internal borders and coverage boundaries
+have separate tolerances. Tile-cut vertices are therefore shared, rather than
+independently rounded during export. Empty regions participate in label transfer;
+the displayed coverage contains only contributing regions.
+
+`topology_build.py` exports parts and buffered source geometry from those same
+faces. Buffer clipping precedes per-language assembly, keeping source interiors
+identical to their parts. It stores canonical partitions and completed LODs
+separately, uses bounded regional subdivisions for ambiguous area-majority labels,
+and records invalid-input repairs and geometry statistics. Complex point contacts
+are decomposed without changing area before GEOS coverage operations. Persistent
+GEOS precision metadata is cleared after quantization so later unions do not
+silently snap simplified boundaries again.
+
+Native preprocessing runs independent dataset/period profiles in separate spawned
+processes, with two workers by default (`--jobs N`; `--jobs 1` is serial). Larger
+inputs are scheduled first, and each worker retires after one profile to release
+native allocations. Per-profile caches, databases and archives have distinct
+paths. LODs within a profile reuse its canonical partition and area index
+sequentially. The coordinator preserves deterministic profile/merge ordering and
+publishes the manifest after all profiles complete. Worker count and phase/cache
+timings are recorded outside the geometry fingerprint. Tile-join threads are
+divided across workers unless `TIPPECANOE_MAX_THREADS` is explicitly set.
+
+`topology_cache.py` shares the lazy LOD builder between generation and restoration.
+Cache keys track individual profile inputs and simplification settings; maximum
+zoom only affects archive keys. Completed builds reuse existing files and indexes
+without loading geometry or invoking packaging. Missing assets are rebuilt from
+cached exports or common LODs.
+
+Integrated manifests carry `geometryBuild` and `coverage-parts/<profile-key>/`
+URLs with opaque profile IDs; archives use `geometry/<archive-key>/` URLs. Caches
+are disposable, with no migration or versioning: clear `data/processed/topology/`
+and `app/public/data/`, then rebuild after algorithm or dependency changes. The browser's
+parts, selection, delivery, and inspection contracts remain the same. Mixed
+profiles still use the existing live fallback. The first full-data pass built all
+seven profiles through zoom 8 and passed the prepared, navigation and inspection
+browser suites. Coarse geometry size and offline label-transfer cost remain
+tuning work. The combined source
+archive grew from about 29 MB to 64 MB; a measured 330,875-position Asher view
+required raising the shared worker/receiver output bound to 600k. This does not
+relax the live overlay's input, intermediate-region or time bounds.
 
 `coverageParts.ts` resolves a profile from actual variant metadata and indexes
 its MVT memberships. Selection changes filter original contributors, map them to
@@ -106,6 +149,7 @@ proposed priorities, and completion criteria across sessions.
    tile-join, preserving coordinates, IDs and attributes. Up to 16 archive readers
    retain range indexes per worker. Partition caches survive source-profile changes
    and clearing a selection; archive identity remains part of result keys.
+   Integrated profile archives instead materialize the common LOD directly.
    Index variant metadata once per decoded tile, then decode only
    selected variant geometries; retain integer tile coordinates for Boolean operations.
 3. Lazily load and initialize GEOS once in the persistent worker. Union duplicate
@@ -279,19 +323,24 @@ different IDs and colors.
 - At most 48 decoded tiles and 16 MiB of decompressed tile bytes are cached.
   Native-result caching is bounded by 48 entries and 150,000 coordinate positions.
   Encoded cache entries share those lifetimes through weak keys. The receiver
-  retains at most 48 desired tiles/200,000 positions plus active/staging snapshot
+  retains at most 48 desired tiles/600,000 positions plus active/staging snapshot
   references; old snapshots can retain different encoded tiles during transitions.
   These are not total browser/WASM/GPU memory limits.
   These are LRU caches; the byte limit does not include decoded object overhead.
   Receiver history is expendable: before rejecting visible coverage for its
-  200,000-position or pattern-memory limit, the controller discards offscreen
+  600,000-position or pattern-memory limit, the controller discards offscreen
   retained tiles and republishes the current viewport. Worker caches remain
   available for a return pan. Visible tiles still enforce the same budgets.
   Cached feature metadata adds JS object overhead. Archive URL and source layer
   are part of cache identity, along with tile coordinates and local selection.
 - A tile accepts at most 100,000 selected input vertices, 12,000 intermediate
   regions, and approximately 1.5 seconds of overlay work. A complete result is
-  limited to 200,000 vertices. Deadline checks occur between Boolean operations;
+  limited to 600,000 vertices, shared with the receiver through `limits.ts`.
+  Integrated source LODs preserve more coverage-boundary detail: an Asher zoom-2
+  viewport can exceed the previous 300,000-position limit. The experimental
+  output/retention bound is raised together; per-tile input, overlay time,
+  caches, and texture budgets are unchanged.
+  Deadline checks occur between Boolean operations;
   a single operation cannot be interrupted.
 - Pattern allocation is limited by padded image area instead of a 128-combination
   cap: at most 4,194,304 texels per result (16 MiB RGBA), and twice that across
@@ -305,7 +354,7 @@ different IDs and colors.
   available, ordinary language fills remain active. Successfully completed tile
   prefixes may publish on initial loads and same-detail extensions even if a later
   tile fails; cross-detail prefixes cannot replace existing coverage. A failed tile never enters the
-  coverage mask. The 200,000-position bound is also checked against retained plus
+  coverage mask. The 600,000-position bound is also checked against retained plus
   newly delivered tiles on the main thread.
 
 This is display geometry. Tile simplification can remove small overlap regions,
