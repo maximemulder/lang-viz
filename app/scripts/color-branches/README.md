@@ -1,7 +1,11 @@
 # Branch-reference color proof of concept
 
-This is an isolated experiment, authorized on 2026-11-09. It does not replace the
-application picker. Open `app/test-results/color-branches/index.html` in a browser
+The successful softer-anchor variant is now integrated into **Optimize colors for
+this view** (2026-11-09). Stable defaults retain their previous initialization.
+The sections below record the isolated experiments that led to this integration;
+references to the production baseline mean the pre-integration optimizer.
+The replay harness reconstructs that initializer and checks exact result parity
+between `branches-chroma-anchors` and the current app optimizer. Open `app/test-results/color-branches/index.html` in a browser
 after running the commands below to compare matched maps. The page works offline
 and supports arrow-key switching among variants.
 
@@ -162,3 +166,127 @@ area-aware family-anchor assignment, and relaxing unnecessary global descendant
 bounds. Then test whether direct branch-reference initialization can replace the
 production initializer without losing its broad distinctions. Preserve the
 current stability, override, worker, and geometry contracts during that work.
+
+## Prominence and chroma experiment
+
+The user's clarification supersedes preferred-palette recovery: restrain vividness
+across large language territories while permitting stronger small accents. The old
+palette-distance metric is a historical diagnostic, not a beauty score. Production
+behavior is unchanged.
+
+Two comparisons, each with 20 matched screenshots:
+
+- `test-results/color-chroma/index.html`: current picker, previous branches,
+  moderate and strong restraint inside unchanged family regions.
+- `test-results/color-chroma-anchors/index.html`: current picker, previous branches,
+  new anchor initialization alone, and new anchors with branch refinement.
+
+Fixed-anchor variants disable the additional palette preference and penalize only
+chroma above `0.18 - 0.08 * sqrt(prominence)`, with weights 0.4 and 1.2. Language
+prominence is represented area divided by the largest language area across groups,
+clamped to [0,1]. Branch references use their aggregate area. Extra candidates
+scale OKLab a/b by 0.45, 0.65 and 0.85, retaining lightness before gamut mapping and
+projection. The previous branch mode remains unchanged.
+
+Fixed anchors proved limiting: world dominant-region mean chroma decreased only
+about 2%, while within-family shortfall rose from 0.292 to 0.327 (moderate) or
+0.390 (strong). Increasing the penalty alone is not the preferred direction.
+
+The anchor experiment adds chroma 0.06 and 0.09 to the existing family candidates.
+It replaces anchor palette-distance cost with excess chroma above
+`0.18 - 0.08 * family.prominence`, using existing prominence weighting and
+coefficient 1.2. Conflict and stability terms remain. Families can choose new hues;
+this is not an isolated fixed-hue chroma ablation. Family bounds and production
+subdivisions are rebuilt, then branch refinement runs with palette preference
+zero and chroma weight 0.1. Candidate budgets and branch weights also differ from
+the fixed-anchor comparison, so not every improvement is attributable to anchors.
+
+| Scene | Dominant chroma, previous → new | Local shortfall, previous → new | Severe pair weight, previous → new |
+| --- | --- | --- | --- |
+| DLAC | 0.162 → 0.119 | 0.0120 → 0.0098 | 0% → 0% |
+| Regional Asher | 0.138 → 0.125 | 0.262 → 0.199 | 33.7% → 24.1% |
+| World Asher | 0.206 → 0.136 | 0.292 → 0.251 | 33.5% → 28.4% |
+
+Dominant means an automatic representation at least 10% of the largest represented
+area; means are area weighted. World area above underlying chroma 0.18 falls from
+50.7% to 28.6%. These are underlying colors, not composited screenshot pixels.
+Coarse area estimates split cell occupancy within families; cross-family overlap
+is not a screen-pixel union. Thresholds are experimental. World cross-family
+contact shortfall falls 0.04189 → 0.04143; regional rises 0.03299 → 0.03343.
+Africa still has a broad aggregate of vivid small language regions: individual
+prominence does not fully control aggregate family prominence.
+
+All independent branch audits pass. New-anchor branches are checked against their
+**own new-anchor initialization**, not the old palette's means. Changing anchors
+legitimately changes complete family palettes including hidden shades; the later
+branch pass preserves these new anchors and hidden shades. Fixed-anchor variants
+retain the original hidden-color contract. Repeated/reversed-input and radius
+checks pass. Captures have no overrides; fixture tests cover fixed representations.
+
+Runtime is worse: one measured round after warmup gave world previous branches
+6.68s and new anchors + branches 14.12s. Fixed-anchor chroma variants took about
+11s in their separate run. These are exploratory timings, not robust comparisons;
+some rendering/evaluation overlapped the run. Expanded candidate search needs
+optimization after settling the visual direction.
+
+Reproduce from `app/` (use three rounds for stronger timing evidence):
+
+```sh
+node scripts/color-refinement/run.mjs --chroma --rounds 1
+python3 scripts/color-refinement/local_evaluation.py test-results/color-chroma
+python3 scripts/color-branches/audit.py test-results/color-chroma
+python3 scripts/color-branches/render.py test-results/color-chroma
+node scripts/color-refinement/run.mjs --chroma-anchors --rounds 1
+python3 scripts/color-refinement/local_evaluation.py test-results/color-chroma-anchors
+python3 scripts/color-branches/audit.py test-results/color-chroma-anchors
+python3 scripts/color-branches/render.py test-results/color-chroma-anchors
+```
+
+The anchor experiment saves `anchor-source.ts` with the injected implementation.
+Nine focused TypeScript tests, strict helper typechecking, and 19 Python evaluator
+tests pass. Browser rendering verifies selection, loaded colors, and geometry.
+Screenshots use the Plain basemap at 82% opacity. These captures predate integration into the application picker.
+
+## Application integration (2026-11-09)
+
+The view optimizer now calls `src/domain/colorBranches.ts` after hierarchical
+initialization and uses subdued anchor candidates. Production code has no shade
+preference objective; the isolated helper remains available for historical
+comparisons. Stable defaults deliberately retain their original candidate set and
+objective, preserving the starting palette used in the successful experiment.
+
+The integrated optimizer matches every saved color and anchor of the successful
+variant in DLAC, regional Asher, and world Asher. Replays also check reversed input
+order, complete family bounds, and hidden fallback colors. The unit suite passes
+173 tests. Two old quality expectations were adjusted explicitly: synthetic
+prominent-family distance from 0.22 to 0.20 (observed 0.20049), and browser DLAC
+family-conflict ceiling from 0.010 to 0.012 (observed 0.0110, versus default 0.0145).
+World prominent-family conflict is 0.06164, versus default 0.06093; its ceiling is
+now 0.065 instead of 0.060. Independent actual-contact and branch checks remain
+unchanged. Softer colors are therefore not a universal improvement in every
+palette-distance metric.
+
+One measured replay round after warmup took 14.12 seconds for the world branch
+variant. A separate Node CPU profile of the integrated world optimizer took 11.25
+seconds: `familyShade` accounted for roughly 2.03 seconds of self time, branch
+candidate cost 1.34 seconds, and anchor candidate costs 0.73 seconds. Color
+conversion/gamut functions account for substantial additional samples. These are
+single-run diagnostics, not a robust speed benchmark.
+
+Recommended next work:
+
+1. Cache equivalent shade projections and candidate-invariant cost terms, checking
+   exact palette equality against these captures. Profile again before reducing
+   search coverage or removing the existing initializer.
+2. Test family-wide visible-area restraint alongside language prominence. Many
+   small regions can otherwise produce a large bright patch collectively.
+3. Once view behavior is accepted, separately decide whether stable defaults
+   should adopt softer anchors too. That changes the initial map and requires its
+   own visual review; it is not necessary to use this integrated view optimizer.
+
+The full browser color suite also passes after updating its obsolete Back-button
+selector to the current Explore tab. It verifies actual rendered pixels, exact
+custom colors, repeatability, undo/default restoration, navigation stability,
+regional and world family/contact/branch checks, unchanged geometry requests, and
+narrow-layout controls. The production build, targeted Biome checks, and 19 Python
+evaluator tests pass as well.

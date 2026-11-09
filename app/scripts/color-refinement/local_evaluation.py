@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tests/browser'))
-from color_evaluation import distance
+from color_evaluation import distance, lab
 
 PREFERRED = (
     '#d15264', '#ce5d1e', '#af7600', '#8f8600', '#559724', '#009b70',
@@ -111,6 +111,16 @@ def evaluate(capture, palette, geometry=None):
     report['aesthetics'] = {
         'areaWeightedPenalty': sum(p * area for p, (_, area) in zip(penalties, automatic)) / total if total else 0.,
         'areaAboveOne': sum(area for p, (_, area) in zip(penalties, automatic) if p > 1) / total if total else 0.,
+    }
+    chromas = [(math.hypot(*lab(sample)[1:]), area) for sample, area in automatic]
+    largest = max((area for _, area in chromas), default=1)
+    dominant = [(c, area) for c, area in chromas if area >= largest * .1]
+    dominant_area = sum(area for _, area in dominant)
+    report['chroma'] = {
+        'areaWeightedMean': sum(c * area for c, area in chromas) / total if total else 0,
+        'areaAbove018': sum(area for c, area in chromas if c > .18) / total if total else 0,
+        'dominantMean': sum(c * area for c, area in dominant) / dominant_area if dominant_area else 0,
+        'dominantCount': len(dominant),
     }
     return report
 

@@ -39,18 +39,24 @@ const preferredFamilyAnchors: readonly ColorSample[] = Array.from({ length: 24 }
  * These are candidates, not fixed category identities.
  * Deduplicate after gamut mapping, preserving every previously available color.
  */
-export const familyCandidates: readonly ColorSample[] = [
-  ...new Set([
-    ...[0.54, 0.64, 0.74, 0.82].flatMap((l) =>
-      [0.12, 0.18, 0.24].flatMap((c) =>
-        Array.from({ length: 48 }, (_, h) =>
-          formatHex(clampChroma({ mode: 'oklch', l, c, h: h * 7.5 }, 'oklch')),
+const anchorCandidates = (chromas: readonly number[]): readonly ColorSample[] =>
+  [
+    ...new Set([
+      ...[0.54, 0.64, 0.74, 0.82].flatMap((l) =>
+        chromas.flatMap((c) =>
+          Array.from({ length: 48 }, (_, h) =>
+            formatHex(clampChroma({ mode: 'oklch', l, c, h: h * 7.5 }, 'oklch')),
+          ),
         ),
       ),
-    ),
-    ...preferredFamilyAnchors.map(({ hex }) => hex),
-  ]),
-].map(colorSample)
+      ...preferredFamilyAnchors.map(({ hex }) => hex),
+    ]),
+  ].map(colorSample)
+
+// Defaults retain their established identities; explicit view optimization can
+// also choose subdued anchors without a preference for particular swatches.
+export const familyCandidates = anchorCandidates([0.12, 0.18, 0.24])
+const subduedFamilyCandidates = anchorCandidates([0.06, 0.09, 0.12, 0.18, 0.24])
 
 export const colorHash = (id: string) => {
   let hash = 0
@@ -189,6 +195,7 @@ export const assignFamilyAnchors = (
   families: readonly ColorFamily[],
   links: readonly FamilyLink[],
   prioritizeProminent = true,
+  restrainChroma = false,
 ): readonly ColorSample[] => {
   if (!families.length) return []
   const prominent = families.map((_, i) => i).filter((i) => families[i]?.prominent)
@@ -199,7 +206,7 @@ export const assignFamilyAnchors = (
       subset,
       (a, b) => proximity.get(`${prominent[a]},${prominent[b]}`) ?? 0,
     )
-    const initial = assignFamilyAnchors(subset, subsetLinks, false)
+    const initial = assignFamilyAnchors(subset, subsetLinks, false, restrainChroma)
     const anchors = new Map(prominent.map((i, j) => [i, initial[j] as ColorSample]))
     return assignFamilyAnchors(
       families.map((family, i) => {
@@ -208,9 +215,11 @@ export const assignFamilyAnchors = (
       }),
       links,
       false,
+      restrainChroma,
     )
   }
-  const samples = [...familyCandidates]
+  const candidates = restrainChroma ? subduedFamilyCandidates : familyCandidates
+  const samples = [...candidates]
   const indices = new Map(samples.map((sample, i) => [sample.hex, i]))
   const indexOf = (sample: ColorSample) => {
     let index = indices.get(sample.hex)
@@ -292,21 +301,23 @@ export const assignFamilyAnchors = (
     const areaWeight = 0.1 + 0.9 * family.prominence ** 2
     return (
       0.018 * (colorDistance(before, after) / 0.3) ** 2 +
-      0.3 * areaWeight * (preferences[candidate] ?? 0)
+      (restrainChroma
+        ? 1.2 *
+          areaWeight *
+          (Math.max(0, Math.hypot(after.a, after.b) - (0.18 - 0.08 * family.prominence)) / 0.08) **
+            2
+        : 0.3 * areaWeight * (preferences[candidate] ?? 0))
     )
   }
   const unaryCosts = families.map((_, i) => Float64Array.from(samples, (_, j) => unaryCost(i, j)))
   const choices = families.map((family, i) => {
     const reference = references[i] ?? 0
     if (family.locked || !family.automatic) return [reference]
-    const offset = colorHash(family.id) % familyCandidates.length
+    const offset = colorHash(family.id) % candidates.length
     return [
       ...new Set([
         reference,
-        ...Array.from(
-          { length: familyCandidates.length },
-          (_, j) => (j + offset) % familyCandidates.length,
-        ),
+        ...Array.from({ length: candidates.length }, (_, j) => (j + offset) % candidates.length),
       ]),
     ]
   })
@@ -445,7 +456,7 @@ export const assignFamilyAnchors = (
     if (energy(alternative) < energy(best) - 1e-9) best = alternative
   }
   descend(best, 2)
-  return best.map((index) => samples[index] ?? (familyCandidates[0] as ColorSample))
+  return best.map((index) => samples[index] ?? (candidates[0] as ColorSample))
 }
 
 /** Bound hue and chroma for family identity, then share remaining anchor margin.

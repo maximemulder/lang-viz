@@ -1,3 +1,4 @@
+import { branchRefinement } from './colorBranches.ts'
 import {
   buildFamilyPalette,
   type ColorAxes,
@@ -487,7 +488,7 @@ export const optimizeColors = ({
     // outpost must not make two otherwise distant families strong neighbors.
     return Math.max(contact(first.cells, fieldB), contact(second.cells, fieldA))
   })
-  const anchors = assignFamilyAnchors(families, links)
+  const anchors = assignFamilyAnchors(families, links, true, true)
   const spaces = familyColorSpaces(families, links, anchors)
   const colors = new Map<string, ColorSample>()
   groups.forEach((group, i) => {
@@ -542,6 +543,7 @@ export const optimizeColors = ({
   groups.forEach((group, i) => {
     refineShades(group, internal[i] ?? [], colors)
   })
+  branchRefinement(groups, colors, view.columns, view.rows, distanceField)
   const after = quality(groups, links, colors, anchors, internal)
   return {
     colors: new Map([...colors].map(([id, sample]) => [id, sample.hex])),

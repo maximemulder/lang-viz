@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { branchCuts, branchRefinement, shadePreference } from '../scripts/color-branches/refine.ts'
+import {
+  branchCuts,
+  branchRefinement,
+  chromaRestraint,
+  shadePreference,
+} from '../scripts/color-branches/refine.ts'
 import type { Group } from '../scripts/color-refinement/spatial.ts'
+import { branchRefinement as integratedRefinement } from '../src/domain/colorBranches.ts'
 import { familyColorFrame, familyShade } from '../src/domain/colorHierarchy.ts'
 import { colorDistance, colorSample } from '../src/domain/familyColors.ts'
 
@@ -134,4 +140,51 @@ test('strong aesthetic pressure cannot erase existing separation between substan
       }
     })
   })
+})
+
+test('chroma restraint allows accents and does not penalize subdued alternatives', () => {
+  const vivid = { hex: '', l: 0.65, a: 0.16, b: 0 }
+  const soft = { ...vivid, a: 0.08 }
+  assert.equal(chromaRestraint(vivid, 0), 0)
+  assert.ok(chromaRestraint(vivid, 1) > 0)
+  assert.equal(chromaRestraint(soft, 1), 0)
+  assert.equal(chromaRestraint({ ...vivid, l: 0.8 }, 1), chromaRestraint(vivid, 1))
+})
+
+test('chroma experiment retains fixed, hidden and root colors and branch separation', () => {
+  const { group, colors } = fixture()
+  const modified = {
+    ...group,
+    vertices: group.vertices.map((v) => (v.id === 'a' ? { ...v, fixed: colors.get('a') } : v)),
+  }
+  const seed = new Map(colors)
+  const before = branchCuts(modified, colors)
+  branchRefinement([modified], colors, [], 10, 10, field, 0, 1.2)
+  for (const id of ['a', 'family', 'hidden']) assert.deepEqual(colors.get(id), seed.get(id))
+  const after = branchCuts(modified, colors)
+  before.forEach((cut, scale) => {
+    cut.forEach((branch, i) => {
+      for (let j = i + 1; j < cut.length; j++) {
+        const a = after[scale]?.[i],
+          b = after[scale]?.[j],
+          other = cut[j]
+        assert.ok(a && b && other)
+        assert.ok(
+          colorDistance(a.seed, b.seed) >=
+            Math.min(0.025, colorDistance(branch.seed, other.seed)) * 0.98 - 1e-10,
+        )
+      }
+    })
+  })
+  const repeated = new Map(seed)
+  branchRefinement([modified], repeated, [], 10, 10, field, 0, 1.2)
+  assert.deepEqual(colors, repeated)
+})
+
+test('app branch pass reproduces the successful chroma experiment', () => {
+  const { group, colors } = fixture()
+  const expected = new Map(colors)
+  branchRefinement([group], expected, [], 10, 10, field, 0, 0.1)
+  integratedRefinement([group], colors, 10, 10, field)
+  assert.deepEqual(colors, expected)
 })

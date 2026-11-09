@@ -5,6 +5,8 @@ from pathlib import Path
 
 def write_review(out):
     evaluation = json.loads((out / 'evaluation.json').read_text())
+    variants = json.loads((out / 'benchmark.json').read_text())['variants']
+    chroma = any('chroma' in name for name in variants)
     rows = []
     for scene, label in [('dlac', 'DLAC'), ('asher', 'Regional Asher'), ('asher-world', 'World Asher')]:
         baseline, proposal = (evaluation[scene][variant]['local'] for variant in ('baseline', 'branches'))
@@ -15,7 +17,7 @@ def write_review(out):
         cells.append(' → '.join(f"{item['aesthetics']['areaWeightedPenalty']:.3f}" for item in (baseline, proposal)))
         rows.append('<tr>' + ''.join('<td>' + cell + '</td>' for cell in cells) + '</tr>')
     summary = '<table><tr><th>View</th><th>Within-family shortfall ↓</th><th>Severe pair weight ↓</th><th>Aesthetic penalty ↓</th></tr>' + ''.join(rows) + '</table>'
-    (out / 'index.html').write_text('''<!doctype html>
+    html = '''<!doctype html>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Branch color proof of concept</title>
@@ -59,7 +61,28 @@ def write_review(out):
     document.onkeydown=event=>{if(event.target.tagName==='SELECT')return;if(event.key==='ArrowRight'||event.key==='ArrowLeft'){
     variant=(variant+(event.key==='ArrowRight'?1:buttons.length-1))%buttons.length;update();event.preventDefault();}};
     update();
-    </script>'''.replace('<!-- summary -->', summary))
+    </script>'''.replace('<!-- summary -->', summary)
+    if chroma:
+        html = html.replace('Branch color proof of concept', 'Prominence and chroma experiment')
+        anchors = 'branches-chroma-anchors' in variants
+        start = html.index('    <button data-variant=')
+        end = html.index('    </nav>', start)
+        labels = ['Current picker', 'Previous branch result', 'Chroma restraint', 'Stronger chroma restraint']
+        if anchors:
+            labels = ['Current picker', 'Previous branch result', 'Softer anchors only', 'Softer anchors + branch refinement']
+        html = html[:start] + ''.join(f'<button data-variant="{name}" aria-pressed="false">{label}</button>' for name, label in zip(variants, labels)) + html[end:]
+        start = html.index('    <p>The proposal')
+        end = html.index('    <nav>', start)
+        rows = []
+        for scene, measurements in evaluation.items():
+            for name in variants:
+                m = measurements[name]['local']
+                rows.append(f"<tr><td>{scene}</td><td>{name}</td><td>{m['chroma']['dominantMean']:.3f}</td><td>{m['chroma']['areaAbove018']:.1%}</td><td>{m['within']['all']['meanShortfall']:.3f}</td><td>{m['within']['all']['severeFraction']:.1%}</td></tr>")
+        html = html[:start] + '<p>Chroma variants replace the old palette preference with a soft penalty on excessive chroma, stronger for large regions. Family anchors and bounds remain fixed. Metrics use underlying fill colors and coarse occupied-area estimates, not composited pixels or human judgments.</p><details><summary>Measurements</summary><table><tr><th>Scene</th><th>Variant</th><th>Dominant-region chroma</th><th>Area above 0.18</th><th>Local shortfall</th><th>Severe pairs</th></tr>' + ''.join(rows) + '</table></details>' + html[end:]
+        if anchors:
+            html = html.replace('identical family anchors, 82%', '82%')
+            html = html.replace('Family anchors and bounds remain fixed.', 'This experiment recomputes family anchors and bounds; hidden family shades also follow the new anchors. Hue assignments can change.')
+    (out / 'index.html').write_text(html)
 
 if __name__ == '__main__':
     write_review(Path(sys.argv[1]))

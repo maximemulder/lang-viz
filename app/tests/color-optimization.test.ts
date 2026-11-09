@@ -457,6 +457,7 @@ test('more descendants cannot outweigh a small family competing with a large ter
   assert.ok(distance(large.colors.get('small'), large.regions.get('large')?.anchor) > 0.24)
 })
 
+// Subdued anchors retain a 0.20 separation here; the former vivid palette used 0.22.
 test('prominent families compete globally, even when their territories are distant', () => {
   const input = inputFor(
     [
@@ -477,7 +478,10 @@ test('prominent families compete globally, even when their territories are dista
     ['b', 'c'],
     ['a', 'c'],
   ] as const)
-    assert.ok(distance(result.colors.get(a), result.colors.get(b)) > 0.22)
+    assert.ok(
+      distance(result.colors.get(a), result.colors.get(b)) > 0.2,
+      `${a}/${b}: ${distance(result.colors.get(a), result.colors.get(b))}`,
+    )
 })
 
 test('distant prominent families retain a separation gap across their complete palettes', () => {

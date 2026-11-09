@@ -17,6 +17,8 @@ const { values } = parseArgs({
     input: { type: 'string', default: join(app, 'test-results/colors') },
     output: { type: 'string' },
     rounds: { type: 'string', default: '3' },
+    'chroma-anchors': { type: 'boolean', default: false },
+    chroma: { type: 'boolean', default: false },
     branches: { type: 'boolean', default: false },
   },
 })
@@ -24,12 +26,25 @@ const rounds = Number(values.rounds)
 assert.ok(Number.isInteger(rounds) && rounds > 0, '--rounds must be a positive integer')
 const output = resolve(
   values.output ??
-    join(app, values.branches ? 'test-results/color-branches' : 'test-results/color-refinement'),
+    join(
+      app,
+      values['chroma-anchors']
+        ? 'test-results/color-chroma-anchors'
+        : values.chroma
+          ? 'test-results/color-chroma'
+          : values.branches
+            ? 'test-results/color-branches'
+            : 'test-results/color-refinement',
+    ),
 )
 await mkdir(output, { recursive: true })
-const names = values.branches
-  ? ['baseline', 'spatial', 'branches', 'branches-no-aesthetic']
-  : ['baseline', 'whole-family', 'spatial']
+const names = values['chroma-anchors']
+  ? ['baseline', 'branches', 'baseline-chroma-anchors', 'branches-chroma-anchors']
+  : values.chroma
+    ? ['baseline', 'branches', 'branches-chroma', 'branches-chroma-strong']
+    : values.branches
+      ? ['baseline', 'spatial', 'branches', 'branches-no-aesthetic']
+      : ['baseline', 'whole-family', 'spatial']
 const scenes = ['dlac', 'asher', 'asher-world']
 const read = async (path) => JSON.parse(await readFile(path, 'utf8'))
 const save = async (name, value) => writeFile(join(output, name), JSON.stringify(value, null, 2))
@@ -52,6 +67,23 @@ try {
         .map(async (name) => [name, await readFile(join(sourceDirectory, name), 'utf8')]),
     ),
   )
+  // Reconstruct the pre-integration initializer for historical ablations.
+  // The successful variant is checked against the actual app below.
+  originals.set(
+    'colorOptimization.ts',
+    replace(
+      replace(
+        originals.get('colorOptimization.ts'),
+        "import { branchRefinement } from './colorBranches.ts'\n",
+        '',
+      ),
+      '  branchRefinement(groups, colors, view.columns, view.rows, distanceField)\n',
+      '',
+    ).replace(
+      'assignFamilyAnchors(families, links, true, true)',
+      'assignFamilyAnchors(families, links)',
+    ),
+  )
   const modules = {}
   for (const name of names) {
     const directory = join(temporary, name)
@@ -59,6 +91,14 @@ try {
     await symlink(join(app, 'node_modules'), join(directory, 'node_modules'), 'dir')
     for (const [file, original] of originals) await writeFile(join(directory, file), original)
     let source = originals.get('colorOptimization.ts')
+    if (name.endsWith('chroma-anchors')) {
+      source = replace(
+        source,
+        'assignFamilyAnchors(families, links)',
+        'assignFamilyAnchors(families, links, true, true)',
+      )
+      await writeFile(join(output, 'anchor-source.ts'), originals.get('familyColors.ts'))
+    }
     if (name === 'whole-family' || name === 'spatial') {
       source = replace(source, '  familyShade,', '  familyShade,\n  familyColorFrame,')
       source = replace(
@@ -94,7 +134,7 @@ try {
         refinement,
         name.startsWith('branches')
           ? `${refinement}
-  const experiment = branchRefinement(groups, colors, links, view.columns, view.rows, distanceField${name === 'branches-no-aesthetic' ? ', 0' : ''})`
+  const experiment = branchRefinement(groups, colors, links, view.columns, view.rows, distanceField${name === 'branches-chroma-anchors' ? ', 0, 0.1' : name === 'branches-chroma' ? ', 0, 0.4' : name === 'branches-chroma-strong' ? ', 0, 1.2' : name === 'branches-no-aesthetic' ? ', 0' : ''})`
           : '  const experiment = spatialRefinement(groups, colors, links, view.columns, view.rows, distanceField)',
       )
     } else {
@@ -136,6 +176,7 @@ ${refinement}
     node: process.version,
     rounds,
     variants: names,
+    anchorExperiment: Boolean(values['chroma-anchors']),
     experimentHash: createHash('sha256')
       .update(await readFile(join(here, '../color-branches/refine.ts')))
       .digest('hex'),
@@ -160,6 +201,7 @@ ${refinement}
     const expected = {}
     const runs = Object.fromEntries(names.map((name) => [name, []]))
     let baseline
+    let anchorBaseline
     for (let round = -1; round < rounds; round++) {
       // Rotate ordering, with one unmeasured warmup, to reduce JIT/order bias.
       const offset = Math.max(0, round) % names.length
@@ -183,18 +225,28 @@ ${refinement}
         if (round === -1) {
           if (name === 'baseline') {
             baseline = result
+          }
+          if (name === 'branches-chroma-anchors') {
             const { experiment: _, ...actual } = result
             assert.deepEqual(
               actual,
               production.optimizeColors(capture),
-              'Isolated baseline differs from production',
+              'Integrated optimizer differs from the successful experiment',
             )
           }
-          assert.deepEqual(
-            result.regions,
-            baseline.regions,
-            'An experiment changed family anchors or bounds',
-          )
+          if (name === 'baseline-chroma-anchors') anchorBaseline = result
+          if (name === 'branches-chroma-anchors')
+            assert.deepEqual(
+              result.regions,
+              anchorBaseline.regions,
+              'Branch pass changed new anchor bounds',
+            )
+          if (!name.endsWith('chroma-anchors'))
+            assert.deepEqual(
+              result.regions,
+              baseline.regions,
+              'An experiment changed family anchors or bounds',
+            )
           expected[name] = palette
           await save(`${name}-${scene}-palette.json`, palette)
         } else {
@@ -209,7 +261,13 @@ ${refinement}
             colorDistance(colorSample(hex), colorSample(region.anchor)) <= region.radius + 0.0015,
             `Shade escaped its family region: ${id}`,
           )
-          if (!visible.has(id))
+          if (!visible.has(id) && name === 'branches-chroma-anchors')
+            assert.equal(
+              hex,
+              anchorBaseline.colors.get(id),
+              `Hidden fallback changed after anchor initialization: ${id}`,
+            )
+          if (!visible.has(id) && !name.endsWith('chroma-anchors'))
             assert.equal(hex, baseline.colors.get(id), `Hidden fallback changed: ${id}`)
         }
       }

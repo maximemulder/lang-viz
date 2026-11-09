@@ -38,6 +38,11 @@ const preferred = [
 ].map(colorSample)
 export const shadePreference = (color: ColorSample) =>
   (Math.min(...preferred.map((reference) => colorDistance(color, reference))) / 0.08) ** 2
+/** Soft restraint, not a beauty score. Small marks retain stronger accents. */
+export const chromaRestraint = (color: ColorSample, prominence: number) => {
+  const target = 0.18 - 0.08 * Math.sqrt(Math.max(0, Math.min(1, prominence)))
+  return (Math.max(0, Math.hypot(color.a, color.b) - target) / 0.08) ** 2
+}
 const loss = (distance: number, target: number) => Math.max(0, 1 - distance / target) ** 2
 const mean = (entries: readonly { color: ColorSample; weight: number }[]): ColorSample => {
   const mass = entries.reduce((sum, entry) => sum + entry.weight, 0) || 1
@@ -104,6 +109,7 @@ export const branchRefinement = (
   rows: number,
   distanceField: (cells: readonly number[], columns: number, rows: number) => Float32Array,
   aestheticWeight = 0.16,
+  chromaWeight = 0,
 ) => {
   const started = performance.now()
   const graph = spatialEdges(groups, columns, rows, distanceField)
@@ -116,6 +122,7 @@ export const branchRefinement = (
       edges.push(edge)
       incident.set(vertex.languageId, edges)
     }
+  const largestArea = Math.max(1, ...groups.flatMap((group) => [...group.weights.values()]))
   const seeds = new Map(colors)
   const states = groups.map((group) => {
     const frame = familyColorFrame(group.anchor, group.radius, group.planes)
@@ -157,6 +164,11 @@ export const branchRefinement = (
           )
         }
     pool.push(...preferred.map((color) => project(color)))
+    if (chromaWeight) {
+      for (const candidate of [...pool])
+        for (const factor of [0.45, 0.65, 0.85])
+          pool.push(project(gamutSample(candidate.l, candidate.a * factor, candidate.b * factor)))
+    }
     const cuts = branchCuts(group, seeds)
     const total = [...group.weights.values()].reduce((s, w) => s + w, 0) || 1
     // Coordinate broad references jointly before assigning individual shades.
@@ -183,7 +195,8 @@ export const branchRefinement = (
             return (
               separation / (mass || 1) +
               0.12 * (colorDistance(candidate, branch.seed) / 0.08) ** 2 +
-              aestheticWeight * shadePreference(candidate)
+              aestheticWeight * shadePreference(candidate) +
+              chromaWeight * chromaRestraint(candidate, branch.mass / largestArea)
             )
           }
           let best = project(branch.reference),
@@ -227,6 +240,9 @@ export const branchRefinement = (
           for (const da of [-0.035, 0, 0.035])
             for (const db of [-0.035, 0, 0.035])
               candidates.push(gamutSample(seed.l + dl, seed.a + da, seed.b + db))
+        if (chromaWeight)
+          for (const factor of [0.45, 0.65, 0.85])
+            candidates.push(gamutSample(seed.l, seed.a * factor, seed.b * factor))
         const unique = new Map(
           candidates.map((c) => {
             const p = state.project(c, id)
@@ -303,6 +319,7 @@ export const branchRefinement = (
           aestheticWeight *
             (0.25 + 0.75 * Math.sqrt(mass / state.total)) *
             (variable.preferences.get(candidate.hex) ?? shadePreference(candidate)) +
+          chromaWeight * chromaRestraint(candidate, mass / largestArea) +
           0.015 * (colorDistance(candidate, seed) / Math.max(0.025, state.group.radius)) ** 2
         )
       }

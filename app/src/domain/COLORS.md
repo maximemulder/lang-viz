@@ -5,16 +5,26 @@ time period, search, and camera. `GeometryVariant.color` remains a legacy catego
 seed in the generated catalog; rendering uses `languageColorsAtom` instead.
 No data rebuild is required to change palettes.
 
-This document describes the current implementation, the
-[refinement experiment](#refinement-ablation-2026-11-09), and the
-[proposed roadmap](#roadmap-implementation-deferred). Roadmap work is deferred
-until the other model's ongoing work has finished and its changes have been pushed.
-The experiment has not replaced the application picker.
+The explicit view optimizer now uses the successful softer-anchor and multiscale
+branch-reference experiment. `colorBranches.ts` refines visible automatic shades
+using the local graph in `colorSpatial.ts`, preserving substantial branch contrasts
+and family bounds. Anchor search offers lower-chroma candidates and penalizes
+excess chroma according to prominence; the branch pass uses chroma weight 0.1.
+Neither pass scores proximity to a preferred palette. Original swatches remain
+candidate samples. The stable default palette retains its previous initialization
+and preference cost, so this integration reproduces the experiment's starting point.
 
-A subsequent user-authorized [branch-reference proof of concept](../../scripts/color-branches/README.md)
-now tests multiscale branch references, aggregate contrast guards, and aesthetic
-preference on actual shades. It remains isolated from the application picker;
-the broader geographic-preprocessing roadmap below is still unimplemented.
+Use **Optimize colors for this view** to see the new behavior. It runs in the existing
+worker and participates in the existing cancellation and undo flow. Large world
+views can still take roughly 14 seconds; this is an experimental implementation,
+not yet a performance-optimized one. Many small vivid regions can also create an
+overly vivid family collectively; family-wide chroma restraint is a next experiment.
+
+The [experiment report](../../scripts/color-branches/README.md) records historical
+ablations. Its replay harness reconstructs the prior initializer and checks the
+successful variant against the app optimizer. The broader geographic preprocessing
+roadmap below remains unimplemented. Historical sections describe their original
+state and are superseded by this integration where applicable.
 
 ## Testing controls
 
@@ -438,7 +448,23 @@ more correction passes, per-family exceptions, or separate locality rules.
 - Retain the rendering contract: color changes must not fetch, repartition, or
   invalidate geometry. Bound runtime and memory and keep search off the UI thread.
 
-### Aesthetic reference
+### Clarification: prominence and vividness (2026-11-09)
+
+The user's later clarification supersedes the palette-recovery proposal below:
+the concern is excessive vividness over large visible language territories, not
+agreement with a particular set of preferred hues. Smaller regions may use stronger
+accents. Recovering a preferred palette from the screenshot is no longer a goal.
+The existing “aesthetic” metric measures reference-palette distance only; it must
+not be interpreted as a human quality score or a measure of excessive chroma.
+
+The [chroma experiment](../../scripts/color-branches/README.md#prominence-and-chroma-experiment)
+compares fixed-anchor restraint with rebuilding family anchors from an expanded
+candidate pool. Its successful variant now powers explicit view optimization. Chroma thresholds,
+area estimates and contrast targets remain experimental; rendered comparisons
+are required. The historical screenshot notes below are context, not a current
+requirement to reproduce those colors.
+
+### Aesthetic reference (historical)
 
 The user's preferred visual reference is the Asher world map before the recent
 color changes:

@@ -9,7 +9,8 @@ def audit(directory):
     result = {}
     for scene, variants in evaluation.items():
         baseline = variants['baseline']['existing']['families']
-        for variant in ('branches', 'branches-no-aesthetic'):
+        for variant in (name for name in variants if name.startswith('branches')):
+            baseline = variants['baseline-chroma-anchors' if variant.endswith('chroma-anchors') else 'baseline']['existing']['families']
             measured = variants[variant]['existing']['families']
             checked, regressions = 0, []
             for family, before in baseline.items():
