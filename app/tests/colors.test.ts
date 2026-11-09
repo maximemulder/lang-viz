@@ -179,6 +179,19 @@ test('geographic neighborhoods use distributed descendants and wrap across the d
   assert.equal(graph.get('missing'), undefined)
 })
 
+test('unary descendants inherit exact seeds at the edges of the sRGB gamut', () => {
+  const hierarchy = buildLanguageHierarchy([
+    entry('root', null),
+    entry('child', 'root'),
+    entry('grandchild', 'child'),
+  ])
+  const topology = buildColorTopology(hierarchy)
+  for (const anchor of ['#ff0000', '#0000ff', '#00ff00', '#000000', '#ffffff']) {
+    const palette = buildSemanticPalette(hierarchy, topology, [], { root: anchor })
+    for (const id of ['root', 'child', 'grandchild']) assert.equal(palette.colors.get(id), anchor)
+  }
+})
+
 test('a custom neighborhood provider can separate roots without catalog coordinates', () => {
   const h = buildLanguageHierarchy([entry('a', null, null, null), entry('y', null, null, null)])
   const t = buildColorTopology(h)
@@ -214,9 +227,44 @@ test('real catalog palettes cover all languoids and retain variation in deep Sin
   const p = buildSemanticPalette(h, buildColorTopology(h))
   assert.equal(p.colors.size, entries.length)
   const chinese = ['mand1415', 'jiny1235', 'yuec1235', 'ganc1239', 'hakk1236']
-  assert.equal(new Set(chinese.map((id) => p.colors.get(id))).size, chinese.length)
+  // Overview palettes may quantize very close relatives to the same RGB color;
+  // focused view tests require their differences to expand perceptibly.
+  assert.ok(new Set(chinese.map((id) => p.colors.get(id))).size > 1)
   for (const id of chinese) assert.equal(p.rootById.get(id), 'sino1245')
   for (const id of ['tibeto-burman', 'shaozhou-tuhua', 'danzhou']) {
     assert.equal(p.rootById.get(`dlac1987china:${id}`), 'sino1245')
   }
+})
+
+test('default branches use available lightness when a neighboring anchor crowds their hue', () => {
+  const branches = ['a', 'b', 'c']
+  const leaves = branches.flatMap((branch) =>
+    Array.from({ length: 8 }, (_, i) => entry(`${branch}-${i}`, branch)),
+  )
+  const h = buildLanguageHierarchy([
+    entry('root', null),
+    ...branches.map((id) => entry(id, 'root')),
+    ...leaves,
+    entry('neighbor', null),
+  ])
+  const p = buildSemanticPalette(h, buildColorTopology(h), [], {
+    root: '#997755',
+    neighbor: '#aa7755',
+  })
+  const means = branches.map((branch) => {
+    const samples = leaves
+      .filter(({ parentId }) => parentId === branch)
+      .map(({ id }) => {
+        const sample = lab(p.colors.get(id))
+        assert.ok(sample)
+        return sample
+      })
+    return samples.reduce((sum, sample) => sum + sample.l, 0) / samples.length
+  })
+  for (let i = 0; i < means.length; i++)
+    for (let j = i + 1; j < means.length; j++)
+      assert.ok(
+        Math.abs((means[i] ?? 0) - (means[j] ?? 0)) * 0.65 > 0.035,
+        'stable defaults flattened broad branches despite available lightness',
+      )
 })

@@ -1,3 +1,4 @@
+import type { FamilyColorRegion, OptimizedColors } from '../../../../domain/colorOptimization'
 import type { ColorConfiguration } from '../../../../domain/colors'
 import type { MapEntry } from '../../../../domain/mapEntries'
 import type { InspectionProbe } from './inspectionProbe'
@@ -17,6 +18,11 @@ export interface OverlapTestApi {
     roots: Record<string, string | undefined>
     branchRoots: readonly string[]
     configuration: ColorConfiguration
+    optimization:
+      | (Omit<OptimizedColors, 'colors' | 'regions'> & {
+          regions: Record<string, FamilyColorRegion>
+        })
+      | null
   }
   camera(center: [number, number], zoom: number, duration?: number): void
   recompute(): void

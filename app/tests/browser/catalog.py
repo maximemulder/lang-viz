@@ -535,7 +535,13 @@ def main():
             color_text('.color-controls input[aria-label="Custom color value"]', '#ff0000')
             color_button('Set subtree color')
             wait_for(lambda: browser.js("return window.overlapTest.colorState(['abkh1244']).roots.abkh1244 === 'abkh1243'"), 10, 'subtree UI anchor')
-            assert browser.js("return window.overlapTest.colorState(['abkh1244']).colors.abkh1244") == '#ff0000'
+            # A subtree seed is exact at its root; branching descendants vary
+            # around it. Exact red for this child previously came from clipping
+            # its increased chroma back to the same sRGB boundary color.
+            anchored = browser.js("return window.overlapTest.colorState(['abkh1243','abkh1244']).colors")
+            assert anchored['abkh1243'] == '#ff0000'
+            red, green, blue = (int(anchored['abkh1244'][i:i+2], 16) for i in (1,3,5))
+            assert red > max(green, blue), anchored
             color_button('Remove subtree color')
             assert not browser.js("return window.overlapTest.colorState([]).configuration.anchors.abkh1243")
             color_text('.color-controls textarea', 'abkh1243')

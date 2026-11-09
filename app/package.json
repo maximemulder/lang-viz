@@ -12,6 +12,8 @@
     "test:browser": "python3 tests/browser/run.py",
     "test:inspection-browser": "python3 tests/browser/inspection.py",
     "test:catalog-browser": "npm run build && python3 tests/browser/catalog.py",
+    "test:colors-browser": "python3 -m unittest discover -s tests/browser -p test_color_evaluation.py && npm run build && python3 tests/browser/colors.py",
+    "evaluate:colors": "python3 tests/browser/color_evaluation.py",
     "test:source-browser": "npm run build && python3 tests/browser/source_languoids.py",
     "test:delivery-browser": "npm run build && python3 tests/browser/delivery.py",
     "test:prepared-browser": "npm run build && python3 tests/browser/prepared.py",

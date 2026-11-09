@@ -22,11 +22,9 @@ export const featureVariantIds = (properties: Record<string, unknown>): string[]
 }
 
 /** Pick the same geometry that contributes color, including retained detail and clipped fallback. */
-export const visibleVariantIds = (
+export const visibleColorLayers = (
   map: Pick<MapLibreMap, 'getLayer' | 'getPaintProperty' | 'queryRenderedFeatures'> &
     Partial<Pick<MapLibreMap, 'getLayersOrder'>>,
-  point: PointLike,
-  refinements?: Refinements,
 ): string[] => {
   const coverage = BUFFERS.flatMap((buffer) =>
     [
@@ -39,7 +37,15 @@ export const visibleVariantIds = (
     ),
   )
   const original = 'selected-language-areas'
-  const layers = coverage.length ? coverage : map.getLayer(original) ? [original] : []
+  return coverage.length ? coverage : map.getLayer(original) ? [original] : []
+}
+
+export const visibleVariantIds = (
+  map: Parameters<typeof visibleColorLayers>[0],
+  point: PointLike,
+  refinements?: Refinements,
+): string[] => {
+  const layers = visibleColorLayers(map)
   // An empty coverage hit must stay empty: original polygons can differ in detail
   // and must not refill holes or restore contributors absent from the displayed face.
   if (!layers.length) return []

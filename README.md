@@ -206,6 +206,19 @@ Solid areas and overlap stripes share the same transparency. They are composited
 once over the basemap, so transparent stripes do not reveal other language fills
 underneath. Adjusting the slider does not recompute geometry.
 
+**Language colors** uses stable genealogy palettes. In Map settings,
+**Optimize colors for this view** adapts the palette to the selected polygons on
+screen. Prominent and neighboring families receive coherent palettes. Internal
+variation follows each family's neighborhood, using available shade differences
+to retain broad branch structure in crowded views and expand focused comparisons.
+Refresh updates offscreen relatives with the same family palette. Colors remain
+fixed while navigating or changing filters. Custom colors are kept;
+**Undo colors** and **Use default palette** restore earlier assignments. These
+settings last until reload. Defaults and view optimization share the same shade
+allocator; fixed catalog evidence keeps defaults stable. Independent evaluation
+checks local conflicts and branch contrast at several area scales. See
+[the color algorithm, controls, and evaluation commands](app/src/domain/COLORS.md).
+
 Overlap geometry is computed in a browser worker from the existing PMTiles
 archive, using its simplified vector tiles and a spatial index. Exact complete
 dataset views and same-dataset/period subsets can use the optional prepared coverage described above; no server
