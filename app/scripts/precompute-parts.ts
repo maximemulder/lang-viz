@@ -1,7 +1,11 @@
 /** Selection-independent, sparse coverage for each dataset and period. */
+
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { FileSource, PMTiles } from 'pmtiles'
 import type { AtlasManifest, GeometryVariant } from '../src/domain/atlas.ts'
@@ -12,6 +16,7 @@ import { mergePartsManifest } from './lib/partsManifest.ts'
 
 const { values } = parseArgs({
   options: {
+    'data-dir': { type: 'string' },
     'max-zoom': { type: 'string' },
     dataset: { type: 'string', multiple: true },
     period: { type: 'string', multiple: true },
@@ -23,9 +28,32 @@ if (
   (!Number.isInteger(requestedZoom) || requestedZoom < 0 || requestedZoom > 8)
 )
   throw new Error('--max-zoom must be an integer from 0 to 8')
-const directory = new URL('../public/data/', import.meta.url)
+const directory = values['data-dir']
+  ? pathToFileURL(`${resolve(values['data-dir'])}/`)
+  : new URL('../public/data/', import.meta.url)
 const manifestUrl = new URL('manifest.json', directory)
 const manifest: AtlasManifest = JSON.parse(await readFile(manifestUrl, 'utf8'))
+if (manifest.geometryBuild?.kind === 'shared-coverage') {
+  const root = new URL('../../', import.meta.url)
+  const localPython = new URL('.venv/bin/python', root)
+  const python = existsSync(localPython) ? fileURLToPath(localPython) : 'python3'
+  const result = spawnSync(
+    python,
+    [
+      '-m',
+      'pipeline.atlas.topology_build',
+      '--restore-parts',
+      '--output',
+      fileURLToPath(directory),
+      ...(values.dataset?.flatMap((dataset) => ['--dataset', dataset]) ?? []),
+      ...(values.period?.flatMap((period) => ['--period', period]) ?? []),
+      ...(requestedZoom === undefined ? [] : ['--max-zoom', String(requestedZoom)]),
+    ],
+    { cwd: fileURLToPath(root), stdio: 'inherit' },
+  )
+  if (result.error) throw result.error
+  process.exit(result.status ?? 1)
+}
 const variants: GeometryVariant[] = JSON.parse(
   await readFile(new URL('geometry-variants.json', directory), 'utf8'),
 )

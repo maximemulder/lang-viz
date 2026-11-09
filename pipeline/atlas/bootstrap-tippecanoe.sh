@@ -29,5 +29,5 @@ if [[ ! -f /usr/include/sqlite3.h && ! -f /usr/local/include/sqlite3.h ]]; then
   )
 fi
 
-make -C "$source_dir" -j"$(getconf _NPROCESSORS_ONLN)" "${make_arguments[@]}" tippecanoe tile-join
+make -C "$source_dir" -j"$(getconf _NPROCESSORS_ONLN)" "${make_arguments[@]}" tippecanoe tile-join tippecanoe-decode
 "$source_dir/tippecanoe" --version

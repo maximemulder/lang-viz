@@ -87,6 +87,8 @@ export interface AtlasManifest {
   readonly geometryVariantCount: number
   readonly vectorLayer: string
   readonly archive: string
+  /** Highest native source LOD; higher camera zooms retain this geometry. */
+  readonly geometryMaxZoom?: number
   readonly geometryIndex?: string
   readonly geometryProvenance?: string
   readonly geometryProfiles?: readonly {
@@ -94,6 +96,12 @@ export interface AtlasManifest {
     readonly viewId: TemporalViewId
     readonly archive: string
   }[]
+  readonly geometryBuild?: {
+    readonly kind: 'shared-coverage'
+    readonly version: number
+    readonly fingerprint: string
+    readonly report: string
+  }
   readonly branchCoverage?: {
     readonly directory: string
     readonly maxZoom: number

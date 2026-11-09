@@ -13,8 +13,8 @@ bash ./pipeline/atlas/bootstrap-tippecanoe.sh
 uv run python -m pipeline.atlas.build
 cd app
 npm install
-npm run precompute:branches
 npm run precompute:parts
+npm run precompute:branches
 npm run dev
 ```
 
@@ -93,9 +93,9 @@ preserves existing entry identities and colors. Source and period choices affect
 the next action; they do not change already pinned entries.
 
 `npm run precompute:branches` optionally prepares complete **single-dataset,
-single-period** views at zooms 0–3 from the existing simplified archive. It costs
-about two minutes on the development machine and resumes completed tiles. The browser
-uses these tiles only for an exact geometry/refinement match.
+single-period** views at zooms 0–3. It composes reusable parts when available and
+resumes completed tiles. Older datasets without parts use the live engine offline.
+The browser uses these tiles only for an exact geometry/refinement match.
 
 `npm run precompute:parts` additionally prepares reusable disjoint coverage at
 all source zooms for every dataset/period (currently 0–8). Each piece retains every original contributor,
@@ -121,8 +121,7 @@ live polygon overlay. `npm run test:prepared-browser` covers dense Asher regions
 world-to-regional navigation, subsets, both periods, and the other datasets.
 When visited tiles consume the receiver's position or pattern budget, offscreen
 history is evicted before rejecting visible coverage. This keeps the current
-view's detail without increasing the rendering limits; worker caches still
-serve return pans.
+view's detail and leaves worker caches available for return pans.
 
 Original geometry is also split by dataset/period into PMTiles archives. The
 browser requests ranges only from archives required by the current browsing
@@ -131,6 +130,84 @@ and periods. Source tiles are filtered from the combined archive without changin
 their coordinates or simplification; mixed-source tiles are assembled in a worker
 before live overlap calculation. The combined archive remains an offline input
 and supports older manifests.
+
+Source LODs protect shared boundary nodes, so adjacent polygons simplify their
+common arcs consistently. Tiny-polygon area diffusion is disabled: it can otherwise
+remove small intervening areas or replace them with squares. Zooms 0–7 use a
+512-unit tile grid to bound the additional shared vertices in the browser;
+zoom 8 keeps the original 4096-unit grid. Simplification
+tolerance scales with the grid to preserve the previous tolerance in map units.
+Components and holes below the grid's precision can still collapse during
+quantization; genuine source gaps are retained where representable.
+Rebuild the source archive **and** both coverage products after changing these
+settings, using the generation commands above; coverage is derived from the
+simplified source tiles and cannot repair their topology afterward. Archive hashes
+give the rebuilt profiles and coverage new URLs.
+
+The integrated builder can be selected with
+`uv run python -m pipeline.atlas.build --shared-coverage`. It constructs one
+high-precision disjoint partition per dataset/period **before** generating LODs.
+Each face keeps its original variant memberships, including hidden ancestors.
+Native Shapely/GEOS nodes the shared boundary network; LOD generation resolves
+coordinate collapse in that network at extent 8192, adds common tile cuts, and
+simplifies shared edges together. Coverage boundaries (coastlines and genuinely
+uncovered regions) use a tighter tolerance than internal language borders.
+This path does not use the legacy 512-unit display grid.
+
+Prepared parts and buffered language geometry are exported from the same LOD
+faces. Language polygons are assembled from their contributing faces after
+buffer clipping, so their tile interiors agree with the prepared parts. Branch
+tiles are then membership/refinement views of those parts; they require no new
+language-to-language overlay. `npm run precompute:parts` detects this build and
+restores missing assets from cached canonical/LOD geometry, rather than
+partitioning simplified source tiles again.
+
+```mermaid
+flowchart LR
+  Original[Original source polygons] --> Canonical[Canonical faces + original memberships]
+  Canonical --> LOD[Shared quantization + shared boundary simplification]
+  LOD --> Parts[Prepared coverage parts]
+  LOD --> Geometry[Buffered language tiles]
+  Parts --> Branches[Branch membership views]
+```
+
+The integrated builder remains opt-in for geometry-size and offline-cost tuning.
+The first full-data pass built all seven profiles through zoom 8 and passed the
+prepared-coverage, navigation and inspection browser suites. Decoded checks
+validated 51 coarse Asher tiles and 55 additional fine/profile tiles, with exact
+source/parts footprint agreement. Five delayed LOD transitions sampled 370 frames;
+another 2,098 navigation frames retained coverage. Hover samples were 8–42 ms in
+software Firefox on the development host. These are observations, not device targets.
+The combined archive grew from about 29 MB to 64 MB. The largest measured view
+used 330,875 output positions, requiring the shared worker/receiver bound to rise
+from 300k to 600k. Other runtime limits remain in place.
+
+To experiment without replacing the app's data, run
+`uv run python -m pipeline.atlas.topology_build --dataset asher2007world --period contemporary`.
+Its default output is `data/processed/topology-preview/`; omit the profile filters
+to generate all profiles. `--max-zoom`, `--tolerance-pixels`, and
+`--boundary-tolerance-pixels` allow bounded comparisons. The geometry manifest
+identifies immutable profile archives and parts; its `geometryBuild.report`
+records the settings, source repairs, and per-level positions/bytes. The command
+also exports a matching, profile-filtered catalogue for an isolated frontend
+preview. `geometryMaxZoom` makes reduced-detail builds overzoom their last
+available LOD rather than request missing higher levels.
+Both coverage scripts accept `--data-dir` to operate on the isolated export.
+The completed local preview can be opened from `app/` with
+`npm run preview -- --outDir test-results/topology/site`. Validation reports and
+screenshots are under `app/test-results/topology/`; these generated artifacts
+are ignored by Git. A normal atlas rebuild uses the explicit `--shared-coverage`
+flag above to install this architecture into `public/data/`.
+
+Canonical geometry and completed LODs are cached separately under
+`data/processed/topology/`. Regional source subdivisions accelerate ambiguous
+membership transfer at the canonical centimetre-scale precision; they do not set
+the visible LOD shape. Invalid source polygons are repaired with GEOS linework
+MakeValid and recorded by variant/feature/reason in the report. The normalized
+source records and provenance remain available. Small regions can still collapse
+at final vector-tile precision; ambiguous surviving overlaps retain contributors,
+and unassigned regions use original area majorities, counting uncovered area.
+Complex shell/hole point contacts are decomposed without moving their boundaries.
 
 Search, hierarchy, availability and source labels remain eager metadata. The
 browser uses `geometry-index.json`; full source feature identifiers load per
@@ -143,8 +220,9 @@ Each row and map inspection identifies the classification level.
 
 The pipeline imports the existing Glottography language, family, and dialect
 areas, then uses original `features.geojson` polygons for entries not covered by
-those prepared layers. Separate original polygons for one languoid are displayed
-together as one source variant, without dissolving their boundaries. Explicitly
+those prepared layers. Original polygons retain their input identities in the
+catalog and provenance; the integrated builder assembles their display geometry
+per variant. Explicitly
 shared source polygons retain each referenced languoid. The pipeline preserves
 source geometry; optional descendant aggregation happens in the browser rather
 than creating new dataset records. Geometry variants record their input
@@ -189,7 +267,9 @@ npm run typecheck
 npm run build
 ```
 
-Pipeline regressions can be checked with `uv run pytest`.
+Pipeline regressions can be checked with `uv run pytest`. The topology cases
+exercise the real tiler and decoder built by `bootstrap-tippecanoe.sh`; they skip
+when those tools are unavailable.
 
 ## Overlap rendering
 

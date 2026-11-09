@@ -1,6 +1,6 @@
 # Overlap roadmap
 
-Last updated: 2026-11-08.
+Last updated: 2026-11-09.
 
 This document tracks the limitations to lift after the browser overlap-hatching
 proof of concept. Item IDs are stable so future sessions can refer to them.
@@ -13,6 +13,35 @@ its completion criteria are met. Update the implementation notes when behavior
 changes.
 
 ## Starting point
+
+An upstream shared-coverage prototype is now available through
+`pipeline.atlas.build --shared-coverage`; the legacy builder remains the default
+while geometry size and offline cost are tuned. It computes a canonical partition before LODs and
+derives both source geometry and reusable parts from the same simplified faces.
+Branch preparation composes those parts rather than repeating a geometric overlay.
+Shared quantization and tile-cut nodes prevent independent simplification/export
+from pulling adjacent boundaries apart. Coverage boundaries use a tighter error
+tolerance than internal language borders. Source repairs and per-level geometry
+costs are recorded in the generated report, with canonical and LOD caches kept
+separate. Offline label transfer remains a significant cost on full Asher data.
+
+The first full-data experiment built all seven dataset/period profiles through
+zoom 8. Decoded checks validated 51 coarse Asher tiles and 55 additional fine/profile
+tiles, with matching source/parts footprints and sampled membership geometry.
+The production prepared-coverage suite passed 65 views plus five delayed LOD
+transitions (370 sampled frames); all used prepared coverage with zero live input
+or partition work. Worker composition times across the recorded views were
+11–742 ms. Navigation retained fill through another 2,098 frames in both
+projections. Inspection lifecycle checks passed, and 48 hover samples were
+8–42 ms (median 19 ms) without geometry recomputation on this host.
+
+The combined archive grew from about 29 MB to 64 MB. The initial 300k output cap
+was raised to 600k after a real Asher zoom-2 view used 330,875 positions. Other
+limits remain unchanged. Before default rollout, tune coarse boundary complexity
+and offline label transfer, then measure representative devices and mixed-profile
+fallbacks. The complete isolated preview is `app/test-results/topology/site`;
+run `npm run preview -- --outDir test-results/topology/site` from `app/`.
+Reports/screenshots are under `app/test-results/topology/` (ignored artifacts).
 
 The current implementation resolves one geometry variant per selected language,
 reads simplified vector tiles from the existing PMTiles archive, and computes
@@ -327,14 +356,14 @@ Current POC limits, to revisit rather than simply remove:
 | Computation tiles | 48, at zoom 0–8; reduce zoom to fit |
 | Decoded tile cache | 48 entries and 16 MiB of decompressed tile bytes |
 | Native partition cache | 48 entries and 150,000 positions; encoded tiles cached weakly |
-| Receiver tile retention | 48 desired tiles/200,000 positions, plus active/staging encoded snapshots |
+| Receiver tile retention | 48 desired tiles/600,000 positions, plus active/staging encoded snapshots |
 | Fallback byte caches | Raw: 48 entries/16 MiB; clipped: 96 entries/16 MiB (local mask keys) |
 | Parent delivery cache | 48 entries/8 MiB; native references follow active/staging snapshots |
 | Request deadlines | 8 seconds computation; 12 seconds publication; 150 ms supersession grace, subject to UI timer scheduling |
 | Selected input per tile | 100,000 positions |
 | Intermediate regions per tile | 12,000 |
 | Overlay time per tile | About 1.5 seconds, checked between operations |
-| Complete output | 200,000 positions |
+| Complete output | 600,000 positions |
 | Padded pattern texels | 4,194,304 per result; twice that across owned images during swaps (16/32 MiB RGBA, excluding atlas copies/overhead) |
 | Pattern image size | 256 × 256 pixels; up to 42 contributors at unchanged spacing; solids allocate no images |
 

@@ -37,6 +37,80 @@ def prepared(browser, dataset, period, zoom):
     return {"report": report, "archives": sources, "zoom": zoom}
 
 
+def lod_continuity(browser, output):
+    # The old archive leaves this Yulu interior empty at source zooms 0–2,
+    # although source zooms 3–8 cover it. Retaining those coarse tiles during
+    # zoom-in therefore magnified a real geometry gap, not a loading seam.
+    point = [25.88134765625, 7.841615185204698]
+    results = []
+    select_all(browser, "Asher", point, zoom=0.25)
+    for projection in ("globe", "mercator"):
+        browser.js(
+            "document.querySelector('input[name=map-projection][value='+arguments[0]+']').click()",
+            projection,
+        )
+        # Mercator's viewport constraint raises the minimum camera zoom above
+        # 1 at this window size; source zoom 0 is only reachable on the globe.
+        for coarse in (0, 1, 2) if projection == "globe" else (1, 2):
+            # The exact Yulu probe is only ~0.1 world pixel from a genuine
+            # uncovered boundary. Nearest framebuffer sampling can alternate
+            # with ocean during globe projection changes. Keep its geographic
+            # membership assertion, and sample a stable Congo interior for
+            # pixel continuity (over two native pixels from that boundary).
+            pixel_point = [25, -4]
+            browser.js("window.overlapTest.camera(arguments[0],arguments[1]+0.25)", point, coarse)
+            prepared(browser, "asher2007world", "contemporary", coarse)
+            ids = browser.js("return window.overlapTest.inspect(arguments[0]).variantIds", point)
+            # Shared simplification can move a language boundary across this
+            # point. It must remain covered; its coarse contributor may differ.
+            assert ids, (projection, coarse, ids)
+            browser.js(
+                """
+                window.overlapTest.watchAreas([arguments[0]]);
+                window.overlapTest.setTileDelay('coverage', 1200);
+                window.overlapTest.setTileDelay('fallback', 1200);
+                """,
+                pixel_point,
+            )
+            browser.call(
+                "POST",
+                "/execute/async",
+                {
+                    "script": "const done=arguments[arguments.length-1];window.overlapTest.samplePixels(arguments[0],1).then(done)",
+                    "args": [pixel_point],
+                },
+            )
+            assert not browser.snapshot()["areaFrames"][-1]["missing"]
+            browser.screenshot(output / f"lod-{projection}-{coarse}-coarse.png")
+            browser.js("window.overlapTest.camera(arguments[0],4.25,900)", point)
+            prepared(browser, "asher2007world", "contemporary", 4)
+            state = browser.snapshot()
+            frames = state["areaFrames"]
+            assert len(frames) >= 10 and all(f["samples"] == 1 for f in frames), frames
+            assert not [f for f in frames if f["missing"]], (projection, coarse, frames)
+            assert any(f["zoom"] > coarse + 1 for f in frames)
+            results.append(
+                {
+                    "projection": projection,
+                    "coarse": coarse,
+                    "pixelPoint": pixel_point,
+                    "frames": frames,
+                }
+            )
+            browser.js(
+                """
+                window.overlapTest.watchAreas(null);
+                window.overlapTest.setTileDelay('coverage', 0);
+                window.overlapTest.setTileDelay('fallback', 0);
+                """
+            )
+            print(
+                f"LOD continuity {projection} {coarse} → 4: {len(frames)} frames, no gap",
+                flush=True,
+            )
+    return results
+
+
 def main():
     output = APP / "test-results/prepared"
     output.mkdir(parents=True, exist_ok=True)
@@ -49,6 +123,7 @@ def main():
                 20,
                 "catalog",
             )
+            result["lodContinuity"] = lod_continuity(browser, output)
             for period in ("contemporary", "time-of-contact"):
                 select_all(browser, "Asher", [100, 30], zoom=4.25, period=period, settle=False)
                 cold = prepared(browser, "asher2007world", period, 4)
@@ -64,6 +139,8 @@ def main():
                         projection,
                     )
                     for center, zoom in [
+                        ([25, 8], 2),
+                        ([25, 8], 3),
                         ([10, 10], 4),
                         ([100, 30], 4),
                         ([100, 30], 5),

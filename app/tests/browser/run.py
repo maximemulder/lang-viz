@@ -234,8 +234,10 @@ def check_pixels(browser):
         "100% color intensity",
     )
     samples = {}
-    language_color = browser.js("return window.overlapTest.colorState(['stan1293']).colors.stan1293")
-    expected = tuple(int(language_color[i:i + 2], 16) for i in (1, 3, 5)) + (255,)
+    language_color = browser.js(
+        "return window.overlapTest.colorState(['stan1293']).colors.stan1293"
+    )
+    expected = tuple(int(language_color[i : i + 2], 16) for i in (1, 3, 5)) + (255,)
     for projection in ("globe", "mercator"):
         browser.js(
             "document.querySelector('input[name=map-projection][value='+arguments[0]+']').click()",
@@ -251,9 +253,7 @@ def check_pixels(browser):
             },
         )
         colors = {tuple(pixels[i : i + 4]) for i in range(0, len(pixels), 4)}
-        assert colors == {expected}, (
-            f"Solid-fill texture/color artifact in {projection}: {colors}"
-        )
+        assert colors == {expected}, f"Solid-fill texture/color artifact in {projection}: {colors}"
         samples[projection] = {"pixels": len(pixels) // 4, "rgba": list(next(iter(colors)))}
     browser.js("document.querySelector('[aria-label=\"Map settings\"]').click()")
     return samples
@@ -499,7 +499,7 @@ def check_area_continuity(browser, args, projection):
 
 
 @contextmanager
-def browser_session(output, *, dev=False, options=None):
+def browser_session(output, *, dev=False, options=None, out_dir=None):
     """Own the application server, WebDriver, browser, and their cleanup."""
     output.mkdir(parents=True, exist_ok=True)
     with ExitStack() as stack:
@@ -508,18 +508,23 @@ def browser_session(output, *, dev=False, options=None):
             driver_port = free_port()
         preview_log = stack.enter_context((output / "preview.log").open("w"))
         driver_log = stack.enter_context((output / "geckodriver.log").open("w"))
+        command = [
+            "npm",
+            "run",
+            "dev" if dev else "preview",
+            "--",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(preview_port),
+            "--strictPort",
+        ]
+        if out_dir is not None:
+            if dev:
+                raise ValueError("out_dir requires a production preview")
+            command.extend(["--outDir", str(out_dir)])
         preview = subprocess.Popen(
-            [
-                "npm",
-                "run",
-                "dev" if dev else "preview",
-                "--",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(preview_port),
-                "--strictPort",
-            ],
+            command,
             cwd=APP,
             stdout=preview_log,
             stderr=subprocess.STDOUT,

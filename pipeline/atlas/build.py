@@ -508,7 +508,18 @@ def build_tiles() -> None:
             "--no-feature-limit",
             "--no-tile-size-limit",
             "--no-progress-indicator",
-            "--simplification=10",
+            # A native-pixel grid bounds the extra vertices retained by
+            # shared-node protection, including intermediate whole-world views.
+            # Scale tolerance with the grid: 1.25/512 == the old 10/4096.
+            # Keep the original grid and tolerance at the finest source level.
+            "--low-detail=9",
+            "--simplification=1.25",
+            "--simplification-at-maximum-zoom=10",
+            # Simplify common arcs consistently rather than pulling adjacent
+            # languages apart. Tiny-area diffusion can otherwise remove an
+            # intervening language or replace its components with squares.
+            "--no-simplification-of-shared-nodes",
+            "--no-tiny-polygon-reduction",
             "--include=variant_id",
             "--include=language_id",
             "--include=level",
@@ -571,7 +582,7 @@ def build_geometry_profiles() -> None:
     temporary_manifest.replace(manifest_path)
 
 
-def build(skip_tiles: bool) -> None:
+def build(skip_tiles: bool, shared_coverage: bool = False) -> None:
     rows, names = read_glottolog()
     known_languoids = {str(row["Glottocode"]) for row in rows}
     level_by_languoid = {str(row["Glottocode"]): str(row["Level"]) for row in rows}
@@ -650,24 +661,37 @@ def build(skip_tiles: bool) -> None:
         )
     write_json(PUBLIC_DATA_DIR / "geography-datasets.json", DATASETS)
     shutil.copyfile(PROJECT_ROOT / "pipeline/dlac/NOTICE.md", PUBLIC_DATA_DIR / "DLAC-NOTICE.md")
-    write_json(
-        PUBLIC_DATA_DIR / "manifest.json",
-        {
-            "schemaVersion": 5,
-            "languoidCount": len(languages),
-            "languoidWithGeometryCount": sum(
-                bool(language["geometryVariantIds"]) for language in languages
-            ),
-            "geometryVariantCount": len(variants),
-            "vectorLayer": "language_areas",
-            "archive": "language-areas.pmtiles",
-            "geometryIndex": "geometry-index.json",
-            "geometryProvenance": "provenance/",
-        },
-    )
+    manifest = {
+        "schemaVersion": 5,
+        "languoidCount": len(languages),
+        "languoidWithGeometryCount": sum(
+            bool(language["geometryVariantIds"]) for language in languages
+        ),
+        "geometryVariantCount": len(variants),
+        "vectorLayer": "language_areas",
+        "archive": "language-areas.pmtiles",
+        "geometryIndex": "geometry-index.json",
+        "geometryProvenance": "provenance/",
+    }
+    if not skip_tiles and shared_coverage:
+        from pipeline.atlas.topology_build import atomic_json
+        from pipeline.atlas.topology_build import build as build_topology
 
-    if not skip_tiles:
-        build_tiles()
+        binary = find_tippecanoe()
+        if not binary:
+            raise RuntimeError("Run pipeline/atlas/bootstrap-tippecanoe.sh first")
+        geometry = build_topology(
+            NORMALIZED_GEOMETRIES,
+            PUBLIC_DATA_DIR,
+            PROCESSED_DIR / "topology",
+            str(Path(binary).with_name("tile-join")),
+        )
+        # Keep the previous geometry manifest usable until every product is ready.
+        atomic_json(PUBLIC_DATA_DIR / "manifest.json", {**manifest, **geometry})
+    else:
+        write_json(PUBLIC_DATA_DIR / "manifest.json", manifest)
+        if not skip_tiles:
+            build_tiles()
 
     print(
         f"Exported {len(languages):,} languoids and {len(variants):,} geometry variants "
@@ -682,8 +706,13 @@ def main() -> None:
         action="store_true",
         help="Build catalogs and normalized GeoJSONL without invoking tippecanoe.",
     )
+    parser.add_argument(
+        "--shared-coverage",
+        action="store_true",
+        help="Build source LODs and prepared parts from one upstream coverage topology.",
+    )
     args = parser.parse_args()
-    build(skip_tiles=args.skip_tiles)
+    build(skip_tiles=args.skip_tiles, shared_coverage=args.shared_coverage)
 
 
 if __name__ == "__main__":
