@@ -179,7 +179,7 @@ const LanguageLayers = memo(() => {
             'line-color': '#111111',
             'line-opacity': ['case', ['boolean', ['feature-state', 'inspected'], false], 0.95, 0],
             'line-opacity-transition': { duration: 0 },
-            'line-width': 3,
+            'line-width': 2,
           }}
         />
       </Source>
