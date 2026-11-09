@@ -10,6 +10,7 @@
     "test:branch-browser": "npm run build && python3 tests/browser/branches.py",
     "test:parts-browser": "npm run build && python3 tests/browser/parts.py",
     "test:browser": "python3 tests/browser/run.py",
+    "test:inspection-browser": "python3 tests/browser/inspection.py",
     "test:catalog-browser": "npm run build && python3 tests/browser/catalog.py",
     "test:source-browser": "npm run build && python3 tests/browser/source_languoids.py",
     "test:delivery-browser": "npm run build && python3 tests/browser/delivery.py",

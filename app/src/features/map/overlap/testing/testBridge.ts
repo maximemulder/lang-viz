@@ -17,6 +17,7 @@ import {
 import { serviceDiagnostics } from '../serviceDiagnostics'
 import { parseOverlapSelection } from '../types.ts'
 import type { OverlapTestApi } from './api'
+import { inspectionHighlightState, probeInspection } from './inspectionProbe'
 
 /** Test controls and observers use public MapLibre APIs only. */
 export const installOverlapTestApi = (
@@ -185,6 +186,9 @@ export const installOverlapTestApi = (
   map.on('idle', onIdle)
   const api = {
     ...colorControls,
+    probeInspection: (center: [number, number]) => probeInspection(map, center, selectionKey()),
+    inspectionHighlight: () =>
+      inspectionHighlightState(map, parseOverlapSelection(selectionKey()).variantIds),
     configure,
     camera: (center: [number, number], zoom: number, duration = 0) =>
       map.easeTo({ center, zoom, duration }),

@@ -14,6 +14,7 @@ npm run test:prepared-browser
 npm run test:coverage-browser
 npm run test:branch-browser
 npm run test:parts-browser
+npm run test:inspection-browser -- --dev
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
@@ -21,6 +22,17 @@ dependencies, and generated atlas data under `public/data/`. The runner uses
 Python's standard library and geckodriver's W3C WebDriver API. It installs and
 downloads nothing. Firefox/geckodriver setup is described in
 [Mozilla's documentation](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html).
+
+`test:inspection-browser` checks real pointer hover, shared contributors, empty
+space, pin/close, canvas exit, selection clearing, aggregate source outlines, style
+replacement, and newly loaded tiles in both projections. It then measures picking
+and mouse-event-to-render latency for complete Asher selections, in world and dense
+African/Asian views, for both periods and projections. Hover must preserve the
+outline filter, coverage URLs, and geometry request count. Reports and screenshots
+go to `test-results/inspection/`; timing observations have no machine-dependent
+pass threshold. The timing probe sends public MapLibre mouse events; lifecycle
+checks use WebDriver pointer actions. The default builds and previews production;
+`--dev` checks development serving, and `--skip-build` reuses the current build.
 
 `test:delivery-browser` checks the production app's lightweight startup geometry
 index, DLAC-only source routing, zoom-5 prepared coverage with zero live Boolean

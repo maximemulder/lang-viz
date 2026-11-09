@@ -36,8 +36,10 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
 
   if (entries.length === 0) return null
 
+  // Popup reads closeButton at construction, so pinning needs a new instance.
   return (
     <Popup
+      key={inspection.pinned ? 'pinned' : 'hover'}
       longitude={inspection.longitude}
       latitude={inspection.latitude}
       anchor="bottom"

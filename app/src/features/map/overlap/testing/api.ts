@@ -1,5 +1,6 @@
 import type { ColorConfiguration } from '../../../../domain/colors'
 import type { MapEntry } from '../../../../domain/mapEntries'
+import type { InspectionProbe } from './inspectionProbe'
 
 type TileService = 'coverage' | 'fallback'
 
@@ -21,6 +22,8 @@ export interface OverlapTestApi {
   recompute(): void
   failNextPublication(service: TileService): void
   inspect(center: [number, number]): { variantIds: string[]; point: [number, number] }
+  probeInspection(center: [number, number]): Promise<InspectionProbe>
+  inspectionHighlight(): { variantIds: readonly string[]; filter: unknown }
   reloadStyle(): void
   setTileDelay(service: TileService, milliseconds: number): void
   watchAreas(points: [number, number][] | null): void
