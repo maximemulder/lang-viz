@@ -116,7 +116,7 @@ export const OverlapHatching = ({
             south: bounds.getSouth(),
             north: bounds.getNorth(),
           },
-          Math.min(map.getZoom(), data.manifest.geometryMaxZoom ?? 8),
+          map.getZoom(),
         ),
       )
     }

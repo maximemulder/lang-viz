@@ -7,7 +7,6 @@ import {
   idleHatchingState,
 } from '../src/features/map/overlap/controller.ts'
 import type { DeliveryTile } from '../src/features/map/overlap/delivery.ts'
-import { MAX_COVERAGE_VERTICES } from '../src/features/map/overlap/limits.ts'
 import { OverlapPatternError } from '../src/features/map/overlap/patterns.ts'
 import type { OverlapRequest, TileCoordinate } from '../src/features/map/overlap/types.ts'
 import { PUBLICATION_TIMEOUT_MS } from '../src/features/map/overlap/workerClient.ts'
@@ -304,7 +303,7 @@ test('visible output evicts offscreen history before rejecting a viewport, while
   context.after(() => f.controller.dispose())
   f.initial()
   f.controller.refresh([coordinate(1)])
-  f.receive({ ...tile(1), vertices: MAX_COVERAGE_VERTICES })
+  f.receive({ ...tile(1), vertices: 200_000 })
   f.finish()
   f.publish()
   assert.equal(f.state.status, 'ready')

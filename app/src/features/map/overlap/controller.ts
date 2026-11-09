@@ -1,7 +1,6 @@
 import { type DeliveryTile, tileKey } from './delivery.ts'
 import type { CoverageSnapshot } from './deliveryProtocol.ts'
 import type { overlapDiagnostics } from './diagnostics.ts'
-import { MAX_COVERAGE_VERTICES } from './limits.ts'
 import { OverlapPatternError } from './patterns.ts'
 import { coverageTilesKey, retainCoverageTiles } from './tiles.ts'
 import type { OverlapRequest, OverlapResponse, TileCoordinate } from './types.ts'
@@ -279,12 +278,7 @@ export const createOverlapController = (options: {
       // replacement finishes. Reuse those native tiles instead of fetching them again.
       let vertices = [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0)
       for (const [key, tile] of active?.tiles ?? []) {
-        if (
-          !desired.has(key) ||
-          results.has(key) ||
-          vertices + tile.vertices > MAX_COVERAGE_VERTICES
-        )
-          continue
+        if (!desired.has(key) || results.has(key) || vertices + tile.vertices > 200_000) continue
         results.set(key, tile)
         vertices += tile.vertices
       }
@@ -333,14 +327,14 @@ export const createOverlapController = (options: {
           [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0) -
           (results.get(key)?.vertices ?? 0) +
           response.tile.vertices
-        if (vertices > MAX_COVERAGE_VERTICES && pruneHistory()) {
+        if (vertices > 200_000 && pruneHistory()) {
           if (!viewportKeys.has(key)) return
           vertices =
             [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0) -
             (results.get(key)?.vertices ?? 0) +
             response.tile.vertices
         }
-        if (vertices > MAX_COVERAGE_VERTICES) {
+        if (vertices > 200_000) {
           fail(
             'output-vertices',
             'Overlap geometry is too complex. Zoom in or select fewer languages.',

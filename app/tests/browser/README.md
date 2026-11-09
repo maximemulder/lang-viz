@@ -41,16 +41,7 @@ source and overlap delivery URLs must reference only the required dataset/period
 Reports and screenshots go to `test-results/delivery/`.
 
 `test:prepared-browser` requires prepared parts through all source zooms (run
-`npm run precompute:parts` with its defaults). It first checks a reproduced Yulu
-interior gap at source zooms 0–2, then magnifies each coarse LOD while delaying
-coverage/fallback delivery by 1200 ms. The exact geographic probe must remain
-covered; a stable Congo interior supplies the framebuffer probe, because the
-Yulu point lies only ~0.1 native world pixel from genuine uncovered territory.
-The probes must stay filled throughout the transition to zoom 4 in both projections (zoom 0 is only
-reachable on the globe at the test window size). Pipeline tests
-separately exercise exact shared arcs and a three-way junction with the real tiler,
-small components, genuine holes, and overlapping contributors.
-The browser suite also checks both Asher periods from
+`npm run precompute:parts` with its defaults). It checks both Asher periods from
 the world view into dense African and Asian regions at zooms 4–5, European detail
 through zoom 8, pan/return and subset selection in globe and Mercator. Each view
 must finish at the requested detail with zero live input/partition work and no
@@ -332,7 +323,5 @@ API reads pinned entries and their resolved colors. Screenshots are saved in
 `test-results/catalog/` alongside the report.
 
 All browser suites share `browser_session()` and `open_atlas()` from `run.py` for
-server/Firefox lifecycle and navigation. `browser_session(out_dir=...)` can serve
-an isolated production build, including the integrated-topology experiment,
-without replacing the control atlas. Sidebar actions live in `sidebar.py`;
+server/Firefox lifecycle and navigation. Sidebar actions live in `sidebar.py`;
 each suite keeps its scenario assertions and reports.
