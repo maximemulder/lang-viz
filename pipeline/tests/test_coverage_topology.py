@@ -371,3 +371,87 @@ def test_preview_catalog_excludes_unbuilt_geometry_and_preserves_the_control(tmp
     languages = json.loads((output / "languages.json").read_text())
     assert languages[0]["geometryVariantIds"] == ["x"] and languages[1]["geometryVariantIds"] == []
     assert json.loads((source / "languages.json").read_text()) == metadata["languages.json"]
+
+
+def test_parallel_profiles_match_serial_geometry_and_cache_outputs(tmp_path):
+    from pipeline.atlas.build import find_tile_join
+
+    binary = find_tile_join()
+    if not binary:
+        pytest.skip("Build tile-join to exercise parallel PMTiles packaging")
+    source = tmp_path / "input.geojsonl"
+    records = []
+    for dataset in ("larger", "smaller"):
+        for label, geometry in [
+            ("parent", box(0.48, 0.48, 0.52, 0.52)),
+            ("child", box(0.495, 0.495, 0.505, 0.505)),
+        ]:
+            record = feature(f"{dataset}:{label}", geometry)
+            record["properties"].update(dataset_id=dataset, temporal_view="contemporary")
+            records.append(record)
+    source.write_text("\n".join(json.dumps(record) for record in records) + "\n")
+    manifests = []
+    for name, jobs in [("serial", 1), ("parallel", 2)]:
+        manifests.append(
+            build(
+                source,
+                tmp_path / name / "public",
+                tmp_path / name / "cache",
+                binary,
+                max_zoom=1,
+                jobs=jobs,
+            )
+        )
+    assert manifests[0] == manifests[1], "Scheduling must not change asset identities or ordering"
+    serial, parallel = tmp_path / "serial", tmp_path / "parallel"
+    tiles = sorted((serial / "public").rglob("*.pbf"))
+    assert tiles
+    for path in tiles:
+        assert (
+            path.read_bytes()
+            == (parallel / "public" / path.relative_to(serial / "public")).read_bytes()
+        )
+    for path in (serial / "cache").rglob("*.mbtiles"):
+        other = parallel / "cache" / path.relative_to(serial / "cache")
+        with sqlite3.connect(path) as a, sqlite3.connect(other) as b:
+            assert (
+                a.execute("SELECT * FROM tiles ORDER BY 1, 2, 3").fetchall()
+                == b.execute("SELECT * FROM tiles ORDER BY 1, 2, 3").fetchall()
+            )
+    report_name = manifests[1]["geometryBuild"]["report"]
+    report = json.loads((parallel / "public" / report_name).read_text())
+    assert report["execution"]["workers"] == 2
+    assert len({p["timings"]["processId"] for p in report["profiles"].values()}) == 2
+    # A resumed parallel build must reuse each profile's completed levels.
+    build(source, parallel / "public", parallel / "cache", binary, max_zoom=1, jobs=2)
+    report = json.loads((parallel / "public" / report_name).read_text())
+    assert all(
+        level["reused"]
+        for profile in report["profiles"].values()
+        for level in profile["timings"]["levels"].values()
+    )
+
+
+def test_failed_parallel_profile_preserves_the_published_archive(tmp_path):
+    from pipeline.atlas.build import find_tile_join
+
+    binary = find_tile_join()
+    if not binary:
+        pytest.skip("Build tile-join to exercise parallel PMTiles packaging")
+    records = []
+    for dataset in ("good", "bad"):
+        record = feature(f"{dataset}:a", box(0.48, 0.48, 0.52, 0.52))
+        record["properties"].update(dataset_id=dataset, temporal_view="contemporary")
+        if dataset == "bad":
+            del record["properties"]["variant_id"]
+        records.append(record)
+    source = tmp_path / "input.geojsonl"
+    source.write_text("\n".join(json.dumps(record) for record in records) + "\n")
+    output = tmp_path / "public"
+    output.mkdir()
+    archive = output / "language-areas.pmtiles"
+    archive.write_bytes(b"previous published archive")
+    with pytest.raises(KeyError, match="variant_id"):
+        build(source, output, tmp_path / "cache", binary, max_zoom=1, jobs=2)
+    assert archive.read_bytes() == b"previous published archive"
+    assert not list(output.rglob("report.json")), "Incomplete profile sets cannot publish a report"

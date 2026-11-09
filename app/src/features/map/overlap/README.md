@@ -66,6 +66,16 @@ are decomposed without changing area before GEOS coverage operations. Persistent
 GEOS precision metadata is cleared after quantization so later unions do not
 silently snap simplified boundaries again.
 
+Native preprocessing runs independent dataset/period profiles in separate spawned
+processes, with two workers by default (`--jobs N`; `--jobs 1` is serial). Larger
+inputs are scheduled first, and each worker retires after one profile to release
+native allocations. Per-profile caches, databases and archives have distinct
+paths. LODs within a profile reuse its canonical partition and area index
+sequentially. The coordinator preserves deterministic profile/merge ordering and
+publishes the manifest after all profiles complete. Worker count and phase/cache
+timings are recorded outside the geometry fingerprint. Tile-join threads are
+divided across workers unless `TIPPECANOE_MAX_THREADS` is explicitly set.
+
 Integrated manifests carry `geometryBuild` and `coverage-parts/v3-*` URLs keyed
 by source/settings/engine identity. Their parts command restores missing files
 from cached common LODs; it never repartitions the display archive. The browser's

@@ -493,7 +493,9 @@ def find_tile_join() -> str | None:
     return shutil.which("tile-join")
 
 
-def build(skip_tiles: bool = False) -> None:
+def build(skip_tiles: bool = False, *, jobs: int | None = None) -> None:
+    if jobs is not None and jobs < 1:
+        raise ValueError("jobs must be a positive integer")
     rows, names = read_glottolog()
     known_languoids = {str(row["Glottocode"]) for row in rows}
     level_by_languoid = {str(row["Glottocode"]): str(row["Level"]) for row in rows}
@@ -596,6 +598,7 @@ def build(skip_tiles: bool = False) -> None:
             PUBLIC_DATA_DIR,
             PROCESSED_DIR / "topology",
             binary,
+            jobs=jobs,
         )
         # Keep the previous geometry manifest usable until every product is ready.
         atomic_json(PUBLIC_DATA_DIR / "manifest.json", {**manifest, **geometry})
@@ -615,8 +618,13 @@ def main() -> None:
         action="store_true",
         help="Build catalogs and normalized GeoJSONL without generating coverage LODs or tiles.",
     )
+    parser.add_argument(
+        "--jobs", type=int, help="Concurrent profiles (default: up to 2; 1 is serial)"
+    )
     args = parser.parse_args()
-    build(skip_tiles=args.skip_tiles)
+    if args.jobs is not None and args.jobs < 1:
+        parser.error("--jobs must be a positive integer")
+    build(skip_tiles=args.skip_tiles, jobs=args.jobs)
 
 
 if __name__ == "__main__":

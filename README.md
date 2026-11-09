@@ -193,6 +193,26 @@ at final vector-tile precision; ambiguous surviving overlaps retain contributors
 and unassigned regions use original area majorities, counting uncovered area.
 Complex shell/hole point contacts are decomposed without moving their boundaries.
 
+Generation runs independent dataset/period profiles in separate processes, using
+up to two workers by default. Larger inputs start first. Use
+`uv run python -m pipeline.atlas.build --jobs 4` to increase concurrency or
+`--jobs 1` for a serial build; the standalone `pipeline.atlas.topology_build`
+command accepts the same option. Each worker owns its profile's caches, database,
+and output files. LODs within that profile stay sequential to reuse its canonical
+partition and regional area index. Additional workers increase memory use, so the
+default does not automatically consume every CPU. Source spooling happens before
+the workers start; archive merging and manifest publication happen after they
+finish. Scheduling does not change geometry fingerprints or tile ordering.
+Reports include the worker count and timings for preparation, each profile's
+canonical geometry, individual LODs (including cache reuse), packaging, and final
+merging. Parts restoration and branch-view materialization remain sequential;
+they reuse the expensive shared geometry rather than rebuilding it.
+An initial cold-cache comparison of Bouckaert, Wurm, Matsumae and DLAC through
+zoom 4 took 199 s with one worker and 145 s with two (about 27% less wall time).
+All 162 prepared tiles and 165 source tiles matched byte-for-byte. That batch was
+dominated by one profile; this is not a full Asher build-speed measurement.
+The local report is `app/test-results/topology/parallel-benchmark.json`.
+
 Search, hierarchy, availability and source labels remain eager metadata. The
 browser uses `geometry-index.json`; full source feature identifiers load per
 dataset/period only when **Original source records** is expanded in Details.

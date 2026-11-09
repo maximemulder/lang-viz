@@ -25,6 +25,16 @@ from pulling adjacent boundaries apart. Coverage boundaries use a tighter error
 tolerance than internal language borders. Source repairs and per-level geometry
 costs are recorded in the generated report, with canonical and LOD caches kept
 separate. Offline label transfer remains a significant cost on full Asher data.
+Generation now overlaps independent profiles with up to two spawned processes by
+default; `--jobs N` controls concurrency. Canonical geometry and regional indexes
+are reused across sequential LODs within each worker. Per-phase timings and cache
+reuse are recorded in the build report; geometry fingerprints remain independent
+of worker count.
+The initial four-profile cold-cache benchmark (Bouckaert, Wurm, Matsumae, DLAC;
+zooms 0–4) fell from 199 s serially to 145 s with two workers. All 162 prepared
+and 165 source tiles were byte-identical. One dominant profile limited overlap;
+full Asher cold-build scaling still needs measurement. See the ignored local
+`app/test-results/topology/parallel-benchmark.json` report.
 
 The first full-data experiment built all seven dataset/period profiles through
 zoom 8. Decoded checks validated 51 coarse Asher tiles and 55 additional fine/profile

@@ -12,13 +12,17 @@ import gzip
 import hashlib
 import json
 import math
+import multiprocessing
+import os
 import shutil
 import sqlite3
 import subprocess
 import time
 from collections import defaultdict
 from collections.abc import Iterable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import ExitStack, closing
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -456,8 +460,10 @@ def build_profile(
     settings: dict[str, Any],
     fingerprint: str,
     lod_fingerprint: str,
+    tile_threads: int = 1,
 ):
     # Keep native geometry ownership inside one profile, including failure paths.
+    started = time.monotonic()
     source_hash = settings["source"]
     max_zoom = settings["maxZoom"]
     tolerance_pixels = settings["tolerancePixels"]
@@ -469,12 +475,16 @@ def build_profile(
         print(f"{label}: {message}", flush=True)
 
     partition_file = cache / f"v{PARTITION_VERSION}-{source_hash[:20]}" / f"{label}.jsonl.gz"
-    if partition_file.exists():
+    canonical_cache_hit = partition_file.exists()
+    if canonical_cache_hit:
         partition = load_partition(partition_file)
         log(f"loaded {len(partition.faces)} canonical faces")
     else:
         partition = partition_sources(read_features(feature_path), log=log)
         save_partition(partition_file, partition)
+    canonical_seconds = time.monotonic() - started
+    levels_started = time.monotonic()
+    level_timings = {}
     parts = output / directory / label
     parts.mkdir(parents=True, exist_ok=True)
     database_path = cache / f"{fingerprint}/{label}.mbtiles"
@@ -484,6 +494,10 @@ def build_profile(
         stats = json.loads(stats_path.read_text()) if stats_path.exists() else {}
         area_index = None
         for zoom in range(max_zoom + 1):
+            level_started = time.monotonic()
+            reused = True
+            lod_seconds = export_seconds = 0.0
+            lod_cache_hit = None
             complete = stats.get(str(zoom))
             source_tiles = {
                 f"{x}-{2**zoom - 1 - row}"
@@ -497,8 +511,11 @@ def build_profile(
                 or not set(complete["tiles"]).issubset(source_tiles)
                 or len(source_tiles) != complete.get("sourceTiles", len(source_tiles))
             ):
+                reused = False
+                lod_started = time.monotonic()
                 lod_file = cache / lod_fingerprint / f"{label}/lod-{zoom}.jsonl.gz"
-                if lod_file.exists():
+                lod_cache_hit = lod_file.exists()
+                if lod_cache_hit:
                     encoded = load_partition(lod_file)
                 else:
                     area_index = area_index or SourceAreaIndex(partition)
@@ -509,13 +526,25 @@ def build_profile(
                         boundary_tolerance_pixels,
                     )
                     save_partition(lod_file, encoded)
+                lod_seconds = time.monotonic() - lod_started
                 log(
                     f"zoom {zoom}: {len(encoded.faces)} simplified faces, {int(sum(geos.get_num_coordinates(encoded.faces)))} positions"
                 )
+                export_started = time.monotonic()
                 stats[str(zoom)] = write_level(encoded, zoom, parts, database)
                 stats[str(zoom)].update(encoded.stats)
                 atomic_json(stats_path, stats)
+                export_seconds = time.monotonic() - export_started
+            level_timings[str(zoom)] = {
+                "seconds": time.monotonic() - level_started,
+                "reused": reused,
+                "lodCacheHit": lod_cache_hit,
+                "lodSeconds": lod_seconds,
+                "exportSeconds": export_seconds,
+            }
             log(f"zoom {zoom}: {stats[str(zoom)]['positions']} parts positions")
+    levels_seconds = time.monotonic() - levels_started
+    package_started = time.monotonic()
     index = {str(z): stats[str(z)]["tiles"] for z in range(max_zoom + 1)}
     index_hash = hashlib.sha256(json.dumps(index, separators=(",", ":")).encode()).hexdigest()[:20]
     index_name = f"index-{index_hash}.json"
@@ -524,6 +553,8 @@ def build_profile(
     target = output / profile_archive
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(".tmp.pmtiles")
+    environment = os.environ.copy()
+    environment.setdefault("TIPPECANOE_MAX_THREADS", str(tile_threads))
     subprocess.run(
         [
             tile_join,
@@ -534,6 +565,7 @@ def build_profile(
             str(database_path),
         ],
         check=True,
+        env=environment,
     )
     temporary.replace(target)
     archive_entry = {"datasetId": dataset, "viewId": period, "archive": profile_archive}
@@ -548,6 +580,15 @@ def build_profile(
         "faces": len(partition.faces),
         "repairs": partition.repairs,
         "levels": stats,
+        "timings": {
+            "processId": os.getpid(),
+            "canonicalCacheHit": canonical_cache_hit,
+            "canonicalSeconds": canonical_seconds,
+            "levelsSeconds": levels_seconds,
+            "packagingSeconds": time.monotonic() - package_started,
+            "totalSeconds": time.monotonic() - started,
+            "levels": level_timings,
+        },
     }
     return archive_entry, profile, report
 
@@ -563,12 +604,16 @@ def build(
     max_zoom: int = MAX_ZOOM,
     tolerance_pixels: float = 1,
     boundary_tolerance_pixels: float = 0.05,
+    jobs: int | None = None,
 ) -> dict[str, Any]:
+    if jobs is not None and jobs < 1:
+        raise ValueError("jobs must be a positive integer")
     if not 0 <= max_zoom <= MAX_ZOOM or any(
         not math.isfinite(t) or t < 0 for t in [tolerance_pixels, boundary_tolerance_pixels]
     ):
         raise ValueError("Invalid LOD settings")
     started = time.monotonic()
+    prepare_started = time.monotonic()
     with source.open("rb") as input_file:
         source_hash = hashlib.file_digest(input_file, "sha256").hexdigest()
     settings = {
@@ -588,30 +633,60 @@ def build(
         json.dumps({**settings, "version": LOD_VERSION}, sort_keys=True).encode()
     ).hexdigest()[:20]
     directory = f"coverage-parts/v3-{fingerprint}/"
+    tasks = [
+        (dataset, period, path)
+        for (dataset, period), path in source_profiles(
+            source, cache / f"sources-{source_hash[:20]}"
+        ).items()
+        if (not datasets or dataset in datasets) and (not periods or period in periods)
+    ]
+    if not tasks:
+        raise ValueError("No matching source profiles")
+    # Start larger inputs first to avoid leaving one expensive profile until last.
+    tasks.sort(key=lambda task: (-task[2].stat().st_size, task[0], task[1]))
+    cpus = getattr(os, "process_cpu_count", os.cpu_count)() or 1
+    workers = min(jobs if jobs is not None else min(2, cpus), len(tasks))
+    worker = partial(
+        build_profile,
+        output=output,
+        cache=cache,
+        tile_join=tile_join,
+        settings=settings,
+        fingerprint=fingerprint,
+        lod_fingerprint=lod_fingerprint,
+        tile_threads=max(1, cpus // workers),
+    )
+    prepare_seconds = time.monotonic() - prepare_started
+    profiles_started = time.monotonic()
+    print(f"Building {len(tasks)} profiles with {workers} worker(s)", flush=True)
+    if workers == 1:
+        results = [worker(*task) for task in tasks]
+    else:
+        # Spawn avoids inheriting initialized GEOS/Polars threads and native state.
+        # Retiring each process after one profile releases its native allocations.
+        with ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=multiprocessing.get_context("spawn"),
+            max_tasks_per_child=1,
+        ) as executor:
+            futures = [executor.submit(worker, *task) for task in tasks]
+            try:
+                results = [future.result() for future in as_completed(futures)]
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                raise
+    profiles_seconds = time.monotonic() - profiles_started
+    # Completion order and scheduling must not change manifests or merge order.
+    results.sort(key=lambda result: (result[0]["datasetId"], result[0]["viewId"]))
     profiles = []
     archives = []
     reports = {}
-    for (dataset, period), feature_path in sorted(
-        source_profiles(source, cache / f"sources-{source_hash[:20]}").items()
-    ):
-        if (datasets and dataset not in datasets) or (periods and period not in periods):
-            continue
-        archive_entry, profile, report = build_profile(
-            dataset,
-            period,
-            feature_path,
-            output,
-            cache,
-            tile_join,
-            settings,
-            fingerprint,
-            lod_fingerprint,
-        )
+    for archive_entry, profile, report in results:
         archives.append(archive_entry)
         profiles.append(profile)
         reports[profile["id"]] = report
-    if not profiles:
-        raise ValueError("No matching source profiles")
+    merge_started = time.monotonic()
     archive = output / "language-areas.pmtiles"
     temporary = archive.with_suffix(".tmp.pmtiles")
     subprocess.run(
@@ -629,7 +704,17 @@ def build(
     report_name = f"geometry/v2-{fingerprint}/report.json"
     atomic_json(
         output / report_name,
-        {"settings": settings, "profiles": reports, "seconds": time.monotonic() - started},
+        {
+            "settings": settings,
+            "profiles": reports,
+            "seconds": time.monotonic() - started,
+            "execution": {
+                "workers": workers,
+                "prepareSeconds": prepare_seconds,
+                "profilesSeconds": profiles_seconds,
+                "mergeSeconds": time.monotonic() - merge_started,
+            },
+        },
     )
     return {
         "archive": archive.name,
@@ -661,7 +746,14 @@ def main() -> None:
     parser.add_argument("--boundary-tolerance-pixels", type=float, default=0.05)
     parser.add_argument("--restore-parts", action="store_true")
     parser.add_argument("--max-zoom", type=int, choices=range(MAX_ZOOM + 1), default=MAX_ZOOM)
+    parser.add_argument(
+        "--jobs", type=int, help="Concurrent profiles (default: up to 2; 1 is serial)"
+    )
     args = parser.parse_args()
+    if args.jobs is not None and args.jobs < 1:
+        parser.error("--jobs must be a positive integer")
+    if args.restore_parts and args.jobs is not None:
+        parser.error("--jobs applies to generation; parts restoration publishes levels serially")
     if args.restore_parts:
         restore_parts(
             NORMALIZED_GEOMETRIES,
@@ -685,6 +777,7 @@ def main() -> None:
         max_zoom=args.max_zoom,
         tolerance_pixels=args.tolerance_pixels,
         boundary_tolerance_pixels=args.boundary_tolerance_pixels,
+        jobs=args.jobs,
     )
     atomic_json(args.output / "geometry-manifest.json", result)
     export_catalog(PUBLIC_DATA_DIR, args.output, result)
