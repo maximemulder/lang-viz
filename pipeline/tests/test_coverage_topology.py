@@ -26,11 +26,10 @@ from pipeline.atlas.topology_build import (
     build,
     create_database,
     export_catalog,
-    load_partition,
     restore_parts,
-    save_partition,
     write_level,
 )
+from pipeline.atlas.topology_cache import load_partition, save_partition
 
 
 def feature(variant, geometry):
@@ -314,7 +313,7 @@ def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
     path = directory / profile["id"] / "1-0-0.pbf"
     expected = path.read_bytes()
     archive_bytes = (output / manifest["archive"]).read_bytes()
-    canonical_file = next(cache.glob("v*/test/contemporary.jsonl.gz"))
+    canonical_file = next(cache.glob("canonical/*/test/contemporary.jsonl.gz"))
     canonical_file.unlink()
     path.unlink()
     restore_parts(source, output, cache)
@@ -323,16 +322,21 @@ def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
     assert (output / manifest["archive"]).read_bytes() == archive_bytes
     # Resuming must also restore a lost source cache, even when parts and their
     # completion statistics survived. Otherwise packaging could publish no LODs.
-    database_path = next(cache.glob("**/contemporary.mbtiles"))
+    database_path = next(cache.glob("tiles/*/test/contemporary/source.mbtiles"))
     with sqlite3.connect(database_path) as database:
         source_tiles = database.execute("SELECT * FROM tiles ORDER BY 1, 2, 3").fetchall()
         database.execute("DELETE FROM tiles WHERE zoom_level=1")
+    # Complete public archives need no internal database. Remove both packaged
+    # copies to exercise recovery of an incomplete source-tile cache.
+    (output / manifest["geometryProfiles"][0]["archive"]).unlink()
+    next(cache.glob("archives/*/test/contemporary.pmtiles")).unlink()
     build(source, output, cache, binary, max_zoom=1)
     with sqlite3.connect(database_path) as database:
         assert database.execute("SELECT * FROM tiles ORDER BY 1, 2, 3").fetchall() == source_tiles
     # A source change cannot silently attach incompatible parts to old geometry.
-    source.write_text(source.read_text() + "\n")
-    with pytest.raises(ValueError, match="source or algorithm changed"):
+    records[0]["geometry"] = json_geometry(box(0.1, 0.1, 0.2, 0.2))
+    source.write_text("\n".join(json.dumps(record) for record in records) + "\n")
+    with pytest.raises(ValueError, match="Source changed"):
         restore_parts(source, output, cache)
 
 

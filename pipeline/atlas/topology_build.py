@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import hashlib
 import json
 import math
 import multiprocessing
@@ -32,74 +31,44 @@ import shapely as geos
 from mapbox_vector_tile.encoder import on_invalid_geometry_raise
 
 from pipeline.atlas.topology import (
-    ALGORITHM_VERSION,
-    AREA_INDEX_ZOOM,
     EXTENT,
-    LOD_VERSION,
     MAX_ZOOM,
-    PARTITION_VERSION,
-    SOURCE_GRID,
     Partition,
-    SourceAreaIndex,
-    partition_sources,
     polygons,
-    quantize_partition,
-    simplify_partition,
     split_point_contacts,
+)
+from pipeline.atlas.topology_cache import (
+    GeometrySettings,
+    ProfileCache,
+    ProfileSource,
+    atomic_json,
+    digest_file,
+    fingerprint,
+    materialize,
 )
 
 
-def atomic_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, separators=(",", ":")) + "\n")
-    temporary.replace(path)
-
-
-def save_partition(path: Path, partition: Partition) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    with gzip.open(temporary, "wt") as output:
-        output.write(
-            json.dumps(
-                {
-                    "properties": partition.properties,
-                    "repairs": partition.repairs,
-                    "stats": partition.stats,
-                }
-            )
-            + "\n"
-        )
-        for geometry, members in zip(partition.faces, partition.memberships, strict=True):
-            output.write(json.dumps([members, geometry.wkb_hex], separators=(",", ":")) + "\n")
-    temporary.replace(path)
-
-
-def load_partition(path: Path) -> Partition:
-    with gzip.open(path, "rt") as source:
-        metadata = json.loads(next(source))
-        rows = [json.loads(line) for line in source]
-    return Partition(
-        geos.from_wkb([bytes.fromhex(row[1]) for row in rows]),
-        [tuple(row[0]) for row in rows],
-        metadata["properties"],
-        metadata["repairs"],
-        metadata.get("stats", {}),
-    )
-
-
-def source_profiles(source: Path, cache: Path) -> dict[tuple[str, str], Path]:
+def source_profiles(source: Path, cache: Path) -> dict[tuple[str, str], ProfileSource]:
     """Spool once; never retain every dataset's coordinates in Python objects."""
     index = cache / "profiles.json"
     if index.exists():
+        records = json.loads(index.read_text())
+        if any(not (cache / p["path"]).is_file() for p in records):
+            index.unlink()
+            return source_profiles(source, cache)
         return {
-            (p["dataset"], p["period"]): cache / p["path"] for p in json.loads(index.read_text())
+            (p["dataset"], p["period"]): ProfileSource(
+                p["dataset"], p["period"], cache / p["path"], p["sha256"]
+            )
+            for p in records
         }
     cache.mkdir(parents=True, exist_ok=True)
     profiles: dict[tuple[str, str], Path] = {}
     with ExitStack() as stack, source.open() as lines:
         handles = {}
         for line in lines:
+            if not line.strip():
+                continue
             props = json.loads(line)["properties"]
             key = (props["dataset_id"], props["temporal_view"])
             if key not in handles:
@@ -107,16 +76,17 @@ def source_profiles(source: Path, cache: Path) -> dict[tuple[str, str], Path]:
                 profiles[key] = path
                 handles[key] = stack.enter_context(path.open("w"))
             handles[key].write(line)
-    atomic_json(
-        index, [{"dataset": d, "period": p, "path": path.name} for (d, p), path in profiles.items()]
-    )
-    return profiles
-
-
-def read_features(path: Path) -> Iterable[dict[str, Any]]:
-    with path.open() as lines:
-        for line in lines:
-            yield json.loads(line)
+    records = [
+        {"dataset": d, "period": p, "path": path.name, "sha256": digest_file(path)}
+        for (d, p), path in profiles.items()
+    ]
+    atomic_json(index, records)
+    return {
+        (p["dataset"], p["period"]): ProfileSource(
+            p["dataset"], p["period"], cache / p["path"], p["sha256"]
+        )
+        for p in records
+    }
 
 
 def tile_geometry(geometry: geos.Geometry, zoom: int, x: int, y: int) -> geos.Geometry:
@@ -240,6 +210,7 @@ def write_level(
     partition: Partition, zoom: int, parts: Path, database: sqlite3.Connection | None
 ) -> dict[str, Any]:
     """Clip only after global simplification and shared coordinate quantization."""
+    parts.mkdir(parents=True, exist_ok=True)
     active = [
         i
         for i, members in enumerate(partition.memberships)
@@ -314,75 +285,67 @@ def restore_parts(
     periods: list[str] | None = None,
     max_zoom: int = MAX_ZOOM,
 ) -> None:
-    """Repair missing parts from the canonical partition, never from source LODs."""
+    """Restore parts through the same profile cache and LOD builder as generation."""
     manifest_path = output / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
     descriptor = manifest.get("geometryBuild", {})
     if descriptor.get("kind") != "shared-coverage":
         raise ValueError("This manifest was not built with shared coverage")
-    settings = json.loads((output / descriptor["report"]).read_text())["settings"]
-    with source.open("rb") as input_file:
-        source_hash = hashlib.file_digest(input_file, "sha256").hexdigest()
-    if settings["version"] != ALGORITHM_VERSION or settings["source"] != source_hash:
-        raise ValueError("Canonical source or algorithm changed; rebuild the atlas first")
+    report_path = output / descriptor["report"]
+    report = json.loads(report_path.read_text())
+    settings = GeometrySettings(
+        report["settings"]["tolerancePixels"], report["settings"]["boundaryTolerancePixels"]
+    )
+    source_hash = digest_file(source)
+    sources = source_profiles(source, cache / f"sources-{source_hash[:20]}")
     config = manifest["coverageParts"]
     matched = 0
     for profile in config["profiles"]:
         dataset, period = profile["datasetId"], profile["viewId"]
         if (datasets and dataset not in datasets) or (periods and period not in periods):
             continue
+        label = f"{dataset}/{period}"
+        current = sources.get((dataset, period))
+        previous = report["profiles"][label]
+        if current is None or previous["source"] != current.digest:
+            raise ValueError("Source changed; rebuild the atlas first")
         matched += 1
+        store = ProfileCache(cache, current, settings)
+        levels = read_json(store.levels_file) or {}
         directory = output / config["directory"]
         parts = directory / profile["id"]
-        parts.mkdir(parents=True, exist_ok=True)
-        try:
-            index = json.loads((directory / profile["tileIndex"]).read_text())
-        except FileNotFoundError:
-            index = {}
-        partition = None
-        for zoom in range(min(max_zoom, settings["maxZoom"]) + 1):
-            if str(zoom) in index and all(
-                (parts / f"{zoom}-{name}.pbf").exists() for name in index[str(zoom)]
+        index = read_json(directory / profile["tileIndex"]) or {}
+        limit = min(max_zoom, profile.get("maxZoom", config["maxZoom"]))
+        for zoom in range(limit + 1):
+            level = levels.get(str(zoom), previous["levels"].get(str(zoom)))
+            if (
+                level
+                and parts_complete(parts, zoom, level)
+                and index.get(str(zoom)) == level["tiles"]
             ):
                 continue
-            lod_fingerprint = hashlib.sha256(
-                json.dumps({**settings, "version": LOD_VERSION}, sort_keys=True).encode()
-            ).hexdigest()[:20]
-            lod_file = cache / lod_fingerprint / f"{profile['id']}/lod-{zoom}.jsonl.gz"
-            if lod_file.exists():
-                low = load_partition(lod_file)
-            else:
-                if partition is None:
-                    partition_file = (
-                        cache
-                        / f"v{PARTITION_VERSION}-{source_hash[:20]}"
-                        / f"{profile['id']}.jsonl.gz"
+            if not parts_complete(store.parts, zoom, level):
+                low, _ = store.get_or_build_lod(zoom)
+                stats = write_level(low, zoom, store.parts, None)
+                if level:
+                    stats.update(
+                        {k: level[k] for k in ("sourceTiles", "sourcePositions") if k in level}
                     )
-                    if partition_file.exists():
-                        partition = load_partition(partition_file)
-                    else:
-                        spooled = source_profiles(source, cache / f"sources-{source_hash[:20]}")
-                        partition = partition_sources(read_features(spooled[(dataset, period)]))
-                        save_partition(partition_file, partition)
-                low = simplify_partition(
-                    quantize_partition(partition, zoom),
-                    zoom,
-                    settings["tolerancePixels"],
-                    settings["boundaryTolerancePixels"],
-                )
-                save_partition(lod_file, low)
-            index[str(zoom)] = write_level(low, zoom, parts, None)["tiles"]
-            index_hash = hashlib.sha256(
-                json.dumps(index, sort_keys=True, separators=(",", ":")).encode()
-            ).hexdigest()[:20]
-            profile["tileIndex"] = f"{profile['id']}/index-{index_hash}.json"
-            profile["maxZoom"] = max(profile.get("maxZoom", 0), zoom)
-            atomic_json(directory / profile["tileIndex"], index)
+                level = {**stats, **low.stats}
+            levels[str(zoom)] = level
+            atomic_json(store.levels_file, levels)
+            for name in level["tiles"]:
+                target = parts / f"{zoom}-{name}.pbf"
+                if not target.is_file():
+                    materialize(store.parts / target.name, target)
+            index[str(zoom)] = level["tiles"]
+            name = f"index-{fingerprint(index)}.json"
+            atomic_json(parts / name, index)
+            profile["tileIndex"] = f"{profile['id']}/{name}"
+            previous["levels"][str(zoom)] = level
+            atomic_json(report_path, report)
             atomic_json(manifest_path, manifest)
-        print(
-            f"{profile['id']}: canonical parts ready through zoom {min(max_zoom, settings['maxZoom'])}",
-            flush=True,
-        )
+        print(f"{label}: canonical parts ready through zoom {limit}", flush=True)
     if not matched:
         raise ValueError("No matching source profiles")
 
@@ -440,7 +403,15 @@ def export_catalog(source: Path, output: Path, geometry: dict[str, Any]) -> None
     notice = source / "DLAC-NOTICE.md"
     if notice.exists() and source.resolve() != output.resolve():
         shutil.copyfile(notice, output / notice.name)
+    previous = read_json(output / "manifest.json") or {}
     manifest.pop("branchCoverage", None)
+    if (
+        geometry.get("geometryBuild", {}).get("fingerprint")
+        and previous.get("geometryBuild", {}).get("fingerprint")
+        == geometry.get("geometryBuild", {}).get("fingerprint")
+        and "branchCoverage" in previous
+    ):
+        manifest["branchCoverage"] = previous["branchCoverage"]
     manifest.update(geometry)
     manifest.update(
         geometryVariantCount=len(variants),
@@ -450,147 +421,193 @@ def export_catalog(source: Path, output: Path, geometry: dict[str, Any]) -> None
     atomic_json(output / "manifest.json", manifest)
 
 
+PARTS_DIRECTORY = "coverage-parts/"
+
+
+def read_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def parts_complete(directory: Path, zoom: int, level: dict[str, Any] | None) -> bool:
+    return level is not None and all(
+        (directory / f"{zoom}-{name}.pbf").is_file() for name in level["tiles"]
+    )
+
+
+def profile_paths(store: ProfileCache, output: Path, max_zoom: int):
+    archive = f"geometry/{store.archive_key(max_zoom)}/{store.source.label}.pmtiles"
+    profile_id = f"{store.lod_key}/{store.source.label}"
+    return archive, profile_id, output / PARTS_DIRECTORY / profile_id
+
+
+def completed_profile(store: ProfileCache, output: Path, max_zoom: int):
+    archive, _, parts = profile_paths(store, output, max_zoom)
+    completed = read_json(store.archive(max_zoom).with_suffix(".json"))
+    if not completed or not (output / archive).is_file():
+        return None
+    index = read_json(output / PARTS_DIRECTORY / completed["profile"]["tileIndex"])
+    levels = completed["report"]["levels"]
+    if index != {str(z): levels[str(z)]["tiles"] for z in range(max_zoom + 1)} or not all(
+        parts_complete(parts, z, levels.get(str(z))) for z in range(max_zoom + 1)
+    ):
+        return None
+    report = completed["report"]
+    report["timings"] = {
+        "processId": os.getpid(),
+        "reused": True,
+        "canonicalLoaded": False,
+        "canonicalSeconds": 0,
+        "levelsSeconds": 0,
+        "packagingSeconds": 0,
+        "totalSeconds": 0,
+        "levels": {
+            str(z): {
+                "reused": True,
+                "seconds": 0,
+                "lodSeconds": 0,
+                "exportSeconds": 0,
+                "lodCacheHit": None,
+            }
+            for z in range(max_zoom + 1)
+        },
+    }
+    return completed["entry"], completed["profile"], report
+
+
+def publish_index(parts: Path, profile_id: str, levels: dict[str, Any], max_zoom: int):
+    index = {str(z): levels[str(z)]["tiles"] for z in range(max_zoom + 1)}
+    name = f"index-{fingerprint(index)}.json"
+    path = parts / name
+    if read_json(path) != index:
+        atomic_json(path, index)
+    return f"{profile_id}/{name}"
+
+
 def build_profile(
-    dataset: str,
-    period: str,
-    feature_path: Path,
+    source: ProfileSource,
     output: Path,
     cache: Path,
     tile_join: str,
-    settings: dict[str, Any],
-    fingerprint: str,
-    lod_fingerprint: str,
+    settings: GeometrySettings,
+    max_zoom: int,
     tile_threads: int = 1,
 ):
-    # Keep native geometry ownership inside one profile, including failure paths.
     started = time.monotonic()
-    source_hash = settings["source"]
-    max_zoom = settings["maxZoom"]
-    tolerance_pixels = settings["tolerancePixels"]
-    boundary_tolerance_pixels = settings["boundaryTolerancePixels"]
-    directory = f"coverage-parts/v3-{fingerprint}/"
-    label = f"{dataset}/{period}"
-
-    def log(message, label=label):
-        print(f"{label}: {message}", flush=True)
-
-    partition_file = cache / f"v{PARTITION_VERSION}-{source_hash[:20]}" / f"{label}.jsonl.gz"
-    canonical_cache_hit = partition_file.exists()
-    if canonical_cache_hit:
-        partition = load_partition(partition_file)
-        log(f"loaded {len(partition.faces)} canonical faces")
-    else:
-        partition = partition_sources(read_features(feature_path), log=log)
-        save_partition(partition_file, partition)
-    canonical_seconds = time.monotonic() - started
-    levels_started = time.monotonic()
+    label = source.label
+    log = partial(print, flush=True)
+    store = ProfileCache(cache, source, settings, lambda message: log(f"{label}: {message}"))
+    complete = completed_profile(store, output, max_zoom)
+    if complete:
+        return complete
+    archive_name, profile_id, parts = profile_paths(store, output, max_zoom)
+    levels = read_json(store.levels_file) or {}
+    cached_archive = store.archive(max_zoom)
+    archive_ready = cached_archive.is_file()
     level_timings = {}
-    parts = output / directory / label
-    parts.mkdir(parents=True, exist_ok=True)
-    database_path = cache / f"{fingerprint}/{label}.mbtiles"
-    database_path.parent.mkdir(parents=True, exist_ok=True)
-    with closing(create_database(database_path, max_zoom)) as database:
-        stats_path = database_path.with_suffix(".json")
-        stats = json.loads(stats_path.read_text()) if stats_path.exists() else {}
-        area_index = None
+    levels_started = time.monotonic()
+    with ExitStack() as stack:
+        database = None
         for zoom in range(max_zoom + 1):
-            level_started = time.monotonic()
-            reused = True
-            lod_seconds = export_seconds = 0.0
-            lod_cache_hit = None
-            complete = stats.get(str(zoom))
-            source_tiles = {
-                f"{x}-{2**zoom - 1 - row}"
-                for x, row in database.execute(
-                    "SELECT tile_column, tile_row FROM tiles WHERE zoom_level=?", (zoom,)
-                )
-            }
-            if (
-                not complete
-                or not all((parts / f"{zoom}-{name}.pbf").is_file() for name in complete["tiles"])
-                or not set(complete["tiles"]).issubset(source_tiles)
-                or len(source_tiles) != complete.get("sourceTiles", len(source_tiles))
-            ):
-                reused = False
-                lod_started = time.monotonic()
-                lod_file = cache / lod_fingerprint / f"{label}/lod-{zoom}.jsonl.gz"
-                lod_cache_hit = lod_file.exists()
-                if lod_cache_hit:
-                    encoded = load_partition(lod_file)
-                else:
-                    area_index = area_index or SourceAreaIndex(partition)
-                    encoded = simplify_partition(
-                        quantize_partition(partition, zoom, log, area_index),
-                        zoom,
-                        tolerance_pixels,
-                        boundary_tolerance_pixels,
+            begin = time.monotonic()
+            level = levels.get(str(zoom))
+            need_parts = not parts_complete(store.parts, zoom, level)
+            need_source = False
+            if not archive_ready:
+                if database is None:
+                    store.database.parent.mkdir(parents=True, exist_ok=True)
+                    database = stack.enter_context(
+                        closing(create_database(store.database, max_zoom))
                     )
-                    save_partition(lod_file, encoded)
+                count = database.execute(
+                    "SELECT COUNT(*) FROM tiles WHERE zoom_level=?", (zoom,)
+                ).fetchone()[0]
+                need_source = level is None or count != level.get("sourceTiles", -1)
+            lod_seconds = export_seconds = 0.0
+            cache_hit = None
+            if need_parts or need_source:
+                lod_started = time.monotonic()
+                low, cache_hit = store.get_or_build_lod(zoom)
                 lod_seconds = time.monotonic() - lod_started
-                log(
-                    f"zoom {zoom}: {len(encoded.faces)} simplified faces, {int(sum(geos.get_num_coordinates(encoded.faces)))} positions"
-                )
                 export_started = time.monotonic()
-                stats[str(zoom)] = write_level(encoded, zoom, parts, database)
-                stats[str(zoom)].update(encoded.stats)
-                atomic_json(stats_path, stats)
+                stats = write_level(low, zoom, store.parts, database)
+                # Parts-only restoration must retain source-cache completion counts.
+                if database is None and level:
+                    stats.update(
+                        {k: level[k] for k in ("sourceTiles", "sourcePositions") if k in level}
+                    )
+                level = levels[str(zoom)] = {**stats, **low.stats}
+                atomic_json(store.levels_file, levels)
                 export_seconds = time.monotonic() - export_started
+            for name in level["tiles"]:
+                target = parts / f"{zoom}-{name}.pbf"
+                if need_parts or not target.is_file():
+                    materialize(store.parts / target.name, target)
             level_timings[str(zoom)] = {
-                "seconds": time.monotonic() - level_started,
-                "reused": reused,
-                "lodCacheHit": lod_cache_hit,
+                "seconds": time.monotonic() - begin,
+                "reused": not (need_parts or need_source),
+                "lodCacheHit": cache_hit,
                 "lodSeconds": lod_seconds,
                 "exportSeconds": export_seconds,
             }
-            log(f"zoom {zoom}: {stats[str(zoom)]['positions']} parts positions")
     levels_seconds = time.monotonic() - levels_started
     package_started = time.monotonic()
-    index = {str(z): stats[str(z)]["tiles"] for z in range(max_zoom + 1)}
-    index_hash = hashlib.sha256(json.dumps(index, separators=(",", ":")).encode()).hexdigest()[:20]
-    index_name = f"index-{index_hash}.json"
-    atomic_json(parts / index_name, index)
-    profile_archive = f"geometry/v2-{fingerprint}/{label}.pmtiles"
-    target = output / profile_archive
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp.pmtiles")
-    environment = os.environ.copy()
-    environment.setdefault("TIPPECANOE_MAX_THREADS", str(tile_threads))
-    subprocess.run(
-        [
-            tile_join,
-            "--force",
-            "--no-tile-size-limit",
-            "--quiet",
-            f"--output={temporary}",
-            str(database_path),
-        ],
-        check=True,
-        env=environment,
-    )
-    temporary.replace(target)
-    archive_entry = {"datasetId": dataset, "viewId": period, "archive": profile_archive}
+    if not archive_ready:
+        cached_archive.parent.mkdir(parents=True, exist_ok=True)
+        temporary = cached_archive.with_suffix(".tmp.pmtiles")
+        environment = os.environ.copy()
+        environment.setdefault("TIPPECANOE_MAX_THREADS", str(tile_threads))
+        subprocess.run(
+            [
+                tile_join,
+                "--force",
+                "--no-tile-size-limit",
+                "--quiet",
+                f"--maximum-zoom={max_zoom}",
+                f"--output={temporary}",
+                str(store.database),
+            ],
+            check=True,
+            env=environment,
+        )
+        temporary.replace(cached_archive)
+    materialize(cached_archive, output / archive_name)
+    tile_index = publish_index(parts, profile_id, levels, max_zoom)
+    entry = {"datasetId": source.dataset, "viewId": source.period, "archive": archive_name}
     profile = {
-        "id": label,
-        "datasetId": dataset,
-        "viewId": period,
+        "id": profile_id,
+        "datasetId": source.dataset,
+        "viewId": source.period,
         "maxZoom": max_zoom,
-        "tileIndex": f"{label}/{index_name}",
+        "tileIndex": tile_index,
     }
     report = {
-        "faces": len(partition.faces),
-        "repairs": partition.repairs,
-        "levels": stats,
+        **store.summary(),
+        "source": source.digest,
+        "levels": {str(z): levels[str(z)] for z in range(max_zoom + 1)},
         "timings": {
             "processId": os.getpid(),
-            "canonicalCacheHit": canonical_cache_hit,
-            "canonicalSeconds": canonical_seconds,
+            "reused": False,
+            "canonicalLoaded": store.canonical_loaded,
+            "canonicalSeconds": store.canonical_seconds,
             "levelsSeconds": levels_seconds,
             "packagingSeconds": time.monotonic() - package_started,
+            "packagingReused": archive_ready,
             "totalSeconds": time.monotonic() - started,
             "levels": level_timings,
         },
     }
-    return archive_entry, profile, report
+    atomic_json(
+        cached_archive.with_suffix(".json"),
+        {
+            "entry": entry,
+            "profile": profile,
+            "report": report,
+        },
+    )
+    return entry, profile, report
 
 
 def build(
@@ -608,100 +625,101 @@ def build(
 ) -> dict[str, Any]:
     if jobs is not None and jobs < 1:
         raise ValueError("jobs must be a positive integer")
-    if not 0 <= max_zoom <= MAX_ZOOM or any(
-        not math.isfinite(t) or t < 0 for t in [tolerance_pixels, boundary_tolerance_pixels]
-    ):
+    if not 0 <= max_zoom <= MAX_ZOOM:
         raise ValueError("Invalid LOD settings")
     started = time.monotonic()
-    prepare_started = time.monotonic()
-    with source.open("rb") as input_file:
-        source_hash = hashlib.file_digest(input_file, "sha256").hexdigest()
+    config = GeometrySettings(tolerance_pixels, boundary_tolerance_pixels)
+    source_hash = digest_file(source)
     settings = {
-        "version": ALGORITHM_VERSION,
+        **config.record(),
         "source": source_hash,
-        "geos": geos.geos_version_string,
-        "extent": EXTENT,
-        "sourceGrid": SOURCE_GRID,
-        "labelPrecision": SOURCE_GRID,
-        "labelRegionZoom": AREA_INDEX_ZOOM,
-        "tolerancePixels": tolerance_pixels,
-        "boundaryTolerancePixels": boundary_tolerance_pixels,
         "maxZoom": max_zoom,
     }
-    fingerprint = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()[:20]
-    lod_fingerprint = hashlib.sha256(
-        json.dumps({**settings, "version": LOD_VERSION}, sort_keys=True).encode()
-    ).hexdigest()[:20]
-    directory = f"coverage-parts/v3-{fingerprint}/"
     tasks = [
-        (dataset, period, path)
-        for (dataset, period), path in source_profiles(
+        profile
+        for (dataset, period), profile in source_profiles(
             source, cache / f"sources-{source_hash[:20]}"
         ).items()
         if (not datasets or dataset in datasets) and (not periods or period in periods)
     ]
     if not tasks:
         raise ValueError("No matching source profiles")
-    # Start larger inputs first to avoid leaving one expensive profile until last.
-    tasks.sort(key=lambda task: (-task[2].stat().st_size, task[0], task[1]))
+    tasks.sort(key=lambda profile: (-profile.path.stat().st_size, profile.label))
+    results = []
+    pending = []
+    for profile in tasks:
+        complete = completed_profile(ProfileCache(cache, profile, config), output, max_zoom)
+        if complete:
+            results.append(complete)
+        else:
+            pending.append(profile)
+    reused_profiles = len(results)
     cpus = getattr(os, "process_cpu_count", os.cpu_count)() or 1
-    workers = min(jobs if jobs is not None else min(2, cpus), len(tasks))
+    workers = min(jobs if jobs is not None else min(2, cpus), len(pending))
     worker = partial(
         build_profile,
         output=output,
         cache=cache,
         tile_join=tile_join,
-        settings=settings,
-        fingerprint=fingerprint,
-        lod_fingerprint=lod_fingerprint,
-        tile_threads=max(1, cpus // workers),
+        settings=config,
+        max_zoom=max_zoom,
+        tile_threads=max(1, cpus // max(1, workers)),
     )
-    prepare_seconds = time.monotonic() - prepare_started
+    prepare_seconds = time.monotonic() - started
     profiles_started = time.monotonic()
-    print(f"Building {len(tasks)} profiles with {workers} worker(s)", flush=True)
-    if workers == 1:
-        results = [worker(*task) for task in tasks]
+    print(
+        f"{reused_profiles} complete profiles reused; building {len(pending)} with {workers} worker(s)",
+        flush=True,
+    )
+    if workers <= 1:
+        results.extend(worker(profile) for profile in pending)
     else:
-        # Spawn avoids inheriting initialized GEOS/Polars threads and native state.
-        # Retiring each process after one profile releases its native allocations.
         with ProcessPoolExecutor(
             max_workers=workers,
             mp_context=multiprocessing.get_context("spawn"),
             max_tasks_per_child=1,
         ) as executor:
-            futures = [executor.submit(worker, *task) for task in tasks]
+            futures = [executor.submit(worker, profile) for profile in pending]
             try:
-                results = [future.result() for future in as_completed(futures)]
+                results.extend(future.result() for future in as_completed(futures))
             except BaseException:
                 for future in futures:
                     future.cancel()
                 raise
     profiles_seconds = time.monotonic() - profiles_started
-    # Completion order and scheduling must not change manifests or merge order.
     results.sort(key=lambda result: (result[0]["datasetId"], result[0]["viewId"]))
-    profiles = []
-    archives = []
-    reports = {}
-    for archive_entry, profile, report in results:
-        archives.append(archive_entry)
-        profiles.append(profile)
-        reports[profile["id"]] = report
+    archives = [entry for entry, _, _ in results]
+    profiles = [profile for _, profile, _ in results]
+    reports = {f"{entry['datasetId']}/{entry['viewId']}": report for entry, _, report in results}
+    archive_keys = [
+        ProfileCache(cache, p, config).archive_key(max_zoom)
+        for p in sorted(tasks, key=lambda p: p.label)
+    ]
+    build_key = fingerprint(archive_keys)
     merge_started = time.monotonic()
     archive = output / "language-areas.pmtiles"
-    temporary = archive.with_suffix(".tmp.pmtiles")
-    subprocess.run(
-        [
-            tile_join,
-            "--force",
-            "--no-tile-size-limit",
-            "--quiet",
-            f"--output={temporary}",
-            *[str(output / p["archive"]) for p in archives],
-        ],
-        check=True,
-    )
-    temporary.replace(archive)
-    report_name = f"geometry/v2-{fingerprint}/report.json"
+    marker = cache / "combined.json"
+    merged_reused = archive.is_file() and read_json(marker) == build_key
+    if not merged_reused:
+        cached = cache / "bundles" / f"{build_key}.pmtiles"
+        if not cached.is_file():
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            temporary = cached.with_suffix(".tmp.pmtiles")
+            subprocess.run(
+                [
+                    tile_join,
+                    "--force",
+                    "--no-tile-size-limit",
+                    "--quiet",
+                    f"--output={temporary}",
+                    *[str(output / p["archive"]) for p in archives],
+                ],
+                check=True,
+            )
+            temporary.replace(cached)
+        materialize(cached, archive)
+        atomic_json(marker, build_key)
+    report_name = f"geometry/build-{build_key}/report.json"
     atomic_json(
         output / report_name,
         {
@@ -710,9 +728,11 @@ def build(
             "seconds": time.monotonic() - started,
             "execution": {
                 "workers": workers,
+                "reusedProfiles": reused_profiles,
                 "prepareSeconds": prepare_seconds,
                 "profilesSeconds": profiles_seconds,
                 "mergeSeconds": time.monotonic() - merge_started,
+                "mergeReused": merged_reused,
             },
         },
     )
@@ -720,11 +740,10 @@ def build(
         "archive": archive.name,
         "geometryMaxZoom": max_zoom,
         "geometryProfiles": archives,
-        "coverageParts": {"directory": directory, "maxZoom": max_zoom, "profiles": profiles},
+        "coverageParts": {"directory": PARTS_DIRECTORY, "maxZoom": max_zoom, "profiles": profiles},
         "geometryBuild": {
             "kind": "shared-coverage",
-            "version": ALGORITHM_VERSION,
-            "fingerprint": fingerprint,
+            "fingerprint": build_key,
             "report": report_name,
         },
     }

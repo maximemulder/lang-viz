@@ -36,6 +36,14 @@ and 165 source tiles were byte-identical. One dominant profile limited overlap;
 full Asher cold-build scaling still needs measurement. See the ignored local
 `app/test-results/topology/parallel-benchmark.json` report.
 
+Stage caches use individual profile inputs and simplification settings. Generation
+and restoration share one lazy LOD builder. Maximum zoom is excluded from lower
+stage keys; unchanged profiles retain their caches and URLs across unrelated
+source edits. Existing files and indexes allow unchanged builds to skip worker
+startup, geometry loading and packaging. Caches are disposable; algorithm and
+dependency changes require clearing the topology cache and generated public data,
+then rebuilding. There is no migration or version negotiation.
+
 The first full-data experiment built all seven dataset/period profiles through
 zoom 8. Decoded checks validated 51 coarse Asher tiles and 55 additional fine/profile
 tiles, with matching source/parts footprints and sampled membership geometry.

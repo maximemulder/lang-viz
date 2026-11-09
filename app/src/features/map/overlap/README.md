@@ -76,9 +76,16 @@ publishes the manifest after all profiles complete. Worker count and phase/cache
 timings are recorded outside the geometry fingerprint. Tile-join threads are
 divided across workers unless `TIPPECANOE_MAX_THREADS` is explicitly set.
 
-Integrated manifests carry `geometryBuild` and `coverage-parts/v3-*` URLs keyed
-by source/settings/engine identity. Their parts command restores missing files
-from cached common LODs; it never repartitions the display archive. The browser's
+`topology_cache.py` shares the lazy LOD builder between generation and restoration.
+Cache keys track individual profile inputs and simplification settings; maximum
+zoom only affects archive keys. Completed builds reuse existing files and indexes
+without loading geometry or invoking packaging. Missing assets are rebuilt from
+cached exports or common LODs.
+
+Integrated manifests carry `geometryBuild` and `coverage-parts/<profile-key>/`
+URLs with opaque profile IDs; archives use `geometry/<archive-key>/` URLs. Caches
+are disposable, with no migration or versioning: clear `data/processed/topology/`
+and `app/public/data/`, then rebuild after algorithm or dependency changes. The browser's
 parts, selection, delivery, and inspection contracts remain the same. Mixed
 profiles still use the existing live fallback. The first full-data pass built all
 seven profiles through zoom 8 and passed the prepared, navigation and inspection

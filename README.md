@@ -193,6 +193,25 @@ at final vector-tile precision; ambiguous surviving overlaps retain contributors
 and unassigned regions use original area majorities, counting uncovered area.
 Complex shell/hole point contacts are decomposed without moving their boundaries.
 
+`topology_cache.py` owns the lazy `get_or_build_lod` path used by both generation
+and restoration. Canonical geometry is keyed by each profile's normalized records;
+LODs and tile exports additionally depend on simplification settings. Maximum zoom
+only enters archive keys, so extending a build reuses completed lower levels and
+changing another profile preserves unchanged profiles' caches and asset URLs.
+
+The directories under `data/processed/topology/` are `canonical/`, `lod/`, `tiles/`,
+`archives/`, and `bundles/`. Public parts live under
+`coverage-parts/<profile-key>/<dataset>/<period>/`; profile archives use
+`geometry/<archive-key>/<dataset>/<period>.pmtiles`. Completed builds check that
+expected files and indexes exist before starting workers, loading geometry or
+packaging. Missing outputs are rebuilt from cached exports or the shared LODs.
+
+These are disposable build products: there is no cache migration, format
+versioning or corruption recovery. After changing preprocessing code or geometry
+dependencies, delete `data/processed/topology/` and `app/public/data/`, then rerun
+the normal build command. Source and simplification-setting changes are detected
+automatically.
+
 Generation runs independent dataset/period profiles in separate processes, using
 up to two workers by default. Larger inputs start first. Use
 `uv run python -m pipeline.atlas.build --jobs 4` to increase concurrency or
@@ -201,8 +220,9 @@ command accepts the same option. Each worker owns its profile's caches, database
 and output files. LODs within that profile stay sequential to reuse its canonical
 partition and regional area index. Additional workers increase memory use, so the
 default does not automatically consume every CPU. Source spooling happens before
-the workers start; archive merging and manifest publication happen after they
-finish. Scheduling does not change geometry fingerprints or tile ordering.
+the workers start; archive merging, when needed, and manifest publication happen
+after they finish. Fully reused profiles start no workers. Scheduling does not
+change geometry fingerprints or tile ordering.
 Reports include the worker count and timings for preparation, each profile's
 canonical geometry, individual LODs (including cache reuse), packaging, and final
 merging. Parts restoration and branch-view materialization remain sequential;

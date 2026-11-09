@@ -600,6 +600,15 @@ def build(skip_tiles: bool = False, *, jobs: int | None = None) -> None:
             binary,
             jobs=jobs,
         )
+        previous_path = PUBLIC_DATA_DIR / "manifest.json"
+        if previous_path.exists():
+            previous = json.loads(previous_path.read_text())
+            if (
+                previous.get("geometryBuild", {}).get("fingerprint")
+                == geometry["geometryBuild"]["fingerprint"]
+                and "branchCoverage" in previous
+            ):
+                manifest["branchCoverage"] = previous["branchCoverage"]
         # Keep the previous geometry manifest usable until every product is ready.
         atomic_json(PUBLIC_DATA_DIR / "manifest.json", {**manifest, **geometry})
     else:
