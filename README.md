@@ -14,6 +14,7 @@ uv run python -m pipeline.atlas.build
 cd app
 npm install
 npm run precompute:branches
+npm run precompute:colors
 npm run dev
 ```
 
@@ -95,6 +96,14 @@ the next action; they do not change already pinned entries.
 single-period** views at zooms 0–3. It composes the atlas build's reusable parts and
 resumes completed tiles. Missing parts must be restored before preparing branches.
 The browser uses these tiles only for an exact geometry/refinement match.
+
+`npm run precompute:colors` builds the finer geometry-based semantic palette for
+all dataset/period profiles from those branch tiles. The app loads the matching
+palette for single-profile pinned geometry; camera movement and browsing filters
+do not change it. Mixed datasets/periods, custom roots, and missing or stale assets
+use the ordinary defaults, with explicit view optimization still available.
+Regenerate colors after rebuilding the catalogs, branch tiles, or color policy.
+Generated palettes and their manifest are published locally under `public/data/`.
 
 The atlas build generates reusable disjoint coverage at all source zooms for
 every dataset/period (currently 0–8). Each piece retains every original contributor,
@@ -307,6 +316,19 @@ overlap at the displayed detail level.
 Solid areas and overlap stripes share the same transparency. They are composited
 once over the basemap, so transparent stripes do not reveal other language fills
 underneath. Adjusting the slider does not recompute geometry.
+
+**Language colors** uses stable genealogy palettes. In Map settings,
+**Optimize colors for this view** adapts the palette to the selected polygons on
+screen. Prominent and neighboring families receive coherent palettes. Internal
+variation follows each family's neighborhood, using available shade differences
+to retain broad branch structure in crowded views and expand focused comparisons.
+Refresh updates offscreen relatives with the same family palette. Colors remain
+fixed while navigating or changing filters. Custom colors are kept;
+**Undo colors** and **Use default palette** restore earlier assignments. These
+settings last until reload. Defaults and view optimization share the same shade
+allocator; fixed catalog evidence keeps defaults stable. Independent evaluation
+checks local conflicts and branch contrast at several area scales. See
+[the color algorithm, roadmap, controls, and evaluation commands](app/src/domain/COLORS.md).
 
 Overlap geometry is computed in a browser worker from the existing PMTiles
 archive, using its simplified vector tiles and a spatial index. Exact complete

@@ -10,6 +10,8 @@ npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
 npm run test:selection-browser
 npm run test:focus-browser
+
+npm run test:colors-browser
 npm run test:source-browser
 npm run test:delivery-browser
 npm run test:prepared-browser
@@ -47,6 +49,30 @@ holes, islands, independent comparison outlines, tile buffers and cancellation.
 Hover must leave selections and coverage request identities unchanged;
 camera bounds must load only on explicit profile actions. Reports/screenshots go to
 `test-results/sidebar-focus/`.
+
+`test:colors-browser` exercises **Optimize colors for this view** on real DLAC and
+Asher branch selections, including a complete Mercator world and a regional globe.
+It first runs the independent evaluator's unit tests. Browser checks cover separate
+family-conflict/coherence/detail diagnostics, bounded palettes and hues, branch
+contrast at four area scales in every large Asher family, same-cell contact conflicts,
+important family ambiguities, unselected/offscreen relatives, deterministic refresh,
+undo/default restoration, navigation and period stability, both levels of manual
+color override, and narrow settings layout. Recoloring must retain coverage URLs
+and issue no geometry computations. Before/after screenshots, closer European and
+African views retaining the world palette, diagnostics, timings, and a replayable
+input/palette pairs for all three scenes are saved under `test-results/colors/`.
+Optimization immediately after selection and after a zoom round trip to the same
+camera must agree. Defaults and optimized palettes share shade allocation; the
+independent report measures both on identical captured footprints.
+
+Compare saved palettes without a browser or optimizer using
+`npm run evaluate:colors -- --input test-results/colors/asher-world-input.json --palette test-results/colors/asher-world-palette.json`.
+Omit `--palette` to measure the reference default. The evaluator uses its own sRGB
+to OKLab conversion and actual topology/footprints, independently of the optimizer's
+graphs and objective. It reports multiscale clade means and weak-pair mass, local
+conflicts and their worst pairs, plus hue/chroma/spread coherence. Values are
+heuristics rather than perceptual confusion rates; same-cell occupancy does not
+prove polygon overlap. Save input and palette JSON together for later comparisons.
 
 `test:delivery-browser` checks the production app's lightweight startup geometry
 index, DLAC-only source routing, zoom-5 prepared coverage with zero live Boolean

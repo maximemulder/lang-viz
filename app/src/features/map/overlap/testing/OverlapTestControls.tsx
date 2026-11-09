@@ -11,8 +11,10 @@ import {
   geometryOverridesAtom,
   languageColorsAtom,
   mapEntriesAtom,
+  optimizedColorsAtom,
   overlapModeAtom,
   overlapStatusAtom,
+  preparedPaletteAtom,
   selectedMapAreasAtom,
   semanticPaletteAtom,
   showLanguagesAtom,
@@ -85,6 +87,7 @@ export default function OverlapTestControls({
           },
           colorState: (ids) => ({
             configuration: store.get(colorConfigurationAtom),
+            preparedProfile: store.get(preparedPaletteAtom)?.profile ?? null,
             colors: Object.fromEntries(
               ids.map((id) => [id, store.get(languageColorsAtom).get(id)]),
             ),
@@ -92,6 +95,18 @@ export default function OverlapTestControls({
               ids.map((id) => [id, store.get(semanticPaletteAtom).rootById.get(id)]),
             ),
             branchRoots: store.get(branchColorRootsAtom),
+            optimization: (() => {
+              const result = store.get(optimizedColorsAtom)
+              return result
+                ? {
+                    languageCount: result.languageCount,
+                    rootCount: result.rootCount,
+                    before: result.before,
+                    after: result.after,
+                    regions: Object.fromEntries(result.regions),
+                  }
+                : null
+            })(),
           }),
         },
         () => store.get(overlapStatusAtom),

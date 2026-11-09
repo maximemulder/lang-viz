@@ -1,6 +1,7 @@
 import { atom } from 'jotai'
 import { selectAtom, unwrap } from 'jotai/utils'
 import { loadAtlasData } from '../data/atlasRepository'
+import { loadPreparedPalette } from '../data/preparedColors'
 import {
   type AreaMode,
   buildGeographyAvailability,
@@ -13,6 +14,7 @@ import type {
   TemporalViewSelection,
 } from '../domain/atlas'
 import { buildBranchMapEntries } from '../domain/branches'
+import type { OptimizedColors } from '../domain/colorOptimization'
 import {
   buildColorTopology,
   buildSemanticPalette,
@@ -34,6 +36,7 @@ import {
   resolveMapEntries,
 } from '../domain/mapEntries'
 import { type GroupColoring, groupMapEntries, type MapGroup, mapGroupId } from '../domain/mapGroups'
+import { selectPreparedColorProfile } from '../domain/preparedColors'
 
 export const atlasDataAtom = atom(async () => loadAtlasData())
 
@@ -51,6 +54,30 @@ export const visibleLanguageIdsAtom = selectAtom(
 )
 export const geometryOverridesAtom = atom<Readonly<Record<LanguageId, GeometryVariantId>>>({})
 export const areaModesAtom = atom<Readonly<Record<LanguageId, AreaMode>>>({})
+/** Frozen, explicit view optimization. Camera/filter/selection changes never write it. */
+export const optimizedColorsAtom = atom<OptimizedColors | null>(null)
+const previousOptimizedColorsAtom = atom<{ readonly value: OptimizedColors | null } | null>(null)
+export const canUndoColorsAtom = atom((get) => get(previousOptimizedColorsAtom) !== null)
+export const applyOptimizedColorsAtom = atom(null, (get, set, result: OptimizedColors) => {
+  const previous = get(optimizedColorsAtom)
+  set(previousOptimizedColorsAtom, { value: previous })
+  set(optimizedColorsAtom, {
+    ...result,
+    colors: new Map([...(previous?.colors ?? []), ...result.colors]),
+    regions: new Map([...(previous?.regions ?? []), ...result.regions]),
+  })
+})
+export const undoColorsAtom = atom(null, (get, set) => {
+  const previous = get(previousOptimizedColorsAtom)
+  if (!previous) return
+  set(optimizedColorsAtom, previous.value)
+  set(previousOptimizedColorsAtom, null)
+})
+export const restoreDefaultColorsAtom = atom(null, (get, set) => {
+  if (!get(optimizedColorsAtom)) return
+  set(previousOptimizedColorsAtom, { value: get(optimizedColorsAtom) })
+  set(optimizedColorsAtom, null)
+})
 const resolvedAtlasDataAtom = unwrap(atlasDataAtom)
 export const languageHierarchyAtom = atom((get) =>
   buildLanguageHierarchy(get(resolvedAtlasDataAtom)?.languages ?? []),
@@ -65,6 +92,14 @@ export const colorConfigurationAtom = atom(
     const sameRecord = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>>) =>
       Object.keys(a).length === Object.keys(b).length &&
       Object.entries(a).every(([id, color]) => b[id] === color)
+    if (
+      validated.strategy !== previous.strategy ||
+      validated.rootIds.join(',') !== previous.rootIds.join(',') ||
+      !sameRecord(validated.anchors, previous.anchors)
+    ) {
+      set(optimizedColorsAtom, null)
+      set(previousOptimizedColorsAtom, null)
+    }
     set(colorConfigurationStateAtom, {
       ...validated,
       rootIds:
@@ -96,35 +131,51 @@ export const branchColorRootsAtom = selectAtom(
 export const colorTopologyAtom = atom((get) => buildColorTopology(get(languageHierarchyAtom)))
 const semanticRootsAtom = atom((get) => get(colorConfigurationAtom).rootIds)
 const semanticAnchorsAtom = atom((get) => get(colorConfigurationAtom).anchors)
-const selectedFamilyRootsAtom = selectAtom(
-  atom((get) => {
-    const hierarchy = get(languageHierarchyAtom)
-    return [
-      ...new Set(
-        get(mapEntriesAtom)
-          .filter((entry) => !entry.branchRootId)
-          .map((entry) => entry.languageId),
-      ),
-    ]
-      .filter((id) => hierarchy.languageById.get(id)?.level === 'family')
-      .sort()
-  }),
-  (roots) => roots,
-  (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
-)
 export const semanticPaletteAtom = atom((get) =>
   buildSemanticPalette(
     get(languageHierarchyAtom),
     get(colorTopologyAtom),
-    [...get(semanticRootsAtom), ...get(selectedFamilyRootsAtom), ...get(branchColorRootsAtom)],
+    get(semanticRootsAtom),
     get(semanticAnchorsAtom),
   ),
 )
+const preparedColorProfileAtom = selectAtom(
+  atom((get) => {
+    const data = get(resolvedAtlasDataAtom)
+    return data
+      ? selectPreparedColorProfile(data, get(mapEntriesAtom), get(colorConfigurationAtom))
+      : null
+  }),
+  (profile) => profile,
+)
+export const preparedPaletteAtom = unwrap(
+  atom(async (get) => {
+    const data = get(resolvedAtlasDataAtom)
+    const profile = get(preparedColorProfileAtom)
+    return data && profile ? loadPreparedPalette(data, profile) : null
+  }),
+)
+
 export const languageColorsAtom = atom((get) => {
   const data = get(resolvedAtlasDataAtom)
-  return data
-    ? resolveLanguageColors(data, get(colorConfigurationAtom), get(semanticPaletteAtom))
-    : new Map<string, string>()
+  if (!data) return new Map<string, string>()
+  const config = get(colorConfigurationAtom)
+  const colors = new Map(resolveLanguageColors(data, config, get(semanticPaletteAtom)))
+  if (config.strategy === 'semantic') {
+    for (const [id, color] of get(preparedPaletteAtom)?.colors ?? []) {
+      if (!config.overrides[id] && !config.anchors[id]) colors.set(id, color)
+    }
+    for (const [id, color] of get(optimizedColorsAtom)?.colors ?? []) {
+      if (!config.overrides[id] && !config.anchors[id]) colors.set(id, color)
+    }
+  }
+  return colors
+})
+
+export const resetColorSettingsAtom = atom(null, (_get, set) => {
+  set(colorConfigurationAtom, DEFAULT_COLOR_CONFIGURATION)
+  set(optimizedColorsAtom, null)
+  set(previousOptimizedColorsAtom, null)
 })
 export const geographyAvailabilityAtom = atom((get) => {
   const data = get(resolvedAtlasDataAtom)
@@ -158,8 +209,7 @@ const mapGroupPalettesAtom = atom((get) => {
   const groups = get(mapGroupStylesAtom)
   const config = get(colorConfigurationAtom)
   const overrides = Object.entries(config.overrides)
-  const colors = get(semanticPaletteAtom).colors
-  const automatic = overrides.length ? new Map([...colors, ...overrides]) : colors
+  const automatic = get(languageColorsAtom)
   const result = new Map<string, ReadonlyMap<string, string>>()
   for (const group of groups) {
     const palette =

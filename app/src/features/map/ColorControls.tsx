@@ -1,19 +1,48 @@
-import { useAtom, useAtomValue } from 'jotai'
-import { useId, useState } from 'react'
-import { DEFAULT_COLOR_CONFIGURATION } from '../../domain/colors'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { useEffect, useId, useRef, useState } from 'react'
+import { useMap } from 'react-map-gl/maplibre'
 import {
+  applyOptimizedColorsAtom,
+  canUndoColorsAtom,
   colorConfigurationAtom,
+  colorTopologyAtom,
   languageColorsAtom,
   languageHierarchyAtom,
+  mapEntriesAtom,
+  optimizedColorsAtom,
+  overlapStatusAtom,
+  preparedPaletteAtom,
+  resetColorSettingsAtom,
+  restoreDefaultColorsAtom,
+  selectedMapAreasAtom,
+  semanticPaletteAtom,
+  undoColorsAtom,
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
+import { captureColorView, optimizeColorView } from './colorView'
 
-/** Temporary testing controls; palette logic stays behind the configuration atom. */
 export const ColorControls = () => {
   const [config, setConfig] = useAtom(colorConfigurationAtom)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const selectedIds = useAtomValue(visibleLanguageIdsAtom)
   const colors = useAtomValue(languageColorsAtom)
+  const topology = useAtomValue(colorTopologyAtom)
+  const reference = useAtomValue(semanticPaletteAtom)
+  const areas = useAtomValue(selectedMapAreasAtom)
+  const entries = useAtomValue(mapEntriesAtom)
+  const optimized = useAtomValue(optimizedColorsAtom)
+  const prepared = useAtomValue(preparedPaletteAtom)
+  const canUndo = useAtomValue(canUndoColorsAtom)
+  const overlap = useAtomValue(overlapStatusAtom)
+  const applyOptimized = useSetAtom(applyOptimizedColorsAtom)
+  const undo = useSetAtom(undoColorsAtom)
+  const restore = useSetAtom(restoreDefaultColorsAtom)
+  const reset = useSetAtom(resetColorSettingsAtom)
+  const { current } = useMap()
+  const map = current?.getMap()
+  const request = useRef<AbortController | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
   const listId = useId()
   const [target, setTarget] = useState<string | null>(null)
   const [color, setColor] = useState('#287cb8')
@@ -21,6 +50,71 @@ export const ColorControls = () => {
   const [error, setError] = useState<string | null>(null)
   const id = (target ?? selectedIds[0] ?? '').trim()
   const language = hierarchy.languageById.get(id)
+
+  // Selection/manual-color changes invalidate an in-flight capture. An applied
+  // palette itself survives all ordinary navigation and selection changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Configuration and entries are explicit cancellation boundaries for asynchronous snapshots.
+  useEffect(() => () => request.current?.abort(), [config, entries])
+  useEffect(() => {
+    if (!map) return
+    const updateReady = () =>
+      setMapReady(Boolean(!map.isMoving() && map.areTilesLoaded() && map.isStyleLoaded()))
+    const loading = () => setMapReady(false)
+    const cancel = () => {
+      request.current?.abort()
+      loading()
+    }
+    updateReady()
+    map.on('movestart', cancel)
+    map.on('resize', cancel)
+    for (const event of ['idle', 'sourcedata', 'styledata', 'moveend'] as const)
+      map.on(event, updateReady)
+    for (const event of ['sourcedataloading', 'styledataloading'] as const) map.on(event, loading)
+    return () => {
+      map.off('movestart', cancel)
+      map.off('resize', cancel)
+      for (const event of ['idle', 'sourcedata', 'styledata', 'moveend'] as const)
+        map.off(event, updateReady)
+      for (const event of ['sourcedataloading', 'styledataloading'] as const)
+        map.off(event, loading)
+      cancel()
+    }
+  }, [map])
+
+  const optimize = async () => {
+    if (!map) return
+    const controller = new AbortController()
+    request.current = controller
+    setBusy(true)
+    setError(null)
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      const camera = JSON.stringify([map.getCenter(), map.getZoom(), map.getProjection()])
+      const view = await captureColorView(map, areas, entries, controller.signal)
+      if (new Set(view.footprints.map(({ languageId }) => languageId)).size < 2) {
+        throw new Error('Show at least two languoids in this view to optimize their colors.')
+      }
+      const result = await optimizeColorView(
+        { topology, reference, configuration: config, view },
+        controller.signal,
+      )
+      controller.signal.throwIfAborted()
+      if (camera !== JSON.stringify([map.getCenter(), map.getZoom(), map.getProjection()])) {
+        throw new Error(
+          'The view changed during color optimization. Try again when the map is still.',
+        )
+      }
+      applyOptimized(result)
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setError(error instanceof Error ? error.message : String(error))
+    } finally {
+      if (request.current === controller) {
+        request.current = null
+        setBusy(false)
+      }
+    }
+  }
 
   const applyColor = (kind: 'anchors' | 'overrides', remove = false) => {
     if (!language) return
@@ -51,23 +145,57 @@ export const ColorControls = () => {
     <fieldset className="map-settings__group color-controls">
       <legend>Language colors</legend>
       <p>Choose colors for each group in On map.</p>
+      <label>
+        Coloring strategy
+        <select
+          value={config.strategy}
+          onChange={(event) =>
+            setConfig({ ...config, strategy: event.currentTarget.value as typeof config.strategy })
+          }
+        >
+          <option value="semantic">Semantic (genealogy)</option>
+          <option value="categorical">Categorical (original colors)</option>
+        </select>
+      </label>
+      <div className="color-controls__actions">
+        <button
+          type="button"
+          disabled={
+            busy ||
+            !mapReady ||
+            config.strategy !== 'semantic' ||
+            selectedIds.length < 2 ||
+            overlap.status === 'loading'
+          }
+          onClick={optimize}
+        >
+          Optimize colors for this view
+        </button>
+        {busy && (
+          <button type="button" onClick={() => request.current?.abort()}>
+            Cancel
+          </button>
+        )}
+        <button type="button" disabled={busy || !canUndo} onClick={() => undo()}>
+          Undo colors
+        </button>
+        <button type="button" disabled={busy || !optimized} onClick={() => restore()}>
+          Use default palette
+        </button>
+      </div>
+      <p role="status" aria-live="polite" className="color-controls__status">
+        {busy
+          ? 'Optimizing visible languoids…'
+          : optimized
+            ? `Optimized ${optimized.languageCount} visible languoids across ${optimized.rootCount} color groups.`
+            : prepared
+              ? 'Using prepared dataset colors.'
+              : 'Using stable default colors.'}{' '}
+        Colors stay fixed while you explore. Refresh also updates offscreen relatives to keep
+        families consistent. Custom colors are kept.
+      </p>
       <details className="color-controls__custom">
         <summary>Advanced palette defaults and overrides</summary>
-        <label>
-          Colors for individual, ungrouped entries
-          <select
-            value={config.strategy}
-            onChange={(event) =>
-              setConfig({
-                ...config,
-                strategy: event.currentTarget.value as typeof config.strategy,
-              })
-            }
-          >
-            <option value="semantic">Color by hierarchy</option>
-            <option value="categorical">Independent source colors</option>
-          </select>
-        </label>
         <label>
           Languoid ID
           <input
@@ -164,8 +292,8 @@ export const ColorControls = () => {
           Apply comparison roots
         </button>
         <p>
-          Comma-separated IDs. These start separate palettes; selected families and mapped-branch
-          groups are also included.
+          Comma-separated IDs. These start separate palettes. Selecting families keeps their
+          genealogy colors; optimize the view to spread its visible branches apart.
         </p>
       </details>
       {error && (
@@ -176,7 +304,8 @@ export const ColorControls = () => {
       <button
         type="button"
         onClick={() => {
-          setConfig(DEFAULT_COLOR_CONFIGURATION)
+          request.current?.abort()
+          reset()
           setRoots(null)
           setColor('#287cb8')
           setError(null)

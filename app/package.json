@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "precompute:colors": "node scripts/precompute-colors.mjs",
     "precompute:branches": "node scripts/precompute-branches.ts",
     "precompute:parts": "node scripts/precompute-parts.ts",
     "benchmark:parts": "node scripts/benchmark-parts.ts",
@@ -14,6 +15,9 @@
     "test:catalog-browser": "npm run build && python3 tests/browser/catalog.py",
     "test:selection-browser": "npm run build && python3 tests/browser/selection.py",
     "test:focus-browser": "npm run build && python3 tests/browser/focus.py",
+    "test:prepared-colors-browser": "npm run build && python3 tests/browser/prepared_colors.py",
+    "test:colors-browser": "python3 -m unittest discover -s tests/browser -p test_color_evaluation.py && npm run build && python3 tests/browser/colors.py",
+    "evaluate:colors": "python3 tests/browser/color_evaluation.py",
     "test:source-browser": "npm run build && python3 tests/browser/source_languoids.py",
     "test:delivery-browser": "npm run build && python3 tests/browser/delivery.py",
     "test:prepared-browser": "npm run build && python3 tests/browser/prepared.py",

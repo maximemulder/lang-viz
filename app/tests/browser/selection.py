@@ -38,6 +38,9 @@ def check_selection(browser, output):
     check_state(browser.settled(60))
     count = len(entries)
     browser.screenshot(output / 'working-selection.png')
+    # Optional dataset colors load asynchronously after the first add. Compare
+    # repeated actions against the settled presentation, not the loading default.
+    entries = state()
     add_selected(browser)
     assert state() == entries, 'Repeated adds preserve identity and style'
     sources(browser, 'DLAC')

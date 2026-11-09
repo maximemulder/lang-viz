@@ -1,5 +1,16 @@
-import { clampChroma, converter, displayable, formatHex, type Oklch } from 'culori'
+import { clampChroma, converter, displayable, formatHex } from 'culori'
 import type { AtlasData, LanguageId } from './atlas.ts'
+import { buildFamilyPalette } from './colorHierarchy.ts'
+import {
+  assignFamilyAnchors,
+  buildFamilyLinks,
+  type ColorFamily,
+  colorHash,
+  colorSample,
+  type FamilyColorSpace,
+  familyCandidates,
+  familyColorSpaces,
+} from './familyColors.ts'
 import type { LanguageHierarchy } from './hierarchy.ts'
 
 export interface ColorConfiguration {
@@ -20,7 +31,6 @@ export const DEFAULT_COLOR_CONFIGURATION: ColorConfiguration = {
 }
 
 const oklch = converter('oklch')
-const oklab = converter('oklab')
 
 /** Opaque sRGB hex is the common contract for CSS, MapLibre and stripe textures. */
 export const normalizeColor = (input: string): string => {
@@ -55,15 +65,9 @@ export const validateColorConfiguration = (config: ColorConfiguration): ColorCon
   }
 }
 
-const hashId = (id: string) => {
-  let hash = 0
-  for (const character of id) hash = (Math.imul(hash, 31) + character.charCodeAt(0)) | 0
-  return hash >>> 0
-}
-
 /** Legacy fallback, including entries without directly supplied polygons. */
 export const aggregateColor = (languageId: string) => {
-  const hue = (hashId(languageId) % 360) / 60
+  const hue = (colorHash(languageId) % 360) / 60
   const chroma = 0.5
   const x = chroma * (1 - Math.abs((hue % 2) - 1))
   const channels =
@@ -218,45 +222,6 @@ export const buildColorNeighborhoods = (
   return neighbors
 }
 
-const palette = Array.from({ length: 24 }, (_, i) =>
-  normalizeColor(`oklch(${i < 12 ? 0.61 : 0.73} 0.16 ${(i % 12) * 30 + 15})`),
-)
-const paletteLab = palette.map((color) => oklab(color))
-const distance = (a: ReturnType<typeof oklab>, b: ReturnType<typeof oklab>) =>
-  a && b ? Math.hypot(a.l - b.l, a.a - b.a, a.b - b.b) : 0
-
-const assignAnchors = (
-  ids: readonly string[],
-  neighborhoods: ColorNeighborhoods,
-  anchors: Map<string, string>,
-) => {
-  const ordered = [...ids].sort(
-    (a, b) =>
-      (neighborhoods.get(b)?.size ?? 0) - (neighborhoods.get(a)?.size ?? 0) || a.localeCompare(b),
-  )
-  for (const id of ordered) {
-    if (anchors.has(id)) continue
-    const nearby = [...(neighborhoods.get(id) ?? [])].flatMap((other) => {
-      const color = anchors.get(other)
-      return color ? [oklab(color)] : []
-    })
-    const offset = hashId(id) % palette.length
-    let best = offset
-    let score = -1
-    for (let i = 0; i < palette.length; i++) {
-      const index = (i + offset) % palette.length
-      const minimum = nearby.length
-        ? Math.min(...nearby.map((color) => distance(paletteLab[index], color)))
-        : 0
-      if (minimum > score) {
-        best = index
-        score = minimum
-      }
-    }
-    anchors.set(id, palette[best] ?? '#777777')
-  }
-}
-
 export interface SemanticPalette {
   readonly colors: ReadonlyMap<string, string>
   readonly rootById: ReadonlyMap<string, string>
@@ -277,92 +242,93 @@ export const buildSemanticPalette = (
       hierarchy.languageById.has(id),
     ),
   )
-  const anchors = new Map(
-    Object.entries(customAnchors)
-      .filter(([id]) => roots.has(id))
-      .map(([id, color]) => [id, normalizeColor(color)]),
-  )
-  // Global anchors are assigned before comparison roots, preserving world palettes
-  // when a new subgroup is brought into a comparison.
-  assignAnchors(topology.roots, neighborhoods(ownersForRoots(topology, globalRoots)), anchors)
+  const globalOwners = ownersForRoots(topology, globalRoots)
   const rootById = ownersForRoots(topology, roots)
-  const comparisonNeighbors = new Map(
-    [...neighborhoods(rootById)].map(([id, values]) => [id, new Set(values)]),
-  )
-  for (const id of roots) {
-    const parent = topology.parentById.get(id)
-    const parentOwner = parent ? rootById.get(parent) : undefined
-    if (parentOwner && parentOwner !== id) {
-      const neighbors = comparisonNeighbors.get(id) ?? new Set<string>()
-      neighbors.add(parentOwner)
-      comparisonNeighbors.set(id, neighbors)
-      const parentNeighbors = comparisonNeighbors.get(parentOwner) ?? new Set<string>()
-      parentNeighbors.add(id)
-      comparisonNeighbors.set(parentOwner, parentNeighbors)
+  const anchors = new Map<string, string>()
+  const spaces = new Map<string, FamilyColorSpace>()
+  const assign = (ids: readonly string[], owners: ReadonlyMap<string, string>, global: boolean) => {
+    const graph = neighborhoods(owners)
+    const occupied = new Map<string, Set<string>>()
+    for (const language of hierarchy.languageById.values()) {
+      const owner = owners.get(language.id)
+      const { latitude, longitude } = language
+      if (
+        !owner ||
+        !language.geometryVariantIds.length ||
+        latitude === null ||
+        longitude === null ||
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        Math.abs(latitude) > 90
+      )
+        continue
+      const cells = occupied.get(owner) ?? new Set<string>()
+      cells.add(
+        `${((Math.floor((longitude + 180) / 10) % 36) + 36) % 36},${Math.min(17, Math.floor((latitude + 90) / 10))}`,
+      )
+      occupied.set(owner, cells)
     }
-  }
-  assignAnchors(
-    [...roots].filter((id) => !globalRoots.has(id)),
-    comparisonNeighbors,
-    anchors,
-  )
-  const colors = new Map<string, string>()
-  // Subdivide all three perceptual dimensions rather than hue alone. Otherwise
-  // a wide first split exhausts the hue range before deeper groups are reached.
-  type Box = readonly [
-    readonly [number, number],
-    readonly [number, number],
-    readonly [number, number],
-  ]
-  const boxes = new Map<string, Box>()
-  for (const id of topology.order) {
-    const root = rootById.get(id)
-    const anchor = root ? anchors.get(root) : undefined
-    if (!anchor) continue
-    const base = oklch(anchor)
-    if (!base) continue
-    const box: Box = roots.has(id)
-      ? [
-          [-32, 32],
-          [-0.055, 0.055],
-          [-base.c * 0.3, base.c * 0.3],
-        ]
-      : (boxes.get(id) ?? [
-          [0, 0],
-          [0, 0],
-          [0, 0],
-        ])
-    const midpoints = box.map(([low, high]) => (low + high) / 2)
-    const color: Oklch = {
-      mode: 'oklch',
-      l: Math.max(0, Math.min(1, base.l + (midpoints[1] ?? 0))),
-      c: Math.max(0, base.c + (midpoints[2] ?? 0)),
-      h: (base.h ?? 0) + (midpoints[0] ?? 0),
+    const maximumArea = Math.max(1, ...[...occupied.values()].map(({ size }) => size))
+    const families: ColorFamily[] = [...ids].sort().map((id) => ({
+      id,
+      reference: colorSample(
+        customAnchors[id]
+          ? normalizeColor(customAnchors[id])
+          : (anchors.get(id) ??
+              familyCandidates[colorHash(id) % familyCandidates.length]?.hex ??
+              '#777777'),
+      ),
+      locked: !!customAnchors[id] || (!global && globalRoots.has(id)),
+      automatic: 1,
+      fixed: [],
+      prominence: Math.sqrt((occupied.get(id)?.size ?? 1) / maximumArea),
+      prominent: (occupied.get(id)?.size ?? 1) >= Math.max(1.5, 36 * 18 * 0.01, maximumArea * 0.04),
+      coverage: (occupied.get(id)?.size ?? 0) / (36 * 18),
+      demand: Math.sqrt(Math.min(16, Math.max(0, (topology.mappedLeafCount.get(id) ?? 0) - 1))),
+    }))
+    const related = new Set<string>()
+    for (const family of families) {
+      const parent = topology.parentById.get(family.id)
+      const parentOwner = parent ? owners.get(parent) : undefined
+      if (parentOwner) related.add(JSON.stringify([family.id, parentOwner].sort()))
     }
-    colors.set(id, roots.has(id) ? anchor : formatHex(clampChroma(color, 'oklch')))
-    // Reserve slots even for branches that start independent palettes, so a
-    // comparison root does not shift the colors of its unaffected siblings.
-    const children = topology.childrenById.get(id) ?? []
-    const weights = children.map((child) =>
-      Math.sqrt(Math.max(1, topology.mappedLeafCount.get(child) ?? 0)),
-    )
-    const total = weights.reduce((sum, value) => sum + value, 0)
-    const scores = box.map(([low, high], axis) => (high - low) / ([64, 0.2, 0.13][axis] ?? 1))
-    const axis = scores.indexOf(Math.max(...scores))
-    const [low, high] = box[axis] ?? [0, 0]
-    let cursor = low
-    children.forEach((child, i) => {
-      const width = ((high - low) * (weights[i] ?? 1)) / total
-      const gap = children.length > 1 ? width * 0.12 : 0
-      const next = [...box] as [
-        readonly [number, number],
-        readonly [number, number],
-        readonly [number, number],
-      ]
-      next[axis] = [cursor + gap, cursor + width - gap]
-      boxes.set(child, next)
-      cursor += width
+    const links = buildFamilyLinks(families, (a, b) => {
+      const first = families[a]?.id ?? ''
+      const second = families[b]?.id ?? ''
+      return graph.get(first)?.has(second) ||
+        graph.get(second)?.has(first) ||
+        related.has(JSON.stringify([first, second].sort()))
+        ? 1
+        : 0
     })
+    const assigned = assignFamilyAnchors(families, links)
+    const regions = familyColorSpaces(families, links, assigned)
+    families.forEach(({ id }, i) => {
+      if (!global && globalRoots.has(id)) return
+      anchors.set(id, assigned[i]?.hex ?? '#777777')
+      spaces.set(id, regions[i] ?? { radius: 0, planes: [] })
+    })
+  }
+  // Fix global palettes before introducing explicit comparison groups. Their
+  // original subdivisions remain reserved, preserving unaffected sibling colors.
+  assign(topology.roots, globalOwners, true)
+  if (roots.size > globalRoots.size) assign([...roots], rootById, false)
+  const colors = new Map<string, string>()
+  const orderedRoots = topology.order.filter((id) => roots.has(id))
+  for (const root of orderedRoots) {
+    const anchor = colorSample(anchors.get(root) ?? '#777777')
+    const owners = globalRoots.has(root) ? globalOwners : rootById
+    const palette = buildFamilyPalette(
+      topology,
+      owners,
+      root,
+      anchor,
+      spaces.get(root) ?? { radius: 0, planes: [] },
+    )
+    for (const [id, color] of palette.colors) {
+      if (rootById.get(id) !== root) continue
+      colors.set(id, color.hex)
+    }
   }
   return { colors, rootById, anchors }
 }

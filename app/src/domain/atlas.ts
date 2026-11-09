@@ -1,4 +1,5 @@
 import type { LanguageSearchIndex } from './catalog.ts'
+import type { PreparedColorsManifest } from './preparedColors.ts'
 
 /** Opaque catalog key: a Glottocode or a stable dataset-namespaced ID. */
 export type LanguageId = string
@@ -81,6 +82,7 @@ export interface GeographyDataset {
 }
 
 export interface AtlasManifest {
+  readonly preparedColors?: PreparedColorsManifest
   readonly schemaVersion: number
   readonly languoidCount: number
   readonly languoidWithGeometryCount: number

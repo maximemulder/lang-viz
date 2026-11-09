@@ -14,6 +14,14 @@ import {
   topmostColorRoots,
   validateColorConfiguration,
 } from '../src/domain/colors.ts'
+import {
+  assignFamilyAnchors,
+  buildFamilyLinks,
+  type ColorFamily,
+  colorDistance,
+  colorSample,
+  familyCandidates,
+} from '../src/domain/familyColors.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
 
 const entry = (
@@ -60,6 +68,98 @@ const distance = (a: string, b: string) => {
   assert.ok(x && y)
   return Math.hypot(x.l - y.l, x.a - y.a, x.b - y.b)
 }
+
+const colorFamily = (id: string, color: string, prominence = 1): ColorFamily => ({
+  id,
+  reference: colorSample(color),
+  locked: false,
+  automatic: 1,
+  fixed: [],
+  prominence,
+  prominent: true,
+  coverage: prominence ** 2 * 0.1,
+  demand: 2,
+})
+
+test('all original anchors are available at the highest aesthetic preference', () => {
+  // Freeze the palette from before the expanded-gamut refactor, including its
+  // olive greens, roses and violets.
+  const preferred = [
+    '#d15264',
+    '#ce5d1e',
+    '#af7600',
+    '#8f8600',
+    '#559724',
+    '#009b70',
+    '#009696',
+    '#0091b7',
+    '#3683e0',
+    '#7c71de',
+    '#a661c4',
+    '#c35599',
+    '#fb7887',
+    '#f8834a',
+    '#df9700',
+    '#b7ac00',
+    '#7abd4f',
+    '#00c58f',
+    '#00bfc0',
+    '#00b9e9',
+    '#67aaff',
+    '#9f99ff',
+    '#cd86ec',
+    '#ec7abf',
+  ]
+  const candidates = new Set(familyCandidates.map(({ hex }) => hex))
+  for (const color of preferred)
+    assert.ok(candidates.has(color), `Missing preferred anchor: ${color}`)
+  const families = preferred.map((color, i) => colorFamily(`preferred-${i}`, color))
+  assert.deepEqual(
+    assignFamilyAnchors(families, []).map(({ hex }) => hex),
+    preferred,
+    'an uncontested original anchor was penalized relative to another candidate',
+  )
+})
+
+test('uncontested families prefer restrained anchors while exact custom anchors stay fixed', () => {
+  const family = colorFamily('family', '#574df5')
+  const large = assignFamilyAnchors([family], [])[0]
+  assert.ok(large)
+  assert.ok(
+    Math.hypot(large.a, large.b) < 0.165,
+    'an uncontested footprint retained a vivid anchor',
+  )
+  assert.equal(
+    assignFamilyAnchors([{ ...family, locked: true }], [])[0]?.hex,
+    family.reference.hex,
+    'an editorial preference replaced an explicit anchor',
+  )
+})
+
+test('crowded comparisons retain pink reserve anchors with stronger restraint on large footprints', () => {
+  const fixed = ['#008700', '#d6c900', '#ff8523', '#fd2e1c', '#125cf7', '#00e4b9', '#7a3dea'].map(
+    (color, i) => ({ ...colorFamily(`fixed-${i}`, color), locked: true }),
+  )
+  const families = [colorFamily('family', '#287cb8'), ...fixed]
+  const links = buildFamilyLinks(families, () => 1)
+  const assigned = assignFamilyAnchors(families, links)
+  const anchor = assigned[0]
+  assert.ok(anchor)
+  assert.ok(anchor.a > 0 && anchor.b < 0, 'the occupied neighborhood lost its pink alternative')
+  assert.ok(Math.hypot(anchor.a, anchor.b) > 0.15)
+  fixed.forEach((family, i) => {
+    assert.equal(assigned[i + 1]?.hex, family.reference.hex)
+    assert.ok(colorDistance(anchor, family.reference) > 0.2)
+  })
+  // Hold separation pressure fixed: area should affect the preference even
+  // when the crowded neighborhood still requires a pink reserve color.
+  const small = assignFamilyAnchors(
+    families.map((family, i) => (i ? family : { ...family, prominence: 0.01, coverage: 0.00001 })),
+    links,
+  )[0]
+  assert.ok(small)
+  assert.ok(Math.hypot(anchor.a, anchor.b) < Math.hypot(small.a, small.b))
+})
 
 test('semantic colors cluster recent branches and distinguish neighboring family roots', () => {
   assert.equal(semantic.colors.size, languages.length)
@@ -179,6 +279,19 @@ test('geographic neighborhoods use distributed descendants and wrap across the d
   assert.equal(graph.get('missing'), undefined)
 })
 
+test('unary descendants inherit exact seeds at the edges of the sRGB gamut', () => {
+  const hierarchy = buildLanguageHierarchy([
+    entry('root', null),
+    entry('child', 'root'),
+    entry('grandchild', 'child'),
+  ])
+  const topology = buildColorTopology(hierarchy)
+  for (const anchor of ['#ff0000', '#0000ff', '#00ff00', '#000000', '#ffffff']) {
+    const palette = buildSemanticPalette(hierarchy, topology, [], { root: anchor })
+    for (const id of ['root', 'child', 'grandchild']) assert.equal(palette.colors.get(id), anchor)
+  }
+})
+
 test('a custom neighborhood provider can separate roots without catalog coordinates', () => {
   const h = buildLanguageHierarchy([entry('a', null, null, null), entry('y', null, null, null)])
   const t = buildColorTopology(h)
@@ -214,9 +327,44 @@ test('real catalog palettes cover all languoids and retain variation in deep Sin
   const p = buildSemanticPalette(h, buildColorTopology(h))
   assert.equal(p.colors.size, entries.length)
   const chinese = ['mand1415', 'jiny1235', 'yuec1235', 'ganc1239', 'hakk1236']
-  assert.equal(new Set(chinese.map((id) => p.colors.get(id))).size, chinese.length)
+  // Overview palettes may quantize very close relatives to the same RGB color;
+  // focused view tests require their differences to expand perceptibly.
+  assert.ok(new Set(chinese.map((id) => p.colors.get(id))).size > 1)
   for (const id of chinese) assert.equal(p.rootById.get(id), 'sino1245')
   for (const id of ['tibeto-burman', 'shaozhou-tuhua', 'danzhou']) {
     assert.equal(p.rootById.get(`dlac1987china:${id}`), 'sino1245')
   }
+})
+
+test('default branches use available lightness when a neighboring anchor crowds their hue', () => {
+  const branches = ['a', 'b', 'c']
+  const leaves = branches.flatMap((branch) =>
+    Array.from({ length: 8 }, (_, i) => entry(`${branch}-${i}`, branch)),
+  )
+  const h = buildLanguageHierarchy([
+    entry('root', null),
+    ...branches.map((id) => entry(id, 'root')),
+    ...leaves,
+    entry('neighbor', null),
+  ])
+  const p = buildSemanticPalette(h, buildColorTopology(h), [], {
+    root: '#997755',
+    neighbor: '#aa7755',
+  })
+  const means = branches.map((branch) => {
+    const samples = leaves
+      .filter(({ parentId }) => parentId === branch)
+      .map(({ id }) => {
+        const sample = lab(p.colors.get(id))
+        assert.ok(sample)
+        return sample
+      })
+    return samples.reduce((sum, sample) => sum + sample.l, 0) / samples.length
+  })
+  for (let i = 0; i < means.length; i++)
+    for (let j = i + 1; j < means.length; j++)
+      assert.ok(
+        Math.abs((means[i] ?? 0) - (means[j] ?? 0)) * 0.65 > 0.035,
+        'stable defaults flattened broad branches despite available lightness',
+      )
 })
