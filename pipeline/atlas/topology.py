@@ -21,7 +21,7 @@ from shapely import Geometry
 from shapely.errors import GEOSException
 
 # About four centimetres at the equator. This is GEOS's numerical precision,
-# independent of zoom; it is not the previous 512-unit display grid.
+# independent of the display LOD's vector-tile precision.
 SOURCE_GRID = 2**-30
 EXTENT = 8192
 MAX_ZOOM = 8

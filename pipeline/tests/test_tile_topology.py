@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Exercise the real tiler: valid individual polygons can still drift apart."""
+"""Shared borders, junctions, islands and holes survive native LOD export."""
 
+import gzip
 import json
 import math
-import shutil
-import subprocess
 from collections import Counter
 from itertools import pairwise
-from pathlib import Path
 
+import mapbox_vector_tile
 import pytest
 
-from pipeline.atlas import build as atlas
+from pipeline.atlas.topology import partition_sources, quantize_partition, simplify_partition
+from pipeline.atlas.topology_build import create_database, write_level
 
 
 def feature(label, rings):
@@ -39,12 +39,6 @@ def box(x, y, width):
 
 @pytest.fixture(scope="module")
 def tiles(tmp_path_factory):
-    binary = atlas.find_tippecanoe()
-    decoder = Path(binary).with_name("tippecanoe-decode") if binary else None
-    if not decoder or not decoder.is_file():
-        decoder = shutil.which("tippecanoe-decode")
-    if not binary or not decoder:
-        pytest.skip("Build Tippecanoe and tippecanoe-decode to exercise tiled topology")
     directory = tmp_path_factory.mktemp("topology")
     junction = (0.56, 0.351)
     left_arc = [
@@ -83,7 +77,7 @@ def tiles(tmp_path_factory):
                 feature("top", [top]),
                 feature("left", [left]),
                 feature("right", [right]),
-                # A one-cell island that the default area diffusion can discard.
+                # A small island must retain its location and area.
                 feature("tiny", [box(2600.8, 1400.8, 8)]),
                 feature("host", [box(2700, 1400, 40), list(reversed(box(2710, 1410, 20)))]),
                 feature("overlap", [box(2720, 1400, 40)]),
@@ -91,31 +85,29 @@ def tiles(tmp_path_factory):
         )
         + "\n"
     )
-    archive = directory / "areas.pmtiles"
-    # Use the production command, without publishing real metadata/profiles.
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(atlas, "NORMALIZED_GEOMETRIES", source)
-        patch.setattr(atlas, "PMTILES_ARCHIVE", archive)
-        patch.setattr(atlas, "build_geometry_profiles", lambda: None)
-        atlas.build_tiles()
+    partition = partition_sources(json.loads(line) for line in source.read_text().splitlines())
+    database = create_database(directory / "areas.mbtiles", 2)
+    for zoom in range(3):
+        low = simplify_partition(quantize_partition(partition, zoom), zoom)
+        write_level(low, zoom, directory, database)
 
     def decode(z):
         x, y = math.floor(0.54 * 2**z), math.floor(0.32 * 2**z)
-        decoded = json.loads(
-            subprocess.check_output(
-                [str(decoder), "--integer-coordinates", str(archive), str(z), str(x), str(y)],
-                text=True,
-            )
-        )
-        layer = decoded["features"][0]
+        data = database.execute(
+            "SELECT tile_data FROM tiles WHERE zoom_level=? AND tile_column=? AND tile_row=?",
+            (z, x, 2**z - 1 - y),
+        ).fetchone()[0]
+        layer = mapbox_vector_tile.decode(
+            gzip.decompress(data), default_options={"y_coord_down": True}
+        )["language_areas"]
 
         # Compare in a common 4096-unit world grid, independent of tile extent.
         def project(coordinates):
             if isinstance(coordinates[0], (int, float)):
                 px, py = coordinates
                 return [
-                    (x + px / layer["properties"]["extent"]) * 4096 / 2**z,
-                    (y + py / layer["properties"]["extent"]) * 4096 / 2**z,
+                    (x + px / layer["extent"]) * 4096 / 2**z,
+                    (y + py / layer["extent"]) * 4096 / 2**z,
                 ]
             return [project(c) for c in coordinates]
 
@@ -123,7 +115,8 @@ def tiles(tmp_path_factory):
             f["geometry"]["coordinates"] = project(f["geometry"]["coordinates"])
         return {f["properties"]["variant_id"]: f["geometry"] for f in layer["features"]}
 
-    return decode
+    yield decode
+    database.close()
 
 
 def signed_area(ring):
@@ -156,8 +149,12 @@ def test_shared_arcs_and_junctions_survive_coarser_lods(tiles, zoom):
 def test_small_components_keep_their_location_and_genuine_holes_remain(tiles):
     geometries = tiles(0)
     tiny = geometries["tiny"]["coordinates"][0]
-    assert abs(signed_area(tiny)) > 0
-    assert all(2600 <= x <= 2608 and 1400 <= y <= 1408 for x, y in tiny)
+    assert abs(signed_area(tiny)) == pytest.approx(64)
+    xs, ys = zip(*tiny)
+    # Extent 8192 rounds within a quarter unit of this 4096-unit world grid.
+    assert (min(xs), min(ys), max(xs), max(ys)) == pytest.approx(
+        (2600.8, 1400.8, 2608.8, 1408.8), abs=0.25
+    )
     host = geometries["host"]["coordinates"]
     assert len(host) == 2, "A genuine hole must not be filled to hide simplification gaps"
     assert abs(signed_area(host[1])) > 0

@@ -2,7 +2,6 @@
 import json
 import math
 import sqlite3
-from pathlib import Path
 
 import mapbox_vector_tile
 import numpy as np
@@ -291,10 +290,10 @@ def test_failed_candidate_cannot_be_masked_by_a_rounded_neighbor(monkeypatch):
 
 
 def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
-    from pipeline.atlas.build import find_tippecanoe
+    from pipeline.atlas.build import find_tile_join
 
-    binary = find_tippecanoe()
-    if not binary or not Path(binary).with_name("tile-join").is_file():
+    binary = find_tile_join()
+    if not binary:
         pytest.skip("Build tile-join to exercise PMTiles packaging")
     source = tmp_path / "input.geojsonl"
     records = [
@@ -305,7 +304,7 @@ def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
         record["properties"].update(dataset_id="test", temporal_view="contemporary")
     source.write_text("\n".join(json.dumps(f) for f in records) + "\n")
     output, cache = tmp_path / "public", tmp_path / "cache"
-    manifest = build(source, output, cache, str(Path(binary).with_name("tile-join")), max_zoom=1)
+    manifest = build(source, output, cache, binary, max_zoom=1)
     assert manifest["geometryMaxZoom"] == 1
     atomic_json(output / "manifest.json", manifest)
     assert (output / manifest["archive"]).stat().st_size > 0
@@ -328,7 +327,7 @@ def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
     with sqlite3.connect(database_path) as database:
         source_tiles = database.execute("SELECT * FROM tiles ORDER BY 1, 2, 3").fetchall()
         database.execute("DELETE FROM tiles WHERE zoom_level=1")
-    build(source, output, cache, str(Path(binary).with_name("tile-join")), max_zoom=1)
+    build(source, output, cache, binary, max_zoom=1)
     with sqlite3.connect(database_path) as database:
         assert database.execute("SELECT * FROM tiles ORDER BY 1, 2, 3").fetchall() == source_tiles
     # A source change cannot silently attach incompatible parts to old geometry.

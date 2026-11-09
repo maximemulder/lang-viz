@@ -14,9 +14,10 @@ changes.
 
 ## Starting point
 
-An upstream shared-coverage prototype is now available through
-`pipeline.atlas.build --shared-coverage`; the legacy builder remains the default
-while geometry size and offline cost are tuned. It computes a canonical partition before LODs and
+`pipeline.atlas.build` now uses shared coverage as the sole language preprocessing
+pipeline. The previous language tiler and post-LOD partition generators have been
+removed. Geometry size and offline cost remain tuning work. The pipeline computes
+a canonical partition before LODs and
 derives both source geometry and reusable parts from the same simplified faces.
 Branch preparation composes those parts rather than repeating a geometric overlay.
 Shared quantization and tile-cut nodes prevent independent simplification/export
@@ -37,8 +38,8 @@ projections. Inspection lifecycle checks passed, and 48 hover samples were
 
 The combined archive grew from about 29 MB to 64 MB. The initial 300k output cap
 was raised to 600k after a real Asher zoom-2 view used 330,875 positions. Other
-limits remain unchanged. Before default rollout, tune coarse boundary complexity
-and offline label transfer, then measure representative devices and mixed-profile
+limits remain unchanged. Next, tune coarse boundary complexity and offline label
+transfer, then measure representative devices and mixed-profile
 fallbacks. The complete isolated preview is `app/test-results/topology/site`;
 run `npm run preview -- --outDir test-results/topology/site` from `app/`.
 Reports/screenshots are under `app/test-results/topology/` (ignored artifacts).

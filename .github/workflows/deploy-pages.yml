@@ -58,10 +58,6 @@ jobs:
         working-directory: app
         run: npm ci
 
-      - name: Precompute reusable coverage parts
-        working-directory: app
-        run: npm run precompute:parts
-
       - name: Precompute dataset branch views
         working-directory: app
         run: npm run precompute:branches

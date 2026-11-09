@@ -650,7 +650,7 @@ def main() -> None:
         NORMALIZED_GEOMETRIES,
         PROCESSED_DIR,
         PUBLIC_DATA_DIR,
-        find_tippecanoe,
+        find_tile_join,
     )
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -672,14 +672,14 @@ def main() -> None:
             max_zoom=args.max_zoom,
         )
         return
-    binary = find_tippecanoe()
+    binary = find_tile_join()
     if not binary:
         parser.error("Run pipeline/atlas/bootstrap-tippecanoe.sh first")
     result = build(
         NORMALIZED_GEOMETRIES,
         args.output,
         PROCESSED_DIR / "topology",
-        str(Path(binary).with_name("tile-join")),
+        binary,
         datasets=args.dataset,
         periods=args.period,
         max_zoom=args.max_zoom,

@@ -4,9 +4,7 @@ import { test } from 'node:test'
 import { VectorTile } from '@mapbox/vector-tile'
 import { fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
 import { PbfReader } from 'pbf'
-import { FileSource, PMTiles } from 'pmtiles'
-import { archiveTiles } from '../scripts/lib/archiveTiles.ts'
-import { mergePartsManifest } from '../scripts/lib/partsManifest.ts'
+import { FileSource, PMTiles, tileIdToZxy } from 'pmtiles'
 import {
   geometryArchiveUrl,
   mergeGeometryTiles,
@@ -116,42 +114,34 @@ test('source routing never fetches the combined archive and preserves membership
   assert.deepEqual(mergeGeometryTiles([]), new Uint8Array())
 })
 
-test('incremental profile publication preserves other periods and never downgrades completed detail', () => {
-  const previous = {
-    directory: 'v1/',
-    maxZoom: 5,
-    profiles: [
-      {
-        id: 'a/now',
-        datasetId: 'a',
-        viewId: 'contemporary' as const,
-        maxZoom: 5,
-        tiles: { '5': ['1-2'] },
-      },
-      { id: 'b/now', datasetId: 'b', viewId: 'contemporary' as const, maxZoom: 3 },
-    ],
+/** Visit the archive index, including run-length entries, rather than the world grid. */
+const archiveTiles = async (archive: PMTiles, maxZoom: number) => {
+  const header = await archive.getHeader()
+  const tiles: { z: number; x: number; y: number }[] = []
+  const visit = async (offset: number, length: number) => {
+    const entries = await archive.cache.getDirectory(archive.source, offset, length, header)
+    for (const entry of entries) {
+      if (!entry.runLength) {
+        await visit(header.leafDirectoryOffset + entry.offset, entry.length)
+        continue
+      }
+      for (let id = entry.tileId; id < entry.tileId + entry.runLength; id++) {
+        const [z, x, y] = tileIdToZxy(id)
+        if (z > maxZoom) break
+        tiles.push({ z, x, y })
+      }
+    }
   }
-  assert.ok(previous.profiles[0])
-  const lower = { ...previous.profiles[0], maxZoom: 3 }
-  assert.deepEqual(mergePartsManifest(previous, 'v1/', [lower]), previous)
-  const added = { id: 'a/then', datasetId: 'a', viewId: 'time-of-contact' as const, maxZoom: 6 }
-  const merged = mergePartsManifest(previous, 'v1/', [added])
-  assert.equal(merged.maxZoom, 6)
-  assert.equal(merged.profiles.length, 3)
-  assert.equal(merged.profiles.find((p) => p.id === 'a/now')?.maxZoom, 5)
-  assert.deepEqual(
-    mergePartsManifest(previous, 'v2/', [added]).profiles,
-    [added],
-    'An archive revision cannot inherit stale preparation',
-  )
-})
+  await visit(header.rootDirectoryOffset, header.rootDirectoryLength)
+  return tiles.sort((a, b) => a.z - b.z || a.x - b.x || a.y - b.y)
+}
 
 const data = new URL('../public/data/', import.meta.url)
 const hasProfiles =
   existsSync(new URL('manifest.json', data)) &&
   JSON.parse(readFileSync(new URL('manifest.json', data), 'utf8')).geometryProfiles
 
-test('real split archives retain source tile properties and coordinates', {
+test('real profile and combined archives retain identical source tile properties and coordinates', {
   skip: !hasProfiles,
 }, async () => {
   const m: AtlasManifest = JSON.parse(readFileSync(new URL('manifest.json', data), 'utf8'))

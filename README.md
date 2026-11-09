@@ -13,7 +13,6 @@ bash ./pipeline/atlas/bootstrap-tippecanoe.sh
 uv run python -m pipeline.atlas.build
 cd app
 npm install
-npm run precompute:parts
 npm run precompute:branches
 npm run dev
 ```
@@ -93,26 +92,27 @@ preserves existing entry identities and colors. Source and period choices affect
 the next action; they do not change already pinned entries.
 
 `npm run precompute:branches` optionally prepares complete **single-dataset,
-single-period** views at zooms 0–3. It composes reusable parts when available and
-resumes completed tiles. Older datasets without parts use the live engine offline.
+single-period** views at zooms 0–3. It composes the atlas build's reusable parts and
+resumes completed tiles. Missing parts must be restored before preparing branches.
 The browser uses these tiles only for an exact geometry/refinement match.
 
-`npm run precompute:parts` additionally prepares reusable disjoint coverage at
-all source zooms for every dataset/period (currently 0–8). Each piece retains every original contributor,
+The atlas build generates reusable disjoint coverage at all source zooms for
+every dataset/period (currently 0–8). Each piece retains every original contributor,
 including ancestors hidden in a branch view. Partial branches, child removal,
 independent entries and descendant aggregates can therefore reuse the same
 geometry: runtime work selects memberships and joins matching shared edges,
 without general polygon unions, intersections or differences. Exact full branch
 views still prefer the more compact prepared branch tiles. Mixed datasets or
 periods, unprepared zooms and missing optional assets use the bounded live engine.
-Run both preparation commands again after regenerating atlas data; deployment
-runs them automatically. To limit generation, use e.g.
+Run branch preparation again after regenerating atlas data; deployment does this
+automatically. `npm run precompute:parts` restores missing coverage from the common
+canonical/LOD caches. To limit restoration, use e.g.
 `npm run precompute:parts -- --dataset asher2007world --period contemporary --max-zoom 6`.
-Filtered runs preserve other completed profiles and never downgrade higher-detail
-preparation. Each completed zoom is published atomically; interrupted runs
-resume existing tiles. The generator visits source archive entries rather than
-the world grid. Empty areas are recorded in a small availability index instead
-of individual files. Indexes and parts load only for the active dataset/period
+Filtered restoration preserves other completed profiles and never downgrades
+higher-detail preparation. Each restored zoom's index is published atomically;
+interrupted runs reuse cached geometry. Empty areas are recorded in a small
+availability index instead of individual files. Indexes and parts load only for
+the active dataset/period
 and viewport; each profile has its own prepared zoom limit (up to source zoom 8).
 The default has no dataset-specific exceptions: both Asher periods and every
 other profile receive all source levels. The browser can therefore compose
@@ -123,44 +123,27 @@ When visited tiles consume the receiver's position or pattern budget, offscreen
 history is evicted before rejecting visible coverage. This keeps the current
 view's detail and leaves worker caches available for return pans.
 
-Original geometry is also split by dataset/period into PMTiles archives. The
+Language geometry is exported by dataset/period into PMTiles archives. The
 browser requests ranges only from archives required by the current browsing
 filters and pinned entries. Pinned comparisons retain their original sources
-and periods. Source tiles are filtered from the combined archive without changing
-their coordinates or simplification; mixed-source tiles are assembled in a worker
-before live overlap calculation. The combined archive remains an offline input
-and supports older manifests.
+and periods. Mixed-source tiles are assembled in a worker before live overlap
+calculation. The combined archive packages the same profile tiles for offline tools.
 
-Source LODs protect shared boundary nodes, so adjacent polygons simplify their
-common arcs consistently. Tiny-polygon area diffusion is disabled: it can otherwise
-remove small intervening areas or replace them with squares. Zooms 0–7 use a
-512-unit tile grid to bound the additional shared vertices in the browser;
-zoom 8 keeps the original 4096-unit grid. Simplification
-tolerance scales with the grid to preserve the previous tolerance in map units.
-Components and holes below the grid's precision can still collapse during
-quantization; genuine source gaps are retained where representable.
-Rebuild the source archive **and** both coverage products after changing these
-settings, using the generation commands above; coverage is derived from the
-simplified source tiles and cannot repair their topology afterward. Archive hashes
-give the rebuilt profiles and coverage new URLs.
-
-The integrated builder can be selected with
-`uv run python -m pipeline.atlas.build --shared-coverage`. It constructs one
+`uv run python -m pipeline.atlas.build` constructs one
 high-precision disjoint partition per dataset/period **before** generating LODs.
 Each face keeps its original variant memberships, including hidden ancestors.
 Native Shapely/GEOS nodes the shared boundary network; LOD generation resolves
 coordinate collapse in that network at extent 8192, adds common tile cuts, and
 simplifies shared edges together. Coverage boundaries (coastlines and genuinely
 uncovered regions) use a tighter tolerance than internal language borders.
-This path does not use the legacy 512-unit display grid.
 
 Prepared parts and buffered language geometry are exported from the same LOD
 faces. Language polygons are assembled from their contributing faces after
 buffer clipping, so their tile interiors agree with the prepared parts. Branch
 tiles are then membership/refinement views of those parts; they require no new
-language-to-language overlay. `npm run precompute:parts` detects this build and
-restores missing assets from cached canonical/LOD geometry, rather than
-partitioning simplified source tiles again.
+language-to-language overlay. `npm run precompute:parts` restores missing assets
+from cached canonical/LOD geometry. Preprocessing uses this single shared topology
+throughout; display tiles are never partitioned again to generate prepared parts.
 
 ```mermaid
 flowchart LR
@@ -171,7 +154,8 @@ flowchart LR
   Parts --> Branches[Branch membership views]
 ```
 
-The integrated builder remains opt-in for geometry-size and offline-cost tuning.
+The shared-coverage builder is the sole language preprocessing pipeline.
+Geometry size and offline cost remain active tuning work.
 The first full-data pass built all seven profiles through zoom 8 and passed the
 prepared-coverage, navigation and inspection browser suites. Decoded checks
 validated 51 coarse Asher tiles and 55 additional fine/profile tiles, with exact
@@ -196,8 +180,8 @@ Both coverage scripts accept `--data-dir` to operate on the isolated export.
 The completed local preview can be opened from `app/` with
 `npm run preview -- --outDir test-results/topology/site`. Validation reports and
 screenshots are under `app/test-results/topology/`; these generated artifacts
-are ignored by Git. A normal atlas rebuild uses the explicit `--shared-coverage`
-flag above to install this architecture into `public/data/`.
+are ignored by Git. A normal atlas rebuild installs this architecture into
+`public/data/`; no pipeline-selection flag is needed.
 
 Canonical geometry and completed LODs are cached separately under
 `data/processed/topology/`. Regional source subdivisions accelerate ambiguous
@@ -267,9 +251,11 @@ npm run typecheck
 npm run build
 ```
 
-Pipeline regressions can be checked with `uv run pytest`. The topology cases
-exercise the real tiler and decoder built by `bootstrap-tippecanoe.sh`; they skip
-when those tools are unavailable.
+Pipeline regressions can be checked with `uv run pytest`. Topology cases exercise
+native GEOS LOD generation and decode its actual MVT output. Archive packaging
+tests additionally require `tile-join`, built by `bootstrap-tippecanoe.sh`, and
+skip when that tool is unavailable. Tippecanoe itself remains available for the
+separate biome-basemap builder.
 
 ## Overlap rendering
 

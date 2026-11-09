@@ -1,17 +1,15 @@
-/** Materialize branch policies from reusable coverage, with legacy archive fallback. */
+/** Materialize branch policies from the common prepared coverage. */
 import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
-import { FileSource, PMTiles } from 'pmtiles'
 import { buildGeographyAvailability, mapAreaSelectionKey } from '../src/domain/aggregation.ts'
-import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
+import type { AtlasData, AtlasManifest, GeometryVariant, Language } from '../src/domain/atlas.ts'
 import { buildBranchMapEntries } from '../src/domain/branches.ts'
 import { buildColorTopology } from '../src/domain/colors.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
 import { resolveMapEntries } from '../src/domain/mapEntries.ts'
-import { OverlapComputer } from '../src/features/map/overlap/compute.ts'
 import { CoverageParts, createPartsResolver } from '../src/features/map/overlap/coverageParts.ts'
 import { encodeCoverageTile } from '../src/features/map/overlap/delivery.ts'
 import { branchCoverageSignature } from '../src/features/map/overlap/precomputed.ts'
@@ -29,7 +27,13 @@ const languages: Language[] = JSON.parse(
 const variants: GeometryVariant[] = JSON.parse(
   await readFile(new URL('geometry-variants.json', directory), 'utf8'),
 )
-const manifest = JSON.parse(await readFile(new URL('manifest.json', directory), 'utf8'))
+const manifest: AtlasManifest = JSON.parse(
+  await readFile(new URL('manifest.json', directory), 'utf8'),
+)
+if (manifest.geometryBuild?.kind !== 'shared-coverage')
+  throw new Error(
+    'Rebuild atlas data with python -m pipeline.atlas.build before preparing branches',
+  )
 const data = {
   languages,
   variants,
@@ -40,8 +44,6 @@ const hierarchy = buildLanguageHierarchy(languages)
 const topology = buildColorTopology(hierarchy)
 const bytes = await readFile(new URL(manifest.archive, directory))
 const archiveHash = createHash('sha256').update(bytes).digest('hex').slice(0, 20)
-const archive = new PMTiles(new FileSource(new File([bytes], manifest.archive)))
-const computer = new OverlapComputer(true)
 const parts = new CoverageParts()
 const resolveParts = createPartsResolver(manifest.coverageParts, variants)
 // Prepared branch views are materialized membership policies over the same
@@ -57,7 +59,7 @@ globalThis.fetch = async (input, options) => {
     return new Response('', { status: 404 })
   }
 }
-// Low zoom is the expensive, common whole-dataset case. Regional views stay live.
+// Exact low-zoom branch views complement reusable parts at every native level.
 const maxZoom = values['max-zoom'] === undefined ? 3 : Number(values['max-zoom'])
 if (!Number.isInteger(maxZoom) || maxZoom < 0 || maxZoom > 3)
   throw new Error('--max-zoom must be an integer from 0 to 3')
@@ -86,10 +88,7 @@ for (const [label, variant] of profiles) {
   const signature = await branchCoverageSignature(selection)
   if (!signature) throw new Error('Offline branch selection must use own source areas')
   const reusable = resolveParts(selection.variantIds)
-  if (
-    manifest.geometryBuild?.kind === 'shared-coverage' &&
-    (!reusable || reusable.maxZoom < maxZoom)
-  )
+  if (!reusable || reusable.maxZoom < maxZoom)
     throw new Error(`Build canonical parts through zoom ${maxZoom} before preparing ${label}`)
   const output = new URL(`${outputDirectory}${signature}/`, directory)
   await mkdir(output, { recursive: true })
@@ -110,16 +109,12 @@ for (const [label, variant] of profiles) {
           sourceLayer: manifest.vectorLayer,
           ...selection,
           tiles: [tile],
-          ...(reusable ? { parts: reusable } : {}),
+          parts: reusable,
         }
-        const prepared = reusable ? await parts.resolve(request, tile) : null
-        if (manifest.geometryBuild?.kind === 'shared-coverage' && !prepared)
-          throw new Error(`Canonical parts unavailable for ${label}/${z}-${x}-${y}`)
-        const results = prepared ? [prepared] : computer.computeTiles(archive, request, () => true)
-        for await (const result of results) {
-          await writeFile(new URL(`${z}-${x}-${y}.tmp`, output), encodeCoverageTile(result).data)
-          await rename(new URL(`${z}-${x}-${y}.tmp`, output), target)
-        }
+        const prepared = await parts.resolve(request, tile)
+        if (!prepared) throw new Error(`Canonical parts unavailable for ${label}/${z}-${x}-${y}`)
+        await writeFile(new URL(`${z}-${x}-${y}.tmp`, output), encodeCoverageTile(prepared).data)
+        await rename(new URL(`${z}-${x}-${y}.tmp`, output), target)
       }
   signatures.push(signature)
   process.stdout.write(

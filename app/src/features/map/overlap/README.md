@@ -23,9 +23,8 @@ It preserves available geographic coverage and incomparable contributors.
 
 `npm run precompute:branches` materializes one dataset/temporal branch policy at
 zooms 0–3. It composes prepared parts through the same membership/refinement
-resolver as the browser. Legacy archives without parts can still use the live
-engine offline; integrated builds require their canonical parts and fail clearly
-if they are missing. It writes coverage MVT files, including empty tiles.
+resolver as the browser. Canonical parts are required; missing assets fail with a
+restoration instruction. It writes coverage MVT files, including empty tiles.
 An archive hash and versioned SHA-256 selection/refinement signature identify the
 output. Tiles are written atomically and completed files can be resumed. The
 manifest is updated only after all profiles complete; normal atlas regeneration
@@ -37,25 +36,20 @@ policies cannot reuse them. Missing optional files fall back to bounded live
 computation. Prepared results use the existing cache, output, pattern, publication,
 and cancellation limits. Higher zooms try reusable parts before live calculation.
 
-For legacy archives, `npm run precompute:parts` creates a selection-independent partition for
-each dataset/period at every source level supported by the client (currently
-zooms 0–8). The same default applies to all datasets, including both Asher periods.
-It uses the same simplified source tiles, with
-no refinement policy: every face retains all original memberships. Those assets
-are versioned by format and archive hash and resumable. Each completed zoom
-is published atomically in `manifest.coverageParts`; interrupted later levels
-cannot remove intermediate coverage. The generator accepts repeated `--dataset` and `--period`
-options and `--max-zoom` (0–8). Filtered runs preserve other profiles and do not
-downgrade completed zoom levels. Generation never combines datasets or periods.
-It traverses the actual PMTiles directory, including run-length entries, rather
-than iterating the world grid. Only nonempty coverage gets an MVT file. A versioned,
+The atlas build generates selection-independent coverage for each dataset/period
+at every native source level (currently zooms 0–8). Every face retains all original
+memberships, with no selection/refinement policy applied. `npm run precompute:parts`
+restores missing files from cached canonical/LOD geometry. It accepts repeated
+`--dataset` and `--period` options, `--max-zoom` (0–8), and `--data-dir`.
+Filtered restoration preserves other profiles and higher completed zooms. Each
+restored level's index is published atomically. Only nonempty coverage gets an MVT file. A versioned,
 lazy profile index lists its nonempty tiles at each complete level. Omitted tiles
 at indexed levels are known empty; unindexed levels or unavailable assets fall
 back live. Availability indexes stay out of the startup manifest and are cached
 for at most eight profiles. The old dense and inline-index manifest shapes remain readable.
 
-The opt-in `pipeline.atlas.build --shared-coverage` path moves the authoritative
-partition upstream of LOD generation. `pipeline/atlas/topology.py` builds a
+`pipeline.atlas.build` constructs the authoritative partition upstream of LOD
+generation. `pipeline/atlas/topology.py` builds a
 high-precision, labelled boundary network separately for each dataset/period.
 Each LOD resolves rounding in that shared network and includes native tile cuts
 before GEOS coverage simplification. Internal borders and coverage boundaries
@@ -78,8 +72,8 @@ from cached common LODs; it never repartitions the display archive. The browser'
 parts, selection, delivery, and inspection contracts remain the same. Mixed
 profiles still use the existing live fallback. The first full-data pass built all
 seven profiles through zoom 8 and passed the prepared, navigation and inspection
-browser suites. The legacy path remains available for comparisons while coarse
-geometry size and offline label-transfer cost are tuned. The combined source
+browser suites. Coarse geometry size and offline label-transfer cost remain
+tuning work. The combined source
 archive grew from about 29 MB to 64 MB; a measured 330,875-position Asher view
 required raising the shared worker/receiver output bound to 600k. This does not
 relax the live overlay's input, intermediate-region or time bounds.
