@@ -15,9 +15,11 @@ candidate samples. The stable default palette retains its previous initializatio
 and preference cost, so this integration reproduces the experiment's starting point.
 
 Use **Optimize colors for this view** to see the new behavior. It runs in the existing
-worker and participates in the existing cancellation and undo flow. Large world
-views can still take roughly 14 seconds; this is an experimental implementation,
-not yet a performance-optimized one. Many small vivid regions can also create an
+worker and participates in the existing cancellation and undo flow. The first performance pass preserves the search and its output while sharing
+shade projections, color conversions, and invariant scoring work. On three saved
+captures, the regional/world optimizer medians fell from 4.79/10.20 seconds to
+2.62/5.35 seconds (Node replay; browser latency differs). Caches require no dataset
+preprocessing and also apply to cross-dataset views. Many small vivid regions can also create an
 overly vivid family collectively; family-wide chroma restraint is a next experiment.
 
 The [experiment report](../../scripts/color-branches/README.md) records historical

@@ -290,3 +290,72 @@ custom colors, repeatability, undo/default restoration, navigation stability,
 regional and world family/contact/branch checks, unchanged geometry requests, and
 narrow-layout controls. The production build, targeted Biome checks, and 19 Python
 evaluator tests pass as well.
+
+
+## Runtime performance pass (2026-11-09)
+
+The app now avoids repeated work without changing candidates, search passes,
+objectives, or acceptance tolerances:
+
+- Share candidate projections among languages with identical ordered plane sets.
+  Cache by sample identity, preserving full precision for unquantized branch means.
+- Prepare plane normals and squared lengths once; weak keys release view geometry.
+- Reuse immutable RGB-to-OKLab samples in a bounded 8,192-entry cache.
+- Generate initializer shade candidates once for both refinement passes.
+- Precompute invariant candidate costs and per-visit neighbor/branch terms.
+  Keep addition order intact. Reject infeasible branch moves before scoring contacts.
+- Precompute representation sizes for the spatial graph's pair loop.
+
+Projection and candidate caches belong to one optimization. Only the bounded color
+cache and weak plane cache span calls. There are no prepared dataset dependencies,
+so the same improvements apply to runtime cross-dataset comparisons.
+
+Matched Node replay on the three saved `color-integrated` captures, three calls per
+scene in a fresh process for each implementation, with no concurrent build/tests:
+
+| Scene | Previous median | Optimized median | Reduction |
+| --- | ---: | ---: | ---: |
+| DLAC | 169 ms | 164 ms | Small/no meaningful change |
+| Asher regional | 4,795 ms | 2,616 ms | 45% |
+| Asher world | 10,197 ms | 5,348 ms | 48% |
+
+These are local elapsed times, including the first invocation, not universal
+latency guarantees. Full serialized optimizer outputs match the previous version
+exactly on all three captures, including metrics and bounds. The optimized replay
+also reverses footprint/cell ordering on alternating rounds. All 174 unit tests
+and the production build pass. The full browser color suite also passes, including
+rendered colors, manual overrides, undo, navigation, and independent branch/contact
+checks. Browser elapsed times were 0.44 s for DLAC, 4.65 s regional, and 7.28 s world;
+these include the app/browser path and differ from the Node optimizer replay.
+A new fixture compares the historical branch solver
+against the cached solver with shared local planes and a language having both fixed
+and automatic representations.
+
+The standalone benchmark saves input hashes, raw timings, and result snapshots.
+To compare a later implementation, run from `app/` before and after editing:
+
+```sh
+node scripts/color-branches/benchmark.mjs --output test-results/performance-before
+node scripts/color-branches/benchmark.mjs --reference test-results/performance-before --output test-results/performance-after
+```
+
+Use `--input` for another directory containing the three captured scene inputs and
+`--rounds` to increase repetitions. Current measurements are saved under
+`test-results/color-performance-before` and `test-results/color-performance`.
+
+### Next steps toward defaults
+
+Keep this exact-result speedup before spending quality for speed. Runtime is still
+several seconds on a world view. For immediate default display, prepare a stable
+palette per supported dataset/configuration during the data build, including
+hidden descendants. Version it against both taxonomy and color algorithm, and
+fall back to runtime computation for configurations without a matching artifact.
+A viewport-optimized palette is view-dependent: baking one world view does not
+reproduce the best colors for every regional view. That default policy needs its
+own visual evaluation before replacing the current stable defaults.
+
+Cross-dataset comparisons and custom configurations can continue to optimize in
+the worker. If they need further acceleration, benchmark a two-pass branch search
+or adaptive candidate shortlist against this exact-output baseline, with explicit
+contact, branch separation, vividness, and rendered-map comparisons. Those quality
+tradeoffs have not been enabled in this pass.

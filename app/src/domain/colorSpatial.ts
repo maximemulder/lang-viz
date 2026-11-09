@@ -52,6 +52,7 @@ export const spatialEdges = (
     const ys = vertex.cells.map((cell) => Math.floor(cell / columns))
     return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
   })
+  const sizes = vertices.map(({ vertex }) => Math.sqrt(vertex.cells.length))
   const nearest: SpatialEdge[][][] = vertices.map(() => [[], []])
   const retain = (index: number, type: number, edge: SpatialEdge) => {
     const list = nearest[index]![type]!
@@ -72,8 +73,7 @@ export const spatialEdges = (
       const b = vertices[j]!
       if (a.vertex.languageId === b.vertex.languageId) continue
       const bb = bounds[j]!
-      const scale =
-        0.75 + 0.15 * (Math.sqrt(a.vertex.cells.length) + Math.sqrt(b.vertex.cells.length))
+      const scale = 0.75 + 0.15 * (sizes[i]! + sizes[j]!)
       const gap = Math.max(0, ab[0]! - bb[1]!, bb[0]! - ab[1]!, ab[2]! - bb[3]!, bb[2]! - ab[3]!)
       if (gap > 1 + scale * 1.921) continue
       const contact = (cells: readonly number[], field: Float32Array) => {

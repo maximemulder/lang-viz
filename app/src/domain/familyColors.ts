@@ -9,10 +9,18 @@ export interface ColorSample {
   readonly b: number
 }
 
+// RGB rounding revisits a small set of colors many times during shade search.
+// Bound retention across view changes; samples are immutable throughout the app.
+const sampleCache = new Map<string, ColorSample>()
 export const colorSample = (hex: string): ColorSample => {
+  const cached = sampleCache.get(hex)
+  if (cached) return cached
   const lab = toLab(hex)
   if (!lab) throw new Error(`Invalid palette color: ${hex}`)
-  return { hex, l: lab.l, a: lab.a, b: lab.b }
+  const sample = { hex, l: lab.l, a: lab.a, b: lab.b }
+  if (sampleCache.size >= 8192) sampleCache.clear()
+  sampleCache.set(hex, sample)
+  return sample
 }
 
 export const colorDistance = (a: ColorSample, b: ColorSample) =>

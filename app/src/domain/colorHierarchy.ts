@@ -193,6 +193,28 @@ export const familyColorFrame = (
   return { axes, box: [range(first), range(second), range(third)] }
 }
 
+// Plane geometry is invariant throughout shade search. Weak keys let completed
+// view constraints be collected with their optimizer inputs.
+const preparedPlanes = new WeakMap<
+  readonly FamilyColorPlane[],
+  readonly {
+    plane: FamilyColorPlane
+    nl: number
+    norm: number
+  }[]
+>()
+const preparePlanes = (planes: readonly FamilyColorPlane[]) => {
+  let prepared = preparedPlanes.get(planes)
+  if (!prepared) {
+    prepared = planes.map((plane) => {
+      const nl = plane.l / 0.65
+      return { plane, nl, norm: nl ** 2 + plane.a ** 2 + plane.b ** 2 }
+    })
+    preparedPlanes.set(planes, prepared)
+  }
+  return prepared
+}
+
 /** Map hue-like, lightness, and chroma-like offsets into a perceptual ball.
  * Project only the component crossing a separating plane, preserving orthogonal
  * detail. Remeasure gamut-mapped RGB and keep every shade in the family region.
@@ -222,6 +244,7 @@ export const familyShade = (
     anchor.a + (delta[1] ?? 0),
     anchor.b + (delta[2] ?? 0),
   )
+  const prepared = preparePlanes(planes)
   for (let pass = 0; pass < 4; pass++) {
     const distance = colorDistance(anchor, result)
     let dl = (result.l - anchor.l) * 0.65
@@ -230,9 +253,7 @@ export const familyShade = (
     let changed = false
     for (let iteration = 0; iteration < 8; iteration++) {
       let movement = 0
-      for (const plane of planes) {
-        const nl = plane.l / 0.65
-        const norm = nl ** 2 + plane.a ** 2 + plane.b ** 2
+      for (const { plane, nl, norm } of prepared) {
         const excess = dl * nl + da * plane.a + db * plane.b - plane.limit
         if (excess <= 0.00001 * plane.distance || norm < 1e-15) continue
         const amount = excess / norm

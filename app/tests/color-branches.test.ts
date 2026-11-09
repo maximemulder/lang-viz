@@ -188,3 +188,29 @@ test('app branch pass reproduces the successful chroma experiment', () => {
   integratedRefinement([group], colors, 10, 10, field)
   assert.deepEqual(colors, expected)
 })
+
+test('cached branch projections preserve local constraints and mixed fixed representations', () => {
+  const { group, colors } = fixture()
+  const plane = { l: 0, a: 1, b: 0, limit: 0.025, distance: 1 }
+  const modified = {
+    ...group,
+    localPlanes: new Map([
+      ['a', [plane]],
+      ['b', [plane]],
+      ['c', []],
+    ]),
+    vertices: [
+      ...group.vertices,
+      {
+        id: 'a-fixed',
+        languageId: 'a',
+        cells: [45],
+        fixed: colorSample('#f8834a'),
+      },
+    ],
+  }
+  const expected = new Map(colors)
+  branchRefinement([modified], expected, [], 10, 10, field, 0, 0.1)
+  integratedRefinement([modified], colors, 10, 10, field)
+  assert.deepEqual(colors, expected)
+})

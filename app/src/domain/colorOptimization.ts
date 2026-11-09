@@ -326,6 +326,7 @@ const refineShades = (
     (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
   )
   const seeds = new Map(ordered.map(([id]) => [id, colors.get(id)]))
+  const candidatesById = new Map<string, ColorSample[]>()
   for (let pass = 0; pass < 2; pass++)
     for (const [id, edges] of ordered) {
       const position = group.positions.get(id)
@@ -350,29 +351,37 @@ const refineShades = (
       }
       let best = colors.get(id) ?? seed
       let bestCost = cost(best)
-      for (const dh of [-0.3, 0, 0.3])
-        for (const dl of [-0.3, 0, 0.3])
-          for (const dc of [-0.3, 0, 0.3]) {
-            const coordinates = position.coordinates.map((coordinate, axis) => {
-              const [low, high] = position.box[axis] ?? [0, 0]
-              return Math.max(
-                low,
-                Math.min(high, coordinate + (high - low) * ([dh, dl, dc][axis] ?? 0)),
+      let candidates = candidatesById.get(id)
+      if (!candidates) {
+        candidates = []
+        for (const dh of [-0.3, 0, 0.3])
+          for (const dl of [-0.3, 0, 0.3])
+            for (const dc of [-0.3, 0, 0.3]) {
+              const coordinates = position.coordinates.map((coordinate, axis) => {
+                const [low, high] = position.box[axis] ?? [0, 0]
+                return Math.max(
+                  low,
+                  Math.min(high, coordinate + (high - low) * ([dh, dl, dc][axis] ?? 0)),
+                )
+              })
+              const candidate = familyShade(
+                group.anchor,
+                coordinates,
+                group.radius,
+                group.localPlanes.get(id) ?? group.planes,
+                group.axes,
               )
-            })
-            const candidate = familyShade(
-              group.anchor,
-              coordinates,
-              group.radius,
-              group.localPlanes.get(id) ?? group.planes,
-              group.axes,
-            )
-            const value = cost(candidate)
-            if (value < bestCost - 1e-10) {
-              best = candidate
-              bestCost = value
+              candidates.push(candidate)
             }
-          }
+        candidatesById.set(id, candidates)
+      }
+      for (const candidate of candidates) {
+        const value = cost(candidate)
+        if (value < bestCost - 1e-10) {
+          best = candidate
+          bestCost = value
+        }
+      }
       colors.set(id, best)
     }
 }

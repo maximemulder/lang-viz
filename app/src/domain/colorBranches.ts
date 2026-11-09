@@ -2,7 +2,13 @@
 /** Multiscale branch references with prominence-weighted chroma restraint. */
 import { familyColorFrame, familyShade } from './colorHierarchy.ts'
 import { type Group, spatialEdges } from './colorSpatial.ts'
-import { type ColorSample, colorDistance, colorSample, gamutSample } from './familyColors.ts'
+import {
+  type ColorSample,
+  colorDistance,
+  colorSample,
+  type FamilyColorPlane,
+  gamutSample,
+} from './familyColors.ts'
 
 const candidateSwatches = [
   '#d15264',
@@ -116,8 +122,28 @@ export const branchRefinement = (
   const seeds = new Map(colors)
   const states = groups.map((group) => {
     const frame = familyColorFrame(group.anchor, group.radius, group.planes)
+    // Languages often share the same ordered set of separating planes. Project
+    // shared pool samples once per region, retaining exact floating point inputs.
+    const planeIds = new Map<FamilyColorPlane, number>()
+    const regions = new Map<string, Map<ColorSample, ColorSample>>()
+    const projections = new Map<readonly FamilyColorPlane[], Map<ColorSample, ColorSample>>()
     const project = (sample: ColorSample, id?: string) => {
       if (!group.radius) return group.anchor
+      const planes = id ? (group.localPlanes.get(id) ?? group.planes) : group.planes
+      let cache = projections.get(planes)
+      if (!cache) {
+        const key = planes
+          .map((plane) => {
+            if (!planeIds.has(plane)) planeIds.set(plane, planeIds.size)
+            return planeIds.get(plane)
+          })
+          .join(',')
+        cache = regions.get(key) ?? new Map<ColorSample, ColorSample>()
+        regions.set(key, cache)
+        projections.set(planes, cache)
+      }
+      const cached = cache.get(sample)
+      if (cached) return cached
       const delta = [
         (sample.l - group.anchor.l) * 0.65,
         sample.a - group.anchor.a,
@@ -127,13 +153,9 @@ export const branchRefinement = (
       const coordinates = axes.map(
         (axis) => axis.reduce((s, v, i) => s + v * delta[i]!, 0) / group.radius,
       )
-      return familyShade(
-        group.anchor,
-        coordinates,
-        group.radius,
-        id ? (group.localPlanes.get(id) ?? group.planes) : group.planes,
-        axes,
-      )
+      const result = familyShade(group.anchor, coordinates, group.radius, planes, axes)
+      cache.set(sample, result)
+      return result
     }
     const pool: ColorSample[] = [group.anchor]
     for (const x of [-1, -0.5, 0, 0.5, 1])
@@ -239,9 +261,21 @@ export const branchRefinement = (
           }),
         )
         unique.set(seed.hex, seed)
+        const mass = group.weights.get(id) ?? 0
+        const staticCosts = new Map(
+          [...unique.values()].map((candidate) => [
+            candidate,
+            [
+              0.04 * (colorDistance(candidate, branch?.reference ?? seed) / 0.1) ** 2,
+              chromaWeight * chromaRestraint(candidate, mass / largestArea),
+              0.015 * (colorDistance(candidate, seed) / Math.max(0.025, group.radius)) ** 2,
+            ],
+          ]),
+        )
         return [
           {
             id,
+            staticCosts,
             state,
             seed,
             branches,
@@ -260,26 +294,26 @@ export const branchRefinement = (
   let accepted = 0
   for (let pass = 0; pass < 3; pass++)
     for (const variable of variables) {
-      const { id, state, seed, branches, branch, candidates, edges } = variable
+      const { id, state, branches, candidates, edges, staticCosts } = variable
       const current = colors.get(id)!
       const mass = state.group.weights.get(id) ?? 0
+      const neighbors = edges.map((edge) => ({
+        color:
+          edge.a.languageId === id
+            ? (edge.b.fixed ?? colors.get(edge.b.languageId)!)
+            : (edge.a.fixed ?? colors.get(edge.a.languageId)!),
+        weight: edge.weight,
+        target: edge.ga === edge.gb ? 0.06 : 0.16,
+      }))
+      const weight = neighbors.reduce((sum, edge) => sum + edge.weight, 0)
+      const branchCosts = branches.map((b) => ({
+        b,
+        fraction: mass / (b.mass || 1),
+        previous: (colorDistance(b.current, b.reference) / 0.06) ** 2,
+      }))
       const cost = (candidate: ColorSample) => {
-        let local = 0,
-          weight = 0,
-          worst = 0
-        for (const edge of edges) {
-          const a =
-            edge.a.fixed ?? (edge.a.languageId === id ? candidate : colors.get(edge.a.languageId)!)
-          const b =
-            edge.b.fixed ?? (edge.b.languageId === id ? candidate : colors.get(edge.b.languageId)!)
-          const penalty = loss(colorDistance(a, b), edge.ga === edge.gb ? 0.06 : 0.16)
-          local += edge.weight * penalty
-          weight += edge.weight
-          worst = Math.max(worst, edge.weight * penalty)
-        }
         let coherence = 0
-        for (const b of branches) {
-          const fraction = mass / (b.mass || 1)
+        for (const { b, fraction, previous } of branchCosts) {
           const next = {
             hex: '',
             l: b.current.l + (candidate.l - current.l) * fraction,
@@ -293,17 +327,23 @@ export const branchRefinement = (
           // Divide by the member's fraction: even small leaves feel the aggregate
           // branch objective, without making small clades dominate the map.
           coherence +=
-            ((colorDistance(next, b.reference) / 0.06) ** 2 -
-              (colorDistance(b.current, b.reference) / 0.06) ** 2) /
-            Math.max(fraction, 1e-9)
+            ((colorDistance(next, b.reference) / 0.06) ** 2 - previous) / Math.max(fraction, 1e-9)
         }
+        let local = 0,
+          worst = 0
+        for (const edge of neighbors) {
+          const penalty = loss(colorDistance(candidate, edge.color), edge.target)
+          local += edge.weight * penalty
+          worst = Math.max(worst, edge.weight * penalty)
+        }
+        const fixed = staticCosts.get(candidate)!
         return (
           local / (weight || 1) +
           0.25 * worst +
           (0.1 * coherence) / Math.max(1, branches.length) +
-          0.04 * (colorDistance(candidate, branch?.reference ?? seed) / 0.1) ** 2 +
-          chromaWeight * chromaRestraint(candidate, mass / largestArea) +
-          0.015 * (colorDistance(candidate, seed) / Math.max(0.025, state.group.radius)) ** 2
+          fixed[0]! +
+          fixed[1]! +
+          fixed[2]!
         )
       }
       let best = current,
