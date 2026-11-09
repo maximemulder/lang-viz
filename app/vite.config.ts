@@ -6,6 +6,10 @@ import { maplibreTileRetention } from './build/maplibreTileRetention.ts'
 // https://vite.dev/config/
 export default defineConfig({
   base: process.env.GITHUB_PAGES === 'true' ? '/lang-viz/' : '/',
+  server: {
+    // Generated atlas assets are fetched at runtime and do not need HMR watchers.
+    watch: { ignored: ['**/public/data/**'] },
+  },
   // Preserve the worker's lazy geometry import as a separate production chunk.
   worker: { format: 'es' },
   // Apply the same narrow retention correction in development and production.

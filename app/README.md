@@ -12,6 +12,11 @@ npm install
 npm run dev
 ```
 
+The dev server excludes generated `public/data/` assets from file watching to
+avoid exhausting OS watcher limits on precomputed coverage tiles. These files
+are still served normally. After regenerating data, restart the dev server and
+reload the browser to pick up the new assets.
+
 MapLibre is pinned to 6.14.0 for a narrowly scoped tile-retention workaround.
 Review `build/maplibreTileRetention.ts` and the overlap lifecycle regressions before
 upgrading it; the build deliberately rejects an unreviewed version change.
