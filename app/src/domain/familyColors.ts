@@ -25,19 +25,31 @@ const identityDistance = (a: ColorSample, b: ColorSample) =>
 export const gamutSample = (l: number, a: number, b: number): ColorSample =>
   colorSample(formatHex(clampChroma({ mode: 'oklab', l, a, b }, 'oklch')))
 
-/** Search the usable gamut in all three dimensions; these are candidates, not
- * a fixed collection of category identities. Deduplicate gamut-mapped colors.
+/** The original 24 anchors define the preferred style. */
+const preferredFamilyAnchors: readonly ColorSample[] = Array.from({ length: 24 }, (_, i) =>
+  formatHex(
+    clampChroma(
+      { mode: 'oklch', l: i < 12 ? 0.61 : 0.73, c: 0.16, h: (i % 12) * 30 + 15 },
+      'oklch',
+    ),
+  ),
+).map(colorSample)
+
+/** Keep the original moderate-chroma anchors alongside the expanded gamut.
+ * These are candidates, not fixed category identities.
+ * Deduplicate after gamut mapping, preserving every previously available color.
  */
 export const familyCandidates: readonly ColorSample[] = [
-  ...new Set(
-    [0.54, 0.64, 0.74, 0.82].flatMap((l) =>
+  ...new Set([
+    ...[0.54, 0.64, 0.74, 0.82].flatMap((l) =>
       [0.12, 0.18, 0.24].flatMap((c) =>
         Array.from({ length: 48 }, (_, h) =>
           formatHex(clampChroma({ mode: 'oklch', l, c, h: h * 7.5 }, 'oklch')),
         ),
       ),
     ),
-  ),
+    ...preferredFamilyAnchors.map(({ hex }) => hex),
+  ]),
 ].map(colorSample)
 
 export const colorHash = (id: string) => {
@@ -162,6 +174,13 @@ const hueRisk = (a: ColorSample, b: ColorSample) => {
   return 0.4 * risk(hue, 0.17)
 }
 
+/** Every preferred anchor has zero cost; nearby shades cost little, and more
+ * extreme colors remain available when their separation is worth the cost.
+ * The reference palette expresses editorial taste, not a universal beauty model.
+ */
+const anchorPreferenceCost = (sample: ColorSample) =>
+  (Math.min(...preferredFamilyAnchors.map((color) => colorDistance(sample, color))) / 0.08) ** 2
+
 /** Deterministic multi-start search with pair swaps. Its objective includes both
  * normalized pair losses and the worst important family conflict. Internal shade
  * differences never compete with family identity in this search.
@@ -262,12 +281,21 @@ export const assignFamilyAnchors = (
     }
     return value + 0.35 * worst
   }
-  const movement = (i: number, candidate: number) => {
-    const before = families[i]?.reference
+  const preferences = samples.map(anchorPreferenceCost)
+  const unaryCost = (i: number, candidate: number) => {
+    const family = families[i]
+    const before = family?.reference
     const after = samples[candidate]
-    return before && after ? 0.018 * (colorDistance(before, after) / 0.3) ** 2 : 0
+    if (!family || !before || !after) return 0
+    // Prefer calmer anchors most strongly on large footprints. Reuse the
+    // existing evidence, keeping defaults independent of camera/selection.
+    const areaWeight = 0.1 + 0.9 * family.prominence ** 2
+    return (
+      0.018 * (colorDistance(before, after) / 0.3) ** 2 +
+      0.3 * areaWeight * (preferences[candidate] ?? 0)
+    )
   }
-  const movementCosts = families.map((_, i) => Float64Array.from(samples, (_, j) => movement(i, j)))
+  const unaryCosts = families.map((_, i) => Float64Array.from(samples, (_, j) => unaryCost(i, j)))
   const choices = families.map((family, i) => {
     const reference = references[i] ?? 0
     if (family.locked || !family.automatic) return [reference]
@@ -293,7 +321,7 @@ export const assignFamilyAnchors = (
       )
     })
   const energy = (assignment: readonly number[]) => {
-    let total = assignment.reduce((sum, candidate, i) => sum + movement(i, candidate), 0)
+    let total = assignment.reduce((sum, candidate, i) => sum + unaryCost(i, candidate), 0)
     let worst = 0
     for (const link of links) {
       const score = pairScore(link, assignment[link.a] ?? 0, assignment[link.b] ?? 0)
@@ -308,8 +336,8 @@ export const assignFamilyAnchors = (
     outsideWorst: number,
     assigned?: ReadonlySet<number>,
   ) => {
-    const movement = movementCosts[i]
-    const costs = movement ? new Float64Array(movement) : new Float64Array(size)
+    const unary = unaryCosts[i]
+    const costs = unary ? new Float64Array(unary) : new Float64Array(size)
     const worst = new Float64Array(size).fill(outsideWorst)
     for (const j of incident[i] ?? []) {
       const link = links[j]

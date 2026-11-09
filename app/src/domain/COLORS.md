@@ -106,11 +106,21 @@ conversion, sRGB gamut mapping, and hex quantization.
    contributes once, with normalized incident weights. A separate global term
    separates prominent families even when geographically distant. Exact subtree
    anchors are fixed throughout the search.
-4. Search a grid of 48 hues × four lightness levels × three chroma levels, removing
-   duplicate gamut-mapped RGB colors. These are candidates, not a fixed number of
-   family identities. The objective combines chromatic separation, a smooth hue
-   separation penalty, a strong penalty for severe shortfalls, the worst important
-   conflict, and a small movement penalty from deterministic reference colors.
+4. Search a grid of 48 hues × four lightness levels × three chroma levels, retaining
+   all 24 original anchors (two lightness levels, moderate chroma).
+   Remove duplicate gamut-mapped RGB colors. These are candidates,
+   not a fixed number of family identities. The objective combines chromatic
+   separation, a smooth hue separation penalty, a strong penalty for severe
+   shortfalls, the worst important conflict, a small movement penalty from
+   deterministic reference colors, and an editorial preference based on the
+   original palette.
+   Preference cost is the squared perceptual distance to the nearest preferred
+   anchor, weighted more strongly on large footprints. All 24 original anchors
+   have zero cost, including the olive greens, roses and violets. Nearby
+   shades cost little; more extreme colors remain available when needed for
+   separation. Exact custom anchors stay fixed. Candidate preferences are cached
+   alongside the existing movement costs; no additional search passes
+   or changes to descendant shade allocation are required.
    Two initializations, repeated coordinate descent, and swaps between difficult
    pairs reduce dependence on an initial greedy assignment.
 5. Both defaults and explicit view optimization use `familyColorSpaces` to allocate

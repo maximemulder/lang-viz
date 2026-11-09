@@ -14,6 +14,14 @@ import {
   topmostColorRoots,
   validateColorConfiguration,
 } from '../src/domain/colors.ts'
+import {
+  assignFamilyAnchors,
+  buildFamilyLinks,
+  type ColorFamily,
+  colorDistance,
+  colorSample,
+  familyCandidates,
+} from '../src/domain/familyColors.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
 
 const entry = (
@@ -60,6 +68,98 @@ const distance = (a: string, b: string) => {
   assert.ok(x && y)
   return Math.hypot(x.l - y.l, x.a - y.a, x.b - y.b)
 }
+
+const colorFamily = (id: string, color: string, prominence = 1): ColorFamily => ({
+  id,
+  reference: colorSample(color),
+  locked: false,
+  automatic: 1,
+  fixed: [],
+  prominence,
+  prominent: true,
+  coverage: prominence ** 2 * 0.1,
+  demand: 2,
+})
+
+test('all original anchors are available at the highest aesthetic preference', () => {
+  // Freeze the palette from before the expanded-gamut refactor, including its
+  // olive greens, roses and violets.
+  const preferred = [
+    '#d15264',
+    '#ce5d1e',
+    '#af7600',
+    '#8f8600',
+    '#559724',
+    '#009b70',
+    '#009696',
+    '#0091b7',
+    '#3683e0',
+    '#7c71de',
+    '#a661c4',
+    '#c35599',
+    '#fb7887',
+    '#f8834a',
+    '#df9700',
+    '#b7ac00',
+    '#7abd4f',
+    '#00c58f',
+    '#00bfc0',
+    '#00b9e9',
+    '#67aaff',
+    '#9f99ff',
+    '#cd86ec',
+    '#ec7abf',
+  ]
+  const candidates = new Set(familyCandidates.map(({ hex }) => hex))
+  for (const color of preferred)
+    assert.ok(candidates.has(color), `Missing preferred anchor: ${color}`)
+  const families = preferred.map((color, i) => colorFamily(`preferred-${i}`, color))
+  assert.deepEqual(
+    assignFamilyAnchors(families, []).map(({ hex }) => hex),
+    preferred,
+    'an uncontested original anchor was penalized relative to another candidate',
+  )
+})
+
+test('uncontested families prefer restrained anchors while exact custom anchors stay fixed', () => {
+  const family = colorFamily('family', '#574df5')
+  const large = assignFamilyAnchors([family], [])[0]
+  assert.ok(large)
+  assert.ok(
+    Math.hypot(large.a, large.b) < 0.165,
+    'an uncontested footprint retained a vivid anchor',
+  )
+  assert.equal(
+    assignFamilyAnchors([{ ...family, locked: true }], [])[0]?.hex,
+    family.reference.hex,
+    'an editorial preference replaced an explicit anchor',
+  )
+})
+
+test('crowded comparisons retain pink reserve anchors with stronger restraint on large footprints', () => {
+  const fixed = ['#008700', '#d6c900', '#ff8523', '#fd2e1c', '#125cf7', '#00e4b9', '#7a3dea'].map(
+    (color, i) => ({ ...colorFamily(`fixed-${i}`, color), locked: true }),
+  )
+  const families = [colorFamily('family', '#287cb8'), ...fixed]
+  const links = buildFamilyLinks(families, () => 1)
+  const assigned = assignFamilyAnchors(families, links)
+  const anchor = assigned[0]
+  assert.ok(anchor)
+  assert.ok(anchor.a > 0 && anchor.b < 0, 'the occupied neighborhood lost its pink alternative')
+  assert.ok(Math.hypot(anchor.a, anchor.b) > 0.15)
+  fixed.forEach((family, i) => {
+    assert.equal(assigned[i + 1]?.hex, family.reference.hex)
+    assert.ok(colorDistance(anchor, family.reference) > 0.2)
+  })
+  // Hold separation pressure fixed: area should affect the preference even
+  // when the crowded neighborhood still requires a pink reserve color.
+  const small = assignFamilyAnchors(
+    families.map((family, i) => (i ? family : { ...family, prominence: 0.01, coverage: 0.00001 })),
+    links,
+  )[0]
+  assert.ok(small)
+  assert.ok(Math.hypot(anchor.a, anchor.b) < Math.hypot(small.a, small.b))
+})
 
 test('semantic colors cluster recent branches and distinguish neighboring family roots', () => {
   assert.equal(semantic.colors.size, languages.length)
