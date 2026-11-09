@@ -15,15 +15,21 @@ const app = resolve(here, '../..')
 const { values } = parseArgs({
   options: {
     input: { type: 'string', default: join(app, 'test-results/colors') },
-    output: { type: 'string', default: join(app, 'test-results/color-refinement') },
+    output: { type: 'string' },
     rounds: { type: 'string', default: '3' },
+    branches: { type: 'boolean', default: false },
   },
 })
 const rounds = Number(values.rounds)
 assert.ok(Number.isInteger(rounds) && rounds > 0, '--rounds must be a positive integer')
-const output = resolve(values.output)
+const output = resolve(
+  values.output ??
+    join(app, values.branches ? 'test-results/color-branches' : 'test-results/color-refinement'),
+)
 await mkdir(output, { recursive: true })
-const names = ['baseline', 'whole-family', 'spatial']
+const names = values.branches
+  ? ['baseline', 'spatial', 'branches', 'branches-no-aesthetic']
+  : ['baseline', 'whole-family', 'spatial']
 const scenes = ['dlac', 'asher', 'asher-world']
 const read = async (path) => JSON.parse(await readFile(path, 'utf8'))
 const save = async (name, value) => writeFile(join(output, name), JSON.stringify(value, null, 2))
@@ -53,7 +59,7 @@ try {
     await symlink(join(app, 'node_modules'), join(directory, 'node_modules'), 'dir')
     for (const [file, original] of originals) await writeFile(join(directory, file), original)
     let source = originals.get('colorOptimization.ts')
-    if (name !== 'baseline') {
+    if (name === 'whole-family' || name === 'spatial') {
       source = replace(source, '  familyShade,', '  familyShade,\n  familyColorFrame,')
       source = replace(
         source,
@@ -69,17 +75,27 @@ try {
     const refinement = `  groups.forEach((group, i) => {
     refineShades(group, internal[i] ?? [], colors)
   })`
-    if (name === 'spatial') {
+    if (name === 'spatial' || name.startsWith('branches')) {
       const helper = (await readFile(join(here, 'spatial.ts'), 'utf8')).replaceAll(
         '../../src/domain/',
         './',
       )
       await writeFile(join(directory, 'experimentalRefinement.ts'), helper)
+      if (name.startsWith('branches')) {
+        const branchHelper = (await readFile(join(here, '../color-branches/refine.ts'), 'utf8'))
+          .replaceAll('../../src/domain/', './')
+          .replace('../color-refinement/spatial.ts', './experimentalRefinement.ts')
+        await writeFile(join(directory, 'branchRefinement.ts'), branchHelper)
+        source = `import { branchRefinement } from './branchRefinement.ts'\n${source}`
+      }
       source = `import { spatialRefinement } from './experimentalRefinement.ts'\n${source}`
       source = replace(
         source,
         refinement,
-        '  const experiment = spatialRefinement(groups, colors, links, view.columns, view.rows, distanceField)',
+        name.startsWith('branches')
+          ? `${refinement}
+  const experiment = branchRefinement(groups, colors, links, view.columns, view.rows, distanceField${name === 'branches-no-aesthetic' ? ', 0' : ''})`
+          : '  const experiment = spatialRefinement(groups, colors, links, view.columns, view.rows, distanceField)',
       )
     } else {
       source = replace(
@@ -103,6 +119,11 @@ ${refinement}
   const topology = buildColorTopology(hierarchy)
   const reference = buildSemanticPalette(hierarchy, topology)
   const production = await import('../../src/domain/colorOptimization.ts')
+  await writeFile(
+    join(output, 'branch-source.ts'),
+    await readFile(join(here, '../color-branches/refine.ts')),
+  )
+  await writeFile(join(output, 'spatial-source.ts'), await readFile(join(here, 'spatial.ts')))
   const report = {
     sourceHash: createHash('sha256')
       .update(
@@ -114,6 +135,10 @@ ${refinement}
       .digest('hex'),
     node: process.version,
     rounds,
+    variants: names,
+    experimentHash: createHash('sha256')
+      .update(await readFile(join(here, '../color-branches/refine.ts')))
+      .digest('hex'),
     scenes: {},
   }
   for (const scene of scenes) {

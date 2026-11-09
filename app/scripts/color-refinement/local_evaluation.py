@@ -119,11 +119,12 @@ def main():
     from color_evaluation import evaluate_colors
     output = Path(sys.argv[1])
     report = {}
+    variants = json.loads((output / 'benchmark.json').read_text()).get('variants', ['baseline', 'whole-family', 'spatial'])
     for scene in ('dlac', 'asher', 'asher-world'):
         capture = json.loads((output / f'{scene}-input.json').read_text())
         geometry = prepare(capture)
         report[scene] = {}
-        for name in ('baseline', 'whole-family', 'spatial'):
+        for name in variants:
             palette = json.loads((output / f'{name}-{scene}-palette.json').read_text())
             local = evaluate(capture, palette, geometry)
             existing = evaluate_colors(capture, palette)

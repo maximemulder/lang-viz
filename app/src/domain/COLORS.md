@@ -11,6 +11,11 @@ This document describes the current implementation, the
 until the other model's ongoing work has finished and its changes have been pushed.
 The experiment has not replaced the application picker.
 
+A subsequent user-authorized [branch-reference proof of concept](../../scripts/color-branches/README.md)
+now tests multiscale branch references, aggregate contrast guards, and aesthetic
+preference on actual shades. It remains isolated from the application picker;
+the broader geographic-preprocessing roadmap below is still unimplemented.
+
 ## Testing controls
 
 Open **Map settings → Language colors** to switch between semantic and categorical
