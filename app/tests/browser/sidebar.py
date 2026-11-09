@@ -13,9 +13,11 @@ def view(browser, name):
         wait_for(lambda: browser.js("return !!document.querySelector('#language-panel-'+arguments[0]+' '+arguments[1]+', #language-panel-'+arguments[0]+' .finder-empty')", name, selector), 10, f"{name} list")
 
 
-def open_details(browser):
+def open_details(browser, *, expand=True):
     browser.js("document.querySelector('.language-row__identity').click()")
     wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "entry details")
+    if expand:
+        browser.js("document.querySelector('.finder-detail__more').open = true")
 
 
 def search(browser, query, glottocode):
@@ -33,7 +35,7 @@ def search(browser, query, glottocode):
             """
             const row = [...document.querySelectorAll('.language-row')]
               .find(row => row.dataset.languageId === arguments[0]);
-            return row ? {text: row.textContent, disabled: row.querySelector('input').disabled, level: row.getAttribute('aria-level')} : null;
+            return row ? {text: row.textContent, label: row.getAttribute('aria-label'), disabled: row.querySelector('input').disabled, level: row.getAttribute('aria-level')} : null;
             """,
             glottocode,
         ),
@@ -43,6 +45,7 @@ def search(browser, query, glottocode):
 
 
 def select_branches(browser, source, center, zoom=4.5, *, settle=True, period="contemporary"):
+    view(browser, "explore")
     browser.js(
         "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:arguments[1]})",
         center, zoom,

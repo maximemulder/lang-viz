@@ -33,6 +33,12 @@ def main():
                 """)
             assert f"{root_count} roots" in results["initialBrowse"]["count"]
             assert all(row["level"] == "1" for row in results["initialBrowse"]["rows"])
+            assert browser.js("""
+                return document.querySelectorAll('.language-tabs [role=tab]').length === 2 &&
+                    !document.querySelector('.finder-detail') &&
+                    !document.querySelector('.language-finder__header') &&
+                    !!document.querySelector('#language-panel-explore .finder-options');
+            """), "Two browsing views, with geography filters in Explore and no empty details pane"
             # Check every virtualized root, including the boundary between availability groups.
             roots_by_position = {}
             height, step = browser.js("""
@@ -134,6 +140,37 @@ def main():
             )
             results["keyboard"] = "passed"
 
+            # Inspect consecutive tree rows without leaving the list or taking its keyboard focus.
+            browser.js("document.querySelector('.language-row__disclosure').click()")
+            key("\ue007")  # Enter: inspect the focused parent.
+            wait_for(lambda: browser.js("return document.querySelector('.finder-detail__heading small')?.textContent.includes('abkh1242')"), 10, "inspect parent")
+            assert browser.js("""
+                return document.activeElement.dataset.languageId === 'abkh1242' &&
+                    !document.querySelector('#language-panel-explore').hidden &&
+                    !document.querySelector('.finder-detail__more').open &&
+                    document.querySelector('.language-row[data-language-id=abkh1242]').dataset.inspected === 'true';
+            """), "Inspection keeps keyboard focus and starts compact"
+            key("\ue015")  # Down: move to the first child while details stays open.
+            child_id = browser.js("return document.activeElement.dataset.languageId")
+            assert child_id != 'abkh1242'
+            key("\ue007")
+            wait_for(lambda: browser.js("return document.querySelector('.finder-detail__heading small').textContent.includes(arguments[0])", child_id), 10, "inspect next result")
+            assert browser.js("return document.activeElement.dataset.languageId") == child_id
+            assert browser.snapshot()["selectedCount"] == 0
+            browser.js("document.querySelector('.finder-detail__toggle').click()")
+            assert browser.js("return document.querySelector('#focused-language-body').hidden")
+            view(browser, 'map')
+            assert browser.js("""
+                return !!document.querySelector('.finder-detail') &&
+                    document.querySelector('#focused-language-body').hidden &&
+                    document.querySelector('.finder-options').getClientRects().length === 0;
+            """), "Collapsed inspection persists across views; filters belong to Explore"
+            view(browser, 'explore')
+            browser.js("document.querySelector('.finder-detail__close').click()")
+            assert browser.js("return !document.querySelector('.finder-detail')")
+            assert browser.snapshot()["selectedCount"] == 0
+            results["continuousInspection"] = "passed"
+
             # Expanding another branch still leaves map selection unchanged.
             search(browser, "jiny1235", "jiny1235")
             browser.js("document.querySelector('.language-row__disclosure').click()")
@@ -223,7 +260,7 @@ def main():
                 ("hara1256", "dialect", [76.2, 25.1]),
             ]:
                 row = search(browser, code, code)
-                assert not row["disabled"] and level in row["text"]
+                assert not row["disabled"] and level in row["label"]
                 browser.js("document.querySelector('.language-row input').click()")
                 assert browser.js("return document.querySelector('.language-row input').checked")
                 browser.js(
@@ -572,8 +609,8 @@ def main():
                 return row.classList.contains('language-row--unavailable') &&
                     row.querySelector('.language-row__area-status').title.includes('sources / period');
             """), "Period-constrained results explain why they have no area"
-            assert "1 shown" in browser.js(
-                "return document.querySelector('.selection-count').textContent"
+            assert "1 entries, 1 displayed" in browser.js(
+                "return document.querySelector('#language-tab-map').getAttribute('aria-label')"
             )
             before = len(browser.snapshot()["reports"])
             browser.js("""
@@ -661,8 +698,8 @@ def main():
             wait_for(lambda: browser.js("return !!document.querySelector('.language-row input')"), 10, "return to family search")
             assert browser.js("return document.querySelector('.language-row input').checked") == sino_has_own
             assert browser.js("return document.querySelectorAll('.language-row').length") == 1
-            assert f"{family_total} shown" in browser.js(
-                "return document.querySelector('.selection-count').textContent"
+            assert f"{family_total} entries, {family_total} displayed" in browser.js(
+                "return document.querySelector('#language-tab-map').getAttribute('aria-label')"
             )
             browser.screenshot(output / "dlac-family-branch.png")
             family_colors = browser.js("return window.overlapTest.colorState(['mand1415','jiny1235','yuec1235'])")
@@ -672,8 +709,8 @@ def main():
             # Repeating the action is idempotent; filters update the count and disable empty actions.
             open_details(browser)
             browser.js("document.querySelector('.finder-detail__branch button').click()")
-            assert f"{family_total} shown" in browser.js(
-                "return document.querySelector('.selection-count').textContent"
+            assert f"{family_total} entries, {family_total} displayed" in browser.js(
+                "return document.querySelector('#language-tab-map').getAttribute('aria-label')"
             )
             browser.js("""
                 const select = document.querySelector('.finder-filters__period select');
@@ -688,8 +725,8 @@ def main():
                 10,
                 "unavailable mapped branches",
             )
-            assert f"{family_total} shown" in browser.js(
-                "return document.querySelector('.selection-count').textContent"
+            assert f"{family_total} entries, {family_total} displayed" in browser.js(
+                "return document.querySelector('#language-tab-map').getAttribute('aria-label')"
             )
             browser.js("""
                 const select = document.querySelector('.finder-filters__period select');
@@ -753,16 +790,16 @@ def main():
                 10,
                 "query mapped branch count",
             )
-            assert browser.js("return document.querySelectorAll('.finder-detail__branch').length") == 0
+            assert browser.js("return !document.querySelector('#language-panel-explore').hidden && !!document.querySelector('.finder-detail')"), "Branch selection keeps inspection and Explore visible"
             before = len(browser.snapshot()["reports"])
             browser.js(f"({bulk_button}).click()")
             ready_after(before, 10)
-            assert "10 shown" in browser.js(
-                "return document.querySelector('.selection-count').textContent"
+            assert "10 entries, 10 displayed" in browser.js(
+                "return document.querySelector('#language-tab-map').getAttribute('aria-label')"
             )
             browser.js(f"({bulk_button}).click()")
-            assert "10 shown" in browser.js(
-                "return document.querySelector('.selection-count').textContent"
+            assert "10 entries, 10 displayed" in browser.js(
+                "return document.querySelector('#language-tab-map').getAttribute('aria-label')"
             )
             query_branch_ids = [code for code in branch_ids if code not in {"ping1245", "minn1248", "sino1245"} and not code.startswith("dlac1987china:")]
             for code in query_branch_ids:
@@ -797,13 +834,13 @@ def main():
             """)
             results["queryBranches"] = {"ids": query_branch_ids, "selectedCount": 10}
 
-            # The three views share selection and details, while keeping independent searches.
+            # Both views share persistent inspection, while keeping independent searches.
             browser.settled(60)
             search(browser, "Chinese", "mand1415")
             explore_before = browser.js("""
                 return {query: document.querySelector('#language-panel-explore input').value,
                     scroll: document.querySelector('.language-list').scrollTop,
-                    rows: [...document.querySelectorAll('.language-row')].map(row => row.dataset.treeKey)};
+                    expanded: [...document.querySelectorAll('.language-row[aria-expanded=true]')].map(row => row.dataset.treeKey)};
             """)
             reports_before_views = len(browser.snapshot()["reports"])
             view(browser, "map")
@@ -819,24 +856,24 @@ def main():
                 input.dispatchEvent(new Event('input', {bubbles:true}));
             """)
             wait_for(lambda: browser.js("return document.querySelectorAll('.on-map-row').length === 1 && document.querySelector('.on-map-row').dataset.languageId === 'yuec1235'"), 10, "selection search")
-            browser.js("document.querySelector('.on-map-row__identity').click()")
+            browser.js("document.querySelector('.on-map-row__identity').focus(); document.querySelector('.on-map-row__identity').click()")
             wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "selection details")
             assert browser.js("""
                 return document.querySelector('.finder-detail').textContent.includes('yuec1235') &&
-                    document.querySelector('.language-back').textContent.includes('On map') &&
-                    document.activeElement.classList.contains('map-entry-card') &&
+                    document.querySelector('.focused-map-entry').dataset.entryId === document.querySelector('.on-map-row').dataset.entryId &&
+                    document.activeElement.classList.contains('on-map-row__identity') &&
                     [...document.querySelectorAll('.language-panel')].filter(panel => !panel.hidden).length === 1 &&
+                    !document.querySelector('#language-panel-map').hidden &&
                     document.querySelector('#language-panel-explore input').getClientRects().length === 0;
-            """), "Details replaces the lists and receives focus"
+            """), "Details identifies the pinned entry and keeps the selection list visible and focused"
             browser.screenshot(output / "details.png")
-            browser.js("document.querySelector('.language-back').click()")
             view(browser, "map")
             assert browser.js("return document.querySelector('#language-panel-map input').value") == 'yuec1235'
             view(browser, "explore")
             assert browser.js("""
                 return {query: document.querySelector('#language-panel-explore input').value,
                     scroll: document.querySelector('.language-list').scrollTop,
-                    rows: [...document.querySelectorAll('.language-row')].map(row => row.dataset.treeKey)};
+                    expanded: [...document.querySelectorAll('.language-row[aria-expanded=true]')].map(row => row.dataset.treeKey)};
             """) == explore_before, "Explore context survives inspection"
             assert len(browser.snapshot()["reports"]) == reports_before_views, "Navigation must not recompute map geometry"
             # Tabs support arrow navigation; a query on the selection list survives switching.
@@ -844,18 +881,23 @@ def main():
             key("\ue014")
             assert browser.js("return document.activeElement.id") == 'language-tab-map'
             view(browser, "map")
+            assert browser.js("return document.querySelector('.finder-options').getClientRects().length === 0")
+            view(browser, "explore")
             browser.js("""
                 const select = document.querySelector('.finder-filters__period select');
                 select.value = 'year-1750'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
+            view(browser, "map")
             assert browser.js("return document.querySelector('.on-map-row').dataset.displayed === 'true'")
             assert browser.snapshot()["selectedCount"] == 10
             assert "10 selected" in browser.js("return document.querySelector('.on-map-actions').textContent")
             browser.screenshot(output / "on-map-pinned.png")
+            view(browser, "explore")
             browser.js("""
                 const select = document.querySelector('.finder-filters__period select');
                 select.value = 'contemporary'; select.dispatchEvent(new Event('change', {bubbles:true}));
             """)
+            view(browser, "map")
             assert browser.snapshot()["selectedCount"] == 10
             browser.js("document.querySelector('.on-map-row__remove').click()")
             wait_for(lambda: browser.snapshot()["selectedCount"] == 9, 10, "remove selected entry")
@@ -868,18 +910,21 @@ def main():
 
             results["comparisons"] = check_comparisons(browser, output)
 
-            # Details uses the full available height on narrow screens.
+            # Expanded details stays bounded and leaves room to browse on narrow screens.
 
             browser.call("POST", "/window/rect", {"width": 390, "height": 844})
             search(browser, "abkh1242", "abkh1242")
+            browser.js("document.querySelector('.finder-options').open = false")
             open_details(browser)
             narrow = browser.js("""
-                const panel = document.querySelector('#language-panel-details');
+                const panel = document.querySelector('.finder-detail');
                 return {height: panel.clientHeight, width: innerWidth,
                     documentWidth: document.documentElement.scrollWidth,
+                    listHeight: document.querySelector('.language-list').clientHeight,
                     visiblePanels: [...document.querySelectorAll('.language-panel')].filter(panel => !panel.hidden).length};
                 """)
-            assert narrow["height"] >= 200 and narrow["visiblePanels"] == 1, narrow
+            assert 120 <= narrow["height"] <= 224 and narrow["visiblePanels"] == 1, narrow
+            assert narrow["listHeight"] >= 88, narrow
             assert narrow["documentWidth"] <= narrow["width"], narrow
             results["narrowLayout"] = narrow
             browser.js("document.querySelector('.language-finder').scrollIntoView({block:'end'})")

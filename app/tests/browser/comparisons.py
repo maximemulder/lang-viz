@@ -16,9 +16,11 @@ def check_comparisons(browser, output):
         """, selector, value)
 
     def period(value):
+        view(browser, 'explore')
         select('.finder-filters__period select', value)
 
     def source(short_name):
+        view(browser, 'explore')
         browser.js("document.querySelector('.finder-options').open = true")
         browser.js("document.querySelector('.source-filter__trigger').click()")
         browser.js("[...document.querySelectorAll('.source-filter__actions button')].find(b=>b.textContent==='Clear').click()")
@@ -111,16 +113,23 @@ def check_comparisons(browser, output):
     wait_for(lambda: browser.js("return document.querySelectorAll('.on-map-row').length") == 1, 10, 'period search')
     assert '1750' in browser.js("return document.querySelector('.on-map-row').textContent")
     browser.js("document.querySelector('.on-map-row__identity').click()")
-    wait_for(lambda: browser.js("return document.activeElement.classList.contains('map-entry-card')"), 10, 'focus pinned entry')
-    focused_id = browser.js('return document.activeElement.dataset.entryId')
+    wait_for(lambda: browser.js("return !!document.querySelector('.focused-map-entry')"), 10, 'inspect pinned entry')
+    focused_id = browser.js("return document.querySelector('.focused-map-entry').dataset.entryId")
     assert focused_id not in {contemporary['id'], traditional['id']}
+    assert browser.js("return !document.querySelector('#language-panel-map').hidden && document.querySelector('#language-panel-map input').value === '1750'")
+    browser.js("document.querySelector('.finder-detail__more').open = true")
+    assert browser.js("return document.querySelector('.map-entry-card[data-focused=true]').dataset.entryId") == focused_id
     browser.screenshot(output / 'comparison-details.png')
-    browser.js("document.querySelector('.language-back').click()")
     view(browser, 'map')
     browser.js("document.querySelector('.on-map-row__remove').click()")
     wait_for(lambda: len(state()) == 2, 10, 'remove just one representation')
     assert {e['id'] for e in state()} == {contemporary['id'], traditional['id']}
     assert {e['color'] for e in state()} == {'#ff0000', '#0000ff'}
+
+    # The details context links to the now Explore-only geography filters.
+    browser.js("document.querySelector('[aria-label=\"Change sources and period\"]').click()")
+    wait_for(lambda: browser.js("return !document.querySelector('#language-panel-explore').hidden && document.querySelector('.finder-options').open"), 10, 'edit geography from details')
+    assert browser.js("return document.activeElement === document.querySelector('.finder-options > summary')")
 
     # Same period, two different datasets, plus independent aggregate snapshots.
     browser.js("window.overlapTest.configure({languageIds:[],center:[112,28],zoom:6})")

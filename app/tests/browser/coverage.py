@@ -55,7 +55,8 @@ def check_selection_list(browser, count):
     before = browser.js("return document.querySelector('.on-map-list').scrollTop")
     browser.js("document.querySelector('.on-map-row:last-child .on-map-row__identity').click()")
     wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "last entry details")
-    browser.js("document.querySelector('.language-back').click()")
+    assert browser.js("return !document.querySelector('#language-panel-map').hidden"), "Inspection keeps the selection list visible"
+    browser.js("document.querySelector('.finder-detail__close').click()")
     wait_for(lambda: browser.js("return !!document.querySelector('.on-map-row')"), 10, "return to selection list")
     assert browser.js("return document.querySelector('.on-map-list').scrollTop") == before
     assert browser.js("return document.querySelectorAll('.on-map-row').length") < 100

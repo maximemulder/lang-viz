@@ -10,7 +10,7 @@ import {
   removeMapEntryAtom,
   selectedMapAreasAtom,
 } from '../../state/atlasState'
-import { openLanguageDetailsAtom } from '../../state/languageControls'
+import { languagePanelAtom, openLanguageDetailsAtom } from '../../state/languageControls'
 
 export const OnMapLanguages = () => {
   const data = useAtomValue(atlasDataAtom)
@@ -20,6 +20,7 @@ export const OnMapLanguages = () => {
   const remove = useSetAtom(removeMapEntryAtom)
   const clear = useSetAtom(clearMapSelectionAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const panel = useAtomValue(languagePanelAtom)
   const [query, setQuery] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
   const rows = useMemo(() => {
@@ -118,6 +119,10 @@ export const OnMapLanguages = () => {
                 data-language-id={language.id}
                 data-entry-id={entry.id}
                 data-displayed={displayed}
+                data-inspected={
+                  panel.detailEntryId === entry.id ||
+                  (panel.detailEntryId === null && panel.detailId === language.id)
+                }
                 style={{ transform: `translateY(${item.start}px)` }}
               >
                 <span
@@ -129,6 +134,12 @@ export const OnMapLanguages = () => {
                   type="button"
                   className="on-map-row__identity"
                   aria-label={`Details for ${language.name}`}
+                  aria-current={
+                    panel.detailEntryId === entry.id ||
+                    (panel.detailEntryId === null && panel.detailId === language.id)
+                      ? 'true'
+                      : undefined
+                  }
                   title={`${language.name} · ${description}`}
                   onClick={() => openDetails({ languageId: language.id, entryId: entry.id })}
                 >

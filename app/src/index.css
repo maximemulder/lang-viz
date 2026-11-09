@@ -101,21 +101,14 @@ h1 {
 
 .language-finder {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, auto) auto minmax(0, 1fr);
   border-left: 1px solid rgb(29 43 39 / 12%);
   background: var(--paper);
 }
 
-.language-finder__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.625rem 0.75rem;
-}
-
-.language-finder__header .eyebrow {
-  font-size: 0.6rem;
+.language-finder__inspection {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .search-field {
@@ -130,20 +123,6 @@ h2 {
   font-size: 1.45rem;
   font-weight: 500;
   line-height: 1;
-}
-
-.language-finder__header h2 {
-  font-size: 1.25rem;
-}
-
-.selection-count {
-  padding: 0.35rem 0.55rem;
-  border-radius: 999px;
-  color: #fff8ee;
-  background: var(--accent);
-  font-size: 0.68rem;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .search-field input,
@@ -359,6 +338,7 @@ h2 {
 
 .finder-options {
   padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
   border-block: 1px solid rgb(29 43 39 / 10%);
 }
 .finder-options summary {
@@ -468,24 +448,6 @@ h2 {
   font-size: 0.58rem;
   line-height: 1.5;
 }
-.language-row__level {
-  flex-shrink: 0;
-  margin-left: 0.35rem;
-  padding: 0.16rem 0.25rem;
-  border-radius: 0.2rem;
-  color: #59645d;
-  background: #e7ebe4;
-  font-size: 0.55rem;
-}
-.language-row__level--family,
-.language-row__level--group {
-  color: #72572c;
-  background: #eee8d8;
-}
-.language-row__level--dialect {
-  color: #5d607c;
-  background: #e8e7ef;
-}
 .language-row input {
   width: 0.9rem;
   height: 0.9rem;
@@ -519,13 +481,8 @@ h2 {
   background: #f0f0eb;
 }
 
-.language-row--unavailable
-  :where(.language-row__context, .language-row__children, .language-row__level) {
+.language-row--unavailable :where(.language-row__context, .language-row__children) {
   color: inherit;
-}
-
-.language-row--unavailable :where(.language-row__level) {
-  background: #e5e6e0;
 }
 
 .language-row--unavailable input {
@@ -598,7 +555,68 @@ h2 {
   line-height: 1.5;
 }
 .finder-detail {
-  padding: 0.625rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  max-height: min(24rem, 38dvh);
+  border-bottom: 1px solid rgb(29 43 39 / 16%);
+  background: #f1f0e6;
+}
+.finder-detail__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.65rem 0.75rem 0.45rem;
+}
+.finder-detail__heading {
+  flex: 1;
+  min-width: 0;
+}
+.finder-detail__toggle,
+.finder-detail__close {
+  flex-shrink: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.3rem;
+  color: var(--muted-ink);
+  background: transparent;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.finder-detail__toggle:hover,
+.finder-detail__close:hover {
+  color: var(--accent);
+  background: rgb(203 93 62 / 10%);
+}
+.finder-detail__body {
+  min-height: 0;
+  padding: 0 0.75rem 0.5rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.finder-detail__more {
+  margin-top: 0.4rem;
+}
+.finder-detail__more > summary {
+  color: var(--ink);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.finder-detail h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.75rem;
+}
+.finder-detail__context button {
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .finder-detail p {
   margin: 0 0 0.35rem;
@@ -611,9 +629,9 @@ h2 {
   display: block;
 }
 .finder-detail__heading h3 {
-  margin: 0.5rem 0 0;
+  margin: 0;
   font-family: "Newsreader", serif;
-  font-size: 1.6rem;
+  font-size: 1.35rem;
   font-weight: 500;
 }
 .finder-detail__heading small {
@@ -623,12 +641,14 @@ h2 {
 }
 .finder-detail__path {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  white-space: nowrap;
   gap: 0.15rem;
   margin: 0.35rem 0;
 }
 .finder-detail__path button,
 .finder-detail__reveal {
+  flex-shrink: 0;
   padding: 0;
   border: 0;
   color: var(--accent);
@@ -1159,6 +1179,10 @@ h2 {
     border-top: 1px solid rgb(29 43 39 / 12%);
     border-left: 0;
   }
+
+  .finder-detail {
+    max-height: 12rem;
+  }
 }
 
 .map-settings__biome-legend {
@@ -1245,7 +1269,7 @@ h2 {
 }
 
 .explore-view {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
 }
 
 .on-map-view {
@@ -1285,13 +1309,6 @@ h2 {
   text-decoration: underline;
 }
 
-.language-panel--details {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
-
-.language-back,
 .language-inspector__details {
   margin: 0.65rem 0.75rem 0;
   padding: 0.35rem 0;
@@ -1312,9 +1329,12 @@ h2 {
   gap: 0.5rem;
   color: var(--muted-ink);
   font-size: 0.68rem;
+  margin: 0.35rem 0;
 }
 
-.detail-selection button {
+.detail-selection button,
+.focused-map-entry button {
+  flex-shrink: 0;
   margin-left: auto;
   padding: 0.4rem 0.5rem;
   border: 1px solid rgb(29 43 39 / 16%);
@@ -1355,6 +1375,35 @@ h2 {
 .map-entry-card:focus {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.map-entry-card[data-focused="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.focused-map-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+}
+
+.focused-map-entry > div {
+  min-width: 0;
+}
+
+.focused-map-entry strong,
+.focused-map-entry small {
+  display: block;
+  color: var(--muted-ink);
+  font-size: 0.65rem;
+  overflow-wrap: anywhere;
+}
+
+.focused-map-entry strong {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .map-entry-card small {
@@ -1446,6 +1495,12 @@ h2 {
   background: rgb(29 43 39 / 4%);
 }
 
+.language-row[data-inspected="true"],
+.on-map-row[data-inspected="true"] {
+  background: #f4e7db;
+  box-shadow: inset 3px 0 var(--accent);
+}
+
 .on-map-row__identity {
   min-width: 0;
 }
@@ -1496,7 +1551,9 @@ h2 {
 .language-tabs button:focus-visible,
 .language-row__identity:focus-visible,
 .on-map-row button:focus-visible,
-.language-back:focus-visible {
+.finder-detail button:focus-visible,
+.finder-detail summary:focus-visible,
+.finder-options summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

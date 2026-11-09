@@ -3,12 +3,11 @@ import { type KeyboardEvent, useRef } from 'react'
 import { mapEntriesAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { type LanguagePanelView, languagePanelAtom } from '../../state/languageControls'
 import { ExploreLanguages } from './ExploreLanguages'
-import { GeographyFilters } from './GeographyFilters'
 import { LanguageDetails } from './LanguageDetails'
 import { OnMapLanguages } from './OnMapLanguages'
 
-const VIEWS = ['explore', 'map', 'details'] as const
-const LABELS = { explore: 'Explore', map: 'On map', details: 'Details' }
+const VIEWS = ['explore', 'map'] as const
+const LABELS = { explore: 'Explore', map: 'On map' }
 
 export const LanguageFinder = () => {
   const [panel, setPanel] = useAtom(languagePanelAtom)
@@ -17,7 +16,7 @@ export const LanguageFinder = () => {
   const tabRefs = useRef<Partial<Record<LanguagePanelView, HTMLButtonElement | null>>>({})
   const selectView = (view: LanguagePanelView) => setPanel({ ...panel, view })
   const handleTabKey = (event: KeyboardEvent, view: LanguagePanelView) => {
-    const views = VIEWS.filter((view) => view !== 'details' || panel.detailId !== null)
+    const views = VIEWS
     const index = views.indexOf(view)
     const next =
       event.key === 'ArrowRight'
@@ -36,18 +35,7 @@ export const LanguageFinder = () => {
   }
   return (
     <aside className="language-finder" aria-label="Language controls">
-      <header className="language-finder__header">
-        <div>
-          <p className="eyebrow">Language layers</p>
-          <h2>Your atlas</h2>
-        </div>
-        <span className="selection-count" aria-live="polite">
-          {displayed.length === selected.length
-            ? `${displayed.length.toLocaleString()} shown`
-            : `${displayed.length.toLocaleString()} of ${selected.length.toLocaleString()} shown`}
-        </span>
-      </header>
-      <GeographyFilters />
+      <div className="language-finder__inspection">{panel.detailId && <LanguageDetails />}</div>
       <div className="language-tabs" role="tablist" aria-label="Language views">
         {VIEWS.map((view) => (
           <button
@@ -57,7 +45,11 @@ export const LanguageFinder = () => {
             id={`language-tab-${view}`}
             aria-controls={`language-panel-${view}`}
             aria-selected={panel.view === view}
-            disabled={view === 'details' && panel.detailId === null}
+            aria-label={
+              view === 'map'
+                ? `On map, ${selected.length.toLocaleString()} entries, ${displayed.length.toLocaleString()} displayed`
+                : undefined
+            }
             tabIndex={panel.view === view ? 0 : -1}
             ref={(element) => {
               tabRefs.current[view] = element
@@ -89,36 +81,12 @@ export const LanguageFinder = () => {
       >
         <OnMapLanguages />
       </section>
-      <section
-        className="language-panel language-panel--details"
-        id="language-panel-details"
-        role="tabpanel"
-        aria-labelledby="language-tab-details"
-        hidden={panel.view !== 'details'}
-      >
-        {panel.view === 'details' && (
-          <>
-            <button
-              type="button"
-              className="language-back"
-              onClick={() => {
-                selectView(panel.returnView)
-                tabRefs.current[panel.returnView]?.focus()
-              }}
-            >
-              ← Back to {LABELS[panel.returnView]}
-            </button>
-            <LanguageDetails />
-          </>
-        )}
-      </section>
     </aside>
   )
 }
 
 export const LanguageFinderFallback = () => (
   <aside className="language-finder language-finder--loading" aria-busy="true">
-    <p className="eyebrow">Language layers</p>
     <h2>Loading catalog…</h2>
     <div className="loading-line" />
     <div className="loading-line loading-line--short" />

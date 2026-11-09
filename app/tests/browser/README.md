@@ -84,9 +84,11 @@ They also exercise the visible Language colors controls: strategy switching,
 setting/removing exact colors and subtree anchors, comparison roots, invalid input,
 and resetting the configuration while retaining map selections.
 Its screenshots, report, and server logs are written to `test-results/catalog/`.
-The sidebar checks cover exclusive Explore / On map / Details views, independent
-searches, context restoration, keyboard tab navigation, shared entry details,
-unavailable selections, removal, and clearing through a filtered selection list.
+The sidebar checks cover Explore / On map views with a persistent details pane,
+independent searches, context restoration, keyboard inspection without losing list
+focus, tab navigation, pane collapse/close, Explore-only geography filters, exact
+pinned-entry inspection, bounded narrow layouts, unavailable selections, removal,
+and clearing through a filtered selection list.
 Switching views must not trigger geometry computation.
 
 `test:coverage-browser` checks the German and Yue coverage regressions using the

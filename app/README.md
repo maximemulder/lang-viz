@@ -39,7 +39,7 @@ subtree anchors, comparison roots, categorical mode, and rendering behavior.
 
 ## Language controls
 
-The sidebar shows one view at a time:
+The sidebar has two browsing views, with a shared language details pane above them:
 
 - **Explore** searches the catalog and browses its classification. Check an entry
   to pin its current representation, or use the bulk mapped-leaves action. The
@@ -51,21 +51,32 @@ The sidebar shows one view at a time:
   for classification roots. Entries without areas are muted and labeled
   No area; tooltips explain source/period or representation constraints. Expanded
   branches retain their classification order.
+  Sources, geographic period, and search-area filters sit above the search field. The
+  collapsed Sources & period control retains a summary of the current context.
 - **On map** lists pinned representations independently of the Explore query,
   geography filters, and map position. A languoid can appear several times with
   different sources, periods, or own/descendant areas. Its search filters this
   list by language, source, or period. Each entry can be inspected or removed.
   Clear map removes the entire selection, including entries outside this search.
-- **Details** shows the languoid's pinned entries, with individual color and
-  removal controls, source/period provenance, contributors, and uncovered branches.
-  “Representation to add” prepares another entry using the geography filters,
-  representation, and geographic source picker. Changing those choices leaves
-  existing entries intact. Identical representations are deduplicated. Back returns to the
-  originating view; Show in classification reveals its ancestry in Explore.
-  Pinned map popups also open this same Details view.
+
+Clicking a name or pressing Enter on a tree row updates the **details pane** without
+changing views or taking keyboard focus from the list. The inspected row is
+highlighted independently of its map checkbox. Details starts compact, with the
+classification path and an add/remove action; **More details** exposes pinned
+entries, individual colors, source provenance, representations, contributors, and
+uncovered branches. Inspecting a specific On map entry or a pinned map popup shows
+that exact representation's source/period context and removal action. The pane
+persists across view changes, can be collapsed or closed, and disappears entirely
+when no language is inspected. Closing it leaves the map selection intact.
+
+“Representation to add” uses the sources and period in Explore, representation,
+and geographic source picker. The add action shows the current context, with a
+Change link that opens its filters in Explore. Changing those choices leaves
+existing entries intact; identical representations are deduplicated. Show in
+classification reveals the inspected languoid's ancestry in Explore.
 
 Explore and On map retain their searches and list positions across view changes.
-“Geography to add” filters the areas available to browse and add; existing entries
+“Sources & period” filters the areas available to browse and add; existing entries
 keep their exact polygons and periods. To compare sources or periods, add a
 languoid, change those filters (or its source picker in Details), then add it again.
 Mapped-leaf actions replace entries within the chosen branches only for the same

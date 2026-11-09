@@ -1,5 +1,5 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { mapEntryDescription } from '../../domain/mapEntries'
 import { temporalQualityLabel } from '../../domain/temporal'
 import {
@@ -25,22 +25,14 @@ export const PinnedMapEntries = ({
   const remove = useSetAtom(removeMapEntryAtom)
   const setColor = useSetAtom(setMapEntryColorAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
-  const rootRef = useRef<HTMLDivElement>(null)
   const selected = useMemo(
     () => entries.filter((entry) => entry.languageId === languageId),
     [entries, languageId],
   )
-  useEffect(() => {
-    const card = [
-      ...(rootRef.current?.querySelectorAll<HTMLElement>('[data-entry-id]') ?? []),
-    ].find((element) => element.dataset.entryId === focusedEntryId)
-    card?.focus({ preventScroll: true })
-    card?.scrollIntoView({ block: 'nearest' })
-  }, [focusedEntryId])
   if (!selected.length) return null
   const language = data.languageById.get(languageId)
   return (
-    <div ref={rootRef} className="pinned-map-entries">
+    <div className="pinned-map-entries">
       <h4>On map ({selected.length})</h4>
       <p>
         Each entry keeps its source polygons and period. Color overrides apply only to that entry.
@@ -51,6 +43,7 @@ export const PinnedMapEntries = ({
           <article
             key={entry.id}
             data-entry-id={entry.id}
+            data-focused={entry.id === focusedEntryId}
             className="map-entry-card"
             tabIndex={-1}
             aria-label={`${language?.name}, ${description}`}

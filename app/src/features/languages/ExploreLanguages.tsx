@@ -43,6 +43,7 @@ import {
   openLanguageDetailsAtom,
   revealLanguageIdAtom,
 } from '../../state/languageControls'
+import { GeographyFilters } from './GeographyFilters'
 
 interface LanguageRowProps {
   readonly row: HierarchyRow
@@ -71,6 +72,7 @@ const LanguageRow = ({
   const availability = useAtomValue(geographyAvailabilityAtom)
   const colors = useAtomValue(languageColorsAtom)
   const modes = useAtomValue(areaModesAtom)
+  const panel = useAtomValue(languagePanelAtom)
   const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
   const available = availability.get(language.id)
   if (!available) return null
@@ -99,6 +101,7 @@ const LanguageRow = ({
       tabIndex={active ? 0 : -1}
       data-tree-key={row.key}
       data-language-id={language.id}
+      data-inspected={panel.detailId === language.id}
       className={`language-row${active ? ' language-row--active' : ''}${variants.length ? '' : ' language-row--unavailable'}`}
       style={{ paddingLeft: `${4 + row.depth * 14}px`, minWidth: `${280 + row.depth * 14}px` }}
       onFocus={onFocus}
@@ -126,19 +129,19 @@ const LanguageRow = ({
       <button
         type="button"
         aria-label={`Details for ${language.name}`}
+        aria-current={panel.detailId === language.id ? 'true' : undefined}
         tabIndex={active ? 0 : -1}
         onClick={(event) => {
           event.stopPropagation()
           onDetails()
         }}
         className="language-row__identity"
-        title={[`${language.name} · ${language.id}`, context].filter(Boolean).join('\n')}
+        title={[`${language.name} · ${language.level} · ${language.id}`, context]
+          .filter(Boolean)
+          .join('\n')}
       >
         <span className="language-row__name">
           <span className="language-row__label">{language.name}</span>
-          <small className={`language-row__level language-row__level--${language.level}`}>
-            {language.level}
-          </small>
           {language.classification.kind === 'source' && (
             <small
               className="language-row__children"
@@ -348,20 +351,7 @@ export const ExploreLanguages = () => {
   }, [panel.view, revealId, data, hierarchy, expandedKeys, setQuery, setScope, setRevealId])
   return (
     <div className="explore-view">
-      <label className="search-field">
-        <span className="visually-hidden">Search families, languages and dialects</span>
-        <input
-          type="search"
-          value={query}
-          placeholder="Name, alternative name, ISO or catalog ID…"
-          onChange={(event) => {
-            setQuery(event.currentTarget.value)
-            pendingFocus.current = null
-            setFocusedKey(null)
-            virtualizer.scrollToOffset(0)
-          }}
-        />
-      </label>
+      <GeographyFilters />
       <label className="finder-scope">
         <span>Search area</span>
         <select
@@ -376,6 +366,20 @@ export const ExploreLanguages = () => {
           <option value="world">Whole world</option>
           <option value="viewport">Current map ({viewportIds.length})</option>
         </select>
+      </label>
+      <label className="search-field">
+        <span className="visually-hidden">Search families, languages and dialects</span>
+        <input
+          type="search"
+          value={query}
+          placeholder="Name, alternative name, ISO or catalog ID…"
+          onChange={(event) => {
+            setQuery(event.currentTarget.value)
+            pendingFocus.current = null
+            setFocusedKey(null)
+            virtualizer.scrollToOffset(0)
+          }}
+        />
       </label>
       <div className="finder-actions">
         <p aria-live="polite">

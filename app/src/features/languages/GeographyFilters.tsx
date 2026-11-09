@@ -7,6 +7,7 @@ import type {
 } from '../../domain/atlas'
 import { isTemporalViewSelection, TEMPORAL_VIEWS, temporalView } from '../../domain/temporal'
 import { atlasDataAtom, geographyDatasetFilterAtom, temporalViewAtom } from '../../state/atlasState'
+import { geographyFiltersRequestedAtom } from '../../state/languageControls'
 
 interface GeographySourceFilterProps {
   readonly data: AtlasData
@@ -122,24 +123,44 @@ const GeographySourceFilter = ({
   )
 }
 
-export const GeographyFilters = () => {
+export const GeographyFilterSummary = () => {
   const data = useAtomValue(atlasDataAtom)
-  const [datasetFilter, setDatasetFilter] = useAtom(geographyDatasetFilterAtom)
-  const [period, setPeriod] = useAtom(temporalViewAtom)
+  const datasetFilter = useAtomValue(geographyDatasetFilterAtom)
+  const period = useAtomValue(temporalViewAtom)
   const summary =
     datasetFilter === 'all'
       ? 'All sources'
       : datasetFilter.length === 0
         ? 'No sources'
         : datasetFilter.length === 1
-          ? data.datasets.find((dataset) => dataset.id === datasetFilter[0])?.shortName
+          ? (data.datasets.find((dataset) => dataset.id === datasetFilter[0])?.shortName ??
+            '1 source')
           : `${datasetFilter.length} sources`
   return (
-    <details className="finder-options">
+    <>
+      {summary} · {temporalView(period).shortLabel}
+    </>
+  )
+}
+
+export const GeographyFilters = () => {
+  const data = useAtomValue(atlasDataAtom)
+  const [datasetFilter, setDatasetFilter] = useAtom(geographyDatasetFilterAtom)
+  const [period, setPeriod] = useAtom(temporalViewAtom)
+  const [requested, setRequested] = useAtom(geographyFiltersRequestedAtom)
+  const rootRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (!requested || !rootRef.current) return
+    rootRef.current.open = true
+    rootRef.current.querySelector('summary')?.focus({ preventScroll: true })
+    setRequested(false)
+  }, [requested, setRequested])
+  return (
+    <details className="finder-options" ref={rootRef}>
       <summary>
-        Geography to add{' '}
+        Sources &amp; period{' '}
         <span>
-          {summary} · {temporalView(period).shortLabel}
+          <GeographyFilterSummary />
         </span>
       </summary>
       <div className="finder-filters">

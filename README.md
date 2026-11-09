@@ -237,7 +237,9 @@ Search, hierarchy, availability and source labels remain eager metadata. The
 browser uses `geometry-index.json`; full source feature identifiers load per
 dataset/period only when **Original source records** is expanded in Details.
 
-Map source/period/viewport controls are under "Map filters". Viewport scope limits
+Source and period controls live under "Sources & period" in Explore, alongside
+search-area scope. They affect geography available to browse and add; existing
+map entries retain their pinned sources and periods. Viewport scope limits
 starting results, including aggregates with contributing areas in view; expanded
 branches still show their full classification children.
 Each row and map inspection identifies the classification level.
