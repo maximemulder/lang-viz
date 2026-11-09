@@ -29,7 +29,7 @@ export const probeInspection = (
   const selection = parseOverlapSelection(selectionKey)
   const point = map.project(center)
   const queryStart = performance.now()
-  const variantIds = visibleVariantIds(map, point, selection.refinements)
+  const variantIds = visibleVariantIds(map, point, selection.refinements, selection.variantGroups)
   const queryMs = performance.now() - queryStart
   const sourceIds = selection.variantGroups
     ? Object.entries(selection.variantGroups)

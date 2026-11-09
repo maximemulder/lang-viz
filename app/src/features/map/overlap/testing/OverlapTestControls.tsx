@@ -18,6 +18,12 @@ import {
   showLanguagesAtom,
   temporalViewAtom,
 } from '../../../../state/atlasState'
+import { languageMapNavigationAtom } from '../../../../state/languageControls'
+import {
+  searchColoringAtom,
+  searchCoverageAtom,
+  searchSelectionAtom,
+} from '../../../../state/searchSelection'
 import { installOverlapTestApi } from './testBridge'
 
 /** Browser fixtures and observers load only with the explicit overlap-test flag. */
@@ -43,10 +49,14 @@ export default function OverlapTestControls({
         map,
         (options) => {
           store.set(clearMapSelectionAtom)
-          store.set(areaModesAtom, {})
+          store.set(languageMapNavigationAtom, null)
+          store.set(searchSelectionAtom, [])
+          store.set(searchCoverageAtom, 'branch')
+          store.set(searchColoringAtom, 'hierarchy')
+          store.set(areaModesAtom, options.areaModes ?? {})
           store.set(geometryOverridesAtom, {})
-          setPeriod('contemporary')
-          setDatasetFilter(['asher2007world'])
+          setPeriod(options.period ?? 'contemporary')
+          setDatasetFilter(options.sources ?? ['asher2007world'])
           setMode('hatching')
           showLanguages(
             options.languageIds === 'all'

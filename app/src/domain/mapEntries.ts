@@ -12,6 +12,7 @@ import type {
   LanguageId,
   TemporalViewSelection,
 } from './atlas.ts'
+import type { MapGroup } from './mapGroups.ts'
 import { temporalQualityLabel } from './temporal.ts'
 
 export interface GeographyContext {
@@ -31,6 +32,7 @@ export interface MapEntry {
   readonly colorOverride: string | null
   /** Entries added together refine ancestors in this branch and pinned context. */
   readonly branchRootId?: LanguageId | undefined
+  readonly group?: MapGroup
 }
 
 export const geographyContextKey = ({ sources, period }: GeographyContext) =>
@@ -39,8 +41,13 @@ export const geographyContextKey = ({ sources, period }: GeographyContext) =>
 const representationKey = (languageId: string, mode: AreaMode, ids: readonly string[]) =>
   JSON.stringify([languageId, mode, [...new Set(ids)].sort()])
 
-export const mapEntryKey = (entry: MapEntry) =>
+export const mapEntryGeometryKey = (entry: MapEntry) =>
   representationKey(entry.languageId, entry.mode, entry.variantIds)
+
+export const mapEntryKey = (entry: MapEntry) =>
+  entry.group
+    ? JSON.stringify([entry.group.id, mapEntryGeometryKey(entry)])
+    : mapEntryGeometryKey(entry)
 
 export const draftRepresentationKey = (
   languageId: LanguageId,
@@ -139,6 +146,7 @@ export const resolveMapEntries = (
   entries: readonly MapEntry[],
   data: AtlasData,
   colors: ReadonlyMap<LanguageId, string>,
+  groupPalettes: ReadonlyMap<string, ReadonlyMap<LanguageId, string>> = new Map(),
 ): readonly MapArea[] => {
   const areas: MapArea[] = entries.flatMap((entry) => {
     const variants = entry.variantIds.flatMap((id) => {
@@ -147,13 +155,18 @@ export const resolveMapEntries = (
     })
     // Never silently display a partial pinned representation after a catalog change.
     if (!variants.length || variants.length !== entry.variantIds.length) return []
+    const palette = entry.group ? (groupPalettes.get(entry.group.id) ?? colors) : colors
+    const automatic =
+      entry.group?.coloring === 'uniform'
+        ? (entry.group.color ?? palette.get(entry.group.rootId))
+        : palette.get(entry.languageId)
     return [
       {
         id: entry.id,
         languageId: entry.languageId,
         mode: entry.mode,
         variants,
-        color: entry.colorOverride ?? colors.get(entry.languageId) ?? '#777777',
+        color: entry.colorOverride ?? automatic ?? '#777777',
         ...(entry.branchRootId ? { branchRootId: entry.branchRootId } : {}),
       },
     ]
@@ -161,7 +174,7 @@ export const resolveMapEntries = (
   // An ancestry index per intentional branch view avoids quadratic pair scans.
   const branches = new Map<string, Map<string, MapArea[]>>()
   const groupFor = (entry: MapEntry) =>
-    JSON.stringify([entry.branchRootId, geographyContextKey(entry.context)])
+    JSON.stringify([entry.group?.id, entry.branchRootId, geographyContextKey(entry.context)])
   const entryById = new Map(entries.map((entry) => [entry.id, entry]))
   for (const area of areas) {
     const entry = entryById.get(area.id)

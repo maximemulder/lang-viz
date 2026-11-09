@@ -7,13 +7,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import {
-  areaMode,
-  areaStatus,
-  areaVariants,
-  isAreaAvailable,
-  mappedBranchForLanguages,
-} from '../../domain/aggregation'
 import { searchCatalog } from '../../domain/catalog'
 import { prepareExploreResults } from '../../domain/exploration'
 import {
@@ -21,20 +14,14 @@ import {
   type HierarchyRow,
   languageAncestors,
 } from '../../domain/hierarchy'
+import { hasCoverage } from '../../domain/mapGroups'
 import {
-  areaModesAtom,
   atlasDataAtom,
   finderScopeAtom,
   geographyAvailabilityAtom,
-  hideLanguagesAtom,
-  languageColorsAtom,
   languageHierarchyAtom,
   languageQueryAtom,
   mapEntriesAtom,
-  selectedDraftLanguageIdsAtom,
-  showBranchAtom,
-  showLanguagesAtom,
-  toggleVisibleLanguageAtom,
   viewportLanguageIdsAtom,
 } from '../../state/atlasState'
 
@@ -43,7 +30,16 @@ import {
   openLanguageDetailsAtom,
   revealLanguageIdAtom,
 } from '../../state/languageControls'
+import {
+  addSearchSelectionToMapAtom,
+  searchColoringAtom,
+  searchCoverageAtom,
+  searchSelectionAtom,
+  selectSearchResultsAtom,
+  toggleSearchSelectionAtom,
+} from '../../state/searchSelection'
 import { GeographyFilters } from './GeographyFilters'
+import { useLanguagePreview } from './LanguagePreview'
 
 interface LanguageRowProps {
   readonly row: HierarchyRow
@@ -67,42 +63,44 @@ const LanguageRow = ({
   onKeyDown,
 }: LanguageRowProps) => {
   const { language } = row
-  const visibleIds = useAtomValue(selectedDraftLanguageIdsAtom)
+  const selectedIds = useAtomValue(searchSelectionAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
-  const colors = useAtomValue(languageColorsAtom)
-  const modes = useAtomValue(areaModesAtom)
+  const coverage = useAtomValue(searchCoverageAtom)
   const panel = useAtomValue(languagePanelAtom)
-  const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
+  const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
+  const preview = useLanguagePreview({ languageId: language.id }, panel.view === 'explore')
   const available = availability.get(language.id)
   if (!available) return null
-  const mode = areaMode(available, modes[language.id])
-  const variants = areaVariants(available, mode)
-  const isVisible = visibleIds.includes(language.id)
+  const usable = hasCoverage(available, coverage)
+  const isSelected = selectedIds.includes(language.id)
   const selectedCount = entries.filter(({ languageId }) => languageId === language.id).length
-  const status = variants.length ? areaStatus(available, mode) : 'No area'
-  const availabilityLabel = variants.length
-    ? `${status}${mode === 'descendants' ? `, ${variants.length} contributors, ${available.uncoveredBranches.length} uncovered branches` : ''}`
+  const status = usable ? 'Area available' : available.hasAnyAreas ? 'Filtered out' : 'No areas'
+  const availabilityLabel = usable
+    ? coverage === 'branch'
+      ? 'Areas available for this entry and its descendants'
+      : 'Own area available'
     : available.hasAnyAreas
-      ? 'No areas for this representation with the selected sources / period'
+      ? 'No areas for this coverage with the selected sources / period'
       : 'No areas available, including descendants'
 
   return (
     <div
+      {...preview}
       role="treeitem"
       aria-label={`${language.name}, ${language.level}, ${availabilityLabel}`}
-      data-area-mode={mode}
+      data-area-mode={coverage}
       data-area-status={status}
       aria-level={row.depth + 1}
       aria-posinset={row.position}
       aria-setsize={row.siblingCount}
       aria-expanded={row.childCount ? expanded : undefined}
-      aria-checked={isVisible}
+      aria-checked={isSelected}
       tabIndex={active ? 0 : -1}
       data-tree-key={row.key}
       data-language-id={language.id}
       data-inspected={panel.detailId === language.id}
-      className={`language-row${active ? ' language-row--active' : ''}${variants.length ? '' : ' language-row--unavailable'}`}
+      className={`language-row${active ? ' language-row--active' : ''}${usable ? '' : ' language-row--unavailable'}`}
       style={{ paddingLeft: `${4 + row.depth * 14}px`, minWidth: `${280 + row.depth * 14}px` }}
       onFocus={onFocus}
       onClick={(event) => {
@@ -157,21 +155,22 @@ const LanguageRow = ({
         </span>
         {context && <small className="language-row__context">{context}</small>}
       </button>
-      <span
-        className={`language-row__area-status${variants.length ? '' : ' language-row__area-status--unavailable'}`}
-        title={`${availabilityLabel}. This checkbox applies to the current representation only.`}
-      >
-        {status}
-      </span>
+      {!usable && (
+        <span
+          className="language-row__area-status language-row__area-status--unavailable"
+          title={availabilityLabel}
+        >
+          {status}
+        </span>
+      )}
       <input
         type="checkbox"
         tabIndex={-1}
-        aria-label={`Show ${language.name} on map`}
-        title={availabilityLabel}
-        checked={isVisible}
-        disabled={!variants.length && !isVisible}
-        style={{ accentColor: colors.get(language.id) }}
-        onChange={() => toggleVisible(language.id)}
+        aria-label={`Select ${language.name}`}
+        title={`${availabilityLabel}. Select for a bulk action; the map stays as it is until Add to map.`}
+        checked={isSelected}
+        disabled={!usable && !isSelected}
+        onChange={() => toggleSelected(language.id)}
       />
     </div>
   )
@@ -180,20 +179,21 @@ const LanguageRow = ({
 export const ExploreLanguages = () => {
   const data = useAtomValue(atlasDataAtom)
   const viewportIds = useAtomValue(viewportLanguageIdsAtom)
-  const visibleIds = useAtomValue(selectedDraftLanguageIdsAtom)
+  const [selectedIds, setSelectedIds] = useAtom(searchSelectionAtom)
   const [query, setQuery] = useAtom(languageQueryAtom)
   const [scope, setScope] = useAtom(finderScopeAtom)
-  const showLanguages = useSetAtom(showLanguagesAtom)
-  const showBranch = useSetAtom(showBranchAtom)
-  const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
-  const hideLanguages = useSetAtom(hideLanguagesAtom)
+  const selectResults = useSetAtom(selectSearchResultsAtom)
+  const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
+  const addSelection = useSetAtom(addSearchSelectionToMapAtom)
+  const [coverage, setCoverage] = useAtom(searchCoverageAtom)
+  const [coloring, setColoring] = useAtom(searchColoringAtom)
+  const [feedback, setFeedback] = useState<string | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const pendingFocus = useRef<string | null>(null)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
-  const modes = useAtomValue(areaModesAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const [revealId, setRevealId] = useAtom(revealLanguageIdAtom)
   const panel = useAtomValue(languagePanelAtom)
@@ -215,18 +215,10 @@ export const ExploreLanguages = () => {
         browseRoots: isBrowsingRoots,
         viewportLanguageIds: searchViewportIds,
         availability,
-        modes,
+        modes: {},
+        coverage,
       }),
-    [matches, hierarchy, isBrowsingRoots, searchViewportIds, availability, modes],
-  )
-  const filteredBranch = useMemo(
-    () =>
-      mappedBranchForLanguages(
-        roots.map(({ id }) => id),
-        hierarchy,
-        availability,
-      ),
-    [roots, hierarchy, availability],
+    [matches, hierarchy, isBrowsingRoots, searchViewportIds, availability, coverage],
   )
   const rows = useMemo(
     () => flattenLanguageHierarchy(hierarchy, roots, expandedKeys),
@@ -262,14 +254,14 @@ export const ExploreLanguages = () => {
     }
   }, [rows, virtualRows, virtualizer, panel.view])
 
-  const visibleIdSet = new Set(visibleIds)
+  const selectedIdSet = new Set(selectedIds)
   const areAllFilteredSelected =
-    showableIds.length > 0 && showableIds.every((id) => visibleIdSet.has(id))
-  const toggleFilteredLanguages = () => {
-    if (areAllFilteredSelected) {
-      hideLanguages(showableIds)
-    } else showLanguages(showableIds)
-  }
+    showableIds.length > 0 && showableIds.every((id) => selectedIdSet.has(id))
+  const resultIds = new Set(roots.map(({ id }) => id))
+  const selectedInResults = selectedIds.filter((id) => resultIds.has(id)).length
+  const mappableSelected = selectedIds.filter((id) =>
+    hasCoverage(availability.get(id), coverage),
+  ).length
   const toggleExpanded = (key: string) =>
     setExpandedKeys((current) => {
       const next = new Set(current)
@@ -315,10 +307,10 @@ export const ExploreLanguages = () => {
         break
       case ' ':
         if (
-          visibleIdSet.has(row.language.id) ||
-          isAreaAvailable(availability.get(row.language.id), modes[row.language.id])
+          selectedIdSet.has(row.language.id) ||
+          hasCoverage(availability.get(row.language.id), coverage)
         )
-          toggleVisible(row.language.id)
+          toggleSelected(row.language.id)
         break
       case 'Enter':
         openDetails(row.language.id)
@@ -351,64 +343,147 @@ export const ExploreLanguages = () => {
   }, [panel.view, revealId, data, hierarchy, expandedKeys, setQuery, setScope, setRevealId])
   return (
     <div className="explore-view">
-      <GeographyFilters />
-      <label className="finder-scope">
-        <span>Search area</span>
-        <select
-          value={scope}
-          onChange={(event) => {
-            setScope(event.currentTarget.value === 'viewport' ? 'viewport' : 'world')
-            pendingFocus.current = null
-            setFocusedKey(null)
-            virtualizer.scrollToOffset(0)
-          }}
-        >
-          <option value="world">Whole world</option>
-          <option value="viewport">Current map ({viewportIds.length})</option>
-        </select>
-      </label>
-      <label className="search-field">
-        <span className="visually-hidden">Search families, languages and dialects</span>
-        <input
-          type="search"
-          value={query}
-          placeholder="Name, alternative name, ISO or catalog ID…"
-          onChange={(event) => {
-            setQuery(event.currentTarget.value)
-            pendingFocus.current = null
-            setFocusedKey(null)
-            virtualizer.scrollToOffset(0)
-          }}
-        />
-      </label>
-      <div className="finder-actions">
-        <p aria-live="polite">
-          <strong>{roots.length.toLocaleString()}</strong>{' '}
-          {isBrowsingRoots ? 'roots' : roots.length === 1 ? 'match' : 'matches'} ·{' '}
-          {showableIds.length.toLocaleString()} mappable
-          <small>
-            {isBrowsingRoots
-              ? `${data.languages.length.toLocaleString()} entries in the classification`
-              : 'Expand a match to browse all its children'}
-          </small>
-        </p>
-        <div>
-          <button
-            type="button"
-            onClick={toggleFilteredLanguages}
-            disabled={!showableIds.length}
-            title="Show these starting entries using their chosen representations. Descendant areas remain one selection."
+      <div className="explore-controls">
+        <GeographyFilters />
+        <label className="finder-scope">
+          <span>Search area</span>
+          <select
+            value={scope}
+            onChange={(event) => {
+              setScope(event.currentTarget.value === 'viewport' ? 'viewport' : 'world')
+              pendingFocus.current = null
+              setFocusedKey(null)
+              virtualizer.scrollToOffset(0)
+            }}
           >
-            {areAllFilteredSelected ? 'Deselect' : 'Select'} {isBrowsingRoots ? 'roots' : 'matches'}
-          </button>
-          <button
-            type="button"
-            disabled={!filteredBranch.languageIds.length}
-            onClick={() => showBranch(roots.map(({ id }) => id))}
-            title={`Show mapped entries throughout these ${isBrowsingRoots ? 'branches' : 'matching branches'}. Descendants refine ancestor colors where they overlap; broader coverage remains. Replaces entries from the same source/period context; keeps other comparisons.`}
-          >
-            Show branches on map ({filteredBranch.languageIds.length.toLocaleString()})
-          </button>
+            <option value="world">Whole world</option>
+            <option value="viewport">Current map ({viewportIds.length})</option>
+          </select>
+        </label>
+        <label className="search-field">
+          <span className="visually-hidden">Search families, languages and dialects</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="Name, alternative name, ISO or catalog ID…"
+            onChange={(event) => {
+              setQuery(event.currentTarget.value)
+              pendingFocus.current = null
+              setFocusedKey(null)
+              virtualizer.scrollToOffset(0)
+            }}
+          />
+        </label>
+        <div className="finder-actions">
+          <p aria-live="polite">
+            <strong>{roots.length.toLocaleString()}</strong>{' '}
+            {isBrowsingRoots ? 'roots' : roots.length === 1 ? 'match' : 'matches'} ·{' '}
+            {showableIds.length.toLocaleString()} mappable
+            <small>
+              {isBrowsingRoots
+                ? `${data.languages.length.toLocaleString()} entries in the classification`
+                : 'Expand a match to browse all its children'}
+            </small>
+          </p>
+          <div>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => {
+                selectResults(showableIds)
+                setFeedback(null)
+              }}
+              disabled={!showableIds.length || areAllFilteredSelected}
+              title="Select all mappable results, including those beyond the visible list. Expanded children are selected separately."
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={!selectedIds.length}
+              onClick={() => {
+                setSelectedIds([])
+                setFeedback(null)
+              }}
+            >
+              Clear selection
+            </button>
+          </div>
+          {selectedIds.length > 0 && (
+            <div className="finder-bulk">
+              <p aria-live="polite">
+                <strong>{selectedIds.length.toLocaleString()} selected</strong> ·{' '}
+                {selectedInResults.toLocaleString()} in these results
+              </p>
+              <div className="finder-bulk__actions">
+                <label>
+                  Coloring
+                  <select
+                    aria-label="Coloring for selected entries"
+                    value={coloring}
+                    onChange={(event) => {
+                      setColoring(event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy')
+                      setFeedback(null)
+                    }}
+                  >
+                    <option value="hierarchy">Color by hierarchy</option>
+                    <option value="uniform">One color per group</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="finder-add"
+                  disabled={!mappableSelected}
+                  onClick={() => {
+                    const result = addSelection()
+                    setFeedback(
+                      result.addedAreas
+                        ? `Added ${result.addedAreas.toLocaleString()} areas${result.addedGroups ? ` in ${result.addedGroups.toLocaleString()} new groups` : ''}.${result.unavailable ? ` ${result.unavailable} selected entries have no area with these settings.` : ''}`
+                        : 'These groups are already on the map.',
+                    )
+                  }}
+                >
+                  Add to map
+                </button>
+              </div>
+              <details className="finder-bulk__coverage">
+                <summary>
+                  Coverage
+                  {coverage === 'own' ? ' · Only this entry’s area' : ' · Entry and descendants'}
+                </summary>
+                <label>
+                  Include
+                  <select
+                    aria-label="Coverage for selected entries"
+                    value={coverage}
+                    onChange={(event) => {
+                      setCoverage(event.currentTarget.value === 'own' ? 'own' : 'branch')
+                      setFeedback(null)
+                    }}
+                  >
+                    <option value="branch">This entry and its descendants</option>
+                    <option value="own">Only this entry’s area</option>
+                  </select>
+                </label>
+                <p>
+                  Descendants take precedence where they overlap ancestors; broader coverage remains
+                  elsewhere. Search area filters results and does not clip added areas.
+                </p>
+              </details>
+              {mappableSelected < selectedIds.length && (
+                <p>
+                  {selectedIds.length - mappableSelected} selected entries have no area with the
+                  current sources, period, and coverage.
+                </p>
+              )}
+            </div>
+          )}
+          {feedback && (
+            <p role="status" className="finder-feedback">
+              {feedback}
+            </p>
+          )}
         </div>
       </div>
       <div

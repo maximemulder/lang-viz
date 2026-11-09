@@ -126,14 +126,7 @@ def lifecycle(browser, output):
 
     # An inspected aggregate must outline all contributing source variants.
     center = [40.8144288679004, 43.27592703258703]
-    browser.js("window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:5})", center)
-    search(browser, "abkh1242", "abkh1242")
-    open_details(browser)
-    browser.js(
-        "const select=document.querySelector('.finder-detail__mode select');select.value='descendants';select.dispatchEvent(new Event('change',{bubbles:true}))"
-    )
-    view(browser, "explore")
-    browser.js("document.querySelector('.language-row input').click()")
+    browser.js("window.overlapTest.configure({languageIds:['abkh1242'],areaModes:{abkh1242:'descendants'},center:arguments[0],zoom:5})", center)
     browser.settled(60, fail_on_error=True)
     ids = move(browser, center)
     assert len(ids) == 1 and ids[0].startswith("descendants:abkh1242:"), ids

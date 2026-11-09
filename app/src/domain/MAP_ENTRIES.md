@@ -15,7 +15,9 @@ or draft representation modes do not modify this snapshot. Own representations
 use their variant ID as the entry ID. Aggregate entries receive independent IDs
 which stay stable while selected and identify grouped overlap memberships.
 
-`mapEntryKey` compares languoid, mode, and the sorted set of variant IDs. Adding
+`mapEntryGeometryKey` compares languoid, mode, and the sorted set of variant IDs.
+Explicit groups also include their group ID in `mapEntryKey`. Legacy ungrouped APIs
+retain their original deduplication behavior. Adding
 identical geometry deduplicates even if reached through different filter contexts
 or contributor order. It preserves the existing entry ID, color, and original
 context. Own and descendant representations stay distinct even if they happen
@@ -28,80 +30,62 @@ such entries for inspection/removal. Contexts are source/period categories, not
 arbitrary historical instants; source period labels and proxy/mixed-period
 qualifications remain visible in Details and map popups.
 
+## Working selection and groups
+
+Explore checkboxes use `searchSelectionAtom`, independently of map entries. The
+`searchCoverageAtom` and `searchColoringAtom` configure the next Add to map.
+`addSearchSelectionToMapAtom` builds groups from all checked identities, skips and
+reports unavailable coverage, and leaves the working selection intact.
+
+`mapGroups.ts` builds pinned entries with a shared `MapGroup` descriptor: stable ID,
+selected root, coverage (`branch` or `own`), coloring (`hierarchy` or `uniform`), and
+optional base color. A branch includes all own polygons across the complete subtree,
+including ancestors, with overlapping requested roots normalized to the topmost root.
+Own coverage only pins each requested entry's own variant.
+
+`addMapGroupEntries` preserves all independent groups. Repeating a group with the
+same root, coverage, and geometry preserves identity, provenance, styles, and entry
+overrides. A partially removed group can be restored with the same styling. Changed
+source variants create independent comparison groups. Native variant IDs are retained
+when unique, preserving prepared-tile eligibility. A polygon already in another group
+gets an aliased entry ID for independent colors, inspection, and refinement.
+`mapEntryGeometryKey` identifies the underlying representation; `mapEntryKey` also
+includes explicit group identity. Legacy ungrouped APIs retain their original keys.
+
 ## State API
 
-The Jotai atoms in `state/atlasState.ts` expose:
+`state/atlasState.ts` exposes the canonical `mapEntriesAtom`, derived `mapGroupsAtom`,
+and resolved `selectedMapAreasAtom`. `removeMapEntryAtom` removes a constituent area;
+`removeMapGroupAtom` removes a complete group, including members hidden by a query.
+`clearMapSelectionAtom` clears the map independently of the working selection.
+`setMapGroupStyleAtom` changes coloring/base color; `setMapEntryColorAtom` overrides
+one area, with `null` restoring its group color. Custom hierarchy base colors create
+local semantic palettes without recoloring other source/period groups. Individual
+entry overrides take precedence. The ordinary palette is shared across automatic
+groups rather than copied per group.
 
-- `mapEntriesAtom`: canonical, serializable in-memory entries.
-- `selectedMapAreasAtom`: pinned geometry and resolved per-entry colors used by
-  rendering, overlap membership, and inspection.
-- `showLanguagesAtom` / `toggleVisibleLanguageAtom`: add or toggle the current
-  draft representations. `hideLanguagesAtom` removes only those representations.
-- `removeMapEntryAtom`: remove one entry by ID; `clearMapSelectionAtom`: clear all.
-- `setMapEntryColorAtom`: `{entryId, color}`; an opaque CSS color is normalized
-  before writing. `null` restores the languoid's color. Entry overrides take
-  precedence over the semantic/categorical palette and languoid overrides.
-- `visibleLanguageIdsAtom`: read-only unique languoid IDs for genealogy/palettes.
-- `selectedDraftLanguageIdsAtom`: languoids whose current draft matches an entry;
-  drives Explore checkboxes rather than collapsing all comparison entries.
-
-The existing `areaModesAtom`, `geometryOverridesAtom`, `temporalViewAtom`, and
-`geographyDatasetFilterAtom` now configure what to browse and add next. They are
-not settings on existing map entries. To change an entry's geometry, prepare
-and add the replacement, then remove the original.
-
-`showBranchAtom` captures every mapped entry's own geometry, color root, and
-`branchRootId`. This includes mapped ancestors. A branch root plus its pinned
-geography context identifies an intentional composition group. Descendants refine
-only ancestors in that group and temporal view; other entries remain comparisons.
-`replaceSubtreeMapEntries` replaces entries in the visited subtree only when
-their source/period filter context equals the current context. Source order and
-duplicates are ignored in this comparison. An `all` context remains distinct
-from a specific source/period context; broad browsing must not erase narrower
-comparisons. Exact replacements retain their IDs/colors and acquire the new branch
-and color root only within the replaced context. Other comparison contexts remain selected.
-
-`branchColorRootsAtom` derives roots from surviving entries, so removing the
-last entry from a group also releases that inferred root. Explicit palette
-configuration remains independent. Entries and color configuration currently
-live until reload; persistence/import/export are not implemented.
+The existing `showLanguagesAtom`, `toggleVisibleLanguageAtom`, `hideLanguagesAtom`,
+`showBranchAtom`, and `selectedDraftLanguageIdsAtom` remain compatibility APIs for
+fixtures and offline preparation. Their own/descendant aggregate modes are still
+supported by the rendering model; Explore's primary UI uses groups instead.
 
 ## Rendering
 
-`resolveMapEntries` resolves selected ancestor relationships through a per-group
-classification index. These relationships are part of coverage cache identity,
-independent of colors. The worker processes descendants first and subtracts their
-combined footprint from ancestors. It preserves the union of available coverage,
-including descendants outside ancestor polygons. Siblings and other groups retain
-their overlap. Removing a descendant restores its ancestor automatically.
-Fully covered ancestors remain pinned and inspectable in Details/On map.
+`resolveMapEntries` resolves ancestor relationships within each intentional group,
+pinned context, and actual temporal view. Other groups remain comparisons. The
+worker subtracts descendant footprints from ancestors while preserving the complete
+union, holes, outlying descendants, and sibling overlaps. Removing a child restores
+ancestor fill. Fully covered ancestors remain pinned and inspectable.
 
-Original and clipped fallback fills sort ancestors before descendants. Fallback
-inspection applies the same refinement rule, while stripe/blend coverage already
-contains resolved contributors. Both modes therefore use the same branch policy.
+Memberships and refinement enter geometry cache identity; colors never do. Aliased
+own-area comparisons also request composition, even for a single source polygon.
+Source/fallback hit targets expand to group memberships before refinement, while
+computed coverage retains its exact surviving owners. Map popups and details therefore
+inspect the precise group entry rather than accidentally restoring hidden ancestors
+from another group.
 
-Own source polygons and aggregate contributor groups feed the existing overlap
-pipeline. Aggregate IDs distinguish snapshots of the same family, including
-when one source polygon belongs to several aggregates or a selected child.
-Inspection resolves these entry memberships and opens the corresponding pinned
-card in Details. Search/viewport hit targets still use browsing geography.
-
-Colors never enter geometry selection keys. Per-entry recoloring updates solid
-fills and stripe textures without recomputing coverage, just like languoid
-palette edits. Separate entries inherit the same languoid color initially;
-the entry color controls let the user distinguish sources/periods explicitly.
-
-## Costs and current limits
-
-Entries store variant IDs and provenance rather than copies of polygon coordinates.
-Resolving them costs O(total pinned variant references) when entries or colors
-change. Browsing filters do not invalidate selected geometry or coverage caches;
-ordinary search/availability preparation remains separate.
-
-Aggregate comparisons still use the renderer's existing geometry budgets and
-publication deadline. Broad views of large families can reach these limits (for
-example, a Sino-Tibetan source comparison with over 200 contributing variants).
-The renderer reports its normal coverage error and preserves available fills.
-This selection refactor does not increase those budgets or replace the geometry
-engine. Zoomed regional comparisons and individual source variants have dedicated
-browser coverage.
+Full source/period branch views with native entry IDs remain eligible for prepared
+branch tiles. Independent groups sharing a polygon can use prepared coverage parts
+or the existing bounded live engine. Existing geometry budgets, publication deadlines,
+and fallback behavior remain unchanged. Group/entry state currently lasts until reload;
+persistence and import/export are not implemented.

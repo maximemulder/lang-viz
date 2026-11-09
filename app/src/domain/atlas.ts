@@ -88,6 +88,7 @@ export interface AtlasManifest {
   readonly vectorLayer: string
   readonly archive: string
   readonly geometryIndex?: string
+  readonly geometryBounds?: string
   readonly geometryProvenance?: string
   readonly geometryProfiles?: readonly {
     readonly datasetId: GeographyDatasetId

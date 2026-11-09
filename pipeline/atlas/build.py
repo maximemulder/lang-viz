@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import shutil
 import subprocess
 import warnings
@@ -453,6 +454,7 @@ def normalize_geometries(
                         "color": color,
                         "temporalCoverage": coverage,
                         "sourceYear": source.source_year,
+                        "bounds": geometry_bounds(features),
                     }
                 )
                 variants_by_languoid[languoid_id].append(variant_id)
@@ -479,6 +481,44 @@ def normalize_geometries(
                     output.write("\n")
                     feature_id += 1
     return variants, variants_by_languoid
+
+
+def geometry_bounds(features: list[dict[str, Any]]) -> list[float]:
+    """Fit actual source footprints, using a short longitude arc across the dateline."""
+    longitudes: set[float] = set()
+    south, north = 90.0, -90.0
+
+    def coordinates(value):
+        nonlocal south, north
+        if value and isinstance(value[0], (int, float)):
+            lon, lat = value[:2]
+            if math.isfinite(lon) and math.isfinite(lat):
+                longitudes.add(lon % 360)
+                south, north = min(south, lat), max(north, lat)
+        else:
+            for child in value:
+                coordinates(child)
+
+    def geometry(value):
+        if value.get("type") == "GeometryCollection":
+            for child in value["geometries"]:
+                geometry(child)
+        else:
+            coordinates(value.get("coordinates", []))
+
+    for feature in features:
+        if feature.get("geometry"):
+            geometry(feature["geometry"])
+    if not longitudes:
+        raise ValueError("Cannot locate an empty source geometry")
+    ordered = sorted(longitudes)
+    gaps = [
+        ((ordered[(i + 1) % len(ordered)] - value) % 360, ordered[(i + 1) % len(ordered)])
+        for i, value in enumerate(ordered)
+    ]
+    gap, start = max(gaps) if len(ordered) > 1 else (360, ordered[0])
+    west = (start + 180) % 360 - 180
+    return [round(v, 6) for v in (west, south, west + 360 - gap, north)]
 
 
 def find_tippecanoe() -> str | None:
@@ -627,6 +667,9 @@ def build(skip_tiles: bool) -> None:
 
     languages.sort(key=lambda language: (str(language["name"]).casefold(), language["id"]))
     write_json(PUBLIC_DATA_DIR / "languages.json", languages)
+    write_json(
+        PUBLIC_DATA_DIR / "geometry-bounds.json", {v["id"]: v.pop("bounds") for v in variants}
+    )
     write_json(PUBLIC_DATA_DIR / "geometry-variants.json", variants)
     # Runtime discovery needs availability and source labels, not thousands of
     # original feature identifiers. Keep that audit detail behind a lazy request.
@@ -662,6 +705,7 @@ def build(skip_tiles: bool) -> None:
             "vectorLayer": "language_areas",
             "archive": "language-areas.pmtiles",
             "geometryIndex": "geometry-index.json",
+            "geometryBounds": "geometry-bounds.json",
             "geometryProvenance": "provenance/",
         },
     )

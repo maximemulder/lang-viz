@@ -33,6 +33,7 @@ import {
   replaceSubtreeMapEntries,
   resolveMapEntries,
 } from '../domain/mapEntries'
+import { type GroupColoring, groupMapEntries, type MapGroup, mapGroupId } from '../domain/mapGroups'
 
 export const atlasDataAtom = atom(async () => loadAtlasData())
 
@@ -137,9 +138,53 @@ export const geographyAvailabilityAtom = atom((get) => {
       )
     : new Map<string, GeographyAvailability>()
 })
+export const mapGroupsAtom = atom((get) => groupMapEntries(get(mapEntriesAtom)))
+const mapGroupStylesAtom = selectAtom(
+  atom((get) => get(mapGroupsAtom).map(({ group }) => group)),
+  (groups) => groups,
+  (a, b) =>
+    a.length === b.length &&
+    a.every((group, i) => {
+      const other = b[i]
+      return (
+        other &&
+        group.id === other.id &&
+        group.coloring === other.coloring &&
+        group.color === other.color
+      )
+    }),
+)
+const mapGroupPalettesAtom = atom((get) => {
+  const groups = get(mapGroupStylesAtom)
+  const config = get(colorConfigurationAtom)
+  const overrides = Object.entries(config.overrides)
+  const colors = get(semanticPaletteAtom).colors
+  const automatic = overrides.length ? new Map([...colors, ...overrides]) : colors
+  const result = new Map<string, ReadonlyMap<string, string>>()
+  for (const group of groups) {
+    const palette =
+      group.color && group.coloring === 'hierarchy'
+        ? buildSemanticPalette(get(languageHierarchyAtom), get(colorTopologyAtom), [group.rootId], {
+            [group.rootId]: group.color,
+          }).colors
+        : automatic
+    result.set(
+      group.id,
+      palette === automatic || !overrides.length ? palette : new Map([...palette, ...overrides]),
+    )
+  }
+  return result
+})
 export const selectedMapAreasAtom = atom((get) => {
   const data = get(resolvedAtlasDataAtom)
-  return data ? resolveMapEntries(get(mapEntriesAtom), data, get(languageColorsAtom)) : []
+  return data
+    ? resolveMapEntries(
+        get(mapEntriesAtom),
+        data,
+        get(languageColorsAtom),
+        get(mapGroupPalettesAtom),
+      )
+    : []
 })
 
 export const geographyContextAtom = atom<GeographyContext>((get) => ({
@@ -219,6 +264,34 @@ export const removeMapEntryAtom = atom(null, (get, set, entryId: string) => {
     get(mapEntriesAtom).filter(({ id }) => id !== entryId),
   )
 })
+
+export const removeMapGroupAtom = atom(null, (get, set, groupId: string) => {
+  set(
+    mapEntriesAtom,
+    get(mapEntriesAtom).filter((entry) => mapGroupId(entry) !== groupId),
+  )
+})
+
+export const setMapGroupStyleAtom = atom(
+  null,
+  (get, set, update: { groupId: string; coloring?: GroupColoring; color?: string | null }) => {
+    const current = get(mapGroupsAtom).find(({ group }) => group.id === update.groupId)
+    if (!current) return
+    const group: MapGroup = {
+      ...current.group,
+      ...(update.coloring ? { coloring: update.coloring } : {}),
+      ...(update.color !== undefined
+        ? { color: update.color === null ? null : normalizeColor(update.color) }
+        : {}),
+    }
+    set(
+      mapEntriesAtom,
+      get(mapEntriesAtom).map((entry) =>
+        mapGroupId(entry) === group.id ? { ...entry, group } : entry,
+      ),
+    )
+  },
+)
 
 export const setMapEntryColorAtom = atom(
   null,

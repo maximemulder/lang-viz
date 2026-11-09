@@ -187,6 +187,25 @@ export const installOverlapTestApi = (
   const api = {
     ...colorControls,
     probeInspection: (center: [number, number]) => probeInspection(map, center, selectionKey()),
+    sidebarHighlight: () => {
+      const layer = map.getLayer('language-preview-outline')
+      if (!layer || !('sourceLayer' in layer)) return { variantIds: [] }
+      const source = 'language-sidebar-preview'
+      const highlighted = (id: string) =>
+        map.getFeatureState({ source, sourceLayer: layer.sourceLayer, id }).inspected
+      const variantIds = [
+        ...new Set(
+          map
+            .querySourceFeatures(source, { sourceLayer: layer.sourceLayer })
+            .flatMap(({ properties }) =>
+              typeof properties.variant_id === 'string' && highlighted(properties.variant_id)
+                ? [properties.variant_id]
+                : [],
+            ),
+        ),
+      ].sort()
+      return { variantIds }
+    },
     inspectionHighlight: () =>
       inspectionHighlightState(map, parseOverlapSelection(selectionKey()).variantIds),
     configure,
@@ -209,12 +228,9 @@ export const installOverlapTestApi = (
     inspect: (center: [number, number]) => {
       const point = map.project(center)
       const bounds = map.getCanvas().getBoundingClientRect()
+      const selection = parseOverlapSelection(selectionKey())
       return {
-        variantIds: visibleVariantIds(
-          map,
-          point,
-          parseOverlapSelection(selectionKey()).refinements,
-        ),
+        variantIds: visibleVariantIds(map, point, selection.refinements, selection.variantGroups),
         point: [Math.round(point.x + bounds.left), Math.round(point.y + bounds.top)] as [
           number,
           number,

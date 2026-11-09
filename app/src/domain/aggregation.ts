@@ -139,11 +139,19 @@ export const mapAreaSourcePriorities = (areas: readonly MapArea[]) => {
 }
 
 /** Grouping and refinement are geometry policy, independent of colors. */
+export const mapAreasNeedComposition = (areas: readonly MapArea[]) =>
+  areas.some(
+    (area) =>
+      area.mode === 'descendants' ||
+      area.refines?.length ||
+      area.variants.some(({ id }) => id !== area.id),
+  )
+
 export const mapAreaSelectionKey = (areas: readonly MapArea[], presentation = 'hatching') => {
   const memberships = mapAreaMemberships(areas)
   const variantIds = Object.keys(memberships).sort()
   const refinements = mapAreaRefinements(areas)
-  return areas.some(({ mode }) => mode === 'descendants') || Object.keys(refinements).length
+  return mapAreasNeedComposition(areas)
     ? JSON.stringify({
         variantIds,
         presentation,

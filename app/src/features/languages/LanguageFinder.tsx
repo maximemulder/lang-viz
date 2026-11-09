@@ -1,6 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai'
 import { type KeyboardEvent, useRef } from 'react'
-import { mapEntriesAtom, selectedMapAreasAtom } from '../../state/atlasState'
+import { mapEntriesAtom, mapGroupsAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { type LanguagePanelView, languagePanelAtom } from '../../state/languageControls'
 import { ExploreLanguages } from './ExploreLanguages'
 import { LanguageDetails } from './LanguageDetails'
@@ -12,6 +12,7 @@ const LABELS = { explore: 'Explore', map: 'On map' }
 export const LanguageFinder = () => {
   const [panel, setPanel] = useAtom(languagePanelAtom)
   const selected = useAtomValue(mapEntriesAtom)
+  const groups = useAtomValue(mapGroupsAtom)
   const displayed = useAtomValue(selectedMapAreasAtom)
   const tabRefs = useRef<Partial<Record<LanguagePanelView, HTMLButtonElement | null>>>({})
   const selectView = (view: LanguagePanelView) => setPanel({ ...panel, view })
@@ -47,7 +48,7 @@ export const LanguageFinder = () => {
             aria-selected={panel.view === view}
             aria-label={
               view === 'map'
-                ? `On map, ${selected.length.toLocaleString()} entries, ${displayed.length.toLocaleString()} displayed`
+                ? `On map, ${groups.length.toLocaleString()} groups, ${selected.length.toLocaleString()} areas, ${displayed.length.toLocaleString()} displayed`
                 : undefined
             }
             tabIndex={panel.view === view ? 0 : -1}
@@ -58,7 +59,7 @@ export const LanguageFinder = () => {
             onKeyDown={(event) => handleTabKey(event, view)}
           >
             {LABELS[view]}
-            {view === 'map' && <span>{selected.length.toLocaleString()}</span>}
+            {view === 'map' && <span>{groups.length.toLocaleString()}</span>}
           </button>
         ))}
       </div>

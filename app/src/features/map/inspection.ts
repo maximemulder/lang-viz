@@ -27,6 +27,7 @@ export const visibleVariantIds = (
     Partial<Pick<MapLibreMap, 'getLayersOrder'>>,
   point: PointLike,
   refinements?: Refinements,
+  memberships?: Readonly<Record<string, readonly string[]>>,
 ): string[] => {
   const coverage = BUFFERS.flatMap((buffer) =>
     [
@@ -46,9 +47,14 @@ export const visibleVariantIds = (
   return refinedMemberships(
     [
       ...new Set(
-        map
-          .queryRenderedFeatures(point, { layers })
-          .flatMap(({ properties }) => featureVariantIds(properties)),
+        map.queryRenderedFeatures(point, { layers }).flatMap(({ properties }) => {
+          const ids = featureVariantIds(properties)
+          // Original/fallback source IDs need expansion. Coverage already contains
+          // exact group memberships, including any ancestor refinement.
+          return typeof properties.variant_id === 'string'
+            ? ids.flatMap((id) => memberships?.[id] ?? [id])
+            : ids
+        }),
       ),
     ],
     refinements,

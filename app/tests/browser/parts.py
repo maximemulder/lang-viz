@@ -4,7 +4,7 @@ import argparse
 import json
 
 from run import APP, browser_session, check_state, wait_for
-from sidebar import open_details, search, select_branches, view
+from sidebar import add_selected, clear_selection, open_details, search, select_branches, select_result, view
 
 
 def main():
@@ -71,7 +71,9 @@ def main():
                     browser.js("window.overlapTest.configure({languageIds:[],center:[108,47],zoom:3.5})")
                     search(browser, "halh1238", "halh1238")
                     open_details(browser)
-                    browser.js("document.querySelector('.finder-detail__branch button').click()")
+                    clear_selection(browser)
+                    select_result(browser, "halh1238")
+                    add_selected(browser)
                     state = record(browser, "Halh-branch", engine, run, [[112, 45.5], [98, 43]])
                     assert browser.js("return window.overlapTest.inspect([112,45.5]).variantIds") == ["asher2007world:contemporary:dari1250"]
                     search(browser, "dari1250", "dari1250")
@@ -91,18 +93,15 @@ def main():
                     browser.js("document.querySelector('.on-map-actions button').click()")
                     search(browser, "sini1245", "sini1245")
                     open_details(browser)
-                    browser.js("document.querySelector('.finder-detail__branch button').click()")
+                    clear_selection(browser)
+                    select_result(browser, "sini1245")
+                    add_selected(browser)
                     record(browser, "DLAC-Sinitic-branch", engine, run, [[112, 28], [114, 25], [110, 30]])
 
                     view(browser, "map")
                     browser.js("document.querySelector('.on-map-actions button').click()")
-                    search(browser, "sino1245", "sino1245")
-                    open_details(browser)
-                    browser.js("""
-                        const select=document.querySelector('.finder-detail__mode select');
-                        select.value='descendants'; select.dispatchEvent(new Event('change',{bubbles:true}));
-                    """)
-                    browser.js("document.querySelector('.detail-selection button').click()")
+                    # Aggregate rendering remains a compatibility fixture, independent of the group UI.
+                    browser.js("window.overlapTest.configure({languageIds:['sino1245'],sources:['dlac1987china'],areaModes:{sino1245:'descendants'},center:[112,28],zoom:3.5})")
                     record(browser, "DLAC-aggregate", engine, run, [[112, 28], [114, 25], [110, 30]])
 
                     if engine == "parts":

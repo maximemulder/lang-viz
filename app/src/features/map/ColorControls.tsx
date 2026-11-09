@@ -50,20 +50,24 @@ export const ColorControls = () => {
   return (
     <fieldset className="map-settings__group color-controls">
       <legend>Language colors</legend>
-      <label>
-        Coloring strategy
-        <select
-          value={config.strategy}
-          onChange={(event) =>
-            setConfig({ ...config, strategy: event.currentTarget.value as typeof config.strategy })
-          }
-        >
-          <option value="semantic">Semantic (genealogy)</option>
-          <option value="categorical">Categorical (original colors)</option>
-        </select>
-      </label>
+      <p>Choose colors for each group in On map.</p>
       <details className="color-controls__custom">
-        <summary>Custom colors and groups</summary>
+        <summary>Advanced palette defaults and overrides</summary>
+        <label>
+          Colors for individual, ungrouped entries
+          <select
+            value={config.strategy}
+            onChange={(event) =>
+              setConfig({
+                ...config,
+                strategy: event.currentTarget.value as typeof config.strategy,
+              })
+            }
+          >
+            <option value="semantic">Color by hierarchy</option>
+            <option value="categorical">Independent source colors</option>
+          </select>
+        </label>
         <label>
           Languoid ID
           <input

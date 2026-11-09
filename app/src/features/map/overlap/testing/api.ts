@@ -1,3 +1,5 @@
+import type { AreaMode } from '../../../../domain/aggregation'
+import type { GeographyDatasetSelection, TemporalViewSelection } from '../../../../domain/atlas'
 import type { ColorConfiguration } from '../../../../domain/colors'
 import type { MapEntry } from '../../../../domain/mapEntries'
 import type { InspectionProbe } from './inspectionProbe'
@@ -9,6 +11,9 @@ export interface OverlapTestApi {
     languageIds: 'all' | readonly string[]
     center: [number, number]
     zoom: number
+    sources?: GeographyDatasetSelection
+    period?: TemporalViewSelection
+    areaModes?: Readonly<Record<string, AreaMode>>
   }): void
   configureColors(config: ColorConfiguration): void
   mapEntryState(): readonly (MapEntry & { color: string | undefined })[]
@@ -24,6 +29,7 @@ export interface OverlapTestApi {
   inspect(center: [number, number]): { variantIds: string[]; point: [number, number] }
   probeInspection(center: [number, number]): Promise<InspectionProbe>
   inspectionHighlight(): { variantIds: readonly string[]; filter: unknown }
+  sidebarHighlight(): { variantIds: readonly string[] }
   reloadStyle(): void
   setTileDelay(service: TileService, milliseconds: number): void
   watchAreas(points: [number, number][] | null): void

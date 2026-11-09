@@ -1,32 +1,40 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useMemo } from 'react'
-import { areaMode, isAreaAvailable, mappedBranchForLanguage } from '../../domain/aggregation'
+import { mappedBranchForLanguage } from '../../domain/aggregation'
 import { languageAncestors } from '../../domain/hierarchy'
+import { targetGeometry } from '../../domain/languageFocus'
 import { mapEntryDescription } from '../../domain/mapEntries'
+import { hasCoverage } from '../../domain/mapGroups'
 import { temporalQualityLabel } from '../../domain/temporal'
 import {
-  areaModesAtom,
   atlasDataAtom,
   geographyAvailabilityAtom,
   geometryOverridesAtom,
   languageColorsAtom,
   languageHierarchyAtom,
   mapEntriesAtom,
+  mapGroupsAtom,
   removeMapEntryAtom,
-  selectedDraftLanguageIdsAtom,
+  removeMapGroupAtom,
+  selectedMapAreasAtom,
   setGeometryOverrideAtom,
-  showBranchAtom,
-  toggleVisibleLanguageAtom,
 } from '../../state/atlasState'
 import {
   closeLanguageDetailsAtom,
   editGeographyFiltersAtom,
+  focusLanguageOnMapAtom,
   languagePanelAtom,
   openLanguageDetailsAtom,
   revealLanguageAtom,
 } from '../../state/languageControls'
+import {
+  searchCoverageAtom,
+  searchSelectionAtom,
+  toggleSearchSelectionAtom,
+} from '../../state/searchSelection'
 import { GeographyFilterSummary } from './GeographyFilters'
 import { GeometrySourceRecords } from './GeometrySourceRecords'
+import { useLanguagePreview } from './LanguagePreview'
 import { PinnedMapEntries } from './PinnedMapEntries'
 
 export const LanguageDetails = () => {
@@ -34,19 +42,28 @@ export const LanguageDetails = () => {
   const data = useAtomValue(atlasDataAtom)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
-  const [modes, setModes] = useAtom(areaModesAtom)
+  const coverage = useAtomValue(searchCoverageAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
   const colors = useAtomValue(languageColorsAtom)
-  const visibleIds = useAtomValue(selectedDraftLanguageIdsAtom)
-  const toggleVisible = useSetAtom(toggleVisibleLanguageAtom)
+  const selectedIds = useAtomValue(searchSelectionAtom)
+  const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
+  const areas = useAtomValue(selectedMapAreasAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
-  const showBranch = useSetAtom(showBranchAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const closeDetails = useSetAtom(closeLanguageDetailsAtom)
   const editGeography = useSetAtom(editGeographyFiltersAtom)
   const entries = useAtomValue(mapEntriesAtom)
+  const groups = useAtomValue(mapGroupsAtom)
   const removeEntry = useSetAtom(removeMapEntryAtom)
+  const removeGroup = useSetAtom(removeMapGroupAtom)
   const reveal = useSetAtom(revealLanguageAtom)
+  const focusOnMap = useSetAtom(focusLanguageOnMapAtom)
+  const profileTarget = {
+    languageId: panel.detailId ?? '',
+    ...(panel.detailEntryId ? { entryId: panel.detailEntryId } : {}),
+    ...(panel.detailGroupId ? { groupId: panel.detailGroupId } : {}),
+  }
+  const preview = useLanguagePreview(profileTarget)
   const detailId = panel.detailId
   const detail = detailId ? data.languageById.get(detailId) : undefined
   const detailAvailability = detail ? availability.get(detail.id) : undefined
@@ -54,16 +71,16 @@ export const LanguageDetails = () => {
     () => (detailId ? mappedBranchForLanguage(detailId, hierarchy, availability) : undefined),
     [detailId, hierarchy, availability],
   )
-  const detailMode = detailAvailability
-    ? areaMode(detailAvailability, modes[detailId ?? ''])
-    : 'own'
   const detailVariants = detailAvailability?.ownVariants ?? []
   const activeVariant =
     detailVariants.find((variant) => variant.id === overrides[detailId ?? '']) ?? detailVariants[0]
-  const selected = detailId !== null && visibleIds.includes(detailId)
+  const selected = detailId !== null && selectedIds.includes(detailId)
   const focusedEntry = entries.find(
     (entry) => entry.id === panel.detailEntryId && entry.languageId === detailId,
   )
+  const focusedGroup = groups.find(({ group }) => group.id === panel.detailGroupId)
+  const canFocusMap =
+    targetGeometry(profileTarget, data, availability, coverage, hierarchy, entries).length > 0
   if (!detail) return null
   const classification = detail.classification
   const draftSelection = (
@@ -74,13 +91,16 @@ export const LanguageDetails = () => {
           style={{ backgroundColor: colors.get(detail.id) }}
           aria-hidden="true"
         />
-        <span>{selected ? 'This representation is on the map' : 'Add this representation'}</span>
+        <span>{selected ? 'Selected in Explore' : 'Select for Add to map'}</span>
         <button
           type="button"
-          disabled={!selected && !isAreaAvailable(detailAvailability, modes[detail.id])}
-          onClick={() => toggleVisible(detail.id)}
+          disabled={!selected && !hasCoverage(detailAvailability, coverage)}
+          onClick={() => {
+            toggleSelected(detail.id)
+            setPanel({ ...panel, view: 'explore' })
+          }}
         >
-          {selected ? 'Remove from map' : 'Add to map'}
+          {selected ? 'Deselect' : 'Select'}
         </button>
       </div>
       <p className="finder-detail__context">
@@ -97,13 +117,24 @@ export const LanguageDetails = () => {
   )
   return (
     <section
+      {...preview}
       className="finder-detail"
       aria-label="Entry details"
       aria-labelledby="focused-language-name"
     >
       <header className="finder-detail__header">
         <div className="finder-detail__heading" aria-live="polite">
-          <h3 id="focused-language-name">{detail.name}</h3>
+          <h3 id="focused-language-name">
+            <button
+              type="button"
+              className="finder-detail__name"
+              disabled={!canFocusMap}
+              title={`Center map on ${detail.name}`}
+              onClick={() => focusOnMap(profileTarget)}
+            >
+              {detail.name}
+            </button>
+          </h3>
           <small>
             {detail.level} · {detail.id}
             {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
@@ -140,7 +171,7 @@ export const LanguageDetails = () => {
       <div
         id="focused-language-body"
         className="finder-detail__body"
-        key={`${detail.id}/${panel.detailEntryId ?? ''}`}
+        key={`${detail.id}/${panel.detailGroupId ?? ''}/${panel.detailEntryId ?? ''}`}
         hidden={panel.detailCollapsed}
       >
         <nav className="finder-detail__path" aria-label="Classification ancestors">
@@ -151,11 +182,29 @@ export const LanguageDetails = () => {
             </button>
           ))}
         </nav>
-        {focusedEntry ? (
+        {focusedGroup ? (
+          <div className="focused-map-entry" data-group-id={focusedGroup.group.id}>
+            <div>
+              <strong>
+                {focusedGroup.entries[0] && mapEntryDescription(focusedGroup.entries[0], data)}
+              </strong>
+              <small>
+                {focusedGroup.entries.length.toLocaleString()} mapped areas ·{' '}
+                {focusedGroup.group.coverage === 'branch' ? 'Entry and descendants' : 'Own area'}
+              </small>
+            </div>
+            <button type="button" onClick={() => removeGroup(focusedGroup.group.id)}>
+              Remove group
+            </button>
+          </div>
+        ) : focusedEntry ? (
           <div className="focused-map-entry" data-entry-id={focusedEntry.id}>
             <span
               className="language-swatch"
-              style={{ backgroundColor: focusedEntry.colorOverride ?? colors.get(detail.id) }}
+              style={{
+                backgroundColor:
+                  areas.find(({ id }) => id === focusedEntry.id)?.color ?? colors.get(detail.id),
+              }}
               aria-hidden="true"
             />
             <div>
@@ -168,6 +217,13 @@ export const LanguageDetails = () => {
           </div>
         ) : (
           draftSelection
+        )}
+        {!canFocusMap && (
+          <p className="finder-detail__context" role="status">
+            {(panel.detailEntryId && !focusedEntry) || (panel.detailGroupId && !focusedGroup)
+              ? 'This map entry has been removed.'
+              : 'No mapped area for this representation.'}
+          </p>
         )}
         <details className="finder-detail__more">
           <summary>More details</summary>
@@ -183,94 +239,34 @@ export const LanguageDetails = () => {
             </div>
           )}
           <PinnedMapEntries languageId={detail.id} focusedEntryId={panel.detailEntryId} />
-          <h4>Representation to add</h4>
-          <p>Uses the sources and period in Explore. Existing map entries keep their geography.</p>
-          {focusedEntry && draftSelection}
-          {mappedBranch && (hierarchy.childrenById.get(detail.id)?.length ?? 0) > 0 && (
-            <div className="finder-detail__branch">
-              <button
-                type="button"
-                disabled={!mappedBranch.languageIds.length}
-                onClick={() => showBranch(detail.id)}
-              >
-                Show branch on map ({mappedBranch.languageIds.length.toLocaleString()})
-              </button>
-              <p>
-                Shows this entry and its mapped descendants. More specific areas replace ancestor
-                colors where they overlap; broader areas remain elsewhere. Uses current sources and
-                period. Replaces entries in this branch from the same context; other comparisons
-                stay.
-              </p>
-            </div>
-          )}
-          {detailAvailability && (
-            <label className="finder-detail__mode">
-              <span>Map representation</span>
-              <select
-                aria-label={`Map representation for ${detail.name}`}
-                value={detailMode}
-                onChange={(event) =>
-                  setModes({
-                    ...modes,
-                    [detail.id]: event.currentTarget.value === 'own' ? 'own' : 'descendants',
-                  })
-                }
-                disabled={!detailAvailability.own && !detailAvailability.descendants.length}
-              >
-                <option value="own" disabled={!detailAvailability.own}>
-                  Own area{!detailAvailability.own ? ' (unavailable)' : ''}
-                </option>
-                <option value="descendants" disabled={!detailAvailability.descendants.length}>
-                  Descendant areas{!detailAvailability.descendants.length ? ' (unavailable)' : ''}
-                </option>
-              </select>
-            </label>
-          )}
-          {detailMode === 'descendants' && detailAvailability ? (
-            <div className="finder-detail__aggregation">
-              <p>
-                {detailAvailability.descendants.length.toLocaleString()} contributing entries ·{' '}
-                {detailAvailability.uncoveredBranches.length.toLocaleString()} uncovered branches
-                with these filters.
-              </p>
-              <p>Uses the first available area down each branch. Coverage may be incomplete.</p>
-              <details>
-                <summary>Contributors and sources</summary>
-                <ul>
-                  {detailAvailability.descendants.map((variant) => (
-                    <li key={variant.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const contributor = data.languageById.get(variant.languageId)
-                          if (contributor) openDetails(contributor.id)
-                        }}
-                      >
-                        {data.languageById.get(variant.languageId)?.name}
+          <h4>Geography for the next Add to map</h4>
+          <p>
+            Select entries in Explore, then choose Add to map. By default, each group includes its
+            entry and all mapped descendants.
+          </p>
+          {(focusedEntry || focusedGroup) && draftSelection}
+          {mappedBranch && mappedBranch.languageIds.length > 0 && (
+            <details className="finder-detail__aggregation">
+              <summary>
+                Available mapped areas ({mappedBranch.languageIds.length.toLocaleString()})
+              </summary>
+              <p>Descendants refine overlapping ancestor areas. Missing areas are not inferred.</p>
+              <ul>
+                {mappedBranch.languageIds.map((id) => {
+                  const variant = availability.get(id)?.own
+                  return (
+                    <li key={id}>
+                      <button type="button" onClick={() => openDetails(id)}>
+                        {data.languageById.get(id)?.name ?? id}
                       </button>
-                      <small>
-                        {variant.label} · {temporalQualityLabel(variant.temporalCoverage.quality)}
-                      </small>
+                      <small>{variant?.label}</small>
                     </li>
-                  ))}
-                </ul>
-              </details>
-              {detailAvailability.uncoveredBranches.length > 0 && (
-                <details>
-                  <summary>Uncovered branches</summary>
-                  <ul>
-                    {detailAvailability.uncoveredBranches.map((entry) => (
-                      <li key={entry.id}>
-                        <button type="button" onClick={() => openDetails(entry.id)}>
-                          {entry.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          ) : detailVariants.length > 1 ? (
+                  )
+                })}
+              </ul>
+            </details>
+          )}
+          {detailVariants.length > 1 ? (
             <select
               className="language-row__variant"
               aria-label={`Geographic source for ${detail.name}`}
@@ -297,7 +293,7 @@ export const LanguageDetails = () => {
                   : 'No polygon available'}
             </p>
           )}
-          {detailMode === 'own' && activeVariant && (
+          {activeVariant && (
             <GeometrySourceRecords
               key={activeVariant.id}
               manifest={data.manifest}

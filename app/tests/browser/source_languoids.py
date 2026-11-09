@@ -4,7 +4,7 @@
 import json
 
 from run import APP, browser_session, open_atlas, wait_for
-from sidebar import open_details, search, view
+from sidebar import add_selected, clear_selection, open_details, search, view
 
 
 def main():
@@ -39,6 +39,8 @@ def main():
                 document.querySelector('.source-filter__trigger').click();
             """)
             for slug, label, center, zoom in cases:
+                view(browser, 'explore')
+                clear_selection(browser)
                 language_id = f"dlac1987china:{slug}"
                 variant_id = f"dlac1987china:contemporary:{language_id}"
                 row = search(browser, label, language_id)
@@ -74,6 +76,7 @@ def main():
                 }
                 search(browser, language_id, language_id)
                 browser.js("document.querySelector('.language-row input').click()")
+                add_selected(browser)
                 browser.js("window.overlapTest.camera(arguments[0], arguments[1])", center, zoom)
                 state = wait_for(
                     lambda: (
@@ -91,7 +94,7 @@ def main():
                 entries = browser.js("return window.overlapTest.mapEntryState()")
                 assert entries[0]["languageId"] == language_id
                 assert entries[0]["variantIds"] == [variant_id]
-                assert entries[0]["colorRootId"] is None
+                assert entries[0]["colorRootId"] == language_id
                 probe = browser.js(
                     """
                     for (let x = -4; x <= 4; x++) for (let y = -4; y <= 4; y++) {
@@ -154,6 +157,8 @@ def main():
                     flush=True,
                 )
 
+            view(browser, "explore")
+            clear_selection(browser)
             search(browser, "danzhou", "dlac1987china:danzhou")
             browser.js("""
                 document.querySelector('.finder-options').open = true;

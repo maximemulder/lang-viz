@@ -73,6 +73,7 @@ def test_all_levels_and_source_parts_without_aggregation(source):
     assert by_id["dial1234"]["geometryKind"] == "dataset-dialect"
     assert by_id["subf1234"]["geometryKind"] == "source"
     assert by_id["vari1234"]["featureCount"] == 3
+    assert by_id["vari1234"]["bounds"] == [3, 0, 10, 1]
     assert by_id["vari1234"]["temporalCoverage"]["quality"] == "mixed"
     assert by_id["shar1234"]["temporalCoverage"]["quality"] == "direct"
     assert by_id["root1234"]["temporalCoverage"]["quality"] == "direct"
@@ -82,6 +83,13 @@ def test_all_levels_and_source_parts_without_aggregation(source):
     assert all(f["properties"]["level"] == "dialect" for f in parts)
     assert len({f["properties"]["variant_id"] for f in parts}) == 1
     assert len({f["id"] for f in normalized}) == len(normalized)
+
+
+def test_camera_bounds_cross_dateline_and_reject_empty_geometry():
+    geometry = {"type": "Polygon", "coordinates": [[[179, -2], [-179, -2], [-179, 3], [179, -2]]]}
+    assert atlas.geometry_bounds([{"geometry": geometry}]) == [179, -2, 181, 3]
+    with pytest.raises(ValueError, match="empty"):
+        atlas.geometry_bounds([{"geometry": {"type": "Polygon", "coordinates": []}}])
 
 
 def test_unmatched_references_are_reported_and_not_assigned_to_other_entries(source):

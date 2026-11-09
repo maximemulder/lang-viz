@@ -4,12 +4,13 @@ import { mapEntryDescription } from '../../domain/mapEntries'
 import { temporalQualityLabel } from '../../domain/temporal'
 import {
   atlasDataAtom,
-  languageColorsAtom,
   mapEntriesAtom,
   removeMapEntryAtom,
+  selectedMapAreasAtom,
   setMapEntryColorAtom,
 } from '../../state/atlasState'
 import { openLanguageDetailsAtom } from '../../state/languageControls'
+import { LanguagePreviewArticle } from './LanguagePreview'
 
 /** Inspect and style pinned geometry without changing the draft being browsed. */
 export const PinnedMapEntries = ({
@@ -21,7 +22,7 @@ export const PinnedMapEntries = ({
 }) => {
   const data = useAtomValue(atlasDataAtom)
   const entries = useAtomValue(mapEntriesAtom)
-  const colors = useAtomValue(languageColorsAtom)
+  const areas = useAtomValue(selectedMapAreasAtom)
   const remove = useSetAtom(removeMapEntryAtom)
   const setColor = useSetAtom(setMapEntryColorAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
@@ -40,7 +41,8 @@ export const PinnedMapEntries = ({
       {selected.map((entry) => {
         const description = mapEntryDescription(entry, data)
         return (
-          <article
+          <LanguagePreviewArticle
+            target={{ languageId, entryId: entry.id }}
             key={entry.id}
             data-entry-id={entry.id}
             data-focused={entry.id === focusedEntryId}
@@ -66,7 +68,7 @@ export const PinnedMapEntries = ({
                 <input
                   type="color"
                   aria-label={`Color for ${language?.name}, ${description}`}
-                  value={entry.colorOverride ?? colors.get(languageId) ?? '#777777'}
+                  value={areas.find(({ id }) => id === entry.id)?.color ?? '#777777'}
                   onChange={(event) =>
                     setColor({ entryId: entry.id, color: event.currentTarget.value })
                   }
@@ -77,7 +79,7 @@ export const PinnedMapEntries = ({
                 disabled={entry.colorOverride === null}
                 onClick={() => setColor({ entryId: entry.id, color: null })}
               >
-                Use languoid color
+                Use group color
               </button>
               <button type="button" onClick={() => remove(entry.id)}>
                 Remove this entry
@@ -120,7 +122,7 @@ export const PinnedMapEntries = ({
                 </>
               )}
             </details>
-          </article>
+          </LanguagePreviewArticle>
         )
       })}
     </div>

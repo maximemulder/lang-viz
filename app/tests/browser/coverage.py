@@ -48,20 +48,24 @@ def check_navigation(browser, output, source, projection, center, points, langua
 
 def check_selection_list(browser, count):
     browser.js("document.querySelector('#language-tab-map').click()")
-    wait_for(lambda: browser.js("return !!document.querySelector('.on-map-row')"), 10, "selection list")
-    assert browser.js("return document.querySelectorAll('.on-map-row').length") < 100
+    wait_for(lambda: browser.js("return !!document.querySelector('.on-map-group')"), 10, 'group list')
+    assert browser.js("return document.querySelectorAll('.on-map-group,.on-map-row').length") < 100
     browser.js("const list=document.querySelector('.on-map-list');list.scrollTop=list.scrollHeight")
-    wait_for(lambda: browser.js("return Number(document.querySelector('.on-map-row:last-child')?.getAttribute('aria-posinset')) === arguments[0]", count), 10, "last selected entry")
+    wait_for(lambda: browser.js("return document.querySelector('.on-map-list').scrollTop > 0"), 10, 'last groups')
+    browser.call('POST', '/execute/async', {
+        'script': 'const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(done)))',
+        'args': [],
+    })
     before = browser.js("return document.querySelector('.on-map-list').scrollTop")
-    browser.js("document.querySelector('.on-map-row:last-child .on-map-row__identity').click()")
-    wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "last entry details")
-    assert browser.js("return !document.querySelector('#language-panel-map').hidden"), "Inspection keeps the selection list visible"
+    browser.js("document.querySelector('.on-map-group:last-child .on-map-row__identity').click()")
+    wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, 'group details')
+    assert browser.js("return !document.querySelector('#language-panel-map').hidden")
     browser.js("document.querySelector('.finder-detail__close').click()")
-    wait_for(lambda: browser.js("return !!document.querySelector('.on-map-row')"), 10, "return to selection list")
-    assert browser.js("return document.querySelector('.on-map-list').scrollTop") == before
-    assert browser.js("return document.querySelectorAll('.on-map-row').length") < 100
+    wait_for(lambda: browser.js("return document.querySelector('.on-map-list').scrollTop === arguments[0]", before), 10, 'restored group list scroll')
+    assert browser.js("return document.querySelectorAll('.on-map-group,.on-map-row').length") < 100
+    assert browser.snapshot()['selectedCount'] == count
     browser.js("document.querySelector('#language-tab-explore').click()")
-    print(f"Selection list: {count} entries, virtualized, scroll preserved", flush=True)
+    print(f'Grouped list: {count} areas, virtualized, scroll preserved', flush=True)
 
 
 def main():

@@ -80,6 +80,7 @@ The current geographic atlas uses:
 - `manifest.json`: catalog counts, source archive profiles, prepared coverage profiles and per-profile zoom limits.
 - `languages.json`: search, classification, coordinates and geometry availability for the full catalog.
 - `geometry-index.json`: geometry variant metadata needed for browsing and selection.
+- `geometry-bounds.json`: source-footprint bounds, loaded lazily for explicit profile navigation. Circular longitude arcs keep dateline-crossing areas local.
 - `geography-datasets.json`: dataset citations and licenses.
 - `geometry/v1-<hash>/<dataset>/<period>.pmtiles`: original source geometry, fetched by HTTP range for viewport tiles. Filters and pinned entries determine which profiles load. Tile-join filters the combined offline archive without re-tiling geometry.
 - `coverage-parts/v2-<hash>/<dataset>/<period>/…`: selection-independent prepared MVT parts and a content-addressed availability index. Indexes and tiles load on demand. Complete indexed levels distinguish known-empty tiles from unprepared detail; no empty tile files are required.

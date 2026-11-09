@@ -3,7 +3,7 @@
 import json
 
 from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import open_details, search, select_branches, view
+from sidebar import add_selected, open_details, search, select_branches, select_result, view
 
 
 def main():
@@ -16,7 +16,8 @@ def main():
             browser.js("window.overlapTest.configure({languageIds:[],center:[108,47],zoom:4.5})")
             search(browser, "halh1238", "halh1238")
             open_details(browser)
-            browser.js("document.querySelector('.finder-detail__branch button').click()")
+            select_result(browser, "halh1238")
+            add_selected(browser)
             state = browser.settled(60)
             check_state(state)
             assert state["reports"][-1]["outcome"] == "ready"

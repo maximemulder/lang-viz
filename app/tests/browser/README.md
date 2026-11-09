@@ -8,6 +8,8 @@ npm run test:browser -- --scenario britain-small
 npm run test:browser -- --runs 3 --output test-results/baseline
 npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
+npm run test:selection-browser
+npm run test:focus-browser
 npm run test:source-browser
 npm run test:delivery-browser
 npm run test:prepared-browser
@@ -34,6 +36,15 @@ pass threshold. The timing probe sends public MapLibre mouse events; lifecycle
 checks use WebDriver pointer actions. The default builds and previews production;
 `--dev` checks development serving, and `--skip-build` reuses the current build.
 
+`test:focus-browser` checks sidebar pointer and keyboard previews for unadded areas,
+no movement on hover, profile/Enter camera movement without stealing list focus,
+persistent outlines, temporary preview precedence, repeated name clicks and rapid
+profile switching. It verifies exact pinned sources despite incompatible search
+filters, unavailable geometry, style restoration, and multi-contributor family
+framing. Hover must leave selections and coverage request identities unchanged;
+camera bounds must load only on explicit profile actions. Reports/screenshots go to
+`test-results/sidebar-focus/`.
+
 `test:delivery-browser` checks the production app's lightweight startup geometry
 index, DLAC-only source routing, zoom-5 prepared coverage with zero live Boolean
 time, pan/return navigation, and lazy source-record retrieval. Both the original
@@ -54,40 +65,33 @@ family placement and ancestry reveal, classification provenance, selection, map 
 removal, and source/period availability. Screenshots and a report go to
 `test-results/source-languoids/`.
 
-`test:catalog-browser` builds the production app and checks family, language,
-and dialect discovery, alternative-name searches for unmapped entries, selection
-and inspection of original family/dialect areas, and mixed-level overlap rendering.
-It also checks visible geography status, switching own/descendant representations,
-aggregation without individually selecting children, independently selecting a
-contributor, grouped hatching and blending, single-contributor aggregation, source/
-period availability recovery, viewport discovery, tree keyboard navigation, and
-narrow layouts.
-The family-selection check selects DLAC and displays all mapped Sino-Tibetan entries
-individually, replaces existing subtree selections while retaining unrelated ones,
-and verifies period availability, count updates, and repeated selection.
-The bulk branch check applies the current query to multiple overlapping
-branches, deduplicates their mapped entries, preserves unrelated selections, and verifies
-filter availability without opening entry details.
-Color checks verify that mapped branches retain their family palette through period
-filters, custom overrides update finder swatches and actual overlap stripe pixels,
-and repeated recoloring reuses coverage URLs without issuing geometry requests.
-They also exercise the visible Language colors controls: strategy switching,
-setting/removing exact colors and subtree anchors, comparison roots, invalid input,
-and resetting the configuration while retaining map selections.
-Its screenshots, report, and server logs are written to `test-results/catalog/`.
-The sidebar checks cover Explore / On map views with a persistent details pane,
-independent searches, context restoration, keyboard inspection without losing list
-focus, tab navigation, pane collapse/close, Explore-only geography filters, exact
-pinned-entry inspection, bounded narrow layouts, unavailable selections, removal,
-and clearing through a filtered selection list.
-Switching views must not trigger geometry computation.
+`test:catalog-browser` builds the production app and checks classification browsing,
+ranked and alternative-name search, availability ordering, virtualized keyboard
+navigation, continuous inspection, and bounded narrow layouts. It also exercises
+the working-selection and source/period comparison checks below. Reports and
+screenshots go to `test-results/catalog/`.
+
+`test:selection-browser` checks that result checkboxes only build a working
+selection, parents do not check children, hidden selections survive queries and
+view/filter changes, and Add to map normalizes overlapping roots into groups.
+It checks idempotent adds, group styling without geometry requests, descendant
+search/inspection/removal, restoring group members with their styles, independent
+own-area comparisons sharing a source polygon, and separate Clear map / Clear
+selection behavior. Reports and screenshots go to `test-results/selection/`.
+
+The shared comparison checks pin three German source/period groups, inspect exact
+representations, verify independent override colors in actual stripe pixels,
+and preserve complete Sino-Tibetan groups across source changes. They verify
+that source filters and palette edits retain pinned coverage and geometry URLs.
+The complete mixed-source Sino-Tibetan view may report an existing renderer budget
+limit; that outcome is recorded explicitly, and both pinned groups must survive.
 
 `test:coverage-browser` checks the German and Yue coverage regressions using the
-visible source filter and bulk Show branches on map action, with Contemporary
+visible source filter, Select all, and Add to map actions, with Contemporary
 selected. It samples inland framebuffer pixels and visible memberships during
 pans and zooms 3–6.5 in globe and Mercator, including a forced final render to
-catch stationary gaps. It also checks that the large branch selection stays
-virtualized and retains its scroll position when inspecting an entry. Reports,
+catch stationary gaps. It also checks that the large group list stays
+virtualized and retains its scroll position when inspecting a group. Reports,
 per-frame evidence, and screenshots go to
 `test-results/coverage/`. These cases caught narrow shells whose winding reversed
 during MVT rounding, causing entire mainland polygons to be read as holes.

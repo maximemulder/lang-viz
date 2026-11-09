@@ -6,6 +6,7 @@ import type {
   Language,
 } from '../domain/atlas'
 import { buildLanguageSearchIndex } from '../domain/catalog'
+import type { GeographicBounds } from '../domain/languageFocus'
 import { geometryArchiveUrl } from './geometryArchives'
 
 const dataUrl = (fileName: string) => `${import.meta.env.BASE_URL}data/${fileName}`
@@ -54,6 +55,20 @@ export const loadAtlasData = (): Promise<AtlasData> => {
 export interface GeometryProvenance {
   readonly sourceFile: string
   readonly sourceFeatureIds: readonly string[]
+}
+
+let boundsPromise: Promise<Readonly<Record<string, GeographicBounds>>> | undefined
+/** Camera metadata is loaded on the first explicit profile action, never on hover. */
+export const loadGeometryBounds = (manifest: AtlasManifest) => {
+  if (!manifest.geometryBounds)
+    return Promise.resolve({} as Readonly<Record<string, GeographicBounds>>)
+  boundsPromise ??= fetchJson<Readonly<Record<string, GeographicBounds>>>(
+    manifest.geometryBounds,
+  ).catch((error) => {
+    boundsPromise = undefined
+    throw error
+  })
+  return boundsPromise
 }
 const provenance = new Map<string, Promise<Record<string, GeometryProvenance>>>()
 

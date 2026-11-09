@@ -40,6 +40,23 @@ test('inspection follows grouped blending coverage, including all overlapping se
   assert.deepEqual(visibleVariantIds(map, [0, 0]), ['child', 'descendants:family'])
 })
 
+test('source hits expand group memberships before refinement; coverage hits keep their exact owners', () => {
+  let source = true
+  const map = {
+    getLayer: (id: string) => id === (source ? 'selected-language-areas' : solidLayerId(0)),
+    getPaintProperty: () => 1,
+    queryRenderedFeatures: () =>
+      source
+        ? [{ properties: { variant_id: 'parent' } }, { properties: { variant_id: 'child' } }]
+        : [{ properties: { variantId: 'parent' } }, { properties: { variantId: 'child-copy' } }],
+  } as unknown as MapLibreMap
+  const groups = { parent: ['parent', 'parent-copy'], child: ['child-copy'] }
+  const refinements = { 'child-copy': ['parent-copy'] }
+  assert.deepEqual(visibleVariantIds(map, [0, 0], refinements, groups), ['child-copy', 'parent'])
+  source = false
+  assert.deepEqual(visibleVariantIds(map, [0, 0], refinements, groups), ['child-copy', 'parent'])
+})
+
 test('inspection follows active coverage and clipped fallback, ignoring original detail and staging', () => {
   const original = 'selected-language-areas'
   const opacity = new Map([

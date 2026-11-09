@@ -9,7 +9,7 @@ def view(browser, name):
     wait_for(lambda: browser.js("return !document.querySelector('#language-panel-'+arguments[0]).hidden", name), 10, f"{name} view")
     if name in ("explore", "map"):
         # ResizeObserver repopulates a virtual list after its panel becomes visible.
-        selector = ".language-row" if name == "explore" else ".on-map-row"
+        selector = ".language-row" if name == "explore" else ".on-map-group"
         wait_for(lambda: browser.js("return !!document.querySelector('#language-panel-'+arguments[0]+' '+arguments[1]+', #language-panel-'+arguments[0]+' .finder-empty')", name, selector), 10, f"{name} list")
 
 
@@ -78,12 +78,43 @@ def select_branches(browser, source, center, zoom=4.5, *, settle=True, period="c
           .querySelector('input').click();
         document.querySelector('.source-filter__trigger').click();
     """, source)
-    button = """
-        [...document.querySelectorAll('.finder-actions button')]
-          .find(button => button.textContent.startsWith('Show branches on map'))
-    """
-    wait_for(
-        lambda: browser.js(f"return !({button}).disabled"), 10, "mapped-branch action"
-    )
-    browser.js(f"({button}).click()")
+    browser.js("[...document.querySelectorAll('.finder-actions button')].find(b=>b.textContent==='Select all').click()")
+    wait_for(lambda: browser.js("return !!document.querySelector('.finder-add')"), 10, 'selected roots')
+    add_selected(browser)
     return browser.settled(100) if settle else None
+
+
+def select_control(browser, selector, value):
+    browser.js("""
+        const input = document.querySelector(arguments[0]);
+        input.value = arguments[1];
+        input.dispatchEvent(new Event('change', {bubbles:true}));
+    """, selector, value)
+
+
+def sources(browser, short_name):
+    view(browser, 'explore')
+    browser.js("document.querySelector('.finder-options').open=true;document.querySelector('.source-filter__trigger').click()")
+    browser.js("[...document.querySelectorAll('.source-filter__actions button')].find(b=>b.textContent==='Clear').click()")
+    wait_for(lambda: browser.js("return document.querySelector('.source-filter__trigger').textContent.includes('No sources')"), 10, 'clear sources')
+    browser.js("""
+        [...document.querySelectorAll('.source-filter__option')].find(e=>e.querySelector('strong').textContent===arguments[0]).querySelector('input').click();
+        document.querySelector('.source-filter__trigger').click();
+    """, short_name)
+
+
+def clear_selection(browser):
+    browser.js("[...document.querySelectorAll('.finder-actions button')].find(b=>b.textContent==='Clear selection').click()")
+
+
+def select_result(browser, language_id):
+    browser.js("""
+        const input=[...document.querySelectorAll('.language-row')].find(e=>e.dataset.languageId===arguments[0]).querySelector('input');
+        if(!input.checked) input.click();
+    """, language_id)
+    wait_for(lambda: browser.js("return !!document.querySelector('.finder-add')"), 10, 'working selection')
+
+
+def add_selected(browser):
+    browser.js("document.querySelector('.finder-add').click()")
+    wait_for(lambda: browser.js("return !!document.querySelector('.finder-feedback')"), 10, 'added selection')

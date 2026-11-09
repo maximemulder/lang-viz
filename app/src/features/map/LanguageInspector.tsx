@@ -1,6 +1,5 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { Popup } from 'react-map-gl/maplibre'
-import { inspectedMapAreaIds } from '../../domain/aggregation'
 import { temporalQualityLabel } from '../../domain/temporal'
 import { atlasDataAtom, languageColorsAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { openLanguageDetailsAtom } from '../../state/languageControls'
@@ -23,7 +22,7 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
   const colors = useAtomValue(languageColorsAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const datasetsById = new Map(data.datasets.map((dataset) => [dataset.id, dataset]))
-  const entries = inspectedMapAreaIds(inspection.variantIds, areas).flatMap((variantId) => {
+  const entries = inspection.variantIds.flatMap((variantId) => {
     const area = areas.find(({ id }) => id === variantId)
     const variant = data.variantById.get(variantId) ?? area?.variants[0]
     const language = variant
@@ -121,9 +120,11 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                     className="language-inspector__details"
                     aria-label={`Details for ${language.name}`}
                     onClick={() => {
-                      openDetails(
-                        area ? { languageId: language.id, entryId: area.id } : language.id,
-                      )
+                      openDetails({
+                        languageId: language.id,
+                        ...(area ? { entryId: area.id } : {}),
+                        moveMap: false,
+                      })
                       onClose()
                     }}
                   >

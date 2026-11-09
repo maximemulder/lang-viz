@@ -15,6 +15,7 @@ import {
   mapAreaSelectionKey,
   mapAreaSourceColors,
   mapAreaSourcePriorities,
+  mapAreasNeedComposition,
 } from '../../domain/aggregation'
 import {
   atlasDataAtom,
@@ -26,10 +27,12 @@ import {
   temporalViewAtom,
   viewportLanguageIdsAtom,
 } from '../../state/atlasState'
+import { languageMapNavigationAtom, languagePointerPreviewAtom } from '../../state/languageControls'
 import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { InspectionHighlight } from './InspectionHighlight'
 import { visibleVariantIds } from './inspection'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
+import { LanguageMapCamera, LanguageMapPreview } from './LanguageMapFocus'
 import { MapBackground } from './MapBackground'
 import { MapSettings, type ProjectionMode } from './MapSettings'
 import { diagnosticsEnabled } from './overlap/diagnostics'
@@ -93,9 +96,7 @@ const LanguageLayers = memo(() => {
   const sourceColors = mapAreaSourceColors(areas)
   const sourcePriorities = mapAreaSourcePriorities(areas)
   const selectionKey = mapAreaSelectionKey(areas, overlapMode)
-  const hasComposition = areas.some(
-    ({ mode, refines }) => mode === 'descendants' || refines?.length,
-  )
+  const hasComposition = mapAreasNeedComposition(areas)
   const coverageReady =
     (overlapMode === 'hatching' || hasComposition) && coverageKey === selectionKey
   const filter: FilterSpecification = ['in', ['get', 'variant_id'], ['literal', variantIds]]
@@ -205,18 +206,22 @@ const MapHint = () => {
       <span className="map-hint__marker" aria-hidden="true" />
       {entries.length
         ? `${visibleInPeriodCount.toLocaleString()} of ${entries.length.toLocaleString()} map entries shown`
-        : 'Choose languages from the finder'}
+        : 'Select entries in Explore, then Add to map'}
     </div>
   )
 }
 
 export const WorldMap = () => {
+  const sidebarPointer = useAtomValue(languagePointerPreviewAtom)
+  const navigation = useAtomValue(languageMapNavigationAtom)
+  const lastNavigation = useRef(navigation)
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('terrain')
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
   const [inspection, setInspection] = useState<MapInspection | null>(null)
   const areas = useAtomValue(selectedMapAreasAtom)
   const inspectionSelectionKey = useMemo(() => mapAreaSelectionKey(areas), [areas])
   const refinements = useMemo(() => mapAreaRefinements(areas), [areas])
+  const memberships = useMemo(() => mapAreaMemberships(areas), [areas])
   const inspectionRef = useRef<MapInspection | null>(null)
   const inspectionFilterRef = useRef({
     inspectionSelectionKey,
@@ -232,6 +237,13 @@ export const WorldMap = () => {
   }
 
   useEffect(() => {
+    if (lastNavigation.current !== navigation) {
+      lastNavigation.current = navigation
+      if (navigation) {
+        cancelPendingHoverQuery()
+        updateInspection(null)
+      }
+    }
     const previousFilters = inspectionFilterRef.current
     if (previousFilters.inspectionSelectionKey !== inspectionSelectionKey) {
       inspectionFilterRef.current = { inspectionSelectionKey }
@@ -282,7 +294,7 @@ export const WorldMap = () => {
           if (!latestEvent || inspectionRef.current?.pinned) return
 
           const nextInspection = inspectionFromVariants(
-            visibleVariantIds(latestEvent.target, latestEvent.point, refinements),
+            visibleVariantIds(latestEvent.target, latestEvent.point, refinements, memberships),
             latestEvent.lngLat.lng,
             latestEvent.lngLat.lat,
             false,
@@ -303,7 +315,7 @@ export const WorldMap = () => {
         cancelPendingHoverQuery()
         updateInspection(
           inspectionFromVariants(
-            visibleVariantIds(event.target, event.point, refinements),
+            visibleVariantIds(event.target, event.point, refinements, memberships),
             event.lngLat.lng,
             event.lngLat.lat,
             true,
@@ -333,7 +345,11 @@ export const WorldMap = () => {
       {!BASEMAP_DISABLED && <MapBackground mode={backgroundMode} />}
       <Suspense fallback={null}>
         <LanguageLayers />
-        <InspectionHighlight variantIds={inspection?.variantIds ?? NO_VARIANT_IDS} />
+        <InspectionHighlight
+          variantIds={sidebarPointer ? NO_VARIANT_IDS : (inspection?.variantIds ?? NO_VARIANT_IDS)}
+        />
+        <LanguageMapPreview mapInspectionActive={Boolean(inspection)} />
+        <LanguageMapCamera />
       </Suspense>
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
