@@ -217,7 +217,7 @@ fixed while navigating or changing filters. Custom colors are kept;
 settings last until reload. Defaults and view optimization share the same shade
 allocator; fixed catalog evidence keeps defaults stable. Independent evaluation
 checks local conflicts and branch contrast at several area scales. See
-[the color algorithm, controls, and evaluation commands](app/src/domain/COLORS.md).
+[the color algorithm, roadmap, controls, and evaluation commands](app/src/domain/COLORS.md).
 
 Overlap geometry is computed in a browser worker from the existing PMTiles
 archive, using its simplified vector tiles and a spatial index. Exact complete

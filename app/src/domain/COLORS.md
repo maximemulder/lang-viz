@@ -5,6 +5,12 @@ time period, search, and camera. `GeometryVariant.color` remains a legacy catego
 seed in the generated catalog; rendering uses `languageColorsAtom` instead.
 No data rebuild is required to change palettes.
 
+This document describes the current implementation, the
+[refinement experiment](#refinement-ablation-2026-11-09), and the
+[proposed roadmap](#roadmap-implementation-deferred). Roadmap work is deferred
+until the other model's ongoing work has finished and its changes have been pushed.
+The experiment has not replaced the application picker.
+
 ## Testing controls
 
 Open **Map settings → Language colors** to switch between semantic and categorical
@@ -290,11 +296,317 @@ optimum or pairwise separability guarantee. Crowded areas and conflicting manual
 colors can remain ambiguous. Color-vision-deficiency modeling and final framebuffer
 contrast against different basemaps remain future refinements.
 
+### Refinement ablation (2026-11-09)
+
+`scripts/color-refinement/` contains an isolated experiment against the picker at
+`dbf53b1`. It does not change application behavior or add production mode switches.
+The replay copies domain modules into temporary directories and checks each source
+injection, failing if the expected implementation has changed. Its baseline must
+match the production optimizer exactly. Every variant uses the same freshly built
+default reference and the same saved DLAC, regional Asher, and world Asher footprints.
+
+- `baseline`: current subdivision-constrained refinement.
+- `whole-family`: replace each language's subdivision box with the family frame's
+  full box. Keep the same seeds, 27 candidate directions, two passes, soft movement
+  cost, internal graph, contrast targets, anchors, and family/local feasibility bounds.
+- `spatial`: the whole-family search with one graph for intra- and inter-family
+  comparisons of actual shades. Apply the existing area-scaled footprint proximity
+  formula to languages. Retain the strongest 12 relationships of each kind per
+  representation and take their union, protecting an enclave's relationship to a
+  larger neighbor. Deterministic mixed tie ranks distribute equal-strength contacts
+  instead of concentrating them on early IDs. Within-family targets are unchanged;
+  between-family targets come from the existing family links. No per-language
+  aesthetic penalty or additional passes are introduced.
+
+The independent experimental evaluator exhaustively compares language pairs within
+1.5 size-scaled reaches, using minimum Chebyshev footprint distance, rather than
+the optimizer's sampled edges or averaged contact. It separately reports shared-cell
+and nearby pairs within and between families. The table combines those distance
+bands. Shortfalls use targets of 0.06 within families and 0.16 between families;
+"severe" means a color distance below 0.025. These are engineering thresholds, not
+validated perceptual limits. Pair averages are weighted by spatial proximity.
+Per-language worst-neighbor measurements prevent improvements in the averages from
+being mistaken for universal readability. Repeated identical representations are
+unioned; fixed colors affect readability but are excluded from aesthetic measurements.
+The aesthetic cost measures agreement with the original 24-color preference, using
+displayed-area weights, rather than claiming to measure human aesthetic judgment.
+
+| View | Variant | Within-family shortfall ↓ | Severe pair weight ↓ | Aesthetic cost ↓ | Median solve seconds |
+| --- | --- | ---: | ---: | ---: | ---: |
+| DLAC | baseline | 0.0230 | 1.60% | 0.337 | 0.103 |
+| DLAC | whole-family | 0.0315 | 4.39% | 0.621 | 0.100 |
+| DLAC | spatial | 0.0136 | 1.55% | 0.363 | 0.097 |
+| Regional Asher | baseline | 0.3551 | 48.82% | 0.806 | 1.321 |
+| Regional Asher | whole-family | 0.2357 | 29.28% | 0.898 | 1.385 |
+| Regional Asher | spatial | 0.2201 | 26.99% | 0.891 | 1.724 |
+| World Asher | baseline | 0.4727 | 70.46% | 0.971 | 2.703 |
+| World Asher | whole-family | 0.3439 | 44.36% | 1.107 | 2.881 |
+| World Asher | spatial | 0.3041 | 36.13% | 1.094 | 4.216 |
+
+Timings are Node v24.14.0 solve-only measurements: one unmeasured warmup followed
+by three measured rounds with rotated variant order. Capture and rendering are
+excluded. The report retains individual runs and a domain-source hash. Repeated
+calls and reversed footprint/cell inputs must produce identical palettes. The runner
+also checks unchanged anchors/regions, valid shade radii, and identical hidden
+fallback colors. Small synthetic checks exercise fixed colors, family roots, and
+dense-contact sampling; matched browser screenshots check unchanged geometry URLs
+and request-report counts when applying each palette.
+
+The experiment confirms that subdivision boxes restrict useful local contrast.
+On the world view, whole-family refinement reduces local shortfall by 27%; the
+spatial graph reduces it by 36%. However, world aesthetic cost rises by 14% and 13%,
+respectively. Existing family-balanced contact shortfall stays close (0.04149,
+0.04121, 0.04091), while severe family-pair counts change from 10 to 11 in both
+experiments. Hue drift stays below 20.3 degrees in all three views.
+
+Local improvement does not ensure branch coherence: the minimum multiscale branch
+contrast for Nuclear Trans New Guinea on the world view falls from 0.00787 to
+0.00483 with whole-family refinement and 0.00682 with the spatial graph. Most world
+languages still have at least one very similar nearby relative on this coarse grid
+(97.1%, 96.6%, 96.7%). The DLAC whole-family result also regresses despite increasing
+mean contrast. Neither experimental variant is enabled in the application. Further
+work should preserve broad branch coherence and apply aesthetic preference to
+actual shades before considering a replacement. The graph prototype additionally
+enumerates candidate pairs quadratically before geometric rejection; its bounded
+retained graph does not make construction linear.
+
+The experimental browser renders use 100% language opacity with the basemap
+disabled. They isolate palette differences under identical conditions, but do not
+match the user's later light-basemap screenshot. The reported aesthetic cost is
+agreement with the original preferred anchors, measured on underlying colors; it
+does not establish which palette looks better under the user's normal display
+conditions. Future aesthetic comparisons must match opacity, basemap, projection,
+camera, source/period, and represented languages.
+
+Reproduce from `app/`, after obtaining the three saved browser captures:
+
+```sh
+node scripts/color-refinement/run.mjs
+python3 scripts/color-refinement/local_evaluation.py test-results/color-refinement
+python3 -m unittest discover -s tests/browser -p 'test_*color_evaluation.py'
+```
+
+Optionally run `python3 scripts/color-refinement/render.py` with a production build,
+Firefox, and geckodriver installed. It renders matched views plus Europe/Africa
+details and creates `test-results/color-refinement/index.html` for switching between
+screenshots. Inputs, palettes, timing runs, independent measurements, and screenshots
+remain in the ignored `test-results/color-refinement/` directory.
+
 Colors communicate qualitative genealogy; they do not measure linguistic distance
 or chronology. Classification depth and color offsets should not be read as measured
 divergence. Finite gamut, quantization, and perceptual differences limit useful
 uniqueness. At an overview, recent relatives can deliberately look almost identical;
 a focused refresh recovers more detail as competing families disappear.
+
+## Roadmap: implementation deferred
+
+Status as of 2026-11-09: record the design direction and evidence now; wait for the
+other model to finish and push its changes before starting implementation. After
+those changes land, inspect the resulting code and data, reconcile this roadmap,
+and capture a fresh baseline. Do not assume the `dbf53b1` implementation or the
+experiment's source injections still apply unchanged.
+
+The following is a proposed replacement strategy to validate, rather than an
+implemented algorithm or a commitment to particular weights and thresholds.
+Prefer a small, coherent objective and shared geographic evidence over accumulating
+more correction passes, per-family exceptions, or separate locality rules.
+
+### Goals and constraints
+
+- Preserve recognizable family identities, with useful global separation between
+  prominent families. Hundreds of families cannot all be guaranteed strong pairwise
+  perceptual separation throughout a finite display gamut.
+- Spend the strongest contrast on nearby languages, both within and between
+  families. Aim to meet useful contrast targets and avoid severe ambiguities;
+  maximizing every difference or maximizing overall variance can produce extreme
+  colors and erase broad branch structure.
+- Scale comparison reach with geographic footprint. Area means occupied territory
+  or displayed area, not speaker population, classification depth, or leaf count.
+- Give large displayed territories priority for aesthetically preferred colors.
+  Small territories may use stronger accents when necessary, but must remain
+  distinguishable from their surroundings. Prominence and the contrast needed to
+  see a small mark are separate concerns.
+- Keep stable defaults independent of navigation, selection, sources, and period
+  filters. View-specific reweighting remains an explicit action; it must retain
+  deterministic refresh, complete affected-family palettes, hidden fallback colors,
+  exact custom colors, and undo behavior.
+- Retain the rendering contract: color changes must not fetch, repartition, or
+  invalidate geometry. Bound runtime and memory and keep search off the UI thread.
+
+### Aesthetic reference
+
+The user's preferred visual reference is the Asher world map before the recent
+color changes:
+[local screenshot](</home/maxime/Pictures/Screenshots/Screenshot from 2026-11-09 16-16-39.png>).
+The file is a local reference, not a checked-in asset. Broad areas use softer blues,
+ochres, salmon, greens, lilacs, and cyans, with brighter accents. Sampled dominant
+language-fill pixels include blue `#7e99e3`, ochre `#b9872a`, green `#669e2a`, and
+lilac `#df99d6`. These are rendered colors, not necessarily the underlying palette
+values. Ignore ocean, unfilled land, UI, antialiasing, and overlap intermediates
+when deriving a representative preferred palette; do not select several nearly
+identical blues simply because they dominate the pixel histogram.
+
+Recover the original fill colors where possible, or fit their displayed appearance
+under matched conditions. Directly reusing composited screenshot pixels as fill
+colors could soften them again. The application defaults to 82% opacity; the exact
+screenshot setting was not recorded. The screenshot also shows 5,020 entries,
+whereas experimental Asher renders show 5,302, so they are not matched selections.
+
+The expanded candidate pool remains useful for differentiation. The original 24
+anchors are all preferred in the current implementation; the screenshot will guide
+the next preferred palette rather than silently changing that implementation.
+The previously mentioned `#e4be29` was an approximate example, not a required extra
+anchor or a request for a special priority color. Golds and olive/dry greens should
+remain represented alongside other basic hues. Aesthetic priority stays soft and
+area-aware, without fixed color assignments for individual families.
+
+Judge the actual language shades occupying area, not only their family anchors.
+Use a continuous preference cost, stronger on large displayed footprints, while
+keeping reserve colors available for difficult comparisons. Agreement with an
+editorial palette is a diagnostic proxy; matched rendered maps remain necessary
+for assessing appearance and the balance of dominant colors.
+
+### Precomputed geographic evidence
+
+Precompute geometry-derived evidence so default colors need not infer language
+area and neighborhood from the current 10-degree catalog-point grid. The atlas
+build and existing offline geometry preparation provide integration points. Begin
+with an Asher contemporary prototype, while retaining geometry-variant, dataset,
+period, and source-hash identities for extending to other profiles.
+
+| Evidence | Intended use |
+| --- | --- |
+| Union polygon area in consistent geographic units | Stable prominence and comparison reach; avoid double-counting overlapping pieces. |
+| Compact footprints retaining disconnected components | Distributed territories, islands, antimeridian handling, and tunable proximity. |
+| Sparse nearby-pair distances | Exclude geographically irrelevant comparisons without scanning all pairs during coloring. |
+| Overlap and directional nearby-coverage fractions | Protect enclaves and distinguish extensive contact from a small encounter. |
+| Union footprints for meaningful clades | Compare unresolved branches and estimate broad branch importance without summing overlapping descendants. |
+
+Prefer compact footprints and raw geographic measurements to one permanently
+weighted distance matrix. Derive locality weights from them so changing a kernel,
+area rule, or contrast target need not rebuild all geometry. Minimum distance alone
+cannot distinguish an enclave from two large territories meeting at one outpost.
+Footprint coverage or compact multi-resolution occupancy can supply that missing
+information; the exact representation remains to be chosen.
+
+Use a sparse graph with an explicit geographic cutoff. Preserve genuine overlaps,
+contacts, and relevant nearby pairs; a fixed number of nearest neighbors without
+a distance cutoff can connect remote languages. A full 5,000-by-5,000 Float32 matrix
+is approximately 100 MB before multiple profiles or additional measurements.
+Spatial indexing should bound candidate construction; retaining a sparse graph
+after a quadratic scan does not address the experiment's construction cost.
+Where dense contacts require sampling, distribute equal-strength relationships
+deterministically rather than favoring early IDs, and verify important conflicts
+against an independent, more complete evaluator.
+
+Keep source/period footprints separate. Do not silently union historical and modern
+territories into one universal language area. Active comparisons must include
+relationships across sources when multiple sources are displayed together.
+Physical area supports a declared, fixed default-reference policy; displayed screen
+area supports explicit view optimization and depends on projection, clipping, and
+zoom. Reuse cached evidence while preserving these different meanings of area.
+
+### Locality model to test
+
+A starting hypothesis for pairwise reach is
+`reach(i, j) = r0 + k * (sqrt(area(i)) + sqrt(area(j)))`, using distances and areas
+in consistent units. Both sizes contribute: a small territory beside a large one
+must not lose its relationship because the smaller territory has a tiny radius.
+Measure distance to footprints rather than centroids, and apply a smooth decay
+kernel within a finite support.
+
+One candidate locality weight is the larger of the two directed averages:
+`max(mean over i of closeness to j, mean over j of closeness to i)`. This extends
+the current family-level approach to languages. It should protect a small enclave
+without letting one minor outpost make two otherwise distant large territories
+strong competitors. Test disconnected and thin footprints before fixing a rule
+for whether reach uses whole-language area or component-local area.
+
+Same-family and different-family comparisons should use the same spatial evidence.
+Different families request stronger contrast; adjacent relatives still need useful
+separation regardless of raw classification depth. Local graph weights must not
+let numerous descendants or duplicate source/period representations dominate simply
+through cardinality. Retain a separate, weaker global identity requirement for
+prominent family anchors. A small African language should have no local contrast
+term against a geographically remote American language.
+
+### Hierarchy-guided assignment to prototype
+
+1. Establish the family anchors, then traverse the entire forest breadth-first so
+   broad identities are known before fine detail. Collapse unary paths. Within a
+   frontier, prioritize represented area and important local conflicts; raw tree
+   depth is not comparable across all classifications.
+2. When a neighbor has a color, compare actual shades using the locality graph.
+   For an unresolved neighbor, use its nearest already-colored ancestor rather
+   than always falling back to the top-level family. Its own footprint still
+   determines locality: borrowing an ancestor color must not borrow a globally
+   distributed ancestor footprint and introduce remote competition.
+3. Aggregate unresolved neighbors sharing a colored ancestor by their local
+   footprint evidence. Do not count the same provisional ancestor color once for
+   every descendant. Treat that color as a prediction, not an exact obstacle.
+4. Coordinate sibling choices with a small assignment/swap step so early siblings
+   do not consume all attractive choices. Keep candidate exploration bounded and
+   deterministic; avoid an exhaustive joint search over the entire hierarchy.
+5. Use a compact family envelope, a soft preference toward parent/major-branch
+   reference colors, and area-weighted aesthetic preference on actual shades.
+   Genealogy supplies broad identity and a starting structure; avoid recursively
+   shrinking hard per-language boxes. Preserve meaningful major-branch references
+   so local improvement does not erase the broad distinctions lost in the ablation.
+6. After descendants have colors, allow one or two bounded local repair passes
+   against actual neighbors. Provisional ancestor colors cannot predict every
+   eventual conflict, so a single greedy pass is not assumed sufficient. Keep
+   exact overrides fixed and evaluate branch coherence as well as local improvement.
+
+The intended objective has three main concerns: sufficient local contrast, soft
+hierarchical coherence, and aesthetic preference weighted by prominence. Strong
+family identity and exact manual colors remain constraints. Search should stop
+rewarding contrast once useful separation is achieved rather than pushing every
+language toward a gamut extreme. Prefer replacing the existing refinement and
+conservative family-wide competition rules after validation over running a second
+independent solver on top of them.
+
+Related design references include
+[Dynamic Color Assignment for Hierarchical Data](https://arxiv.org/abs/2407.14742),
+which combines spatial discrimination, harmony, and parent-guided colors, and
+[Towards a Quality Approach to Hierarchical Color Maps](https://arxiv.org/abs/2407.08287),
+which discusses competing hierarchical design goals. These support investigation
+of the direction, not a guarantee that a particular traversal will work for this map.
+
+### Evaluation and implementation sequence after the pending changes land
+
+1. Reconcile the new code/data with this document and capture fresh, reproducible
+   inputs for DLAC, regional Asher, and world Asher. Record revision, selected
+   representations, source/period, projection, camera, opacity, and basemap.
+   Preserve the earlier ablation as historical evidence rather than treating its
+   scores and source injections as a current baseline automatically.
+2. Reproduce the reference appearance and derive a small, representative preferred
+   palette while retaining reserve candidates. Make matched rendered comparisons
+   before interpreting any aesthetic score as an improvement.
+3. Prototype precomputed Asher evidence and verify area unions, enclaves, distant
+   exclusions, islands, disconnected territories, antimeridian cases, overlapping
+   parent/descendant geometry, and repeated representations. Separate preprocessing,
+   data-size, and runtime costs.
+4. Compare the existing picker with the proposed traversal, ancestor proxies,
+   sibling coordination, and bounded repair on identical evidence. Isolate the
+   effects of traversal, locality, and repair where useful; avoid view-specific
+   exceptions and tuning only to one favorable map.
+5. Promote a replacement only after assessing the following dimensions together;
+   improving one mean score is insufficient. Keep the implementation simple enough
+   to explain, profile, and maintain.
+
+| Dimension | Measurements and review |
+| --- | --- |
+| Local readability | Contact and nearby shortfalls separately within and between families; lower-tail distances and severe pairs. |
+| Protection of small languages | Per-language worst neighbors and enclave cases alongside area-weighted averages. |
+| Family and broad branch identity | Prominent family separation, multiscale branch contrast, hue/coherence distributions, and offscreen relatives. |
+| Appearance | Area-weighted preference on actual shades and matched screenshots under normal compositing. |
+| Approximation quality | Finer sampling or polygon evidence on selected cases; coarse shared cells alone do not prove adjacency. |
+| Practicality and stability | Runtime, graph construction, memory/data size, deterministic repeats and input order, fixed colors, undo, and unchanged geometry work. |
+
+Thresholds, family-envelope width, parent-coherence strength, neighborhood support,
+candidate budget, and the final preferred palette remain experimental choices.
+Color-vision-deficiency modeling, full perceptual calibration, and unrelated color
+settings/persistence features remain outside this initial prototype.
 
 ## Rendering contract
 
