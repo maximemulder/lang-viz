@@ -165,6 +165,9 @@ def main():
                 browser.js(
                     "document.querySelector('.map-entry-card__actions button:last-child').click()"
                 )
+                # Opening details can focus the camera once bounds metadata is available.
+                browser.settled(90, fail_on_error=True)
+                browser.js("window.overlapTest.camera([10,10],4.25)")
                 state = prepared(browser, "asher2007world", period, 4)
                 assert state["report"]["metrics"].get("partsTiles", 0) > 0
                 result["asher"][period]["subset"] = state

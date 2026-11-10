@@ -1,8 +1,7 @@
 {
   "repository": "maximemulder/lang-viz",
-  "tag": "atlas-data-2026-11-09",
+  "tag": "atlas-data-2026-11-10",
   "asset": "atlas-data.tar.gz",
-  "sha256": "13c033e495bb51effe7bdd6d2db7dfeda7af7f8065b18a6247baaca5c07a88cc",
-  "pipelineCommit": null,
-  "packagedFromCommit": "70bc2be6e6c0bf53b001178154cc1a1512afa967"
+  "sha256": "5421fd907ef287e0157d4d04b5350245e56a587f7a0bfaa292ddbf5d1bab9c24",
+  "pipelineCommit": "a085ae36592b67395b408036d196a6b1f4326fba"
 }

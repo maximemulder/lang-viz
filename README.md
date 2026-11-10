@@ -367,9 +367,9 @@ application whenever `main` is pushed. Deployment does not fetch source datasets
 install Python pipeline dependencies, build Tippecanoe, or run preprocessing.
 Generated browser data lives in GitHub Release assets, outside Git history.
 
-To publish new data, first run the full atlas build and branch preparation command from
-the setup instructions on a suitable development/build machine. Record the full
-Git commit used for that build; commit changes to data-producing code before
+To publish new data, first run the full atlas build, branch preparation, and palette
+preparation commands from the setup instructions on a suitable development/build
+machine. Record the full Git commit used for that build; commit changes to data-producing code before
 generating release data. Then, from the repository root:
 
 ```sh
@@ -387,7 +387,8 @@ profile indexes, and branch signatures; old archives, old index snapshots,
 unindexed tiles and interrupted writes are excluded. Missing referenced files,
 incomplete tile indexes and mismatched catalog counts stop packaging. The bundle
 retains the combined archive and detailed geometry catalog for offline tools and
-integration tests, as well as notices, provenance and the geometry build report.
+integration tests, as well as prepared palettes, notices, provenance and the geometry
+build report.
 The audit reports selected and excluded **logical file bytes**; disk usage can
 differ because of hard links, compression or filesystem allocation.
 

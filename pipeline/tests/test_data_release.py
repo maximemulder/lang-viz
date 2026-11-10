@@ -118,6 +118,23 @@ def test_missing_active_assets_fail_packaging(data, tmp_path, name):
     assert not (tmp_path / "bundle").exists()
 
 
+def test_prepared_palettes_follow_manifest_through_bundle_install(data, tmp_path):
+    palette = "palettes/current.json"
+    write(data, palette, {"colors": {"language": "#123456"}})
+    write(data, "palettes/old.json", {"colors": {"language": "#abcdef"}})
+    manifest = release.read_json(data / "manifest.json")
+    manifest["preparedColors"] = {"profiles": [{"id": "dataset/now", "file": palette}]}
+    write(data, "manifest.json", manifest)
+    reference = package(data, tmp_path / "bundle")
+    output = tmp_path / "installed"
+    release.install(reference.parent / release.ASSET, reference, output)
+    assert (output / palette).read_bytes() == (data / palette).read_bytes()
+    assert not (output / "palettes/old.json").exists()
+    (data / palette).unlink()
+    with pytest.raises(ValueError, match="Missing data file: palettes/current.json"):
+        release.release_files(data)
+
+
 def test_missing_index_level_fails_instead_of_silently_reducing_coverage(data):
     write(data, "parts/current/dataset/now/index.json", {"0": ["0-0"]})
     with pytest.raises(ValueError, match="Incomplete coverage index"):
