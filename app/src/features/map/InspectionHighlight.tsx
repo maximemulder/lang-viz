@@ -1,37 +1,41 @@
 import { useAtomValue } from 'jotai'
 import { useLayoutEffect, useRef } from 'react'
-import { useMap } from 'react-map-gl/maplibre'
-import { atlasDataAtom, selectedMapAreasAtom } from '../../state/atlasState'
-import { createInspectionHighlight } from './inspectionHighlight'
-import { UnionOutline } from './UnionOutline'
+import { selectedMapAreasAtom } from '../../state/atlasState'
+import { createBoundaryInspection, inspectionLayerId } from './geometry/boundaryInspection'
+import { useGeometryDisplay } from './geometry/display'
 
-/** Hover updates stay outside the large, memoized language/coverage layer tree. */
+/** Picking and outlines reference the same committed source, including fallback. */
 export const InspectionHighlight = ({ variantIds }: { readonly variantIds: readonly string[] }) => {
-  const { current } = useMap()
-  const map = current?.getMap()
-  const sourceLayer = useAtomValue(atlasDataAtom).manifest.vectorLayer
   const areas = useAtomValue(selectedMapAreasAtom)
-  const contributors = variantIds.map(
+  const { map, display, state } = useGeometryDisplay()
+  const inspection = useRef<ReturnType<typeof createBoundaryInspection> | null>(null)
+  const variants = variantIds.flatMap(
     (id) => areas.find((area) => area.id === id)?.variants.map((variant) => variant.id) ?? [id],
   )
-  const directIds = contributors.flatMap((ids) => (ids.length === 1 ? ids : []))
-  const aggregates = contributors.filter((ids) => ids.length > 1)
-  const highlightRef = useRef<ReturnType<typeof createInspectionHighlight> | null>(null)
-
   useLayoutEffect(() => {
-    if (!map) return
-    const highlight = createInspectionHighlight(map, 'language-areas', sourceLayer)
-    highlightRef.current = highlight
+    if (!map || !state.source) return
+    const controller = createBoundaryInspection(map, state.source)
+    inspection.current = controller
     return () => {
-      highlight.dispose()
-      highlightRef.current = null
+      controller.dispose()
+      inspection.current = null
     }
-  }, [map, sourceLayer])
-
+  }, [map, state.source])
   useLayoutEffect(() => {
-    if (!map || !sourceLayer) return
-    highlightRef.current?.set(directIds)
-  }, [map, sourceLayer, directIds])
-
-  return <UnionOutline id="language-inspection" groups={aggregates} />
+    const groups = variantIds.map((id) => [id])
+    inspection.current?.set(groups)
+    if (!state.source) return
+    display.highlights.set('language-inspection', {
+      layerId: inspectionLayerId(state.source),
+      source: state.source,
+      groups,
+      variants,
+      visible: true,
+      featureState: true,
+    })
+    return () => {
+      display.highlights.delete('language-inspection')
+    }
+  }, [display, state.source, variantIds, variants])
+  return null
 }

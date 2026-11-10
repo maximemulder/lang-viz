@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Map as MapLibreMap } from 'maplibre-gl'
+import { PUBLICATION_TIMEOUT_MS } from '../src/features/map/geometry/limits.ts'
 import {
   type CoverageResources,
   createOverlapController,
@@ -15,7 +16,6 @@ import {
   type StripeTextureOutput,
 } from '../src/features/map/overlap/stripeTextureJobs.ts'
 import type { OverlapRequest, TileCoordinate } from '../src/features/map/overlap/types.ts'
-import { PUBLICATION_TIMEOUT_MS } from '../src/features/map/overlap/workerClient.ts'
 
 const required = <T>(value: T | null | undefined): T => {
   assert.ok(value !== undefined && value !== null)
@@ -30,7 +30,7 @@ const tile = (x: number, features = 1): DeliveryTile => ({
   vertices: features * 5,
   patterns: features ? [{ pattern: 'overlap:A|B', variantIds: ['A', 'B'] }] : [],
 })
-const fixture = () => {
+const fixture = (nativeFallback = false) => {
   let state = idleHatchingState()
   let coverage: string | null = null
   const sent: OverlapRequest[] = []
@@ -59,6 +59,7 @@ const fixture = () => {
   let cancellations = 0
   let terminated = false
   const controller = createOverlapController({
+    nativeFallback,
     worker: {
       postMessage: (request) => {
         sent.push(request)
@@ -202,15 +203,15 @@ test('a failed staging source cannot publish even when loaded; retry reuses geom
   assert.equal(f.state.status, 'ready', 'late errors from released snapshots are ignored')
 })
 
-test('failure in an active streaming source restores original fills and can recover', (context) => {
+test('failure in an active source retains its geometry until Retry publishes a replacement', (context) => {
   const f = fixture()
   context.after(() => f.controller.dispose())
   f.initial()
   f.controller.sourceFailed(required(f.state.snapshots[0]).id)
   assert.equal(f.state.status, 'error')
-  assert.equal(f.state.activeBuffer, null)
-  assert.equal(f.coverage, null)
-  assert.equal(f.registered.size, 0)
+  assert.equal(f.state.activeBuffer, 0)
+  assert.equal(f.coverage, '["A","B"]')
+  assert.equal(f.registered.size, 1)
   f.controller.retry()
   f.controller.refresh([coordinate(0)])
   f.finish()
@@ -607,4 +608,26 @@ test('style replacement restores owned stripe images without recomputing and rel
   assert.equal(images.size, 0, 'released and pruned images cannot be resurrected')
   resources.dispose()
   assert.equal(listeners.size, 0)
+})
+
+test('initial fallback and composition share a committed native scope, including single selections', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture(true)
+  context.after(() => f.controller.dispose())
+  f.controller.configure('["A"]', true)
+  f.controller.refresh([coordinate(0)])
+  assert.equal(f.sent.length, 1)
+  assert.deepEqual(f.sent[0]?.knownTiles, [])
+  assert.ok([...required(f.registered.values().next().value).values()].every((t) => t.fallback))
+  f.publish()
+  assert.equal(f.state.activeBuffer, 0)
+  const previous = f.state.snapshots[0]
+  f.controller.refresh([coordinate(0, 5)])
+  f.publish()
+  assert.equal(f.state.snapshots[0], previous)
+  assert.equal(f.state.activeBuffer, 0)
+  f.receive({ ...tile(0), tile: coordinate(0, 5) })
+  f.finish()
+  f.publish()
+  assert.equal(required(f.state.snapshots[required(f.state.activeBuffer)]).maxzoom, 5)
 })

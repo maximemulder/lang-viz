@@ -1,4 +1,5 @@
 import type { ErrorEvent, Map as MapLibreMap } from 'maplibre-gl'
+import { geometryDisplay } from '../../geometry/display'
 import { featureVariantIds, visibleVariantIds } from '../../inspection'
 import {
   browserMessages,
@@ -18,6 +19,7 @@ import { stripeTextureState } from '../mapResources'
 import { serviceDiagnostics } from '../serviceDiagnostics'
 import { parseOverlapSelection } from '../types.ts'
 import type { OverlapTestApi } from './api'
+import { highlightBoundaryEvidence } from './highlightProbe'
 import { inspectionHighlightState, probeInspection } from './inspectionProbe'
 
 /** Test controls and observers use public MapLibre APIs only. */
@@ -41,6 +43,18 @@ export const installOverlapTestApi = (
   let blankLayerFrames = 0
   let styleReloading = false
   let styleReloadBlankFrames = 0
+  let observedSelection = ''
+  let observedGeometry = false
+  let geometryFrames:
+    | {
+        zoom: number
+        source: string | null
+        outline: string | undefined
+        boundaryFeatures: number
+        committedZoom: number
+        mismatch: boolean
+      }[]
+    | null = null
   let renderedFrames = 0
   let areaProbes: [number, number][] | null = null
   const areaFrames: {
@@ -138,9 +152,6 @@ export const installOverlapTestApi = (
       filledAreas = new Set([...filledAreas].filter((p) => inView.has(p)))
       for (const p of visible) if (!missing.includes(p)) filledAreas.add(JSON.stringify(p))
     }
-    const original = map.getLayer('selected-language-areas')
-      ? Number(map.getPaintProperty('selected-language-areas', 'fill-opacity'))
-      : 0
     const layers = map.getLayersOrder()
     const active = BUFFERS.some((buffer) =>
       [
@@ -152,9 +163,40 @@ export const installOverlapTestApi = (
         (id) => map.getLayer(id) && Number(map.getPaintProperty(id, 'fill-layer-opacity')) > 0,
       ),
     )
-    if (selectedIds().length > 1 && !original && !active) {
+    const key = selectionKey()
+    if (observedSelection !== key) {
+      observedSelection = key
+      observedGeometry = false
+    }
+    if (active) observedGeometry = true
+    if (observedGeometry && selectedIds().length && !active) {
       if (styleReloading) styleReloadBlankFrames++
       else blankLayerFrames++
+    }
+    if (geometryFrames && geometryFrames.length < 1200) {
+      const display = geometryDisplay(map).getSnapshot()
+      const highlight = geometryDisplay(map).highlights.get('language-inspection')
+      const outline = highlight && map.getLayer(`${highlight.layerId}-outline`)?.source
+      const evidence = highlightBoundaryEvidence(map, 'language-inspection')
+      const source =
+        BUFFERS.map(coverageSourceId).find((source) =>
+          layers.some((id) => {
+            const layer = map.getLayer(id)
+            return (
+              layer?.type === 'fill' &&
+              layer.source === source &&
+              Number(map.getPaintProperty(id, 'fill-layer-opacity')) > 0
+            )
+          }),
+        ) ?? null
+      geometryFrames.push({
+        zoom: map.getZoom(),
+        source,
+        outline,
+        boundaryFeatures: evidence.boundaryFeatures,
+        committedZoom: display.zoom,
+        mismatch: Boolean(source && source !== outline),
+      })
     }
     for (const report of overlapDiagnostics.reports) {
       const displayed =
@@ -189,21 +231,13 @@ export const installOverlapTestApi = (
     ...colorControls,
     probeInspection: (center: [number, number]) => probeInspection(map, center, selectionKey()),
     sidebarHighlight: () => {
-      const layer = map.getLayer('language-preview-outline')
-      if (!layer || !('sourceLayer' in layer) || typeof layer.source !== 'string')
-        return { variantIds: [] }
-      const variantIds = [
-        ...new Set(
-          map
-            .querySourceFeatures(layer.source, { sourceLayer: layer.sourceLayer })
-            .flatMap(({ properties }) =>
-              typeof properties.variant_ids === 'string'
-                ? (JSON.parse(properties.variant_ids) as string[])
-                : [],
-            ),
-        ),
-      ].sort()
-      return { variantIds }
+      const evidence = [...geometryDisplay(map).highlights.keys()]
+        .filter((id) => id.startsWith('language-preview'))
+        .map((id) => highlightBoundaryEvidence(map, id))
+      return {
+        variantIds: [...new Set(evidence.flatMap((item) => item.variantIds))].sort(),
+        boundaryFeatures: evidence.reduce((sum, item) => sum + item.boundaryFeatures, 0),
+      }
     },
     inspectionHighlight: () =>
       inspectionHighlightState(map, parseOverlapSelection(selectionKey()).variantIds),
@@ -288,11 +322,15 @@ export const installOverlapTestApi = (
         ),
       ]
     },
+    watchGeometry: (enabled: boolean) => {
+      geometryFrames = enabled ? [] : null
+    },
     snapshot: () => {
       const status = readStatus()
       const gl = map.getCanvas().getContext('webgl2')
       const debug = gl?.getExtension('WEBGL_debug_renderer_info')
       return {
+        geometryFrames,
         status: status.status,
         message: status.message,
         selectedCount: selectedIds().length,

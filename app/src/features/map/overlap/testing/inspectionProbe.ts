@@ -1,6 +1,8 @@
 import type { Map as MapLibreMap } from 'maplibre-gl'
-import { visibleVariantIds } from '../../inspection.ts'
+import { geometryDisplay } from '../../geometry/display.ts'
+import { visibleColorLayers, visibleVariantIds } from '../../inspection.ts'
 import { parseOverlapSelection } from '../types.ts'
+import { highlightBoundaryEvidence } from './highlightProbe.ts'
 
 export interface InspectionProbe {
   readonly variantIds: readonly string[]
@@ -8,29 +10,19 @@ export interface InspectionProbe {
   readonly renderedMs: number
   readonly filterUnchanged: boolean
   readonly timedOut: boolean
+  readonly sourceReloads: number
 }
 
+const coverageFilters = (map: MapLibreMap) =>
+  visibleColorLayers(map).map((id) => map.getFilter(id) ?? null)
+
 export const inspectionHighlightState = (map: MapLibreMap, sourceIds: readonly string[]) => {
-  const sourceLayer = map.getLayer('inspected-language-areas')?.sourceLayer ?? ''
-  const outline = map.getLayer('language-inspection-outline')
-  const merged = new Set<string>(
-    outline && 'sourceLayer' in outline && typeof outline.source === 'string'
-      ? map
-          .querySourceFeatures(outline.source, { sourceLayer: outline.sourceLayer })
-          .flatMap(({ properties }) =>
-            typeof properties.variant_ids === 'string'
-              ? (JSON.parse(properties.variant_ids) as string[])
-              : [],
-          )
-      : [],
-  )
+  const evidence = highlightBoundaryEvidence(map, 'language-inspection')
+  const merged = new Set(evidence.variantIds)
   return {
-    variantIds: sourceIds.filter(
-      (id) =>
-        merged.has(id) ||
-        map.getFeatureState({ source: 'language-areas', sourceLayer, id }).inspected,
-    ),
-    filter: map.getFilter('inspected-language-areas'),
+    boundaryFeatures: evidence.boundaryFeatures,
+    variantIds: sourceIds.filter((id) => merged.has(id)),
+    filter: coverageFilters(map),
   }
 }
 
@@ -57,18 +49,23 @@ export const probeInspection = (
     JSON.stringify(inspectionHighlightState(map, candidates).variantIds.sort()) === expected
   const unchanged = matches()
   const started = performance.now()
+  const source = geometryDisplay(map).getSnapshot().source
   return new Promise((resolve) => {
+    let sourceReloads = 0
+    const onSourceLoading = (event: { sourceId?: string }) => {
+      if (event.sourceId === source) sourceReloads++
+    }
     const finish = (timedOut: boolean) => {
       clearTimeout(timer)
       map.off('render', onRender)
+      map.off('sourcedataloading', onSourceLoading)
       resolve({
         variantIds,
         queryMs,
         renderedMs: unchanged ? 0 : performance.now() - started,
-        filterUnchanged:
-          JSON.stringify(map.getFilter('inspected-language-areas')) ===
-          JSON.stringify(previous.filter),
+        filterUnchanged: JSON.stringify(coverageFilters(map)) === JSON.stringify(previous.filter),
         timedOut,
+        sourceReloads,
       })
     }
     const onRender = () => {
@@ -76,6 +73,7 @@ export const probeInspection = (
     }
     const timer = setTimeout(() => finish(true), 15_000)
     map.on('render', onRender)
+    map.on('sourcedataloading', onSourceLoading)
     map.fire('mousemove', {
       point,
       lngLat: map.unproject(point),

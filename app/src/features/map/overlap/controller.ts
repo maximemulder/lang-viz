@@ -1,3 +1,5 @@
+import type { GeometryCoverageClient } from '../geometry/geometryService.ts'
+import { PUBLICATION_TIMEOUT_MS } from '../geometry/limits.ts'
 import { type DeliveryTile, tileKey } from './delivery.ts'
 import type { CoverageSnapshot } from './deliveryProtocol.ts'
 import type { overlapDiagnostics } from './diagnostics.ts'
@@ -6,7 +8,6 @@ import { OverlapPatternError } from './patterns.ts'
 import { coverageTilesKey, retainCoverageTiles } from './tiles.ts'
 import type { OverlapRequest, OverlapResponse, TileCoordinate } from './types.ts'
 import { parseOverlapSelection } from './types.ts'
-import { type OverlapWorkerClient, PUBLICATION_TIMEOUT_MS } from './workerClient.ts'
 
 export interface HatchingState {
   readonly snapshots: readonly [CoverageSnapshot | null, CoverageSnapshot | null]
@@ -19,6 +20,7 @@ export interface CoverageResources {
   stage(
     tiles: ReadonlyMap<string, DeliveryTile>,
     buffer: 0 | 1,
+    scope: readonly TileCoordinate[],
   ): {
     snapshot: CoverageSnapshot
     pixels: number
@@ -54,7 +56,7 @@ export const idleHatchingState = (): HatchingState => ({
 
 /** Own computation and publication transitions, independent of React and MapLibre. */
 export const createOverlapController = (options: {
-  worker: Pick<OverlapWorkerClient, 'postMessage' | 'cancel' | 'terminate' | 'restarts'>
+  worker: Pick<GeometryCoverageClient, 'postMessage' | 'cancel' | 'terminate' | 'restarts'>
   resources: CoverageResources
   archiveUrl: string | (() => string)
   sourceLayer: string
@@ -63,6 +65,7 @@ export const createOverlapController = (options: {
   precomputed?: OverlapRequest['precomputed']
   parts?: (variantIds: readonly string[]) => OverlapRequest['parts']
   diagnostics?: typeof overlapDiagnostics
+  nativeFallback?: boolean
 }) => {
   const { worker, resources, diagnostics } = options
   let selectionKey = '[]'
@@ -78,6 +81,7 @@ export const createOverlapController = (options: {
   let batch: ReturnType<typeof setTimeout> | undefined
   let deadline: ReturnType<typeof setTimeout> | undefined
   let disposed = false
+  let failedSource = false
 
   const report = () => diagnostics?.reports.findLast((entry) => entry.requestId === request?.id)
   const update = (values: Parameters<NonNullable<typeof diagnostics>['update']>[1]) => {
@@ -171,12 +175,15 @@ export const createOverlapController = (options: {
     // solid fallback. Keep the old snapshot until the whole replacement succeeds;
     // a failed prefix stays cached for Retry without degrading the current view.
     if (changesDetail() && request.phase !== 'complete') return
-    if (request.phase === 'computing' && [...results.values()].every((tile) => !tile.features))
+    if (
+      request.phase === 'computing' &&
+      [...results.values()].every((tile) => !tile.features && !tile.fallback)
+    )
       return
     const started = performance.now()
     try {
       const buffer = active?.buffer === 0 ? 1 : 0
-      const { snapshot, pixels } = resources.stage(results, buffer)
+      const { snapshot, pixels } = resources.stage(results, buffer, retained)
       staging = {
         snapshot,
         tiles: new Map(results),
@@ -219,6 +226,7 @@ export const createOverlapController = (options: {
     if (!resources.isReady(staging.snapshot, staging.buffer)) return
     const previous = active
     active = staging
+    failedSource = false
     staging = null
     const finished = request.phase === 'complete' && active.version === request.version
     if (request.phase !== 'computing' && active.version === request.version) clearTimeout(deadline)
@@ -236,6 +244,7 @@ export const createOverlapController = (options: {
     if (active.version !== request.version) batch = setTimeout(stage, 32)
   }
   const reset = () => {
+    failedSource = false
     supersede()
     worker.cancel()
     if (active) resources.release(active.snapshot)
@@ -259,10 +268,7 @@ export const createOverlapController = (options: {
       viewportKeys = new Set(viewport.map(tileKey))
       const selection = enabled ? parseOverlapSelection(selectionKey) : { variantIds: [] }
       const { variantIds } = selection
-      const tiles = retainCoverageTiles(
-        variantIds.length > 1 || selection.variantGroups ? viewport : [],
-        retained,
-      )
+      const tiles = retainCoverageTiles(variantIds.length ? viewport : [], retained)
       const key = JSON.stringify([variantIds, coverageTilesKey(tiles)])
       retained = tiles
       if (key === previousKey) return
@@ -274,13 +280,14 @@ export const createOverlapController = (options: {
         return
       }
       const desired = new Set(tiles.map(tileKey))
-      for (const key of results.keys()) if (!desired.has(key)) results.delete(key)
+      for (const [key, tile] of results) if (!desired.has(key) || tile.fallback) results.delete(key)
       // Reversing a zoom can return to the still-visible snapshot before its
       // replacement finishes. Reuse those native tiles instead of fetching them again.
       let vertices = [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0)
       for (const [key, tile] of active?.tiles ?? []) {
         if (
           !desired.has(key) ||
+          tile.fallback ||
           results.has(key) ||
           vertices + tile.vertices > MAX_COVERAGE_VERTICES
         )
@@ -309,6 +316,20 @@ export const createOverlapController = (options: {
       )
       emit()
       const parts = options.parts?.(variantIds)
+      if (options.nativeFallback)
+        for (const tile of tiles) {
+          const key = tileKey(tile)
+          if (!results.has(key))
+            results.set(key, {
+              tile,
+              fallback: true,
+              data: new Uint8Array(),
+              renderData: new Uint8Array(),
+              patterns: [],
+              vertices: 0,
+              features: 0,
+            })
+        }
       worker.postMessage({
         requestId: request.id,
         archiveUrl:
@@ -320,9 +341,10 @@ export const createOverlapController = (options: {
         ...(options.precomputed ? { precomputed: options.precomputed } : {}),
         ...(parts ? { parts } : {}),
         tiles,
-        knownTiles: [...results.keys()],
+        knownTiles: [...results].filter(([, tile]) => !tile.fallback).map(([key]) => key),
         ...(diagnostics ? { profile: true } : {}),
       })
+      if (options.nativeFallback) stage()
     },
     receive(response: OverlapResponse) {
       if (disposed || response.requestId !== request?.id || request.phase !== 'computing') return
@@ -367,6 +389,7 @@ export const createOverlapController = (options: {
       request.phase = 'complete'
       if (
         active &&
+        !failedSource &&
         results.size === active.tiles.size &&
         [...results].every(([key, tile]) => active?.tiles.get(key) === tile)
       ) {
@@ -389,17 +412,15 @@ export const createOverlapController = (options: {
       if (disposed || (staging?.snapshot.id !== snapshotId && active?.snapshot.id !== snapshotId))
         return
       if (active?.snapshot.id === snapshotId) {
-        // Streaming errors in an already-visible source require the original
-        // fills again; keeping a clipped mask could leave uncovered areas blank.
-        resources.release(active.snapshot)
-        active = null
-        options.onCoverageReady(null)
+        // Loaded tiles remain a coherent geometry revision. Retry replaces the
+        // source atomically instead of exposing independently loaded originals.
+        failedSource = true
       }
       fail(
         'source-error',
         active
           ? 'New stripes could not load. Keeping the previous view. Try again.'
-          : 'Stripes could not load. Showing original language areas. Try again.',
+          : 'Map geometry could not load. Try again.',
         true,
       )
     },

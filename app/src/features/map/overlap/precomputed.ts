@@ -42,10 +42,11 @@ export const loadPrecomputedTile = async (
   tile: TileCoordinate,
   metrics?: OverlapMetrics,
   signal?: AbortSignal,
+  fetcher: (url: string, options?: { signal?: AbortSignal }) => Promise<Response> = fetch,
 ): Promise<CoverageTile | null> => {
   const started = performance.now()
   try {
-    const response = await fetch(url, signal ? { signal } : {})
+    const response = await fetcher(url, signal ? { signal } : {})
     if (!response.ok) throw new Error(`Prepared coverage HTTP ${response.status}`)
     const data = new Uint8Array(await response.arrayBuffer())
     if (metrics) metrics.fetchMs += performance.now() - started

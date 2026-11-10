@@ -17,7 +17,9 @@ import {
   languagePointerPreviewAtom,
 } from '../../state/languageControls'
 import { searchCoverageAtom } from '../../state/searchSelection'
-import { UnionOutline } from './UnionOutline'
+import { GeometryHighlight } from './GeometryHighlight'
+import { useGeometryDisplay } from './geometry/display'
+import { GeometryPreview } from './geometry/GeometryPreview'
 
 /** Independent tiles and paint keep previews out of selected coverage/cache identities. */
 export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActive: boolean }) => {
@@ -27,6 +29,7 @@ export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActiv
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const selected = useAtomValue(selectedMapAreasAtom)
+  const { state } = useGeometryDisplay()
   const pointer = useAtomValue(languagePointerPreviewAtom)
   const keyboard = useAtomValue(languageKeyboardPreviewAtom)
   const panel = useAtomValue(languagePanelAtom)
@@ -44,13 +47,39 @@ export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActiv
           : null)))
   const variants = targetGeometry(target, data, availability, coverage, hierarchy, entries)
   const ids = [...new Set(variants.map(({ id }) => id))].sort()
+  if (!ids.length) return null
+  const groupEntries = target?.groupId
+    ? new Set(
+        entries.filter((entry) => entry.group?.id === target.groupId).map((entry) => entry.id),
+      )
+    : null
+  const candidates = selected.filter((area) =>
+    target?.entryId
+      ? area.id === target.entryId
+      : groupEntries
+        ? groupEntries.has(area.id)
+        : area.variants.every((variant) => ids.includes(variant.id)),
+  )
+  const represented = [
+    ...new Set(candidates.flatMap((area) => area.variants.map((variant) => variant.id))),
+  ].sort()
+  if (
+    state.source &&
+    (state.snapshot?.composed || candidates.length === 1) &&
+    JSON.stringify(represented) === JSON.stringify(ids)
+  )
+    return (
+      <GeometryHighlight
+        key={state.source}
+        id="language-preview"
+        source={state.source}
+        groups={[candidates.map((area) => area.id)]}
+        variants={ids}
+        halo
+      />
+    )
   return (
-    <UnionOutline
-      id="language-preview"
-      groups={[ids]}
-      halo
-      fillOpacity={selected.length ? 0 : 0.12}
-    />
+    <GeometryPreview key={JSON.stringify(ids)} ids={ids} fillOpacity={selected.length ? 0 : 0.12} />
   )
 }
 

@@ -35,11 +35,12 @@ export const clipFallbackTile = async (
   metrics?: FallbackClipMetrics,
   signal?: AbortSignal,
   buffered = false,
+  clipBuffer = false,
 ): Promise<Uint8Array> => {
   signal?.throwIfAborted()
   if (!data.length) return data
   const rectangles = coverageRectangles(tile, coverage, 1)
-  if (!rectangles.length) return data
+  if (!rectangles.length && !clipBuffer) return data
   if (
     rectangles.some(
       ([left, top, right, bottom]) => left === 0 && top === 0 && right === 1 && bottom === 1,

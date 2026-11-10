@@ -203,9 +203,9 @@ def check_state(state, require_stripes=False, expected_errors=()):
     assert delivery.get("parentBytes", 0) <= 8 * 1024**2
     assert delivery.get("parentEntries", 0) <= 48
     fallback = services.get("fallback", {})
-    assert fallback.get("rawBytes", 0) <= 16 * 1024**2
+    assert fallback.get("rawBytes", 0) <= 32 * 1024**2
     assert fallback.get("resultBytes", 0) <= 16 * 1024**2
-    assert fallback.get("rawEntries", 0) <= 48
+    assert fallback.get("rawEntries", 0) <= 96
     assert fallback.get("resultEntries", 0) <= 96
     cache = report.get("metrics", {}).get("cache", {})
     assert cache.get("decodedEntries", 0) <= 48

@@ -105,8 +105,14 @@ const inputsFromFeatures = (
 export class OverlapComputer {
   /** Offline generation has no interactive deadline; browser requests cannot enable it. */
   private readonly offline: boolean
-  constructor(offline = false) {
+  private readonly fetcher: (url: string, options?: { signal?: AbortSignal }) => Promise<Response>
+  constructor(
+    offline = false,
+    fetcher: (url: string, options?: { signal?: AbortSignal }) => Promise<Response> = fetch,
+  ) {
     this.offline = offline
+    this.fetcher = fetcher
+    this.parts = new CoverageParts(fetcher)
   }
   private readonly tiles = new Map<
     string,
@@ -122,7 +128,7 @@ export class OverlapComputer {
   >()
   private cachedBytes = 0
   private cachedResultVertices = 0
-  private readonly parts = new CoverageParts()
+  private readonly parts: CoverageParts
 
   stats() {
     return {
@@ -194,7 +200,13 @@ export class OverlapComputer {
       if (preparedKey) {
         let result = this.results.get(preparedKey)
         if (!result) {
-          const decoded = await loadPrecomputedTile(preparedKey, tile, metrics, signal)
+          const decoded = await loadPrecomputedTile(
+            preparedKey,
+            tile,
+            metrics,
+            signal,
+            this.fetcher,
+          )
           if (!isCurrent()) return
           if (decoded) {
             result = { features: decoded.features, vertices: decoded.vertices }
@@ -269,6 +281,7 @@ export class OverlapComputer {
           bytes: response?.data.byteLength ?? 0,
         }
         if (metrics) metrics.decodeMs += performance.now() - decodeStart
+        this.cachedBytes -= this.tiles.get(key)?.bytes ?? 0
         this.tiles.set(key, cached)
         this.cachedBytes += cached.bytes
         while (this.tiles.size > MAX_CACHED_TILES || this.cachedBytes > MAX_CACHED_BYTES) {
@@ -384,6 +397,7 @@ export class OverlapComputer {
     key: string,
     result: { features: NativeCoverageFeature[]; vertices: number },
   ) {
+    this.cachedResultVertices -= this.results.get(key)?.vertices ?? 0
     this.results.set(key, result)
     this.cachedResultVertices += result.vertices
     while (

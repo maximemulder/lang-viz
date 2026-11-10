@@ -51,6 +51,12 @@ interface PartsTile {
 
 /** Selection-independent MVT/metadata cache; decoded coordinates belong to result caches. */
 export class CoverageParts {
+  private readonly fetcher: (url: string, options?: { signal?: AbortSignal }) => Promise<Response>
+  constructor(
+    fetcher: (url: string, options?: { signal?: AbortSignal }) => Promise<Response> = fetch,
+  ) {
+    this.fetcher = fetcher
+  }
   private readonly tiles = new Map<string, PartsTile>()
   private readonly indexes = new Map<string, Readonly<Record<string, readonly string[]>>>()
   private bytes = 0
@@ -74,7 +80,7 @@ export class CoverageParts {
       if (!index) {
         try {
           const started = performance.now()
-          const response = await fetch(url, signal ? { signal } : {})
+          const response = await this.fetcher(url, signal ? { signal } : {})
           signal?.throwIfAborted()
           if (!response.ok) return null
           const parsed: unknown = await response.json()
@@ -126,7 +132,7 @@ export class CoverageParts {
       // and format failures fall back live; cancellation and output budgets propagate.
       try {
         const started = performance.now()
-        const response = await fetch(url, signal ? { signal } : {})
+        const response = await this.fetcher(url, signal ? { signal } : {})
         signal?.throwIfAborted()
         if (!response.ok) return null
         const data = new Uint8Array(await response.arrayBuffer())
@@ -155,6 +161,7 @@ export class CoverageParts {
         }
         cached = { partsByVariant, extent: layer?.extent ?? 8192, bytes: data.byteLength }
         if (metrics) metrics.decodeMs += performance.now() - decodeStart
+        this.bytes -= this.tiles.get(url)?.bytes ?? 0
         this.tiles.set(url, cached)
         this.bytes += cached.bytes
         while (this.tiles.size > 48 || this.bytes > 16 * 1024 * 1024) {

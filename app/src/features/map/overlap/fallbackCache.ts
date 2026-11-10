@@ -16,6 +16,26 @@ export interface FallbackMetrics extends FallbackClipMetrics {
   resultEntries: number
 }
 
+export const createFallbackMetrics = (): FallbackMetrics => ({
+  features: 0,
+  clippedFeatures: 0,
+  untouchedFeatures: 0,
+  coveredFeatures: 0,
+  decodeMs: 0,
+  initializeMs: 0,
+  overlayMs: 0,
+  encodeMs: 0,
+  requests: 0,
+  cacheHits: 0,
+  rawCacheHits: 0,
+  fetchMs: 0,
+  clipMs: 0,
+  rawBytes: 0,
+  resultBytes: 0,
+  rawEntries: 0,
+  resultEntries: 0,
+})
+
 /** Key only the mask inside this tile, independent of unrelated snapshot changes. */
 export const fallbackMaskKey = (tile: TileCoordinate, coverage: readonly TileCoordinate[]) =>
   JSON.stringify(
@@ -27,25 +47,7 @@ export const fallbackMaskKey = (tile: TileCoordinate, coverage: readonly TileCoo
 export class FallbackCache {
   private readonly raw = new ByteCache(48, 16 * 1024 * 1024)
   private readonly results = new ByteCache(96, 16 * 1024 * 1024)
-  private readonly metrics: FallbackMetrics = {
-    features: 0,
-    clippedFeatures: 0,
-    untouchedFeatures: 0,
-    coveredFeatures: 0,
-    decodeMs: 0,
-    initializeMs: 0,
-    overlayMs: 0,
-    encodeMs: 0,
-    requests: 0,
-    cacheHits: 0,
-    rawCacheHits: 0,
-    fetchMs: 0,
-    clipMs: 0,
-    rawBytes: 0,
-    resultBytes: 0,
-    rawEntries: 0,
-    resultEntries: 0,
-  }
+  private readonly metrics = createFallbackMetrics()
 
   stats(): FallbackMetrics {
     return {

@@ -1,4 +1,6 @@
 import type { ErrorEvent, Map as MapLibreMap, VectorSourceSpecification } from 'maplibre-gl'
+import { geometryDisplay } from '../geometry/display.ts'
+import type { FallbackGeometry } from '../geometry/fallbackGeometry.ts'
 import type { CoverageResources } from './controller.ts'
 import { COVERAGE_LAYER } from './delivery.ts'
 import { type CoverageSnapshot, registerCoverage, releaseCoverage } from './deliveryProtocol.ts'
@@ -37,6 +39,7 @@ export const createMapResources = (
   drawPatterns: () => boolean = () => true,
   createStripeWorker: () => StripeTextureWorker = () =>
     new Worker(new URL('./stripeTexture.worker.ts', import.meta.url), { type: 'module' }),
+  geometry?: () => Omit<FallbackGeometry, 'tiles'>,
 ): CoverageResources & {
   updateColors(colors: ReadonlyMap<string, string>): void
   updateStripeThickness(thickness: number): void
@@ -97,9 +100,12 @@ export const createMapResources = (
     }
   }
   const syncLayerOrder = () => {
-    if (!map.getLayer('inspected-language-areas')) return
+    const anchor = map.getLayer('language-highlight-anchor')
+      ? 'language-highlight-anchor'
+      : 'inspected-language-areas'
+    if (!map.getLayer(anchor)) return
     const layers = map.getLayersOrder()
-    const inspection = layers.indexOf('inspected-language-areas')
+    const inspection = layers.indexOf(anchor)
     for (const buffer of BUFFERS)
       for (const id of [
         solidLayerId(buffer),
@@ -107,7 +113,7 @@ export const createMapResources = (
         fallbackLayerId(buffer),
         ...layers.filter((id) => id.startsWith(blendLayerPrefix(buffer))),
       ])
-        if (layers.indexOf(id) > inspection) map.moveLayer(id, 'inspected-language-areas')
+        if (layers.indexOf(id) > inspection) map.moveLayer(id, anchor)
   }
   const patternImage = (members: readonly string[]) => {
     const memberColors = members.map((member) => {
@@ -195,7 +201,7 @@ export const createMapResources = (
       lastDensity = null
       updateDensity()
     },
-    stage(tiles, buffer) {
+    stage(tiles, buffer, scope) {
       const unique = new Map(
         [...tiles.values()]
           .flatMap((tile) => tile.patterns)
@@ -223,6 +229,7 @@ export const createMapResources = (
       const snapshot = registerCoverage(
         tiles,
         typeof archiveUrl === 'function' ? archiveUrl() : archiveUrl,
+        geometry ? { ...geometry(), tiles: scope } : undefined,
       )
       preparePublicationTest(snapshot.id)
       snapshots.set(snapshot.id, {
@@ -243,6 +250,7 @@ export const createMapResources = (
       const failed = snapshots.get(snapshot.id)?.failed !== false
       return (
         !failed &&
+        geometryDisplay(map).canPublish(snapshot.maxzoom) &&
         source(coverageSourceId(buffer))?.tiles?.[0] === snapshot.url &&
         map.isSourceLoaded(coverageSourceId(buffer))
       )

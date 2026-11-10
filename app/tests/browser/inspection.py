@@ -141,6 +141,10 @@ def lifecycle(browser, output):
 def benchmark(browser):
     results = []
     for period in ("contemporary", "time-of-contact"):
+        # Keep the selected dataset while navigating, so this measures hover on
+        # settled coverage rather than repeatedly clearing and cold-loading it.
+        select_all(browser, "Asher", [25, 8], zoom=4.25, period=period, settle=False)
+        browser.settled(120, fail_on_error=True)
         for projection in ("globe", "mercator"):
             browser.js(
                 "document.querySelector('input[name=map-projection][value='+arguments[0]+']').click()",
@@ -151,7 +155,7 @@ def benchmark(browser):
                 ("africa", [25, 8], 4.25, [[25, 8], [27, 8], [25, 8], [27, 8]]),
                 ("asia", [100, 30], 4.25, [[100, 30], [102, 30], [100, 30], [102, 30]]),
             ):
-                select_all(browser, "Asher", center, zoom=zoom, period=period, settle=False)
+                browser.js("window.overlapTest.camera(arguments[0],arguments[1])", center, zoom)
                 before = browser.settled(120, fail_on_error=True)
                 check_state(before)
                 assert before["selectedCount"] > 5000
@@ -166,6 +170,7 @@ def benchmark(browser):
                         },
                     )
                     assert not sample["timedOut"] and sample["filterUnchanged"], sample
+                    assert sample["sourceReloads"] == 0, "Hover reloaded the shared geometry source: " + str(sample)
                     assert sample["variantIds"], (period, name, point)
                     samples.append(sample)
                 after = browser.snapshot()
@@ -194,6 +199,9 @@ def main():
         open_atlas(browser, origin)
         try:
             lifecycle(browser, args.output)
+            # Reset document-wide diagnostics after the lifecycle's intentional
+            # selection clearing; measure steady hover in a fresh map session.
+            open_atlas(browser, origin)
             results = benchmark(browser)
             (args.output / "report.json").write_text(json.dumps(results, indent=2) + "\n")
         except Exception:

@@ -196,7 +196,7 @@ class GeometryScope {
 }
 
 /** Dissolve a highlighted footprint without constructing overlap memberships. */
-export const createOutlineUnion = async () => {
+export const createFootprintUnion = async () => {
   let lastError = ''
   const geos = await initGeos({
     errorHandler: (message) => {
@@ -204,12 +204,17 @@ export const createOutlineUnion = async () => {
     },
     noticeHandler: () => {},
   })
-  return (polygons: MultiPolygon): MultiPolygon => {
+  return (polygons: MultiPolygon, subtract: MultiPolygon = []): MultiPolygon => {
     lastError = ''
     const scope = new GeometryScope(geos, () => lastError)
     try {
       const inputs = polygons.map((polygon) => scope.read([polygon]))
-      const merged = scope.unionAll(inputs)
+      let merged = scope.unionAll(inputs)
+      if (subtract.length)
+        merged = scope.difference(
+          merged,
+          scope.unionAll(subtract.map((polygon) => scope.read([polygon]))),
+        )
       return scope.polygons(merged).map((polygon) => scope.exportPolygon(polygon))
     } finally {
       scope.dispose()

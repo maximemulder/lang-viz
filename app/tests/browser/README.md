@@ -34,7 +34,7 @@ space, pin/close, canvas exit, selection clearing, aggregate source outlines, st
 replacement, and newly loaded tiles in both projections. It then measures picking
 and mouse-event-to-render latency for complete Asher selections, in world and dense
 African/Asian views, for both periods and projections. Hover must preserve the
-outline filter, coverage URLs, and geometry request count. Reports and screenshots
+fill filters, coverage URLs, and geometry request count. Reports and screenshots
 go to `test-results/inspection/`; timing observations have no machine-dependent
 pass threshold. The timing probe sends public MapLibre mouse events; lifecycle
 checks use WebDriver pointer actions. The default builds and previews production;
@@ -372,3 +372,27 @@ zoom-step continuity, style restoration and narrow settings. Screenshots and the
 frequency report go to `test-results/stripes/`. A rapid slider sequence in the dense
 world view verifies actual worker cancellation before all textures are generated,
 latest-value completion, unchanged sprite counts, and preserved geometry.
+
+### Shared geometry and outline LOD
+
+`npm run test:geometry-browser` checks direct and aggregate inspections during rapid
+zoom-in/zoom-out transitions. Each rendered frame must use the active fill source
+for its outline, including detection of missing outline layers. Inspection and
+sidebar probes query loaded boundary lines through the actual layer filters,
+require nondegenerate geometry for every requested group, and reject incorrect
+filters or invisible lines. Resident inspection layers additionally require the
+feature-state opacity expression and applied `inspected` state on the loaded IDs.
+The inspection benchmark counts source-loading events during each hover and
+requires zero: stable coverage URLs and fill filters alone cannot detect a costly
+MapLibre reparse caused by changing an outline filter. Each period stays selected
+while the benchmark navigates between settled world, Africa and Asia views.
+Each settled zoom must retain loaded outline geometry;
+the report is written to `test-results/geometry/report.json`. These are source
+geometry checks, not framebuffer proofs of every outline pixel.
+Initial loading is excluded from blank-frame diagnostics; once a selection has
+rendered geometry, losing every visible fill layer remains a failure.
+
+The unit geometry suites cover boundary adjacency, unions, holes, native fallback
+LOD/parent delivery (including mixed composed/fallback seams), preview commit coordination, shared fetch cancellation, and
+worker restart replay. The focus/inspection browser suites additionally exercise
+pinned source/period previews, style replacement, and pointer/keyboard lifecycle.

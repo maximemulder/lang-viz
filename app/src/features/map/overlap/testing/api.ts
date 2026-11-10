@@ -36,10 +36,15 @@ export interface OverlapTestApi {
   failNextPublication(service: TileService): void
   inspect(center: [number, number]): { variantIds: string[]; point: [number, number] }
   probeInspection(center: [number, number]): Promise<InspectionProbe>
-  inspectionHighlight(): { variantIds: readonly string[]; filter: unknown }
-  sidebarHighlight(): { variantIds: readonly string[] }
+  inspectionHighlight(): {
+    variantIds: readonly string[]
+    boundaryFeatures: number
+    filter: unknown
+  }
+  sidebarHighlight(): { variantIds: readonly string[]; boundaryFeatures: number }
   reloadStyle(): void
   setTileDelay(service: TileService, milliseconds: number): void
+  watchGeometry(enabled: boolean): void
   watchAreas(points: [number, number][] | null): void
   watchStripes(center: [number, number] | null): void
   samplePixels(center: [number, number], radius: number): Promise<number[]>

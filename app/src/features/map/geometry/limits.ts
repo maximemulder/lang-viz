@@ -1,0 +1,3 @@
+export const CANCELLATION_GRACE_MS = 150
+export const REQUEST_TIMEOUT_MS = 8_000
+export const PUBLICATION_TIMEOUT_MS = 12_000

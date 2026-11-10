@@ -1,65 +1,15 @@
 import { addProtocol } from 'maplibre-gl'
+import type { FallbackGeometry } from '../geometry/fallbackGeometry.ts'
+import { geometryService } from '../geometry/geometryService.ts'
 import { combineTileLayers, type DeliveryTile, isTileDescendant, tileKey } from './delivery.ts'
-import type { DeliveryRequest, DeliveryResponse } from './deliveryStore.ts'
 import { checkTileTestFailure, delayTileTest, diagnosticsEnabled } from './diagnostics.ts'
 import { requestFallbackTile } from './fallbackProtocol.ts'
 import { serviceDiagnostics } from './serviceDiagnostics.ts'
 import type { OverlapProperties, TileCoordinate } from './types.ts'
 
 let nextId = 0
-let nextTileId = 0
-let nextRequestId = 0
-let worker: Worker | undefined
-const tileIds = new WeakMap<DeliveryTile, number>()
-const sentIds = new Set<number>()
-const pending = new Map<
-  number,
-  { resolve: (data: Uint8Array) => void; reject: (error: Error) => void }
->()
-
-const postSnapshot = (id: number, tiles: ReadonlyMap<string, DeliveryTile>) => {
-  const additions: [number, DeliveryTile][] = []
-  const ids = [...tiles.values()].map((tile) => {
-    let key = tileIds.get(tile)
-    if (key === undefined) {
-      key = ++nextTileId
-      tileIds.set(tile, key)
-    }
-    if (!sentIds.has(key)) {
-      sentIds.add(key)
-      additions.push([key, tile])
-    }
-    return key
-  })
-  const request: DeliveryRequest = { register: id, ids, additions }
-  worker?.postMessage(request)
-}
-
-const ensureWorker = () => {
-  if (worker) return worker
-  worker = new Worker(new URL('./delivery.worker.ts', import.meta.url), { type: 'module' })
-  const currentWorker = worker
-  sentIds.clear()
-  for (const [id, tiles] of snapshots) postSnapshot(id, tiles)
-  worker.onmessage = ({ data }: MessageEvent<DeliveryResponse>) => {
-    if (worker !== currentWorker) return
-    if (diagnosticsEnabled) serviceDiagnostics.delivery = data.metrics
-    const request = pending.get(data.request)
-    pending.delete(data.request)
-    if (data.error) request?.reject(new Error(data.error))
-    else request?.resolve(data.data ?? new Uint8Array())
-  }
-  worker.onerror = () => {
-    if (worker !== currentWorker) return
-    for (const request of pending.values())
-      request.reject(new Error('Could not assemble overlap tiles.'))
-    pending.clear()
-    worker?.terminate()
-    worker = undefined
-  }
-  return worker
-}
 const snapshots = new Map<number, ReadonlyMap<string, DeliveryTile>>()
+const fallbacks = new Map<number, FallbackGeometry>()
 const recordSnapshots = () => {
   if (!diagnosticsEnabled) return
   const tiles = new Set([...snapshots.values()].flatMap((snapshot) => [...snapshot.values()]))
@@ -81,21 +31,25 @@ export interface CoverageSnapshot {
   readonly coverageTiles: readonly TileCoordinate[]
   readonly maxzoom: number
   readonly patterns?: readonly OverlapProperties[]
+  readonly composed?: boolean
 }
 
 /** Snapshots share immutable encoded tile buffers; they never copy the geometry. */
 export const registerCoverage = (
   tiles: ReadonlyMap<string, DeliveryTile>,
   archiveUrl: string,
+  fallback?: FallbackGeometry,
 ): CoverageSnapshot => {
   const id = ++nextId
   snapshots.set(id, new Map(tiles))
+  if (fallback) fallbacks.set(id, fallback)
   recordSnapshots()
-  if (worker) postSnapshot(id, tiles)
+  geometryService.register(id, [...tiles.values()])
   return {
     id,
-    url: `language-overlap://${id}/{z}/{x}/{y}?archive=${encodeURIComponent(archiveUrl.replace(/^pmtiles:\/\//, ''))}`,
+    url: `language-overlap://${id}/{z}/{x}/{y}?archive=${encodeURIComponent(archiveUrl.replace(/^pmtiles:\/\//, ''))}&fallback=${fallback ? 1 : 0}`,
     coverageTiles: [...tiles.values()].map(({ tile }) => tile),
+    composed: [...tiles.values()].every((tile) => !tile.fallback),
     maxzoom: tiles.values().next().value?.tile.z ?? 0,
     patterns: [
       ...new Map(
@@ -107,14 +61,9 @@ export const registerCoverage = (
 
 export const releaseCoverage = (snapshot: CoverageSnapshot) => {
   snapshots.delete(snapshot.id)
+  fallbacks.delete(snapshot.id)
   recordSnapshots()
-  worker?.postMessage({ release: snapshot.id } satisfies DeliveryRequest)
-  const used = new Set(
-    [...snapshots.values()].flatMap((tiles) =>
-      [...tiles.values()].map((tile) => tileIds.get(tile)),
-    ),
-  )
-  for (const id of sentIds) if (!used.has(id)) sentIds.delete(id)
+  geometryService.release(snapshot.id)
 }
 
 const requestCoverageTile = async (id: number, target: TileCoordinate, signal: AbortSignal) => {
@@ -131,21 +80,13 @@ const requestCoverageTile = async (id: number, target: TileCoordinate, signal: A
     if (diagnosticsEnabled) serviceDiagnostics.nativeRequests++
     return native?.renderData ?? new Uint8Array()
   }
-  const request = ++nextRequestId
-  const currentWorker = ensureWorker()
-  const abort = () => {
-    pending.get(request)?.reject(new DOMException('Tile request aborted', 'AbortError'))
-    pending.delete(request)
-  }
-  signal.addEventListener('abort', abort, { once: true })
-  try {
-    return await new Promise<Uint8Array>((resolve, reject) => {
-      pending.set(request, { resolve, reject })
-      currentWorker.postMessage({ request, snapshot: id, tile: target } satisfies DeliveryRequest)
-    })
-  } finally {
-    signal.removeEventListener('abort', abort)
-  }
+  const result = await geometryService.request(
+    { kind: 'delivery', snapshot: id, tile: target },
+    signal,
+  )
+  if (result.kind !== 'delivery') throw new Error('Invalid geometry delivery')
+  if (diagnosticsEnabled) serviceDiagnostics.delivery = result.metrics
+  return result.data
 }
 
 addProtocol('language-overlap', async ({ url }, controller) => {
@@ -153,6 +94,7 @@ addProtocol('language-overlap', async ({ url }, controller) => {
   const [path = '', query] = url.split('?')
   const [id, z, x, y] = path.slice('language-overlap://'.length).split('/').map(Number)
   const archiveUrl = new URLSearchParams(query).get('archive')
+  const needsFallback = new URLSearchParams(query).get('fallback') !== '0'
   if (
     id === undefined ||
     z === undefined ||
@@ -172,13 +114,16 @@ addProtocol('language-overlap', async ({ url }, controller) => {
     const target = { z, x, y }
     const [coverage, fallback] = await Promise.all([
       requestCoverageTile(id, target, cancellation.signal),
-      requestFallbackTile(
-        archiveUrl,
-        [...tiles.values()].map(({ tile }) => tile),
-        target,
-        id,
-        cancellation.signal,
-      ),
+      needsFallback
+        ? requestFallbackTile(
+            archiveUrl,
+            [...tiles.values()].filter((tile) => !tile.fallback).map(({ tile }) => tile),
+            target,
+            id,
+            cancellation.signal,
+            fallbacks.get(id),
+          )
+        : Promise.resolve(new Uint8Array()),
     ])
     controller.signal.throwIfAborted()
     // One source owns both sides of the partition. Tile retention and stencil
@@ -192,8 +137,7 @@ addProtocol('language-overlap', async ({ url }, controller) => {
 
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
-    worker?.terminate()
+    for (const id of snapshots.keys()) geometryService.release(id)
     snapshots.clear()
-    for (const request of pending.values()) request.reject(new Error('Overlap delivery reloaded'))
-    pending.clear()
+    fallbacks.clear()
   })

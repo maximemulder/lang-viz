@@ -36,8 +36,7 @@ export const visibleColorLayers = (
       (id) => map.getLayer(id) && Number(map.getPaintProperty(id, 'fill-layer-opacity')) > 0,
     ),
   )
-  const original = 'selected-language-areas'
-  return coverage.length ? coverage : map.getLayer(original) ? [original] : []
+  return coverage
 }
 
 export const visibleVariantIds = (

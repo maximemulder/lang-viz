@@ -1,17 +1,26 @@
+import type { FallbackGeometry } from '../geometry/fallbackGeometry.ts'
+import { geometryService } from '../geometry/geometryService.ts'
 import { checkTileTestFailure, delayTileTest, diagnosticsEnabled } from './diagnostics.ts'
-import { FallbackWorkerClient } from './fallbackWorkerClient.ts'
 import { serviceDiagnostics } from './serviceDiagnostics.ts'
 import type { TileCoordinate } from './types.ts'
 
-const client = new FallbackWorkerClient(
-  () => new Worker(new URL('./fallback.worker.ts', import.meta.url), { type: 'module' }),
-  (metrics) => {
-    if (diagnosticsEnabled) serviceDiagnostics.fallback = metrics
-  },
-)
-
+const requestTile = async (
+  archiveUrl: string,
+  tile: TileCoordinate,
+  coverage: readonly TileCoordinate[],
+  signal: AbortSignal,
+  fallback?: FallbackGeometry,
+) => {
+  const result = await geometryService.request(
+    { kind: 'source', archiveUrl, coverage, tile, ...(fallback ? { fallback } : {}) },
+    signal,
+  )
+  if (result.kind !== 'source') throw new Error('Invalid geometry response')
+  if (diagnosticsEnabled) serviceDiagnostics.fallback = result.metrics
+  return result.data
+}
 export const requestSourceTile = (archiveUrl: string, tile: TileCoordinate, signal: AbortSignal) =>
-  client.request({ archiveUrl, coverage: [], tile }, signal)
+  requestTile(archiveUrl, tile, [], signal)
 
 /** Load the complementary layer for the same atomic MVT as coverage. */
 export const requestFallbackTile = async (
@@ -20,13 +29,9 @@ export const requestFallbackTile = async (
   tile: TileCoordinate,
   snapshotId: number,
   signal: AbortSignal,
+  fallback?: FallbackGeometry,
 ) => {
   await delayTileTest('fallback', signal)
   checkTileTestFailure('fallback', snapshotId)
-  return client.request({ archiveUrl, coverage, tile }, signal)
+  return requestTile(archiveUrl, tile, coverage, signal, fallback)
 }
-
-if (import.meta.hot)
-  import.meta.hot.dispose(() => {
-    client.terminate(new Error('Fallback worker reloaded'))
-  })

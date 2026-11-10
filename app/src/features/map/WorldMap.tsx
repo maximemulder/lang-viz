@@ -15,12 +15,10 @@ import {
   mapAreaSelectionKey,
   mapAreaSourceColors,
   mapAreaSourcePriorities,
-  mapAreasNeedComposition,
 } from '../../domain/aggregation'
 import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
-  languageOpacityAtom,
   mapEntriesAtom,
   overlapModeAtom,
   selectedMapAreasAtom,
@@ -65,7 +63,6 @@ const PROJECTIONS = {
 
 const LANGUAGE_SOURCE_ID = 'language-areas'
 const LANGUAGE_HIT_LAYER_ID = 'language-area-hit-targets'
-const SELECTED_LANGUAGE_LAYER_ID = 'selected-language-areas'
 const NO_VARIANT_IDS: readonly string[] = []
 
 const inspectionFromVariants = (
@@ -88,7 +85,6 @@ const LanguageLayers = memo(() => {
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const overlapMode = useAtomValue(overlapModeAtom)
-  const opacity = useAtomValue(languageOpacityAtom)
   const [coverageKey, setCoverageKey] = useState<string | null>(null)
   const areas = useAtomValue(selectedMapAreasAtom)
   const memberships = mapAreaMemberships(areas)
@@ -96,10 +92,7 @@ const LanguageLayers = memo(() => {
   const sourceColors = mapAreaSourceColors(areas)
   const sourcePriorities = mapAreaSourcePriorities(areas)
   const selectionKey = mapAreaSelectionKey(areas, overlapMode)
-  const hasComposition = mapAreasNeedComposition(areas)
-  const coverageReady =
-    (overlapMode === 'hatching' || hasComposition) && coverageKey === selectionKey
-  const filter: FilterSpecification = ['in', ['get', 'variant_id'], ['literal', variantIds]]
+  const coverageReady = coverageKey === selectionKey
   const temporalFilter: FilterSpecification =
     temporalSelection === 'all'
       ? ['has', 'variant_id']
@@ -137,51 +130,6 @@ const LanguageLayers = memo(() => {
           type="fill"
           filter={availableGeometryFilter}
           paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
-        />
-        <Layer
-          id={SELECTED_LANGUAGE_LAYER_ID}
-          source={LANGUAGE_SOURCE_ID}
-          source-layer={data.manifest.vectorLayer}
-          type="fill"
-          filter={filter}
-          layout={{
-            'fill-sort-key': [
-              'coalesce',
-              ['get', ['get', 'variant_id'], ['literal', sourcePriorities]],
-              0,
-            ],
-          }}
-          paint={{
-            'fill-color': [
-              'coalesce',
-              ['get', ['get', 'variant_id'], ['literal', sourceColors]],
-              '#777777',
-            ],
-            // Once ready, coverage and its spatially clipped vector fallback
-            // replace these fills. Neither draws beneath the other's interiors.
-            'fill-opacity': coverageReady
-              ? 0
-              : overlapMode === 'blending' && !hasComposition
-                ? opacity
-                : 1,
-            'fill-layer-opacity': overlapMode === 'hatching' || hasComposition ? opacity : 1,
-            'fill-opacity-transition': { duration: 0 },
-            'fill-layer-opacity-transition': { duration: 0 },
-          }}
-        />
-        <Layer
-          id="inspected-language-areas"
-          source={LANGUAGE_SOURCE_ID}
-          source-layer={data.manifest.vectorLayer}
-          type="line"
-          // Selection changes rebuild this bucket; hover only changes feature paint.
-          filter={filter}
-          paint={{
-            'line-color': '#111111',
-            'line-opacity': ['case', ['boolean', ['feature-state', 'inspected'], false], 0.95, 0],
-            'line-opacity-transition': { duration: 0 },
-            'line-width': 3,
-          }}
         />
       </Source>
       <OverlapHatching
@@ -226,6 +174,8 @@ export const WorldMap = () => {
   const inspectionFilterRef = useRef({
     inspectionSelectionKey,
   })
+  const lastHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
+  const inspectionDirtyRef = useRef(false)
   const pendingHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
   const hoverQueryFrameRef = useRef<number | null>(null)
   const viewportDirtyRef = useRef(true)
@@ -270,6 +220,33 @@ export const WorldMap = () => {
     [],
   )
 
+  const queryHover = (event: MapLayerMouseEvent) => {
+    if (inspectionRef.current?.pinned) return
+
+    pendingHoverEventRef.current = event
+    if (hoverQueryFrameRef.current !== null) return
+
+    hoverQueryFrameRef.current = window.requestAnimationFrame(() => {
+      hoverQueryFrameRef.current = null
+      const latestEvent = pendingHoverEventRef.current
+      pendingHoverEventRef.current = null
+      if (!latestEvent || inspectionRef.current?.pinned) return
+
+      const location = latestEvent.target.unproject(latestEvent.point)
+      const nextInspection = inspectionFromVariants(
+        visibleVariantIds(latestEvent.target, latestEvent.point, refinements, memberships),
+        location.lng,
+        location.lat,
+        false,
+      )
+      latestEvent.target.getCanvas().style.cursor = nextInspection ? 'pointer' : ''
+
+      if (!hasSameVariants(inspectionRef.current, nextInspection)) {
+        updateInspection(nextInspection)
+      }
+    })
+  }
+
   // Pattern zoom fades blend two stripe phases and create false category colors.
   return (
     <MapView
@@ -283,31 +260,11 @@ export const WorldMap = () => {
       fadeDuration={0}
       reuseMaps
       onMouseMove={(event) => {
-        if (inspectionRef.current?.pinned) return
-
-        pendingHoverEventRef.current = event
-        if (hoverQueryFrameRef.current !== null) return
-
-        hoverQueryFrameRef.current = window.requestAnimationFrame(() => {
-          hoverQueryFrameRef.current = null
-          const latestEvent = pendingHoverEventRef.current
-          pendingHoverEventRef.current = null
-          if (!latestEvent || inspectionRef.current?.pinned) return
-
-          const nextInspection = inspectionFromVariants(
-            visibleVariantIds(latestEvent.target, latestEvent.point, refinements, memberships),
-            latestEvent.lngLat.lng,
-            latestEvent.lngLat.lat,
-            false,
-          )
-          latestEvent.target.getCanvas().style.cursor = nextInspection ? 'pointer' : ''
-
-          if (!hasSameVariants(inspectionRef.current, nextInspection)) {
-            updateInspection(nextInspection)
-          }
-        })
+        lastHoverEventRef.current = event
+        queryHover(event)
       }}
       onMouseOut={(event) => {
+        lastHoverEventRef.current = null
         cancelPendingHoverQuery()
         event.target.getCanvas().style.cursor = ''
         if (!inspectionRef.current?.pinned) updateInspection(null)
@@ -324,12 +281,20 @@ export const WorldMap = () => {
         )
       }}
       onMoveStart={() => {
+        inspectionDirtyRef.current = true
         viewportDirtyRef.current = true
       }}
       onSourceData={(event) => {
+        if (event.sourceId?.startsWith('language-overlap-regions-'))
+          inspectionDirtyRef.current = true
         if (event.sourceId === LANGUAGE_SOURCE_ID) viewportDirtyRef.current = true
       }}
       onIdle={(event) => {
+        if (inspectionDirtyRef.current) {
+          inspectionDirtyRef.current = false
+          if (lastHoverEventRef.current) queryHover(lastHoverEventRef.current)
+        }
+
         // Hover repaints also become idle; viewport discovery only needs new
         // camera/source data, not a scan of every language on each hover.
         if (!viewportDirtyRef.current || !event.target.getLayer(LANGUAGE_HIT_LAYER_ID)) return
@@ -346,6 +311,11 @@ export const WorldMap = () => {
       {!BASEMAP_DISABLED && <MapBackground mode={backgroundMode} />}
       <Suspense fallback={null}>
         <LanguageLayers />
+        <Layer
+          id="language-highlight-anchor"
+          type="background"
+          paint={{ 'background-opacity': 0 }}
+        />
         <InspectionHighlight
           variantIds={sidebarPointer ? NO_VARIANT_IDS : (inspection?.variantIds ?? NO_VARIANT_IDS)}
         />

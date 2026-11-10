@@ -1,6 +1,7 @@
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { type Feature, fromVectorTileJs, GeoJSONWrapper } from '@maplibre/vt-pbf'
 import { PbfReader } from 'pbf'
+import { BOUNDARY_LAYER, geometryBoundaries } from '../geometryBoundaries.ts'
 import type { CoverageTile } from './compute.ts'
 import { bufferTileEdges } from './tileBuffer.ts'
 import { quantizeTilePolygon } from './tileGeometry.ts'
@@ -10,6 +11,8 @@ export const COVERAGE_LAYER = 'overlap_coverage'
 const EXTENT = 8192
 
 export interface DeliveryTile {
+  /** Geometry is still composing; this native tile is supplied by source fallback. */
+  readonly fallback?: boolean
   readonly tile: TileCoordinate
   /** Exact tile interiors, used when assembling a coarser parent. */
   readonly data: Uint8Array
@@ -31,7 +34,7 @@ export const isTileDescendant = (source: TileCoordinate, target: TileCoordinate)
   )
 }
 
-const encode = (features: Feature[], buffered = false) => {
+const encode = (features: Feature[], buffered: boolean, boundaries: Feature[]) => {
   if (!features.length) return new Uint8Array()
   const layer = new GeoJSONWrapper(
     buffered
@@ -45,7 +48,9 @@ const encode = (features: Feature[], buffered = false) => {
     { extent: EXTENT, version: 2 },
   )
   layer.name = COVERAGE_LAYER
-  return fromVectorTileJs({ layers: { [COVERAGE_LAYER]: layer } })
+  const boundary = new GeoJSONWrapper(boundaries, { extent: EXTENT, version: 2 })
+  boundary.name = BOUNDARY_LAYER
+  return fromVectorTileJs({ layers: { [COVERAGE_LAYER]: layer, [BOUNDARY_LAYER]: boundary } })
 }
 
 /** MVT winding is clockwise for shells in downward-growing tile Y coordinates. */
@@ -65,8 +70,9 @@ export const encodeCoverageTile = (result: CoverageTile): DeliveryTile => {
       ]),
     ),
   }))
-  const data = encode(features)
-  const renderData = encode(features, true)
+  const boundaries = geometryBoundaries(features, EXTENT)
+  const data = encode(features, false, boundaries)
+  const renderData = encode(features, true, boundaries)
   return {
     tile: result.tile,
     patterns: result.features.map(({ properties }) => properties),
@@ -81,7 +87,9 @@ export const encodeCoverageTile = (result: CoverageTile): DeliveryTile => {
  * The vector source maxzoom is the computation zoom, so children are overzoomed
  * by MapLibre and never need a second clipping/overlay pass here. Parents assemble
  * canonical bytes first, then add only their own outer render buffer: carrying
- * native buffers inward would double-cover internal child boundaries.
+ * native buffers inward would double-cover internal child boundaries. Carry the
+ * native boundary network too: reconstructing it from child faces would turn
+ * clipping cuts beside fallback or absent children into geographic borders.
  */
 export const deliveryTile = (
   tiles: ReadonlyMap<string, DeliveryTile>,
@@ -91,6 +99,7 @@ export const deliveryTile = (
   const native = tiles.get(tileKey(target))
   if (native) return buffered ? native.renderData : native.data
   const features: Feature[] = []
+  const boundaries: Feature[] = []
   for (const result of tiles.values()) {
     const scale = 2 ** (result.tile.z - target.z)
     if (
@@ -100,7 +109,8 @@ export const deliveryTile = (
       !result.data.length
     )
       continue
-    const layer = new VectorTile(new PbfReader(result.data)).layers[COVERAGE_LAYER]
+    const layers = new VectorTile(new PbfReader(result.data)).layers
+    const layer = layers[COVERAGE_LAYER]
     if (!layer) continue
     const offsetX = result.tile.x / scale - target.x
     const offsetY = result.tile.y / scale - target.y
@@ -117,8 +127,23 @@ export const deliveryTile = (
         ),
       })
     }
+    const boundary = layers[BOUNDARY_LAYER]
+    if (!boundary) continue
+    for (let i = 0; i < boundary.length; i++) {
+      const feature = boundary.feature(i)
+      const geometry = feature.loadGeometry().flatMap((line) => {
+        const points = line.map(({ x, y }): [number, number] => [
+          Math.round(offsetX * EXTENT + x / scale),
+          Math.round(offsetY * EXTENT + y / scale),
+        ])
+        return points.some((point) => point[0] !== points[0]?.[0] || point[1] !== points[0]?.[1])
+          ? [points]
+          : []
+      })
+      if (geometry.length) boundaries.push({ type: 2, tags: feature.properties, geometry })
+    }
   }
-  return encode(features, buffered)
+  return encode(features, buffered, boundaries)
 }
 
 /** MVT repeats its layer field: concatenate distinct layers without re-encoding. */

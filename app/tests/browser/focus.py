@@ -29,7 +29,10 @@ def check_focus(browser, output):
 
     def outlined(expected):
         field = 'variantIds'
-        return wait_for(lambda: highlight() if sorted(highlight()[field]) == sorted(expected) else None, 20, 'sidebar outline '+str(expected))
+        state = wait_for(lambda: highlight() if sorted(highlight()[field]) == sorted(expected) else None, 20, 'sidebar outline '+str(expected))
+        if expected:
+            assert state['boundaryFeatures'] > 0, state
+        return state
 
     browser.js('window.overlapTest.configure({languageIds:[],center:[8,50],zoom:3})')
     search(browser, 'stan1295', 'stan1295')
@@ -162,6 +165,8 @@ def check_focus(browser, output):
     wait_for(lambda: not browser.snapshot()['moving'] and browser.snapshot()['camera']['center'][0] < 50, 20, 'pinned group framing')
     ready()
     move('#language-tab-map')
+    # The source loaded before this profile outline was added. Its overzoomed
+    # tiles must retain real boundaries, not just the visible fill layer.
     outlined(expected)
     assert browser.js("return !!document.querySelector('.focused-map-entry[data-group-id]')")
     assert not aggregate['errors']

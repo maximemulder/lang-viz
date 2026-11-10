@@ -12,6 +12,8 @@ import {
   overlapStatusAtom,
   stripeThicknessAtom,
 } from '../../../state/atlasState'
+import { geometryDisplay } from '../geometry/display'
+import { GeometryCoverageClient } from '../geometry/geometryService'
 import { CoverageLayers } from './CoverageLayers'
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
 import { createPartsResolver } from './coverageParts'
@@ -19,7 +21,6 @@ import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
 import { createMapResources } from './mapResources'
 import { tilesForBounds } from './tiles'
 import { parseOverlapSelection } from './types'
-import { OverlapWorkerClient } from './workerClient'
 
 const OverlapTestControls = lazy(() => import('./testing/OverlapTestControls'))
 
@@ -77,15 +78,19 @@ export const OverlapHatching = ({
 
   useEffect(() => {
     if (!map) return
-    const worker = new OverlapWorkerClient(
-      () => new Worker(new URL('./overlap.worker.ts', import.meta.url), { type: 'module' }),
-    )
+    const display = geometryDisplay(map)
+    const worker = new GeometryCoverageClient()
     const resources = createMapResources(
       map,
       () => archiveRef.current,
       colorsRef.current,
       (id) => controller.sourceFailed(id),
       () => configRef.current.mode === 'hatching',
+      undefined,
+      () => ({
+        selection: parseOverlapSelection(configRef.current.selectionKey),
+        sourceLayer: data.manifest.vectorLayer,
+      }),
     )
     resourcesRef.current = resources
     resources.updateStripeThickness(thicknessRef.current)
@@ -95,10 +100,14 @@ export const OverlapHatching = ({
       : null
     const controller = createOverlapController({
       worker,
+      nativeFallback: true,
       resources,
       archiveUrl: () => archiveRef.current,
       sourceLayer: data.manifest.vectorLayer,
-      onChange: setState,
+      onChange: (next) => {
+        setState(next)
+        display.publish(next, configRef.current.selectionKey)
+      },
       onCoverageReady,
       ...(engine !== 'live' && engine !== 'parts' && data.manifest.branchCoverage
         ? { precomputed: data.manifest.branchCoverage }
@@ -110,19 +119,19 @@ export const OverlapHatching = ({
     })
     controllerRef.current = controller
     const refresh = () => {
-      if (map.isMoving() || !map.getLayer('selected-language-areas')) return
+      if (map.isMoving() || !map.getLayer('language-area-hit-targets')) return
       const bounds = map.getBounds()
-      controller.refresh(
-        tilesForBounds(
-          {
-            west: bounds.getWest(),
-            east: bounds.getEast(),
-            south: bounds.getSouth(),
-            north: bounds.getNorth(),
-          },
-          Math.min(map.getZoom(), data.manifest.geometryMaxZoom ?? 8),
-        ),
+      const tiles = tilesForBounds(
+        {
+          west: bounds.getWest(),
+          east: bounds.getEast(),
+          south: bounds.getSouth(),
+          north: bounds.getNorth(),
+        },
+        Math.min(map.getZoom(), data.manifest.geometryMaxZoom ?? 8),
       )
+      display.target(tiles)
+      controller.refresh(tiles)
     }
     let timer: ReturnType<typeof setTimeout> | undefined
     const schedule = () => {
@@ -143,11 +152,7 @@ export const OverlapHatching = ({
     map.on('idle', resources.prune)
     map.on('sourcedata', controller.publish)
     map.on('idle', controller.publish)
-    controller.configure(
-      configRef.current.selectionKey,
-      configRef.current.mode === 'hatching' ||
-        Boolean(parseOverlapSelection(configRef.current.selectionKey).variantGroups),
-    )
+    controller.configure(configRef.current.selectionKey, true)
     schedule()
     return () => {
       clearTimeout(timer)
@@ -176,10 +181,7 @@ export const OverlapHatching = ({
 
   useEffect(() => {
     configRef.current = { selectionKey, mode }
-    controllerRef.current?.configure(
-      selectionKey,
-      mode === 'hatching' || Boolean(parseOverlapSelection(selectionKey).variantGroups),
-    )
+    controllerRef.current?.configure(selectionKey, true)
     // Recompute is reserved for benchmarks; selection changes already reset the controller.
     retryRef.current?.()
   }, [selectionKey, mode])

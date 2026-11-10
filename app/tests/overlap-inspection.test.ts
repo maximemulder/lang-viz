@@ -43,7 +43,7 @@ test('inspection follows grouped blending coverage, including all overlapping se
 test('source hits expand group memberships before refinement; coverage hits keep their exact owners', () => {
   let source = true
   const map = {
-    getLayer: (id: string) => id === (source ? 'selected-language-areas' : solidLayerId(0)),
+    getLayer: (id: string) => id === (source ? fallbackLayerId(0) : solidLayerId(0)),
     getPaintProperty: () => 1,
     queryRenderedFeatures: () =>
       source
@@ -98,8 +98,8 @@ test('inspection follows active coverage and clipped fallback, ignoring original
   for (const id of [solidLayerId(0), stripeLayerId(0), fallbackLayerId(0)]) opacity.set(id, 0)
   assert.deepEqual(
     visibleVariantIds(map, [0, 0]),
-    ['wrong-detail'],
-    'blending/error mode picks originals',
+    [],
+    'geometry that is not displayed cannot be picked while the first snapshot prepares',
   )
   opacity.clear()
   assert.deepEqual(visibleVariantIds(map, [0, 0]), [], 'unmounted layers are safe')

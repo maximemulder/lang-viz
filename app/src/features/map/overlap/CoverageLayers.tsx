@@ -1,6 +1,8 @@
 import { Fragment, useMemo } from 'react'
 import { Layer, Source } from 'react-map-gl/maplibre'
 import type { GeometryVariant } from '../../../domain/atlas'
+import { inspectionLayerId, inspectionLineOpacity } from '../geometry/boundaryInspection'
+import { BOUNDARY_ID, BOUNDARY_LAYER, FALLBACK_BOUNDARY_LAYER } from '../geometryBoundaries'
 import { blendedFace } from './blending'
 import type { HatchingState } from './controller'
 import { COVERAGE_LAYER } from './delivery'
@@ -69,6 +71,10 @@ export const CoverageLayers = ({
                 tiles={[snapshot.url]}
                 minzoom={0}
                 maxzoom={snapshot.maxzoom}
+                promoteId={{
+                  [BOUNDARY_LAYER]: BOUNDARY_ID,
+                  [FALLBACK_BOUNDARY_LAYER]: BOUNDARY_ID,
+                }}
               >
                 {mode === 'hatching' && (
                   <Layer
@@ -174,6 +180,23 @@ export const CoverageLayers = ({
                     }}
                   />
                 )}
+                {/* Stage resident boundaries alongside fills. Feature-state hover
+                    repaints them without reparsing the shared vector source, and
+                    registers both families before MapLibre caches overzoom slices. */}
+                {[BOUNDARY_LAYER, FALLBACK_BOUNDARY_LAYER].map((layer, index) => (
+                  <Layer
+                    key={layer}
+                    id={`${inspectionLayerId(coverageSourceId(buffer))}${index ? '-fallback' : ''}-outline`}
+                    source-layer={layer}
+                    type="line"
+                    paint={{
+                      'line-color': '#111111',
+                      'line-width': 3,
+                      'line-opacity': inspectionLineOpacity,
+                      'line-opacity-transition': { duration: 0 },
+                    }}
+                  />
+                ))}
               </Source>
             </Fragment>
           )
