@@ -19,6 +19,7 @@ npm run test:coverage-browser
 npm run test:branch-browser
 npm run test:parts-browser
 npm run test:inspection-browser -- --dev
+npm run build && python3 tests/browser/dropdowns.py
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
@@ -358,3 +359,7 @@ API reads pinned entries and their resolved colors. Screenshots are saved in
 All browser suites share `browser_session()` and `open_atlas()` from `run.py` for
 server/Firefox lifecycle and navigation. Sidebar actions live in `sidebar.py`;
 each suite keeps its scenario assertions and reports.
+
+`dropdowns.py` checks real pointer selection over the next sidebar section, viewport
+bounds at desktop, short and narrow sizes, Escape dismissal, and section collapse.
+Screenshots go to `test-results/dropdowns/`.

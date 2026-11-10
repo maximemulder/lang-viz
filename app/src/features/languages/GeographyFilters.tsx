@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue } from 'jotai'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { SidebarPane } from '../../components/SidebarPane'
 import type {
   AtlasData,
@@ -25,6 +25,8 @@ const GeographySourceFilter = ({
 }: GeographySourceFilterProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const popoverId = useId()
   const selectedIds = selection === 'all' ? data.datasets.map((dataset) => dataset.id) : selection
   const selectedIdSet = new Set(selectedIds)
   const availableDatasetIds = new Set(
@@ -44,20 +46,46 @@ const GeographySourceFilter = ({
           ? (data.datasets.find((dataset) => dataset.id === selection[0])?.shortName ?? '1 source')
           : `${selection.length} sources`
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen) return
+    const root = rootRef.current
+    const popover = popoverRef.current
+    const trigger = root?.querySelector('button')
+    if (!root || !popover || !trigger) return
 
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false)
+    // Top-layer popovers escape section scroll clipping; keep them beside their trigger.
+    const position = () => {
+      if (!trigger.getClientRects().length) {
+        popover.hidePopover()
+        return
+      }
+      const rect = trigger.getBoundingClientRect()
+      const gap = 5
+      const margin = 8
+      const width = Math.min(Math.max(rect.width, 240), window.innerWidth - margin * 2)
+      popover.style.width = `${width}px`
+      popover.style.left = `${Math.max(margin, Math.min(rect.right - width, window.innerWidth - width - margin))}px`
+      const below = window.innerHeight - rect.bottom - gap - margin
+      const above = rect.top - gap - margin
+      const upwards = below < popover.scrollHeight && above > below
+      popover.style.maxHeight = `${Math.max(0, upwards ? above : below)}px`
+      popover.style.top = `${upwards ? rect.top - gap - popover.offsetHeight : rect.bottom + gap}px`
     }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false)
+    position()
+    const observer = new ResizeObserver(position)
+    observer.observe(root)
+    const section = root.closest('details')
+    const closeWithSection = () => {
+      if (!section?.open) popover.hidePopover()
     }
-    document.addEventListener('pointerdown', closeOnOutsideClick)
-    document.addEventListener('keydown', closeOnEscape)
+    section?.addEventListener('toggle', closeWithSection)
+    window.addEventListener('resize', position)
+    document.addEventListener('scroll', position, true)
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick)
-      document.removeEventListener('keydown', closeOnEscape)
+      observer.disconnect()
+      section?.removeEventListener('toggle', closeWithSection)
+      window.removeEventListener('resize', position)
+      document.removeEventListener('scroll', position, true)
     }
   }, [isOpen])
 
@@ -76,50 +104,56 @@ const GeographySourceFilter = ({
         className="source-filter__trigger"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        onClick={() => setIsOpen((open) => !open)}
+        popoverTarget={popoverId}
       >
         <span>{summary}</span>
         <span className="source-filter__chevron" aria-hidden="true">
           ▾
         </span>
       </button>
-      {isOpen && (
-        <div className="source-filter__popover" role="dialog" aria-label="Geographic sources">
-          <div className="source-filter__actions">
-            <button type="button" onClick={() => onChange('all')}>
-              Select all
-            </button>
-            <button type="button" onClick={() => onChange([])}>
-              Clear
-            </button>
-          </div>
-          <div className="source-filter__options">
-            {data.datasets.map((dataset) => {
-              const availableInPeriod = availableDatasetIds.has(dataset.id)
-              return (
-                <label
-                  className={`source-filter__option${
-                    availableInPeriod ? '' : ' source-filter__option--unavailable'
-                  }`}
-                  key={dataset.id}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIdSet.has(dataset.id)}
-                    onChange={() => toggleDataset(dataset.id)}
-                  />
-                  <span>
-                    <strong>{dataset.shortName}</strong>
-                    <small>
-                      {availableInPeriod ? dataset.citation : 'Not available in this period'}
-                    </small>
-                  </span>
-                </label>
-              )
-            })}
-          </div>
+      <div
+        id={popoverId}
+        ref={popoverRef}
+        popover="auto"
+        className="source-filter__popover"
+        role="dialog"
+        aria-label="Geographic sources"
+        onToggle={(event) => setIsOpen(event.currentTarget.matches(':popover-open'))}
+      >
+        <div className="source-filter__actions">
+          <button type="button" onClick={() => onChange('all')}>
+            Select all
+          </button>
+          <button type="button" onClick={() => onChange([])}>
+            Clear
+          </button>
         </div>
-      )}
+        <div className="source-filter__options">
+          {data.datasets.map((dataset) => {
+            const availableInPeriod = availableDatasetIds.has(dataset.id)
+            return (
+              <label
+                className={`source-filter__option${
+                  availableInPeriod ? '' : ' source-filter__option--unavailable'
+                }`}
+                key={dataset.id}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIdSet.has(dataset.id)}
+                  onChange={() => toggleDataset(dataset.id)}
+                />
+                <span>
+                  <strong>{dataset.shortName}</strong>
+                  <small>
+                    {availableInPeriod ? dataset.citation : 'Not available in this period'}
+                  </small>
+                </span>
+              </label>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
