@@ -4,9 +4,11 @@ import { useMap } from 'react-map-gl/maplibre'
 import { SidebarPane } from '../../components/SidebarPane'
 import {
   applyOptimizedColorsAtom,
+  atlasDataAtom,
   canUndoColorsAtom,
   colorConfigurationAtom,
   colorTopologyAtom,
+  globalColorProfileAtom,
   languageColorsAtom,
   languageHierarchyAtom,
   mapEntriesAtom,
@@ -20,7 +22,7 @@ import {
   undoColorsAtom,
   visibleLanguageIdsAtom,
 } from '../../state/atlasState'
-import { captureColorView, optimizeColorView } from './colorView'
+import { captureColorView, optimizeColorDataset, optimizeColorView } from './colorView'
 
 export const ColorControls = () => {
   const [config, setConfig] = useAtom(colorConfigurationAtom)
@@ -32,6 +34,8 @@ export const ColorControls = () => {
   const areas = useAtomValue(selectedMapAreasAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const optimized = useAtomValue(optimizedColorsAtom)
+  const data = useAtomValue(atlasDataAtom)
+  const profile = useAtomValue(globalColorProfileAtom)
   const prepared = useAtomValue(preparedPaletteAtom)
   const canUndo = useAtomValue(canUndoColorsAtom)
   const overlap = useAtomValue(overlapStatusAtom)
@@ -42,7 +46,8 @@ export const ColorControls = () => {
   const maps = useMap()
   const map = maps['atlas-map']?.getMap()
   const request = useRef<AbortController | null>(null)
-  const [busy, setBusy] = useState(false)
+  const requestScope = useRef<'dataset' | 'view'>('view')
+  const [busy, setBusy] = useState<'dataset' | 'view' | null>(null)
   const [mapReady, setMapReady] = useState(false)
   const listId = useId()
   const [target, setTarget] = useState<string | null>(null)
@@ -62,7 +67,7 @@ export const ColorControls = () => {
       setMapReady(Boolean(!map.isMoving() && map.areTilesLoaded() && map.isStyleLoaded()))
     const loading = () => setMapReady(false)
     const cancel = () => {
-      request.current?.abort()
+      if (requestScope.current === 'view') request.current?.abort()
       loading()
     }
     updateReady()
@@ -82,13 +87,22 @@ export const ColorControls = () => {
     }
   }, [map])
 
-  const optimize = async () => {
-    if (!map) return
+  const optimize = async (scope: 'dataset' | 'view') => {
+    if (scope === 'view' && !map) return
+    if (scope === 'dataset' && !profile) return
     const controller = new AbortController()
     request.current = controller
-    setBusy(true)
+    requestScope.current = scope
+    setBusy(scope)
     setError(null)
     try {
+      if (scope === 'dataset' && profile) {
+        const result = await optimizeColorDataset(data, profile, controller.signal)
+        controller.signal.throwIfAborted()
+        applyOptimized(result)
+        return
+      }
+      if (!map) return
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       const camera = JSON.stringify([map.getCenter(), map.getZoom(), map.getProjection()])
       const view = await captureColorView(map, areas, entries, controller.signal)
@@ -112,7 +126,7 @@ export const ColorControls = () => {
     } finally {
       if (request.current === controller) {
         request.current = null
-        setBusy(false)
+        setBusy(null)
       }
     }
   }
@@ -166,14 +180,21 @@ export const ColorControls = () => {
       <div className="color-controls__actions">
         <button
           type="button"
+          disabled={Boolean(busy) || !profile}
+          onClick={() => optimize('dataset')}
+        >
+          Optimize full dataset
+        </button>
+        <button
+          type="button"
           disabled={
-            busy ||
+            Boolean(busy) ||
             !mapReady ||
             config.strategy !== 'semantic' ||
             selectedIds.length < 2 ||
             overlap.status === 'loading'
           }
-          onClick={optimize}
+          onClick={() => optimize('view')}
         >
           Optimize colors for this view
         </button>
@@ -182,23 +203,30 @@ export const ColorControls = () => {
             Cancel
           </button>
         )}
-        <button type="button" disabled={busy || !canUndo} onClick={() => undo()}>
+        <button type="button" disabled={Boolean(busy) || !canUndo} onClick={() => undo()}>
           Undo colors
         </button>
-        <button type="button" disabled={busy || !optimized} onClick={() => restore()}>
+        <button type="button" disabled={Boolean(busy) || !optimized} onClick={() => restore()}>
           Use default palette
         </button>
       </div>
       <p role="status" aria-live="polite" className="color-controls__status">
         {busy
-          ? 'Optimizing visible languoids…'
+          ? busy === 'dataset'
+            ? 'Optimizing the full dataset…'
+            : 'Optimizing visible languoids…'
           : optimized
-            ? `Optimized ${optimized.languageCount} visible languoids across ${optimized.rootCount} color groups.`
+            ? optimized.datasetProfile
+              ? 'Using the full-dataset optimized palette.'
+              : `Optimized ${optimized.languageCount} visible languoids across ${optimized.rootCount} color groups.`
             : prepared
-              ? 'Using prepared dataset colors.'
-              : 'Using stable default colors.'}{' '}
-        Colors stay fixed while you explore. Optimization also updates offscreen relatives to keep
-        families consistent. Custom colors are kept.
+              ? 'Using the precomputed full-dataset palette.'
+              : config.strategy === 'categorical'
+                ? 'Using original categorical colors.'
+                : 'Using catalog colors for a mixed selection, custom groups, or no dataset.'}{' '}
+        Full dataset reproduces the default for the pinned dataset and period, including unselected
+        languages. View optimization adapts colors to the current screen. Colors stay fixed while
+        you explore. Custom colors are kept.
       </p>
       <SidebarPane
         className="color-controls__custom"

@@ -1,9 +1,11 @@
 # Languoid colors
 
-`colors.ts` owns presentation colors independently of geometry, source availability,
-time period, search, and camera. `GeometryVariant.color` remains a legacy categorical
-seed in the generated catalog; rendering uses `languageColorsAtom` instead.
-No data rebuild is required to change palettes.
+`colors.ts` owns the catalog fallback and deterministic reference palette.
+`globalColors.ts` defines the optimized default for each dataset/period using its
+full geometry, independently of search and camera. `GeometryVariant.color` remains
+a legacy categorical seed; rendering uses `languageColorsAtom` instead.
+No geometry rebuild is required to change palettes. Regenerate prepared palettes
+when the color recipe changes.
 
 The explicit view optimizer now uses the successful softer-anchor and multiscale
 branch-reference experiment. `colorBranches.ts` refines visible automatic shades
@@ -16,8 +18,10 @@ and preference cost as the live optimizer's deterministic starting point. Suppor
 single-dataset/period maps now use a prepared geometry-64 palette for their default
 presentation.
 
-Use **Optimize colors for this view** to see the new behavior. It runs in the existing
-worker and participates in the existing cancellation and undo flow. The first performance pass preserves the search and its output while sharing
+**Optimize full dataset** rebuilds the default palette using the same canonical
+recipe as precomputation. **Optimize colors for this view** remains an explicit
+regional alternative. Both run in workers and support cancellation and undo.
+The first performance pass preserves the search and its output while sharing
 shade projections, color conversions, and invariant scoring work. On three saved
 captures, the regional/world optimizer medians fell from 4.79/10.20 seconds to
 2.62/5.35 seconds (Node replay; browser latency differs). Caches require no dataset
@@ -39,31 +43,57 @@ state and are superseded by this integration where applicable.
 ## Prepared dataset defaults
 
 Run `npm run precompute:colors` after `npm run precompute:branches`. This standalone
-builder reads the catalogs and prepared zoom-3 geometry, constructs the same 64-grid
-footprints as the successful experiment, and generates all seven dataset/period
-profiles without browser captures. It publishes content-addressed palette files
-before updating the manifest. Generated assets remain untracked, like other atlas
-data. Bump `PREPARED_COLOR_POLICY` when the recipe or color policy changes.
+builder calls `globalColors.ts`, which reads the catalogs and prepared zoom-3
+geometry, constructs canonical 64-grid footprints, and invokes the optimizer.
+The browser's full-dataset worker calls the same recipe with an HTTP tile loader;
+the offline builder supplies a filesystem loader. Geometry selection, tile order,
+sampling, configuration, reference palette and completion of unaffected catalog
+colors are identical. Both include every mapped branch in the dataset/period,
+regardless of pinned subsets, camera, projection, or window size.
 
-`preparedPaletteAtom` loads the profile determined by **actual pinned variant IDs**,
-not the source/period finder filters. Selection changes within that profile, panning,
-zooming and browsing filters keep the same palette. Changing the represented dataset
-or period can change defaults. Empty selections, mixed profiles, categorical mode
-and custom comparison roots/anchors do not use prepared defaults. Exact languoid and
-map-entry overrides continue to win. A missing/failed asset uses the ordinary stable
-palette; a later profile selection can retry. While an initial request is pending,
-ordinary defaults render until the validated table arrives.
+All seven dataset/period profiles are generated without browser captures. Check
+installed metadata against fresh canonical solves with
+`node scripts/precompute-colors.mjs --check`. The shared `geometry64-v1` recipe
+preserves all existing colors; the delivery format uses compact arrays aligned to
+`languages.json`, bound to that exact catalog order by a fingerprint.
 
-The loader checks policy version, catalog fingerprint, geometry directory/signature,
-asset integrity, profile identity, complete catalog coverage and normalized colors.
-Only the active profile is fetched, and successful loads are cached. Switching
-profiles does not keep the previous profile's table while its replacement loads.
+The builder publishes one content-addressed `dataset-metadata/<hash>.json` containing
+dataset descriptions and their period palettes, then updates `manifest.datasetMetadata`.
+`geography-datasets.json` remains an offline input. There are no per-profile palette
+assets in the browser contract. Generated metadata remains untracked, like the
+other atlas data. Bump `PREPARED_COLOR_POLICY` when the color recipe changes.
+
+The initial atlas load fetches dataset metadata alongside language and geometry
+catalogs. It validates policy, catalog fingerprint, geometry directory/signatures,
+complete profile membership and every color before publishing `AtlasData`.
+Missing or incompatible metadata fails the catalog load with an error; it does not
+silently substitute another palette. Thus every ready dataset already has its
+colors, before geometry layers mount. There is no palette request on selection,
+per-profile loading state, palette cache, or rendering barrier.
+
+`preparedPaletteAtom` synchronously selects the table using **actual pinned variant
+IDs**, not source/period finder filters. Panning, zooming and browsing filters keep
+the same palette. Changing the represented dataset or period can change defaults.
+Empty selections, mixed profiles, categorical mode and custom comparison
+roots/anchors deliberately use the catalog resolver. These are alternative coloring
+configurations, not failed-loading fallbacks. Exact languoid and map-entry overrides
+continue to win.
+
 Prepared colors sit below explicit frozen optimization and exact overrides.
-**Use default palette** clears the explicit optimization and reveals prepared colors
-when eligible; undo restores the previous frozen optimization. The existing live
-optimizer retains its original stable reference (including its `before` diagnostics),
-so its successful output and repeated-refresh determinism are unchanged. That
-reference diagnostic is not a measurement of the prepared on-screen baseline.
+**Use default palette** clears the explicit optimization and reveals dataset colors
+when eligible; undo restores the previous frozen optimization.
+**Optimize full dataset** recomputes the canonical result in a worker and replaces
+any earlier optimized colors and region metadata. It uses the default recipe;
+explicit language, entry and group colors remain presentation overrides. Custom
+comparison roots or family anchors and mixed dataset/period selections do not have
+one canonical profile, so the global action is disabled for them. View optimization
+remains available for those configurations.
+
+Global computation survives camera changes and resizing; selection or configuration
+changes, cancellation and unmounting stop it. The view optimizer cancels on camera
+changes and retains its original stable reference (including `before` diagnostics).
+That diagnostic measures the optimizer's reference, not the prepared on-screen
+baseline. No objective weights changed.
 
 Asher/DLAC production tables exactly match the reviewed geometry-64 experiment.
 All seven profiles are generated, but detailed visual quality comparisons so far
@@ -74,11 +104,11 @@ without solving those quality limitations.
 ## Testing controls
 
 Open **Map settings → Language colors** to switch between semantic and categorical
-coloring. Semantic mode offers **Optimize colors for this view**. It captures the
-selected polygons currently on screen and computes a frozen palette in a worker.
-**Undo colors** restores the previous palette; **Use default palette** removes view
-optimizations without removing custom colors. Moving, resizing, or changing the
-selection/configuration during computation cancels that computation. Navigation
+coloring. Semantic mode offers **Optimize full dataset** and
+**Optimize colors for this view**. The latter captures the selected polygons currently on screen and computes a frozen palette in a worker.
+**Undo colors** restores the previous palette; **Use default palette** removes explicit
+optimizations without removing custom colors. Moving or resizing cancels view
+optimization. Changing selection/configuration cancels either computation. Navigation
 after applying a palette never recolors anything automatically. A refresh of the
 same view is deterministic. Refresh updates the complete palettes of the families
 represented in the view, including their offscreen and unselected relatives.

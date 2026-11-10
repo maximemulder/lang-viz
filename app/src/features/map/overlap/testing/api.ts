@@ -25,7 +25,8 @@ export interface OverlapTestApi {
     preparedProfile: string | null
     configuration: ColorConfiguration
     optimization:
-      | (Omit<OptimizedColors, 'colors' | 'regions'> & {
+      | (Omit<OptimizedColors, 'colors' | 'regions' | 'datasetProfile'> & {
+          datasetProfile: string | null
           regions: Record<string, FamilyColorRegion>
         })
       | null

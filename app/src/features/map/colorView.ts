@@ -1,12 +1,15 @@
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { type MapArea, mapAreaMemberships, mapAreaRefinements } from '../../domain/aggregation.ts'
+import type { AtlasData } from '../../domain/atlas.ts'
 import type {
   ColorOptimizationInput,
   ColorView,
   OptimizedColors,
 } from '../../domain/colorOptimization.ts'
+import type { GlobalColorProfile } from '../../domain/globalColors.ts'
 import type { MapEntry } from '../../domain/mapEntries.ts'
 import { refinedMemberships } from '../../domain/refinement.ts'
+import type { GlobalColorRequest } from './globalColorOptimization.worker.ts'
 import { featureVariantIds, visibleColorLayers } from './inspection.ts'
 
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
@@ -93,12 +96,14 @@ export const captureColorView = async (
   }
 }
 
-export const optimizeColorView = (input: ColorOptimizationInput, signal: AbortSignal) =>
+const runColorWorker = (
+  createWorker: () => Worker,
+  input: ColorOptimizationInput | GlobalColorRequest,
+  signal: AbortSignal,
+) =>
   new Promise<OptimizedColors>((resolve, reject) => {
     signal.throwIfAborted()
-    const worker = new Worker(new URL('./colorOptimization.worker.ts', import.meta.url), {
-      type: 'module',
-    })
+    const worker = createWorker()
     const finish = () => {
       worker.terminate()
       clearTimeout(timer)
@@ -110,7 +115,7 @@ export const optimizeColorView = (input: ColorOptimizationInput, signal: AbortSi
     }
     const timer = setTimeout(() => {
       finish()
-      reject(new Error('Color optimization took too long. Try a smaller view.'))
+      reject(new Error('Color optimization took too long. Try again.'))
     }, 60_000)
     signal.addEventListener('abort', abort, { once: true })
     worker.onmessage = ({ data }: MessageEvent<{ result?: OptimizedColors; error?: string }>) => {
@@ -129,3 +134,28 @@ export const optimizeColorView = (input: ColorOptimizationInput, signal: AbortSi
       reject(error)
     }
   })
+
+export const optimizeColorView = (input: ColorOptimizationInput, signal: AbortSignal) =>
+  runColorWorker(
+    () => new Worker(new URL('./colorOptimization.worker.ts', import.meta.url), { type: 'module' }),
+    input,
+    signal,
+  )
+
+export const optimizeColorDataset = (
+  data: AtlasData,
+  profile: GlobalColorProfile,
+  signal: AbortSignal,
+) =>
+  runColorWorker(
+    () =>
+      new Worker(new URL('./globalColorOptimization.worker.ts', import.meta.url), {
+        type: 'module',
+      }),
+    {
+      data,
+      profile,
+      dataUrl: new URL(`${import.meta.env.BASE_URL}data/`, window.location.href).href,
+    },
+    signal,
+  )

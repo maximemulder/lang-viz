@@ -9,12 +9,12 @@ import type { MapEntryGroup } from '../../domain/mapGroups'
 import {
   atlasDataAtom,
   clearMapSelectionAtom,
+  languageColorsAtom,
   mapEntriesAtom,
   mapGroupsAtom,
   removeMapEntryAtom,
   removeMapGroupAtom,
   selectedMapAreasAtom,
-  semanticPaletteAtom,
   setMapGroupStyleAtom,
 } from '../../state/atlasState'
 import { languagePanelAtom, openLanguageDetailsAtom } from '../../state/languageControls'
@@ -41,7 +41,7 @@ export const OnMapLanguages = () => {
   const entries = useAtomValue(mapEntriesAtom)
   const groups = useAtomValue(mapGroupsAtom)
   const areas = useAtomValue(selectedMapAreasAtom)
-  const palette = useAtomValue(semanticPaletteAtom)
+  const colors = useAtomValue(languageColorsAtom)
   const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas])
   const remove = useSetAtom(removeMapEntryAtom)
   const removeGroup = useSetAtom(removeMapGroupAtom)
@@ -159,7 +159,7 @@ export const OnMapLanguages = () => {
               const { group, entries: members } = row.grouped
               const name = data.languageById.get(group.rootId)?.name ?? group.rootId
               const rootEntry = members.find((entry) => entry.languageId === group.rootId)
-              const seed = group.color ?? palette.colors.get(group.rootId) ?? '#777777'
+              const seed = group.color ?? colors.get(group.rootId) ?? '#777777'
               return (
                 <LanguagePreviewItem
                   target={{ languageId: group.rootId, groupId: group.id }}

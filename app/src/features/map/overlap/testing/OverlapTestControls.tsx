@@ -99,6 +99,7 @@ export default function OverlapTestControls({
               const result = store.get(optimizedColorsAtom)
               return result
                 ? {
+                    datasetProfile: result.datasetProfile ?? null,
                     languageCount: result.languageCount,
                     rootCount: result.rootCount,
                     before: result.before,

@@ -31,6 +31,7 @@ def data(tmp_path):
     write(root, "geometry-variants.json", [{"detail": "kept for integration tests"}])
     write(root, "geometry-bounds.json", {})
     write(root, "geography-datasets.json", [])
+    write(root, "dataset-metadata/current.json", {"datasets": []})
     write(root, "provenance/dataset/now.json", {})
     write(root, "geometry/current.pmtiles", "profile archive")
     write(root, "geometry/current/report.json", {})
@@ -44,6 +45,7 @@ def data(tmp_path):
         "manifest.json",
         {
             "schemaVersion": 5,
+            "datasetMetadata": "dataset-metadata/current.json",
             "languoidCount": 1,
             "geometryVariantCount": 1,
             "archive": "language-areas.pmtiles",
@@ -108,6 +110,7 @@ def test_audit_and_bundle_exclude_old_generations_without_removing_them(data, tm
         "parts/current/dataset/now/0-0-0.pbf",
         "branches/current/signature/0-0-0.pbf",
         "geometry/current.pmtiles",
+        "dataset-metadata/current.json",
         "provenance/dataset/now.json",
     ],
 )
@@ -118,20 +121,24 @@ def test_missing_active_assets_fail_packaging(data, tmp_path, name):
     assert not (tmp_path / "bundle").exists()
 
 
-def test_prepared_palettes_follow_manifest_through_bundle_install(data, tmp_path):
-    palette = "palettes/current.json"
-    write(data, palette, {"colors": {"language": "#123456"}})
+def test_dataset_metadata_follows_manifest_through_bundle_install(data, tmp_path):
+    metadata = "dataset-metadata/current.json"
+    write(data, metadata, {"datasets": [{"id": "dataset", "profiles": [{"colors": ["#123456"]}]}]})
+    write(data, "dataset-metadata/old.json", {"datasets": []})
     write(data, "palettes/old.json", {"colors": {"language": "#abcdef"}})
-    manifest = release.read_json(data / "manifest.json")
-    manifest["preparedColors"] = {"profiles": [{"id": "dataset/now", "file": palette}]}
-    write(data, "manifest.json", manifest)
     reference = package(data, tmp_path / "bundle")
     output = tmp_path / "installed"
     release.install(reference.parent / release.ASSET, reference, output)
-    assert (output / palette).read_bytes() == (data / palette).read_bytes()
+    assert (output / metadata).read_bytes() == (data / metadata).read_bytes()
+    assert not (output / "dataset-metadata/old.json").exists()
     assert not (output / "palettes/old.json").exists()
-    (data / palette).unlink()
-    with pytest.raises(ValueError, match="Missing data file: palettes/current.json"):
+
+
+def test_unprepared_dataset_metadata_fails_packaging(data):
+    manifest = release.read_json(data / "manifest.json")
+    del manifest["datasetMetadata"]
+    write(data, "manifest.json", manifest)
+    with pytest.raises(ValueError, match="precompute:colors"):
         release.release_files(data)
 
 

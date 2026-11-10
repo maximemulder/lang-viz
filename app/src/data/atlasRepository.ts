@@ -1,11 +1,6 @@
-import type {
-  AtlasData,
-  AtlasManifest,
-  GeographyDataset,
-  GeometryVariant,
-  Language,
-} from '../domain/atlas'
+import type { AtlasData, AtlasManifest, GeometryVariant, Language } from '../domain/atlas'
 import { buildLanguageSearchIndex } from '../domain/catalog'
+import { type DatasetMetadata, decodeDatasetMetadata } from '../domain/datasetMetadata'
 import type { GeographicBounds } from '../domain/languageFocus'
 import { geometryArchiveUrl } from './geometryArchives'
 
@@ -23,10 +18,12 @@ let atlasDataPromise: Promise<AtlasData> | undefined
 
 export const loadAtlasData = (): Promise<AtlasData> => {
   atlasDataPromise ??= fetchJson<AtlasManifest>('manifest.json').then(async (manifest) => {
-    const [languages, variants, datasets] = await Promise.all([
+    if (!manifest.datasetMetadata)
+      throw new Error('Dataset metadata is missing. Rebuild atlas data with precompute:colors.')
+    const [languages, variants, metadata] = await Promise.all([
       fetchJson<readonly Language[]>('languages.json'),
       fetchJson<readonly GeometryVariant[]>(manifest.geometryIndex ?? 'geometry-variants.json'),
-      fetchJson<readonly GeographyDataset[]>('geography-datasets.json'),
+      fetchJson<DatasetMetadata>(manifest.datasetMetadata),
     ])
     if (manifest.schemaVersion !== 5) {
       throw new Error(`Unsupported atlas schema version: ${manifest.schemaVersion}`)
@@ -38,11 +35,18 @@ export const loadAtlasData = (): Promise<AtlasData> => {
       throw new Error('Geometry catalog does not match its manifest')
     }
 
+    const { datasets, palettes } = await decodeDatasetMetadata(
+      metadata,
+      languages,
+      variants,
+      manifest,
+    )
     return {
       manifest,
       languages,
       variants,
       datasets,
+      palettes,
       languageById: new Map(languages.map((language) => [language.id, language])),
       variantById: new Map(variants.map((variant) => [variant.id, variant])),
       languageSearchIndex: buildLanguageSearchIndex(languages),

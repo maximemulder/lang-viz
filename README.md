@@ -97,13 +97,16 @@ single-period** views at zooms 0–3. It composes the atlas build's reusable par
 resumes completed tiles. Missing parts must be restored before preparing branches.
 The browser uses these tiles only for an exact geometry/refinement match.
 
-`npm run precompute:colors` builds the finer geometry-based semantic palette for
-all dataset/period profiles from those branch tiles. The app loads the matching
-palette for single-profile pinned geometry; camera movement and browsing filters
-do not change it. Mixed datasets/periods, custom roots, and missing or stale assets
-use the ordinary defaults, with explicit view optimization still available.
-Regenerate colors after rebuilding the catalogs, branch tiles, or color policy.
-Generated palettes and their manifest are published locally under `public/data/`.
+`npm run precompute:colors` builds the geometry-based semantic palette for every
+dataset/period and embeds compact tables with dataset descriptions in the initial
+metadata. Run it before serving or packaging the app: the catalog is ready only
+once this metadata has loaded and validated. Selection and dataset switches then
+choose colors synchronously, without palette requests. Mixed datasets/periods and
+custom roots use catalog defaults; explicit regional optimization remains available.
+Regenerate metadata after rebuilding catalogs, branch tiles, or the color policy.
+The builder publishes `dataset-metadata/<hash>.json` and updates the manifest locally
+under `public/data/`. `node scripts/precompute-colors.mjs --check` verifies every
+embedded color against a fresh canonical solve.
 
 The atlas build generates reusable disjoint coverage at all source zooms for
 every dataset/period (currently 0–8). Each piece retains every original contributor,

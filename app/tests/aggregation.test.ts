@@ -112,6 +112,7 @@ const data: AtlasData = {
   languages,
   variants,
   datasets: [],
+  palettes: new Map(),
   languageById: new Map(languages.map((language) => [language.id, language])),
   variantById: new Map(variants.map((variant) => [variant.id, variant])),
   languageSearchIndex: buildLanguageSearchIndex(languages),

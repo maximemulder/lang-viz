@@ -1,7 +1,6 @@
 import { atom } from 'jotai'
 import { selectAtom, unwrap } from 'jotai/utils'
 import { loadAtlasData } from '../data/atlasRepository'
-import { loadPreparedPalette } from '../data/preparedColors'
 import {
   type AreaMode,
   buildGeographyAvailability,
@@ -36,7 +35,7 @@ import {
   resolveMapEntries,
 } from '../domain/mapEntries'
 import { type GroupColoring, groupMapEntries, type MapGroup, mapGroupId } from '../domain/mapGroups'
-import { selectPreparedColorProfile } from '../domain/preparedColors'
+import { selectGlobalColorProfile } from '../domain/preparedColors'
 
 export const atlasDataAtom = atom(async () => loadAtlasData())
 
@@ -54,18 +53,23 @@ export const visibleLanguageIdsAtom = selectAtom(
 )
 export const geometryOverridesAtom = atom<Readonly<Record<LanguageId, GeometryVariantId>>>({})
 export const areaModesAtom = atom<Readonly<Record<LanguageId, AreaMode>>>({})
-/** Frozen, explicit view optimization. Camera/filter/selection changes never write it. */
+/** Frozen, explicit dataset or view optimization. Camera/filter/selection changes never write it. */
 export const optimizedColorsAtom = atom<OptimizedColors | null>(null)
 const previousOptimizedColorsAtom = atom<{ readonly value: OptimizedColors | null } | null>(null)
 export const canUndoColorsAtom = atom((get) => get(previousOptimizedColorsAtom) !== null)
 export const applyOptimizedColorsAtom = atom(null, (get, set, result: OptimizedColors) => {
   const previous = get(optimizedColorsAtom)
   set(previousOptimizedColorsAtom, { value: previous })
-  set(optimizedColorsAtom, {
-    ...result,
-    colors: new Map([...(previous?.colors ?? []), ...result.colors]),
-    regions: new Map([...(previous?.regions ?? []), ...result.regions]),
-  })
+  set(
+    optimizedColorsAtom,
+    result.datasetProfile
+      ? result
+      : {
+          ...result,
+          colors: new Map([...(previous?.colors ?? []), ...result.colors]),
+          regions: new Map([...(previous?.regions ?? []), ...result.regions]),
+        },
+  )
 })
 export const undoColorsAtom = atom(null, (get, set) => {
   const previous = get(previousOptimizedColorsAtom)
@@ -139,35 +143,38 @@ export const semanticPaletteAtom = atom((get) =>
     get(semanticAnchorsAtom),
   ),
 )
-const preparedColorProfileAtom = selectAtom(
+export const globalColorProfileAtom = selectAtom(
   atom((get) => {
     const data = get(resolvedAtlasDataAtom)
     return data
-      ? selectPreparedColorProfile(data, get(mapEntriesAtom), get(colorConfigurationAtom))
+      ? selectGlobalColorProfile(data, get(mapEntriesAtom), get(colorConfigurationAtom))
       : null
   }),
   (profile) => profile,
+  (a, b) => a?.id === b?.id,
 )
-export const preparedPaletteAtom = unwrap(
-  atom(async (get) => {
-    const data = get(resolvedAtlasDataAtom)
-    const profile = get(preparedColorProfileAtom)
-    return data && profile ? loadPreparedPalette(data, profile) : null
-  }),
-)
+/** Dataset metadata is validated before AtlasData is published; selection is synchronous. */
+export const preparedPaletteAtom = atom((get) => {
+  const data = get(resolvedAtlasDataAtom)
+  const profile = get(globalColorProfileAtom)
+  return data && profile ? (data.palettes.get(profile.id) ?? null) : null
+})
 
 export const languageColorsAtom = atom((get) => {
   const data = get(resolvedAtlasDataAtom)
   if (!data) return new Map<string, string>()
   const config = get(colorConfigurationAtom)
-  const colors = new Map(resolveLanguageColors(data, config, get(semanticPaletteAtom)))
+  const colors = new Map(
+    get(preparedPaletteAtom)?.colors ??
+      resolveLanguageColors(data, config, get(semanticPaletteAtom)),
+  )
   if (config.strategy === 'semantic') {
-    for (const [id, color] of get(preparedPaletteAtom)?.colors ?? []) {
-      if (!config.overrides[id] && !config.anchors[id]) colors.set(id, color)
-    }
     for (const [id, color] of get(optimizedColorsAtom)?.colors ?? []) {
-      if (!config.overrides[id] && !config.anchors[id]) colors.set(id, color)
+      if (!config.anchors[id]) colors.set(id, color)
     }
+  }
+  for (const [id, color] of Object.entries(config.overrides)) {
+    if (data.languageById.has(id)) colors.set(id, color)
   }
   return colors
 })

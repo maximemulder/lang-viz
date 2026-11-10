@@ -53,6 +53,8 @@ export interface FamilyColorRegion {
   readonly visibleCount: number
 }
 export interface OptimizedColors {
+  /** Present only for the canonical full-dataset result. */
+  readonly datasetProfile?: string
   /** Entire affected families, including offscreen relatives. */
   readonly colors: ReadonlyMap<string, string>
   readonly regions: ReadonlyMap<string, FamilyColorRegion>

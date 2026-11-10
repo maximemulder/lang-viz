@@ -1,5 +1,5 @@
 import type { LanguageSearchIndex } from './catalog.ts'
-import type { PreparedColorsManifest } from './preparedColors.ts'
+import type { PreparedPalette } from './preparedColors.ts'
 
 /** Opaque catalog key: a Glottocode or a stable dataset-namespaced ID. */
 export type LanguageId = string
@@ -82,7 +82,8 @@ export interface GeographyDataset {
 }
 
 export interface AtlasManifest {
-  readonly preparedColors?: PreparedColorsManifest
+  /** Required by the browser; produced by precompute:colors after geometry preparation. */
+  readonly datasetMetadata?: string
   readonly schemaVersion: number
   readonly languoidCount: number
   readonly languoidWithGeometryCount: number
@@ -130,6 +131,7 @@ export interface AtlasData {
   readonly languages: readonly Language[]
   readonly variants: readonly GeometryVariant[]
   readonly datasets: readonly GeographyDataset[]
+  readonly palettes: ReadonlyMap<string, PreparedPalette>
   readonly languageById: ReadonlyMap<LanguageId, Language>
   readonly variantById: ReadonlyMap<GeometryVariantId, GeometryVariant>
   readonly languageSearchIndex: LanguageSearchIndex

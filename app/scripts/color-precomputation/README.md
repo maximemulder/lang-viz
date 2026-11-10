@@ -7,8 +7,8 @@ The coarse geometry palette and simple regional patch are not recommended.
 
 **Integration update:** geometry-64 is now the app default for compatible pinned
 single-dataset/period views. `npm run precompute:colors` builds all profiles without
-these experimental captures; `src/domain/preparedColors.ts` and
-`src/data/preparedColors.ts` validate and load them. See `src/domain/COLORS.md` for
+these experimental captures; `src/domain/datasetMetadata.ts` validates the compact palettes embedded in initial
+dataset metadata, loaded by `src/data/atlasRepository.ts`. See `src/domain/COLORS.md` for
 fallback, override and undo behavior. The measurements and recommendations below
 record the original experiment; the original “do not silently replace” recommendation
 has been superseded by the user's explicit request to integrate this candidate.

@@ -69,8 +69,9 @@ def release_files(root: Path) -> list[Path]:
         add(notice.name)
     for profile in manifest.get("geometryProfiles", []):
         add(profile["archive"])
-    for profile in manifest.get("preparedColors", {}).get("profiles", []):
-        add(profile["file"])
+    if not manifest.get("datasetMetadata"):
+        raise ValueError("Run npm run precompute:colors before packaging data")
+    add(manifest["datasetMetadata"])
     profiles = {(v["datasetId"], v["temporalCoverage"]["viewId"]) for v in variants}
     if manifest.get("geometryProvenance"):
         for dataset, view in profiles:
