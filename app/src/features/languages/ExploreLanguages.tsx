@@ -188,7 +188,6 @@ export const ExploreLanguages = () => {
   const addSelection = useSetAtom(addSearchSelectionToMapAtom)
   const [coverage, setCoverage] = useAtom(searchCoverageAtom)
   const [coloring, setColoring] = useAtom(searchColoringAtom)
-  const [feedback, setFeedback] = useState<string | null>(null)
   const [searchExpanded, setSearchExpanded] = useState(true)
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
@@ -406,7 +405,6 @@ export const ExploreLanguages = () => {
                 className="button-secondary"
                 onClick={() => {
                   selectResults(showableIds)
-                  setFeedback(null)
                 }}
                 disabled={!showableIds.length || areAllFilteredSelected}
                 title="Select all mappable results, including those beyond the visible list. Expanded children are selected separately."
@@ -484,7 +482,6 @@ export const ExploreLanguages = () => {
               disabled={!selectedIds.length}
               onClick={() => {
                 setSelectedIds([])
-                setFeedback(null)
               }}
             >
               Clear selection
@@ -493,14 +490,7 @@ export const ExploreLanguages = () => {
               type="button"
               className="finder-add"
               disabled={!mappableSelected}
-              onClick={() => {
-                const result = addSelection()
-                setFeedback(
-                  result.addedAreas
-                    ? `Added ${result.addedAreas.toLocaleString()} areas${result.addedGroups ? ` in ${result.addedGroups.toLocaleString()} new groups` : ''}.${result.unavailable ? ` ${result.unavailable} selected entries have no area with these settings.` : ''}`
-                    : 'These groups are already on the map.',
-                )
-              }}
+              onClick={() => addSelection()}
             >
               Add to map
             </button>
@@ -517,7 +507,6 @@ export const ExploreLanguages = () => {
                 value={coloring}
                 onChange={(event) => {
                   setColoring(event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy')
-                  setFeedback(null)
                 }}
               >
                 <option value="hierarchy">Color by hierarchy</option>
@@ -531,7 +520,6 @@ export const ExploreLanguages = () => {
                 value={coverage}
                 onChange={(event) => {
                   setCoverage(event.currentTarget.value === 'own' ? 'own' : 'branch')
-                  setFeedback(null)
                 }}
               >
                 <option value="branch">This entry and its descendants</option>
@@ -543,18 +531,7 @@ export const ExploreLanguages = () => {
               elsewhere. Search area filters results and does not clip added areas.
             </p>
           </SidebarPane>
-          {mappableSelected < selectedIds.length && (
-            <p>
-              {selectedIds.length - mappableSelected} selected entries have no area with the current
-              sources, period, and coverage.
-            </p>
-          )}
         </div>
-        {feedback && (
-          <p role="status" className="finder-feedback">
-            {feedback}
-          </p>
-        )}
       </footer>
     </div>
   )

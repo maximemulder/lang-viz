@@ -128,7 +128,7 @@ applies the same refinement relation.
 Default two-color stripe repeats retain their 16-pixel period from zoom 5 onward.
 Below that, integer-zoom steps use progressively denser patterns (2, 3 and 4 times
 as many repeats).
-Map settings offers 25%–200% thickness in 5% increments, with reset to 100%; the
+Map settings offers 25%–200% thickness in 5% increments, defaulting to 100%; the
 preference scales these zoom steps and survives switching overlap modes. Widths
 are still quantized to whole cycles in the texture grid. Equivalent effective
 widths reuse their current job. No geometry is

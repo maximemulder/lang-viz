@@ -367,7 +367,7 @@ Screenshots go to `test-results/dropdowns/`.
 
 `stripes.py` measures stripe frequency in rendered pixels at finer, intermediate,
 default and thicker settings,
-checks reset, low-zoom density, geometry preservation, overlap-mode switching,
+checks returning to 100%, low-zoom density, geometry preservation, overlap-mode switching,
 zoom-step continuity, style restoration and narrow settings. Screenshots and the
 frequency report go to `test-results/stripes/`. A rapid slider sequence in the dense
 world view verifies actual worker cancellation before all textures are generated,

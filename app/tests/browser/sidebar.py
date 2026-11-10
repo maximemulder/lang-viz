@@ -133,4 +133,3 @@ def select_result(browser, language_id):
 
 def add_selected(browser):
     browser.js("document.querySelector('.finder-add').click()")
-    wait_for(lambda: browser.js("return !!document.querySelector('.finder-feedback')"), 10, 'added selection')

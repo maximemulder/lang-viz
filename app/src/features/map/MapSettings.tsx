@@ -233,20 +233,8 @@ export const MapSettings = ({
                 step="5"
                 value={thicknessPercent}
                 aria-valuetext={`${thicknessPercent}%${thicknessPercent === 100 ? ', default' : ''}`}
-                aria-describedby="stripe-thickness-hint"
                 onChange={(event) => setStripeThickness(Number(event.currentTarget.value) / 100)}
               />
-              <div className="map-stripe-control__hint">
-                <p id="stripe-thickness-hint">Adapts to zoom.</p>
-                <button
-                  type="button"
-                  disabled={stripeThickness === 1}
-                  onClick={() => setStripeThickness(1)}
-                  aria-label="Reset stripe thickness"
-                >
-                  Reset
-                </button>
-              </div>
             </div>
           )}
         </fieldset>

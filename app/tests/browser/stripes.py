@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check stripe density, zoom adaptation, reset and geometry preservation."""
+"""Check stripe density, zoom adaptation and geometry preservation."""
 
 import json
 
@@ -55,10 +55,8 @@ def main():
             assert len(state['reports']) == len(baseline['reports']), 'Thickness recomputed geometry'
             assert not state['errors'], state['errors']
         assert results['finer'] > results['intermediate'] > results['default'] > results['thicker'] > 0, results
-        browser.js("document.querySelector('[aria-label=\"Reset stripe thickness\"]').click()")
-        wait_for(lambda: browser.js("return document.querySelector('#stripe-thickness').value==='100'"), 10, 'default reset')
-        wait_for(lambda: not browser.snapshot()['stripeTextures']['pending'], 20, 'reset textures')
-        assert pixels(browser) == patches['default'], 'Reset must restore the original stripe pixels'
+        thickness(browser, 100)
+        assert pixels(browser) == patches['default'], 'Returning to 100% must restore the original stripe pixels'
 
         thickness(browser, 200)
         browser.js("document.querySelector('input[name=map-overlap][value=blending]').click()")
@@ -140,7 +138,7 @@ def main():
         assert not final['errors'], final['errors']
         results['cancellation'] = jobs
         (output / 'report.json').write_text(json.dumps(results, indent=2) + '\n')
-    print('Stripe density, zoom steps, reset, mode switching and style restoration pass:', results)
+    print('Stripe density, zoom steps, mode switching and style restoration pass:', results)
 
 
 if __name__ == '__main__':
