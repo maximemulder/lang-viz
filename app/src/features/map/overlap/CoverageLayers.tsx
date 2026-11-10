@@ -102,6 +102,7 @@ export const CoverageLayers = ({
                     filter={['!', ['has', 'variantId']]}
                     paint={{
                       'fill-pattern': ['get', 'pattern'],
+                      'fill-pattern-transition': { duration: 0 },
                       'fill-opacity': 1,
                       'fill-layer-opacity': coverageReady && activeBuffer === buffer ? opacity : 0,
                       'fill-layer-opacity-transition': { duration: 0 },

@@ -10,6 +10,7 @@ import {
   languageOpacityAtom,
   overlapModeAtom,
   overlapStatusAtom,
+  stripeThicknessAtom,
 } from '../../../state/atlasState'
 import { CoverageLayers } from './CoverageLayers'
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
@@ -48,6 +49,8 @@ export const OverlapHatching = ({
   const languageColors = useAtomValue(languageColorsAtom)
   const mode = useAtomValue(overlapModeAtom)
   const opacity = useAtomValue(languageOpacityAtom)
+  const stripeThickness = useAtomValue(stripeThicknessAtom)
+  const thicknessRef = useRef(stripeThickness)
   const setOverlapStatus = useSetAtom(overlapStatusAtom)
   const [state, setState] = useState<HatchingState>(idleHatchingState)
   const colors = useMemo(() => {
@@ -85,6 +88,7 @@ export const OverlapHatching = ({
       () => configRef.current.mode === 'hatching',
     )
     resourcesRef.current = resources
+    resources.updateStripeThickness(thicknessRef.current)
     // Diagnostics can compare identical selections through the real delivery path.
     const engine = diagnosticsEnabled
       ? new URLSearchParams(location.search).get('overlap-engine')
@@ -164,6 +168,11 @@ export const OverlapHatching = ({
     colorsRef.current = colors
     resourcesRef.current?.updateColors(colors)
   }, [colors])
+
+  useEffect(() => {
+    thicknessRef.current = stripeThickness
+    resourcesRef.current?.updateStripeThickness(stripeThickness)
+  }, [stripeThickness])
 
   useEffect(() => {
     configRef.current = { selectionKey, mode }

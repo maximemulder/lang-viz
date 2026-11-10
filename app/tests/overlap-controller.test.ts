@@ -9,6 +9,11 @@ import {
 import type { DeliveryTile } from '../src/features/map/overlap/delivery.ts'
 import { MAX_COVERAGE_VERTICES } from '../src/features/map/overlap/limits.ts'
 import { OverlapPatternError } from '../src/features/map/overlap/patterns.ts'
+import type { StripeTextureWorker } from '../src/features/map/overlap/stripeTextureClient.ts'
+import {
+  createStripeTextureJobs,
+  type StripeTextureOutput,
+} from '../src/features/map/overlap/stripeTextureJobs.ts'
 import type { OverlapRequest, TileCoordinate } from '../src/features/map/overlap/types.ts'
 import { PUBLICATION_TIMEOUT_MS } from '../src/features/map/overlap/workerClient.ts'
 
@@ -436,7 +441,7 @@ test('a completed zoom replacement still has a loading deadline after a worker f
 // The adapter imports browser protocol registration. Only location is needed
 // to keep its explicit diagnostics switch off in this Node test environment.
 Object.assign(globalThis, { location: { search: '' } })
-const { createMapResources, coverageSourceId } = await import(
+const { createMapResources, coverageSourceId, stripeTextureState } = await import(
   '../src/features/map/overlap/mapResources.ts'
 )
 
@@ -453,6 +458,7 @@ test('MapLibre adapter rejects errored sources despite loaded=true and ignores u
       sources.has(id) ? { serialize: () => ({ tiles: [sources.get(id)] }) } : undefined,
     isSourceLoaded: () => true,
     isMoving: () => moving,
+    getZoom: () => 6,
   } as unknown as MapLibreMap
   const resources = createMapResources(map, 'archive', new Map(), (id) => failures.push(id))
   // Empty tiles need no images; they still establish coverage/fallback identities.
@@ -478,12 +484,13 @@ test('MapLibre adapter rejects errored sources despite loaded=true and ignores u
   assert.equal(listeners.size, 0)
 })
 
-test('style replacement restores owned stripe images without recomputing and releases them on disposal', () => {
+test('style replacement restores owned stripe images without recomputing and releases them on disposal', async () => {
   const listeners = new Map<string, (event: unknown) => void>()
   const images = new Map<string, { width: number; height: number; data: Uint8Array }>()
   const failures: number[] = []
   const sources = new Map<string, string>()
   let imageUpdates = 0
+  let zoom = 6
   const map = {
     on: (event: string, callback: (event: unknown) => void) => listeners.set(event, callback),
     off: (event: string) => listeners.delete(event),
@@ -492,6 +499,7 @@ test('style replacement restores owned stripe images without recomputing and rel
       sources.has(id) ? { serialize: () => ({ tiles: [sources.get(id)] }) } : undefined,
     isSourceLoaded: () => true,
     isMoving: () => false,
+    getZoom: () => zoom,
     querySourceFeatures: () => [],
     getImage: (id: string) => (images.has(id) ? { data: images.get(id) } : undefined),
     hasImage: (id: string) => images.has(id),
@@ -511,9 +519,55 @@ test('style replacement restores owned stripe images without recomputing and rel
       ['B', '#0000ff'],
     ]),
     (id) => failures.push(id),
+    () => true,
+    () => {
+      const worker: StripeTextureWorker = {
+        onmessage: null,
+        onerror: null,
+        postMessage: (input) => receive(input),
+        terminate: () => {
+          worker.onmessage = null
+        },
+      }
+      const receive = createStripeTextureJobs((data) => {
+        queueMicrotask(() => worker.onmessage?.({ data } as MessageEvent<StripeTextureOutput>))
+      })
+      return worker
+    },
   )
+  const densityReady = async () => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      if (!stripeTextureState(map)?.pending) return
+      await new Promise((resolve) => setTimeout(resolve, 1))
+    }
+    assert.fail('Stripe density did not settle')
+  }
   const { snapshot } = resources.stage(new Map([['2/0/0', tile(0)]]), 0)
   const original = required(images.get('overlap:A|B'))
+  resources.updateStripeThickness(0.5)
+  assert.deepEqual(
+    images.get('overlap:A|B'),
+    original,
+    'Previous stripes stay visible while generating',
+  )
+  await densityReady()
+  assert.notDeepEqual(images.get('overlap:A|B')?.data, original.data)
+  assert.equal(images.get('overlap:A|B')?.width, original.width)
+  resources.updateStripeThickness(1)
+  await densityReady()
+  assert.deepEqual(images.get('overlap:A|B'), original)
+  zoom = 2
+  required(listeners.get('zoom'))({})
+  await densityReady()
+  assert.notDeepEqual(images.get('overlap:A|B')?.data, original.data)
+  const zoomUpdates = imageUpdates
+  required(listeners.get('zoom'))({})
+  assert.equal(imageUpdates, zoomUpdates, 'Density only updates when its level changes')
+  zoom = 6
+  required(listeners.get('zoom'))({})
+  await densityReady()
+  assert.deepEqual(images.get('overlap:A|B'), original)
+  imageUpdates = 0
   resources.updateColors(
     new Map([
       ['A', '#00ff00'],

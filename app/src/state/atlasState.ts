@@ -259,6 +259,7 @@ export const selectedDraftLanguageIdsAtom = atom((get) => {
     .map(({ languageId }) => languageId)
 })
 export const overlapModeAtom = atom<'hatching' | 'blending'>('hatching')
+export const stripeThicknessAtom = atom(1)
 export const languageOpacityAtom = atom(0.82)
 export const overlapStatusAtom = atom<{
   readonly status: 'idle' | 'loading' | 'ready' | 'error'

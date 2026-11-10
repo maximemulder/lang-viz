@@ -14,6 +14,7 @@ import {
   solidLayerId,
   stripeLayerId,
 } from '../layerIds'
+import { stripeTextureState } from '../mapResources'
 import { serviceDiagnostics } from '../serviceDiagnostics'
 import { parseOverlapSelection } from '../types.ts'
 import type { OverlapTestApi } from './api'
@@ -307,6 +308,7 @@ export const installOverlapTestApi = (
         patternImages: map.isStyleLoaded()
           ? map.listImages().filter((id) => id.startsWith('overlap:')).length
           : 0,
+        stripeTextures: stripeTextureState(map),
         missingVisiblePatterns: BUFFERS.flatMap((buffer) => {
           const id = stripeLayerId(buffer)
           if (!map.getLayer(id) || !Number(map.getPaintProperty(id, 'fill-layer-opacity')))

@@ -27,6 +27,7 @@ import {
   patternSize,
   stripeImage,
 } from '../src/features/map/overlap/patterns.ts'
+import { stripeRepeats } from '../src/features/map/overlap/stripeStyle.ts'
 import {
   coverageTilesKey,
   retainCoverageTiles,
@@ -251,6 +252,37 @@ test('stripe images use all contributor colors, opaque alpha, and seamless power
         [...image.data.slice((y * image.width + x) * 4, (y * image.width + x) * 4 + 3)],
         palette[Math.floor((((x + y) % image.width) * palette.length) / image.width)],
       )
+})
+
+test('high-zoom default stripes preserve the original pixels in a doubled seamless texture', () => {
+  const colors = ['#ff0000', '#00ff00', '#0000ff']
+  const original = stripeImage(colors)
+  const image = stripeImage(colors, 2, stripeRepeats(colors.length, 6, 1))
+  assert.equal(patternPixels(colors.length, 2), (image.width + 2) ** 2)
+  for (let y = 0; y < image.height; y++)
+    for (let x = 0; x < image.width; x++) {
+      const source = ((y % original.height) * original.width + (x % original.width)) * 4
+      const target = (y * image.width + x) * 4
+      assert.deepEqual(
+        image.data.slice(target, target + 4),
+        original.data.slice(source, source + 4),
+      )
+    }
+})
+
+test('stripe density follows zoom and thickness while retaining readable contributor bands', () => {
+  for (const count of [2, 3, 8, 16, 42]) {
+    for (const thickness of [0.5, 1, 2]) {
+      let previous = Number.POSITIVE_INFINITY
+      for (const zoom of [0.5, 2, 3, 4.9, 5, 12]) {
+        const repeats = stripeRepeats(count, zoom, thickness)
+        assert.ok(Number.isInteger(repeats) && repeats > 0)
+        assert.ok(repeats <= previous, 'Bands thicken as the map zooms in')
+        assert.ok((patternSize(count) * 2) / count / repeats >= 1.5)
+        previous = repeats
+      }
+    }
+  }
 })
 
 test('single-language coverage identifies native solid fills, including retained parent tiles', () => {

@@ -125,11 +125,38 @@ one MapLibre layer per selected entry. Color/opacity changes do not recompute
 geometry. Native fallback fills sort descendants above ancestors and inspection
 applies the same refinement relation.
 
-Two-color stripe repeats retain their 16-pixel period. Larger contributor sets use
-tighter repeats with at least three native pixels per color band, reducing texture
-storage within the existing padded-texel and resident-image budgets. Images use
-integer `pixelRatio: 1`: MapLibre's data-driven pattern attributes store that value
-as Uint16, so fractional ratios truncate to zero and make shared faces disappear.
+Default two-color stripe repeats retain their 16-pixel period from zoom 5 onward.
+Below that, integer-zoom steps use progressively denser patterns (2, 3 and 4 times
+as many repeats).
+Map settings offers 25%–200% thickness in 5% increments, with reset to 100%; the
+preference scales these zoom steps and survives switching overlap modes. Widths
+are still quantized to whole cycles in the texture grid. Equivalent effective
+widths reuse their current job. No geometry is
+recomputed. Pattern transitions stay disabled to avoid mixing category colors.
+Larger contributor sets use tighter source repeats. Density is clamped to retain
+at least 1.5 pixels per band before fractional-zoom/projection scaling. A doubled
+texture contains two default cycles, leaving room for thicker stripes. Thickness
+and zoom changes update whole cycles in the same image, keeping image IDs,
+dimensions, tile atlases and coverage snapshots intact. This avoids gaps while
+MapLibre rebuilds buckets for a different sprite name. Ratios remain
+`pixelRatio: 1`: MapLibre's data-driven pattern attributes store them as Uint16,
+so fractional ratios can truncate to zero and make shared faces disappear.
+Images recolor in place, restore at the current density after style replacement,
+and are released with the membership's last source reference.
+
+Thickness and zoom updates use a lazy texture worker with one active job and one
+replaceable pending job. New input cancels obsolete generation between batches
+of at most 64 images or approximately four milliseconds. Each batch yields a
+macrotask so incoming cancellation messages can run; an executing image finishes
+before cancellation takes effect. Only complete, current results transfer back.
+Main-thread uploads also yield between bounded batches and stop when superseded.
+Existing images remain visible until replacements are ready, with unchanged
+image IDs and dimensions. Palette changes cancel old-color jobs; pruning cancels
+work for removed memberships, and disposal terminates the worker. Initial image
+registration and style restoration remain synchronous to avoid missing fills.
+Worker results temporarily hold generated texture bytes in addition to resident
+image storage. `stripeTextures` browser diagnostics record pending work,
+completion, and the number of images generated before actual cancellation.
 
 See the [overlap roadmap](../../../../../OVERLAP_ROADMAP.md) for open limitations,
 proposed priorities, and completion criteria across sessions.
@@ -339,12 +366,16 @@ different IDs and colors.
   Integrated source LODs preserve more coverage-boundary detail: an Asher zoom-2
   viewport can exceed the previous 300,000-position limit. The experimental
   output/retention bound is raised together; per-tile input, overlay time,
-  caches, and texture budgets are unchanged.
+  caches are unchanged.
   Deadline checks occur between Boolean operations;
   a single operation cannot be interrupted.
 - Pattern allocation is limited by padded image area instead of a 128-combination
-  cap: at most 4,194,304 texels per result (16 MiB RGBA), and twice that across
-  owned images while buffers coexist. This includes MapLibre's one-pixel wrap
+  cap: at most 16,777,216 texels per result (64 MiB RGBA), and 33,554,432
+  resident texels (128 MiB RGBA) across publication buffers. Doubled image
+  dimensions cost up to four times the former storage while retaining the same
+  combination capacity. The result's `patternPixels` diagnostic counts the actual
+  padded textures. Thickness changes allocate no additional images.
+  This includes MapLibre's one-pixel wrap
   padding, but not atlas packing waste, per-tile atlas copies, JS metadata, or
   GPU overhead. It is not a total memory bound. Images are capped at 256×256
   pixels (still up to 42 contributors at the same displayed spacing).

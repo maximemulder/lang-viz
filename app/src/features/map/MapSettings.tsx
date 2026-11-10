@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai'
 import { useEffect, useId, useRef, useState } from 'react'
-import { languageOpacityAtom, overlapModeAtom } from '../../state/atlasState'
+import { languageOpacityAtom, overlapModeAtom, stripeThicknessAtom } from '../../state/atlasState'
 
 import { BIOMES } from './biomes'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
@@ -73,6 +73,8 @@ export const MapSettings = ({
   const toggleRef = useRef<HTMLButtonElement>(null)
   const [mode, setMode] = useAtom(overlapModeAtom)
   const [opacity, setOpacity] = useAtom(languageOpacityAtom)
+  const [stripeThickness, setStripeThickness] = useAtom(stripeThicknessAtom)
+  const thicknessPercent = Math.round(stripeThickness * 100)
 
   useEffect(() => {
     if (!open) return
@@ -217,8 +219,38 @@ export const MapSettings = ({
               </label>
             ))}
           </div>
+          {mode === 'hatching' && (
+            <div className="map-range-control map-stripe-control">
+              <label htmlFor="stripe-thickness">
+                Stripe thickness
+                <output htmlFor="stripe-thickness">{thicknessPercent}%</output>
+              </label>
+              <input
+                id="stripe-thickness"
+                type="range"
+                min="25"
+                max="200"
+                step="5"
+                value={thicknessPercent}
+                aria-valuetext={`${thicknessPercent}%${thicknessPercent === 100 ? ', default' : ''}`}
+                aria-describedby="stripe-thickness-hint"
+                onChange={(event) => setStripeThickness(Number(event.currentTarget.value) / 100)}
+              />
+              <div className="map-stripe-control__hint">
+                <p id="stripe-thickness-hint">Adapts to zoom.</p>
+                <button
+                  type="button"
+                  disabled={stripeThickness === 1}
+                  onClick={() => setStripeThickness(1)}
+                  aria-label="Reset stripe thickness"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          )}
         </fieldset>
-        <label className="map-opacity-control" htmlFor="language-opacity">
+        <label className="map-range-control map-opacity-control" htmlFor="language-opacity">
           <span>
             Color intensity
             <output htmlFor="language-opacity">{Math.round(opacity * 100)}%</output>

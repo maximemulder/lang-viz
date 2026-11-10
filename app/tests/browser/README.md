@@ -20,6 +20,7 @@ npm run test:branch-browser
 npm run test:parts-browser
 npm run test:inspection-browser -- --dev
 npm run build && python3 tests/browser/dropdowns.py
+npm run build && python3 tests/browser/stripes.py
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
@@ -363,3 +364,11 @@ each suite keeps its scenario assertions and reports.
 `dropdowns.py` checks real pointer selection over the next sidebar section, viewport
 bounds at desktop, short and narrow sizes, Escape dismissal, and section collapse.
 Screenshots go to `test-results/dropdowns/`.
+
+`stripes.py` measures stripe frequency in rendered pixels at finer, intermediate,
+default and thicker settings,
+checks reset, low-zoom density, geometry preservation, overlap-mode switching,
+zoom-step continuity, style restoration and narrow settings. Screenshots and the
+frequency report go to `test-results/stripes/`. A rapid slider sequence in the dense
+world view verifies actual worker cancellation before all textures are generated,
+latest-value completion, unchanged sprite counts, and preserved geometry.

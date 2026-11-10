@@ -24,7 +24,8 @@ export const patternSize = (contributors: number) => {
 
 // Include MapLibre's one-pixel wrap padding on every edge. This bounds source
 // image area, not all browser/GPU memory: MapLibre also makes per-tile atlases.
-export const patternPixels = (contributors: number) => (patternSize(contributors) + 2) ** 2
+export const patternPixels = (contributors: number, sizeMultiplier: 1 | 2 = 1) =>
+  (patternSize(contributors) * sizeMultiplier + 2) ** 2
 export const MAX_PATTERN_PIXELS = 4 * 1024 * 1024
 
 export const checkPatternBudget = (pixels: number, limit = MAX_PATTERN_PIXELS) => {
@@ -35,8 +36,8 @@ export const checkPatternBudget = (pixels: number, limit = MAX_PATTERN_PIXELS) =
     )
 }
 
-export const stripeImage = (colors: readonly string[]) => {
-  const size = patternSize(colors.length)
+export const stripeImage = (colors: readonly string[], sizeMultiplier: 1 | 2 = 1, repeats = 1) => {
+  const size = patternSize(colors.length) * sizeMultiplier
   const channels = colors.map((color) => {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`Invalid language color: ${color}`)
     return [
@@ -48,7 +49,7 @@ export const stripeImage = (colors: readonly string[]) => {
   const data = new Uint8Array(size * size * 4)
   const row = new Uint8Array(size * 4)
   for (let x = 0; x < size; x++) {
-    const color = channels[Math.floor((x * channels.length) / size)]
+    const color = channels[Math.floor((((x * repeats) % size) * channels.length) / size)]
     if (color) row.set([...color, 255], x * 4)
   }
   // Every diagonal row is a cyclic shift of the same color band. Copy bytes
