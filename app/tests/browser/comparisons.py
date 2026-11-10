@@ -94,7 +94,11 @@ def check_comparisons(browser, output):
     both = state()
     assert {e['group']['id'] for e in both} != {e['group']['id'] for e in dlac}
     assert len({e['group']['id'] for e in both}) == 2
-    assert both[:len(dlac)] == dlac
+    # Pinned sources and explicit styles survive; automatic colors can change
+    # when a mixed-source selection switches away from a dataset's prepared palette.
+    assert [{k: v for k, v in e.items() if k != 'color'} for e in both[:len(dlac)]] == [
+        {k: v for k, v in e.items() if k != 'color'} for e in dlac
+    ]
     coverage = wait_for(lambda: (s if (s := browser.snapshot())['status'] in ('ready', 'error') and s['mapLoaded'] and s['tilesLoaded'] and not s['moving'] else None), 45, 'terminal mixed-source coverage')
     coverage_outcome = check_state(coverage, require_stripes=coverage['status'] == 'ready')
     # Large mixed-source branches may hit the existing renderer budgets; pinning must survive.

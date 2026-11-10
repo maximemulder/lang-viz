@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai'
 import { useEffect, useRef, useState } from 'react'
+import { SidebarPane } from '../../components/SidebarPane'
 import type {
   AtlasData,
   GeographyDatasetSelection,
@@ -156,13 +157,12 @@ export const GeographyFilters = () => {
     setRequested(false)
   }, [requested, setRequested])
   return (
-    <details className="finder-options" ref={rootRef}>
-      <summary>
-        Sources &amp; period{' '}
-        <span>
-          <GeographyFilterSummary />
-        </span>
-      </summary>
+    <SidebarPane
+      className="finder-options"
+      ref={rootRef}
+      title="Data sources"
+      summary={<GeographyFilterSummary />}
+    >
       <div className="finder-filters">
         <label className="finder-filters__period">
           <span>Geographic period</span>
@@ -191,6 +191,6 @@ export const GeographyFilters = () => {
         Filters areas to browse and add. Existing map entries keep their sources and periods.{' '}
         {temporalView(period).description}
       </p>
-    </details>
+    </SidebarPane>
   )
 }

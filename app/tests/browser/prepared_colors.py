@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from run import APP, browser_session, open_atlas, wait_for
 from sidebar import select_branches, add_selected
-from colors import color_state, settings, button, optimize
+from colors import color_state, color_controls, button, optimize
 
 out=APP/'test-results/prepared-colors'
 manifest=json.loads((APP/'public/data/manifest.json').read_text())
@@ -33,7 +33,7 @@ with browser_session(out) as (browser,origin):
     optimize(browser,ids)
     optimized=color_state(browser,ids)['colors']
     assert all(entry['color']==optimized[entry['languageId']] for entry in browser.js('return window.overlapTest.mapEntryState()'))
-    settings(browser)
+    color_controls(browser)
     button(browser,'Use default palette')
     assert color_state(browser,ids)['colors']==expected
     button(browser,'Undo colors')

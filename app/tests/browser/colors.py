@@ -7,14 +7,12 @@ import time
 
 from color_evaluation import distance, evaluate_colors, lab
 from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import open_details, search, select_branches, view
+from sidebar import open_details, search, select_branches, view, map_section
 
 
-def settings(browser):
-    browser.js("""
-        const toggle=document.querySelector('[aria-label="Map settings"]');
-        if(toggle.getAttribute('aria-expanded')!=='true') toggle.click();
-    """)
+def color_controls(browser):
+    map_section(browser, "colors")
+    browser.js("document.querySelector('#on-map-colors-heading').scrollIntoView({block:'nearest'})")
 
 
 def button(browser, text):
@@ -64,7 +62,7 @@ def captured_input(browser):
 
 def optimize(browser, ids, output=None, name=None):
     browser.settled(100)
-    settings(browser)
+    color_controls(browser)
     wait_for(lambda: browser.js("""
         return ![...document.querySelectorAll('.color-controls button')]
             .find(button=>button.textContent.trim()==='Optimize colors for this view').disabled;
@@ -124,7 +122,7 @@ def main():
             """)
             state = select_branches(browser, "DLAC", [108, 32], zoom=3)
             check_state(state, True)
-            settings(browser)
+            color_controls(browser)
             browser.js("""
                 const input=document.querySelector('#language-opacity');
                 Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'100');
@@ -312,11 +310,12 @@ def main():
             browser.js("window.overlapTest.camera([20,15],.4)")
             browser.settled(100)
 
-            # Settings remain usable on a narrow layout.
+            # Sidebar color actions remain reachable on a narrow layout.
             browser.call("POST", "/window/rect", {"width": 420, "height": 850})
-            settings(browser)
+            color_controls(browser)
+            browser.js("document.querySelector('.language-finder').scrollIntoView({block:'end'})")
             bounds = browser.js("""
-                const r=document.querySelector('.map-settings__panel').getBoundingClientRect();
+                const r=document.querySelector('.on-map-workspace').getBoundingClientRect();
                 return {left:r.left,right:r.right,width:innerWidth,bottom:r.bottom,height:innerHeight};
             """)
             assert bounds["left"] >= 0 and bounds["right"] <= bounds["width"], bounds
@@ -325,7 +324,7 @@ def main():
                 const button=[...document.querySelectorAll('.color-controls button')]
                     .find(button=>button.textContent.trim()==='Use default palette');
                 button.scrollIntoView({block:'center',inline:'nearest'});
-                const panel=document.querySelector('.map-settings__panel').getBoundingClientRect();
+                const panel=document.querySelector('.on-map-workspace').getBoundingClientRect();
                 const r=button.getBoundingClientRect();
                 return r.top>=panel.top && r.bottom<=panel.bottom && r.right<=innerWidth;
             """)

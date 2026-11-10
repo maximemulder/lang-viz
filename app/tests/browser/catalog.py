@@ -6,7 +6,7 @@ import json
 from comparisons import check_comparisons
 from selection import check_selection
 from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import open_details, search, view
+from sidebar import open_details, search, view, map_section
 
 
 def main():
@@ -40,6 +40,49 @@ def main():
                 return labels.includes('Select all') && labels.includes('Clear selection') &&
                     !labels.some(s=>s.includes('Select roots') || s.includes('Show branches on map'));
             """), 'Explore uses the restored selection controls'
+            assert browser.js("""
+                const list=document.querySelector('.language-list').getBoundingClientRect();
+                const footer=document.querySelector('.explore-footer').getBoundingClientRect();
+                const sources=document.querySelector('.finder-options');
+                const search=document.querySelector('#explore-search-content');
+                return !sources.open && sources.querySelector('summary').textContent.includes('Data sources') &&
+                    search.contains(document.querySelector('.search-field')) &&
+                    search.contains(document.querySelector('.finder-scope')) &&
+                    document.querySelector('.search-field').getClientRects().length>0 &&
+                    footer.top >= list.bottom - 1 &&
+                    !document.querySelector('.map-settings__panel .color-controls') &&
+                    document.querySelector('#on-map-colors-content').hidden;
+            """), 'Data sources and Colors start collapsed, and Search contains the query, area, and results'
+            map_section(browser, 'colors')
+            assert browser.js("""
+                return !document.querySelector('#on-map-entries-content').hidden &&
+                    !document.querySelector('#on-map-colors-content').hidden &&
+                    document.querySelectorAll('.language-finder [role=tablist]').length===1 &&
+                    document.querySelector('#on-map-colors').getBoundingClientRect().bottom <=
+                    document.querySelector('#on-map-entries').getBoundingClientRect().top + 1 &&
+                    document.querySelector('#on-map-entries-heading').textContent.includes('Entries');
+            """), 'Colors precedes Entries and both can stay open together in one vertical section stack'
+            map_section(browser, 'entries', False)
+            browser.js("document.querySelector('.color-controls__custom').open=true")
+            browser.js("""
+                const input=document.querySelector('.color-controls__custom input[type=text]');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'stan1293');
+                input.dispatchEvent(new Event('input',{bubbles:true}));
+            """)
+            map_section(browser, 'colors', False)
+            map_section(browser, 'colors')
+            view(browser, 'explore')
+            view(browser, 'map')
+            assert browser.js("""
+                return document.querySelector('#on-map-colors').dataset.expanded==='true' &&
+                    document.querySelector('#on-map-entries').dataset.expanded==='false' &&
+                    document.querySelector('.color-controls__custom').open &&
+                    document.querySelector('.color-controls__custom input[type=text]').value==='stan1293';
+            """), 'Collapsing sections and changing views preserve independent expansion and color drafts'
+            browser.screenshot(output / 'stacked-sections.png')
+            map_section(browser, 'entries')
+            map_section(browser, 'colors', False)
+            view(browser, 'explore')
             # Check every virtualized root, including the boundary between availability groups.
             roots_by_position = {}
             height, step = browser.js("""
@@ -107,6 +150,30 @@ def main():
                 )
                 browser.call("DELETE", "/actions")
 
+            browser.js("""
+                document.querySelector('.finder-options').open=true;
+                window.sourceControlsHeight=document.querySelector('.explore-controls').getBoundingClientRect().height;
+                document.querySelector('#explore-search-heading').focus();
+            """)
+            key("\ue00d")
+            assert browser.js("""
+                const content=document.querySelector('#explore-search-content');
+                return content.hidden && getComputedStyle(content).display==='none' &&
+                    document.querySelector('.search-field').getClientRects().length===0 &&
+                    document.querySelector('.language-list').getClientRects().length===0 &&
+                    document.querySelector('.finder-options').open &&
+                    document.querySelector('.finder-filters__period select').getClientRects().length>0 &&
+                    document.querySelector('.explore-controls').getBoundingClientRect().height >= window.sourceControlsHeight-1;
+            """), 'Collapsing Search removes its rendered content while Data sources stays open at its full height'
+            browser.screenshot(output / 'collapsed-search.png')
+            key("\ue00d")
+            wait_for(lambda: browser.js("return document.querySelectorAll('.language-row[aria-level=\"2\"]').length===3"), 10, 'expanded family survives section collapse')
+            browser.js("document.querySelector('.finder-options').open=false")
+            assert browser.js("""
+                return document.querySelector('.search-field').getClientRects().length>0 &&
+                    document.querySelector('#explore-search input[type=search]').value==='abkh1242';
+            """), 'Collapsing Data sources preserves the visible query and results in Search'
+            browser.js("document.querySelector('.language-row').focus()")
             key("\ue014")  # Right: already expanded, enter first child.
             wait_for(
                 lambda: browser.js(
@@ -159,6 +226,10 @@ def main():
             wait_for(lambda: browser.js("return document.querySelector('.finder-detail__heading small').textContent.includes(arguments[0])", child_id), 10, "inspect next result")
             assert browser.js("return document.activeElement.dataset.languageId") == child_id
             assert browser.snapshot()["selectedCount"] == 0
+            assert browser.js("""
+                return document.querySelector('.language-tabs').getBoundingClientRect().bottom <=
+                    document.querySelector('.finder-detail').getBoundingClientRect().top + 1;
+            """), 'Opening the inspector keeps primary navigation anchored above it'
             browser.js("document.querySelector('.finder-detail__toggle').click()")
             assert browser.js("return document.querySelector('#focused-language-body').hidden")
             view(browser, 'map')

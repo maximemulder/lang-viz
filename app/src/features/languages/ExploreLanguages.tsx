@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { SidebarPane, SidebarSection } from '../../components/SidebarPane'
 import { searchCatalog } from '../../domain/catalog'
 import { prepareExploreResults } from '../../domain/exploration'
 import {
@@ -188,6 +189,7 @@ export const ExploreLanguages = () => {
   const [coverage, setCoverage] = useAtom(searchCoverageAtom)
   const [coloring, setColoring] = useAtom(searchColoringAtom)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [searchExpanded, setSearchExpanded] = useState(true)
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -228,6 +230,8 @@ export const ExploreLanguages = () => {
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => listRef.current,
+    // Section resizing and virtual row measurement must settle in separate frames.
+    useAnimationFrameWithResizeObserver: true,
     estimateSize: () => 44,
     overscan: 8,
     getItemKey: (index) => rows[index]?.key ?? index,
@@ -327,6 +331,7 @@ export const ExploreLanguages = () => {
       setRevealId(null)
       return
     }
+    setSearchExpanded(true)
     const path = [...languageAncestors(hierarchy, language), language]
     const next = new Set(expandedKeys)
     let key = ''
@@ -345,59 +350,134 @@ export const ExploreLanguages = () => {
     <div className="explore-view">
       <div className="explore-controls">
         <GeographyFilters />
-        <label className="finder-scope">
-          <span>Search area</span>
-          <select
-            value={scope}
-            onChange={(event) => {
-              setScope(event.currentTarget.value === 'viewport' ? 'viewport' : 'world')
-              pendingFocus.current = null
-              setFocusedKey(null)
-              virtualizer.scrollToOffset(0)
-            }}
-          >
-            <option value="world">Whole world</option>
-            <option value="viewport">Current map ({viewportIds.length})</option>
-          </select>
-        </label>
-        <label className="search-field">
-          <span className="visually-hidden">Search families, languages and dialects</span>
-          <input
-            type="search"
-            value={query}
-            placeholder="Name, alternative name, ISO or catalog ID…"
-            onChange={(event) => {
-              setQuery(event.currentTarget.value)
-              pendingFocus.current = null
-              setFocusedKey(null)
-              virtualizer.scrollToOffset(0)
-            }}
-          />
-        </label>
-        <div className="finder-actions">
-          <p aria-live="polite">
-            <strong>{roots.length.toLocaleString()}</strong>{' '}
-            {isBrowsingRoots ? 'roots' : roots.length === 1 ? 'match' : 'matches'} ·{' '}
-            {showableIds.length.toLocaleString()} mappable
-            <small>
-              {isBrowsingRoots
-                ? `${data.languages.length.toLocaleString()} entries in the classification`
-                : 'Expand a match to browse all its children'}
-            </small>
-          </p>
-          <div>
-            <button
-              type="button"
-              className="button-secondary"
-              onClick={() => {
-                selectResults(showableIds)
-                setFeedback(null)
+      </div>
+      <SidebarSection
+        id="explore-search"
+        className="explore-search"
+        title="Search"
+        expanded={searchExpanded}
+        onExpandedChange={setSearchExpanded}
+      >
+        <div className="explore-search-controls">
+          <label className="search-field">
+            <span className="visually-hidden">Search families, languages and dialects</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="Name, alternative name, ISO or catalog ID…"
+              onChange={(event) => {
+                setQuery(event.currentTarget.value)
+                setSearchExpanded(true)
+                pendingFocus.current = null
+                setFocusedKey(null)
+                virtualizer.scrollToOffset(0)
               }}
-              disabled={!showableIds.length || areAllFilteredSelected}
-              title="Select all mappable results, including those beyond the visible list. Expanded children are selected separately."
+            />
+          </label>
+          <label className="finder-scope">
+            <span>Search area</span>
+            <select
+              value={scope}
+              onChange={(event) => {
+                setScope(event.currentTarget.value === 'viewport' ? 'viewport' : 'world')
+                pendingFocus.current = null
+                setFocusedKey(null)
+                virtualizer.scrollToOffset(0)
+              }}
             >
-              Select all
-            </button>
+              <option value="world">Whole world</option>
+              <option value="viewport">Current map ({viewportIds.length})</option>
+            </select>
+          </label>
+          <div className="finder-actions">
+            <p aria-live="polite">
+              <strong>{roots.length.toLocaleString()}</strong>{' '}
+              {isBrowsingRoots ? 'roots' : roots.length === 1 ? 'match' : 'matches'} ·{' '}
+              {showableIds.length.toLocaleString()} mappable
+              <small>
+                {isBrowsingRoots
+                  ? `${data.languages.length.toLocaleString()} entries in the classification`
+                  : 'Expand a match to browse all its children'}
+              </small>
+            </p>
+            <div>
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => {
+                  selectResults(showableIds)
+                  setFeedback(null)
+                }}
+                disabled={!showableIds.length || areAllFilteredSelected}
+                title="Select all mappable results, including those beyond the visible list. Expanded children are selected separately."
+              >
+                Select all
+              </button>
+            </div>
+          </div>
+        </div>
+        <div
+          className="language-list"
+          ref={listRef}
+          role="tree"
+          tabIndex={virtualRows.some((row) => rows[row.index]?.key === activeKey) ? -1 : 0}
+          onFocus={(event) => {
+            if (event.target === event.currentTarget) focusRow(virtualRows[0]?.index ?? 0)
+          }}
+          aria-label={isBrowsingRoots ? 'Language classification' : 'Expandable search results'}
+        >
+          {rows.length === 0 && (
+            <p className="finder-empty">
+              No matching entries{scope === 'viewport' ? ' in the current map area' : ''}. Try
+              another name or identifier.
+            </p>
+          )}
+          <div
+            className="language-list__sizer"
+            role="presentation"
+            style={{ height: `${virtualizer.getTotalSize()}px` }}
+          >
+            {virtualRows.map((virtualRow) => {
+              const row = rows[virtualRow.index]
+              if (!row) return null
+              const context =
+                row.depth === 0 && !isBrowsingRoots
+                  ? languageAncestors(hierarchy, row.language)
+                      .map(({ name }) => name)
+                      .join(' › ')
+                  : null
+              return (
+                <div
+                  className="language-list__item"
+                  role="presentation"
+                  key={row.key}
+                  style={{ transform: `translateY(${virtualRow.start}px)` }}
+                >
+                  <LanguageRow
+                    row={row}
+                    context={context}
+                    expanded={expandedKeys.has(row.key)}
+                    active={row.key === activeKey}
+                    onExpand={() => toggleExpanded(row.key)}
+                    onFocus={() => {
+                      setFocusedKey(row.key)
+                    }}
+                    onDetails={() => openDetails(row.language.id)}
+                    onKeyDown={(event) => handleTreeKey(event, row, virtualRow.index)}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </SidebarSection>
+      <footer className="finder-actions explore-footer">
+        <div className="finder-bulk">
+          <p aria-live="polite">
+            <strong>{selectedIds.length.toLocaleString()} selected</strong> ·{' '}
+            {selectedInResults.toLocaleString()} in these results
+          </p>
+          <div className="finder-bulk__actions">
             <button
               type="button"
               className="button-secondary"
@@ -409,137 +489,73 @@ export const ExploreLanguages = () => {
             >
               Clear selection
             </button>
+            <button
+              type="button"
+              className="finder-add"
+              disabled={!mappableSelected}
+              onClick={() => {
+                const result = addSelection()
+                setFeedback(
+                  result.addedAreas
+                    ? `Added ${result.addedAreas.toLocaleString()} areas${result.addedGroups ? ` in ${result.addedGroups.toLocaleString()} new groups` : ''}.${result.unavailable ? ` ${result.unavailable} selected entries have no area with these settings.` : ''}`
+                    : 'These groups are already on the map.',
+                )
+              }}
+            >
+              Add to map
+            </button>
           </div>
-          {selectedIds.length > 0 && (
-            <div className="finder-bulk">
-              <p aria-live="polite">
-                <strong>{selectedIds.length.toLocaleString()} selected</strong> ·{' '}
-                {selectedInResults.toLocaleString()} in these results
-              </p>
-              <div className="finder-bulk__actions">
-                <label>
-                  Coloring
-                  <select
-                    aria-label="Coloring for selected entries"
-                    value={coloring}
-                    onChange={(event) => {
-                      setColoring(event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy')
-                      setFeedback(null)
-                    }}
-                  >
-                    <option value="hierarchy">Color by hierarchy</option>
-                    <option value="uniform">One color per group</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  className="finder-add"
-                  disabled={!mappableSelected}
-                  onClick={() => {
-                    const result = addSelection()
-                    setFeedback(
-                      result.addedAreas
-                        ? `Added ${result.addedAreas.toLocaleString()} areas${result.addedGroups ? ` in ${result.addedGroups.toLocaleString()} new groups` : ''}.${result.unavailable ? ` ${result.unavailable} selected entries have no area with these settings.` : ''}`
-                        : 'These groups are already on the map.',
-                    )
-                  }}
-                >
-                  Add to map
-                </button>
-              </div>
-              <details className="finder-bulk__coverage">
-                <summary>
-                  Coverage
-                  {coverage === 'own' ? ' · Only this entry’s area' : ' · Entry and descendants'}
-                </summary>
-                <label>
-                  Include
-                  <select
-                    aria-label="Coverage for selected entries"
-                    value={coverage}
-                    onChange={(event) => {
-                      setCoverage(event.currentTarget.value === 'own' ? 'own' : 'branch')
-                      setFeedback(null)
-                    }}
-                  >
-                    <option value="branch">This entry and its descendants</option>
-                    <option value="own">Only this entry’s area</option>
-                  </select>
-                </label>
-                <p>
-                  Descendants take precedence where they overlap ancestors; broader coverage remains
-                  elsewhere. Search area filters results and does not clip added areas.
-                </p>
-              </details>
-              {mappableSelected < selectedIds.length && (
-                <p>
-                  {selectedIds.length - mappableSelected} selected entries have no area with the
-                  current sources, period, and coverage.
-                </p>
-              )}
-            </div>
-          )}
-          {feedback && (
-            <p role="status" className="finder-feedback">
-              {feedback}
+          <SidebarPane
+            className="finder-bulk__coverage"
+            title="Add options"
+            summary={`${coverage === 'own' ? 'Own area' : 'Entry + descendants'} · ${coloring === 'uniform' ? 'One color' : 'Hierarchy colors'}`}
+          >
+            <label>
+              Coloring
+              <select
+                aria-label="Coloring for selected entries"
+                value={coloring}
+                onChange={(event) => {
+                  setColoring(event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy')
+                  setFeedback(null)
+                }}
+              >
+                <option value="hierarchy">Color by hierarchy</option>
+                <option value="uniform">One color per group</option>
+              </select>
+            </label>
+            <label>
+              Include
+              <select
+                aria-label="Coverage for selected entries"
+                value={coverage}
+                onChange={(event) => {
+                  setCoverage(event.currentTarget.value === 'own' ? 'own' : 'branch')
+                  setFeedback(null)
+                }}
+              >
+                <option value="branch">This entry and its descendants</option>
+                <option value="own">Only this entry’s area</option>
+              </select>
+            </label>
+            <p>
+              Descendants take precedence where they overlap ancestors; broader coverage remains
+              elsewhere. Search area filters results and does not clip added areas.
+            </p>
+          </SidebarPane>
+          {mappableSelected < selectedIds.length && (
+            <p>
+              {selectedIds.length - mappableSelected} selected entries have no area with the current
+              sources, period, and coverage.
             </p>
           )}
         </div>
-      </div>
-      <div
-        className="language-list"
-        ref={listRef}
-        role="tree"
-        tabIndex={virtualRows.some((row) => rows[row.index]?.key === activeKey) ? -1 : 0}
-        onFocus={(event) => {
-          if (event.target === event.currentTarget) focusRow(virtualRows[0]?.index ?? 0)
-        }}
-        aria-label={isBrowsingRoots ? 'Language classification' : 'Expandable search results'}
-      >
-        {rows.length === 0 && (
-          <p className="finder-empty">
-            No matching entries{scope === 'viewport' ? ' in the current map area' : ''}. Try another
-            name or identifier.
+        {feedback && (
+          <p role="status" className="finder-feedback">
+            {feedback}
           </p>
         )}
-        <div
-          className="language-list__sizer"
-          role="presentation"
-          style={{ height: `${virtualizer.getTotalSize()}px` }}
-        >
-          {virtualRows.map((virtualRow) => {
-            const row = rows[virtualRow.index]
-            if (!row) return null
-            const context =
-              row.depth === 0 && !isBrowsingRoots
-                ? languageAncestors(hierarchy, row.language)
-                    .map(({ name }) => name)
-                    .join(' › ')
-                : null
-            return (
-              <div
-                className="language-list__item"
-                role="presentation"
-                key={row.key}
-                style={{ transform: `translateY(${virtualRow.start}px)` }}
-              >
-                <LanguageRow
-                  row={row}
-                  context={context}
-                  expanded={expandedKeys.has(row.key)}
-                  active={row.key === activeKey}
-                  onExpand={() => toggleExpanded(row.key)}
-                  onFocus={() => {
-                    setFocusedKey(row.key)
-                  }}
-                  onDetails={() => openDetails(row.language.id)}
-                  onKeyDown={(event) => handleTreeKey(event, row, virtualRow.index)}
-                />
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      </footer>
     </div>
   )
 }

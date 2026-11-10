@@ -56,6 +56,7 @@ def check_selection(browser, output):
     before_style = browser.snapshot()
     browser.js("""
         const group=[...document.querySelectorAll('.on-map-group')].find(e=>e.dataset.groupId===arguments[0]);
+        group.querySelector('.on-map-group__style-options > summary').click();
         const select=group.querySelector('select');select.value='uniform';select.dispatchEvent(new Event('change',{bubbles:true}));
     """, halh_group)
     wait_for(lambda: all(e['group']['coloring'] == 'uniform' for e in state() if e['group']['id'] == halh_group), 10, 'uniform group')

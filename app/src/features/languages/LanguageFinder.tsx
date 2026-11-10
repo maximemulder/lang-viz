@@ -4,7 +4,7 @@ import { mapEntriesAtom, mapGroupsAtom, selectedMapAreasAtom } from '../../state
 import { type LanguagePanelView, languagePanelAtom } from '../../state/languageControls'
 import { ExploreLanguages } from './ExploreLanguages'
 import { LanguageDetails } from './LanguageDetails'
-import { OnMapLanguages } from './OnMapLanguages'
+import { OnMapView } from './OnMapView'
 
 const VIEWS = ['explore', 'map'] as const
 const LABELS = { explore: 'Explore', map: 'On map' }
@@ -36,7 +36,6 @@ export const LanguageFinder = () => {
   }
   return (
     <aside className="language-finder" aria-label="Language controls">
-      <div className="language-finder__inspection">{panel.detailId && <LanguageDetails />}</div>
       <div className="language-tabs" role="tablist" aria-label="Language views">
         {VIEWS.map((view) => (
           <button
@@ -63,6 +62,7 @@ export const LanguageFinder = () => {
           </button>
         ))}
       </div>
+      <div className="language-finder__inspection">{panel.detailId && <LanguageDetails />}</div>
       {/* Keep list views mounted so their searches, expansion and scroll positions survive inspection. */}
       <section
         className="language-panel"
@@ -80,7 +80,7 @@ export const LanguageFinder = () => {
         aria-labelledby="language-tab-map"
         hidden={panel.view !== 'map'}
       >
-        <OnMapLanguages />
+        <OnMapView />
       </section>
     </aside>
   )

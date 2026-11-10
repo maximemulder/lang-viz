@@ -7,10 +7,22 @@ from run import wait_for
 def view(browser, name):
     browser.js("document.querySelector('#language-tab-'+arguments[0]).click()", name)
     wait_for(lambda: browser.js("return !document.querySelector('#language-panel-'+arguments[0]).hidden", name), 10, f"{name} view")
+    section = '#on-map-entries' if name == 'map' else '#explore-search'
+    if browser.js("return document.querySelector(arguments[0]).dataset.expanded==='false'", section):
+        return
     if name in ("explore", "map"):
         # ResizeObserver repopulates a virtual list after its panel becomes visible.
         selector = ".language-row" if name == "explore" else ".on-map-group"
         wait_for(lambda: browser.js("return !!document.querySelector('#language-panel-'+arguments[0]+' '+arguments[1]+', #language-panel-'+arguments[0]+' .finder-empty')", name, selector), 10, f"{name} list")
+
+
+def map_section(browser, name, expanded=True):
+    view(browser, "map")
+    browser.js("""
+        const toggle=document.querySelector('#on-map-'+arguments[0]+'-heading');
+        if ((toggle.getAttribute('aria-expanded')==='true') !== arguments[1]) toggle.click();
+    """, name, expanded)
+    wait_for(lambda: browser.js("return document.querySelector('#on-map-'+arguments[0]).dataset.expanded===String(arguments[1])", name, expanded), 10, f"{name} map section")
 
 
 def open_details(browser, *, expand=True):
@@ -22,6 +34,10 @@ def open_details(browser, *, expand=True):
 
 def search(browser, query, glottocode):
     view(browser, "explore")
+    browser.js("""
+        const toggle=document.querySelector('#explore-search-heading');
+        if(toggle.getAttribute('aria-expanded')!=='true') toggle.click();
+    """)
     browser.js(
         """
         const input = document.querySelector('#language-panel-explore input[type=search]');

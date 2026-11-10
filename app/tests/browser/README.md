@@ -57,7 +57,7 @@ family-conflict/coherence/detail diagnostics, bounded palettes and hues, branch
 contrast at four area scales in every large Asher family, same-cell contact conflicts,
 important family ambiguities, unselected/offscreen relatives, deterministic refresh,
 undo/default restoration, navigation and period stability, both levels of manual
-color override, and narrow settings layout. Recoloring must retain coverage URLs
+color override, and narrow sidebar color controls. Recoloring must retain coverage URLs
 and issue no geometry computations. Before/after screenshots, closer European and
 African views retaining the world palette, diagnostics, timings, and a replayable
 input/palette pairs for all three scenes are saved under `test-results/colors/`.
@@ -96,7 +96,7 @@ removal, and source/period availability. Screenshots and a report go to
 
 `test:catalog-browser` builds the production app and checks classification browsing,
 ranked and alternative-name search, availability ordering, virtualized keyboard
-navigation, continuous inspection, and bounded narrow layouts. It also exercises
+navigation, continuous inspection, independent section collapse and rendered visibility, keyboard navigation, preserved color drafts, the selection footer, and bounded narrow layouts. It also exercises
 the working-selection and source/period comparison checks below. Reports and
 screenshots go to `test-results/catalog/`.
 

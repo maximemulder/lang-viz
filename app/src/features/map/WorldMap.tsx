@@ -273,6 +273,7 @@ export const WorldMap = () => {
   // Pattern zoom fades blend two stripe phases and create false category colors.
   return (
     <MapView
+      id="atlas-map"
       initialViewState={INITIAL_VIEW}
       mapStyle={MAP_STYLE}
       projection={PROJECTIONS[projectionMode]}

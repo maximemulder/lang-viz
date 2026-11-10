@@ -1,6 +1,7 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useMap } from 'react-map-gl/maplibre'
+import { SidebarPane } from '../../components/SidebarPane'
 import {
   applyOptimizedColorsAtom,
   canUndoColorsAtom,
@@ -38,8 +39,8 @@ export const ColorControls = () => {
   const undo = useSetAtom(undoColorsAtom)
   const restore = useSetAtom(restoreDefaultColorsAtom)
   const reset = useSetAtom(resetColorSettingsAtom)
-  const { current } = useMap()
-  const map = current?.getMap()
+  const maps = useMap()
+  const map = maps['atlas-map']?.getMap()
   const request = useRef<AbortController | null>(null)
   const [busy, setBusy] = useState(false)
   const [mapReady, setMapReady] = useState(false)
@@ -142,15 +143,20 @@ export const ColorControls = () => {
   }
 
   return (
-    <fieldset className="map-settings__group color-controls">
-      <legend>Language colors</legend>
-      <p>Choose colors for each group in On map.</p>
+    <div className="color-controls">
+      <p>
+        Set the palette for mapped languages. Use the swatches in Entries for individual group
+        colors.
+      </p>
       <label>
         Coloring strategy
         <select
           value={config.strategy}
           onChange={(event) =>
-            setConfig({ ...config, strategy: event.currentTarget.value as typeof config.strategy })
+            setConfig({
+              ...config,
+              strategy: event.currentTarget.value as typeof config.strategy,
+            })
           }
         >
           <option value="semantic">Semantic (genealogy)</option>
@@ -191,11 +197,17 @@ export const ColorControls = () => {
             : prepared
               ? 'Using prepared dataset colors.'
               : 'Using stable default colors.'}{' '}
-        Colors stay fixed while you explore. Refresh also updates offscreen relatives to keep
+        Colors stay fixed while you explore. Optimization also updates offscreen relatives to keep
         families consistent. Custom colors are kept.
       </p>
-      <details className="color-controls__custom">
-        <summary>Advanced palette defaults and overrides</summary>
+      <SidebarPane
+        className="color-controls__custom"
+        title="Advanced palette defaults and overrides"
+      >
+        <p>
+          These defaults apply across the catalog. Group colors and individual area overrides take
+          precedence.
+        </p>
         <label>
           Languoid ID
           <input
@@ -295,24 +307,24 @@ export const ColorControls = () => {
           Comma-separated IDs. These start separate palettes. Selecting families keeps their
           genealogy colors; optimize the view to spread its visible branches apart.
         </p>
-      </details>
+        <button
+          type="button"
+          onClick={() => {
+            request.current?.abort()
+            reset()
+            setRoots(null)
+            setColor('#287cb8')
+            setError(null)
+          }}
+        >
+          Reset color settings
+        </button>
+      </SidebarPane>
       {error && (
         <p className="color-controls__error" role="alert">
           {error}
         </p>
       )}
-      <button
-        type="button"
-        onClick={() => {
-          request.current?.abort()
-          reset()
-          setRoots(null)
-          setColor('#287cb8')
-          setError(null)
-        }}
-      >
-        Reset color settings
-      </button>
-    </fieldset>
+    </div>
   )
 }

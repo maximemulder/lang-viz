@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useMemo } from 'react'
+import { SidebarPane, SidebarPaneHeader } from '../../components/SidebarPane'
 import { mappedBranchForLanguage } from '../../domain/aggregation'
 import { languageAncestors } from '../../domain/hierarchy'
 import { targetGeometry } from '../../domain/languageFocus'
@@ -122,52 +123,52 @@ export const LanguageDetails = () => {
       aria-label="Entry details"
       aria-labelledby="focused-language-name"
     >
-      <header className="finder-detail__header">
-        <div className="finder-detail__heading" aria-live="polite">
-          <h3 id="focused-language-name">
-            <button
-              type="button"
-              className="finder-detail__name"
-              disabled={!canFocusMap}
-              title={`Center map on ${detail.name}`}
-              onClick={() => focusOnMap(profileTarget)}
-            >
-              {detail.name}
-            </button>
-          </h3>
-          <small>
-            {detail.level} · {detail.id}
-            {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
-          </small>
-        </div>
-        <button
-          type="button"
-          className="finder-detail__toggle"
-          aria-label={
-            panel.detailCollapsed ? 'Expand language details' : 'Collapse language details'
-          }
-          aria-expanded={!panel.detailCollapsed}
-          aria-controls="focused-language-body"
-          onClick={() => setPanel({ ...panel, detailCollapsed: !panel.detailCollapsed })}
-        >
-          <span aria-hidden="true">{panel.detailCollapsed ? '▸' : '▾'}</span>
-        </button>
-        <button
-          type="button"
-          className="finder-detail__close"
-          aria-label="Close language details"
-          onClick={() => {
-            const origin = document.querySelector<HTMLElement>(
-              `#language-panel-${panel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
-            )
-            const restoreFocus = origin ?? document.getElementById(`language-tab-${panel.view}`)
-            closeDetails()
-            restoreFocus?.focus({ preventScroll: true })
-          }}
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-      </header>
+      <SidebarPaneHeader
+        className="finder-detail__header"
+        toggleClassName="finder-detail__toggle"
+        title={
+          <div className="finder-detail__heading" aria-live="polite">
+            <h3 id="focused-language-name">
+              <button
+                type="button"
+                className="finder-detail__name"
+                disabled={!canFocusMap}
+                title={`Center map on ${detail.name}`}
+                onClick={() => focusOnMap(profileTarget)}
+              >
+                {detail.name}
+              </button>
+            </h3>
+            <small>
+              {detail.level} · {detail.id}
+              {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
+            </small>
+          </div>
+        }
+        expanded={!panel.detailCollapsed}
+        controls="focused-language-body"
+        toggleLabel={
+          panel.detailCollapsed ? 'Expand language details' : 'Collapse language details'
+        }
+        onToggle={() => setPanel({ ...panel, detailCollapsed: !panel.detailCollapsed })}
+        actions={
+          <button
+            type="button"
+            className="finder-detail__close"
+            aria-label="Close language details"
+            onClick={() => {
+              const origin = document.querySelector<HTMLElement>(
+                `#language-panel-${panel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
+              )
+              const restoreFocus = origin ?? document.getElementById(`language-tab-${panel.view}`)
+              closeDetails()
+              restoreFocus?.focus({ preventScroll: true })
+            }}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        }
+      />
       <div
         id="focused-language-body"
         className="finder-detail__body"
@@ -225,8 +226,7 @@ export const LanguageDetails = () => {
               : 'No mapped area for this representation.'}
           </p>
         )}
-        <details className="finder-detail__more">
-          <summary>More details</summary>
+        <SidebarPane className="finder-detail__more" title="More details">
           {classification.kind === 'source' && (
             <div className="finder-detail__classification">
               <h4>Source-defined entry</h4>
@@ -300,7 +300,7 @@ export const LanguageDetails = () => {
               variant={activeVariant}
             />
           )}
-        </details>
+        </SidebarPane>
         <button type="button" className="finder-detail__reveal" onClick={() => reveal(detail.id)}>
           Show in classification
         </button>

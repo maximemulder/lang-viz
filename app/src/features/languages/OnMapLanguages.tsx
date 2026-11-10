@@ -1,6 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useMemo, useRef, useState } from 'react'
+import { SidebarPane } from '../../components/SidebarPane'
 import { matchesLanguageQuery, normalizeLanguageQuery } from '../../domain/catalog'
 import type { MapEntry } from '../../domain/mapEntries'
 import { mapEntryDescription } from '../../domain/mapEntries'
@@ -93,7 +94,9 @@ export const OnMapLanguages = () => {
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (index) => (rows[index]?.kind === 'group' ? 126 : 68),
+    // Section resizing and virtual row measurement must settle in separate frames.
+    useAnimationFrameWithResizeObserver: true,
+    estimateSize: (index) => (rows[index]?.kind === 'group' ? 108 : 68),
     overscan: 4,
     getItemKey: (index) => rows[index]?.key ?? index,
   })
@@ -230,25 +233,6 @@ export const OnMapLanguages = () => {
                     </button>
                   </div>
                   <div className="on-map-group__style">
-                    <label>
-                      <span className="visually-hidden">
-                        Coloring for {name}, {row.description}
-                      </span>
-                      <select
-                        aria-label={`Coloring for ${name}, ${row.description}`}
-                        value={group.coloring}
-                        onChange={(event) =>
-                          setGroupStyle({
-                            groupId: group.id,
-                            coloring:
-                              event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy',
-                          })
-                        }
-                      >
-                        <option value="hierarchy">Color by hierarchy</option>
-                        <option value="uniform">One color</option>
-                      </select>
-                    </label>
                     <input
                       type="color"
                       aria-label={`Group color for ${name}, ${row.description}`}
@@ -258,13 +242,37 @@ export const OnMapLanguages = () => {
                         setGroupStyle({ groupId: group.id, color: event.currentTarget.value })
                       }
                     />
-                    <button
-                      type="button"
-                      disabled={group.color === null}
-                      onClick={() => setGroupStyle({ groupId: group.id, color: null })}
+                    <SidebarPane
+                      className="on-map-group__style-options"
+                      title={group.coloring === 'uniform' ? 'One color' : 'Color by hierarchy'}
                     >
-                      Reset color
-                    </button>
+                      <label>
+                        <span className="visually-hidden">
+                          Coloring for {name}, {row.description}
+                        </span>
+                        <select
+                          aria-label={`Coloring for ${name}, ${row.description}`}
+                          value={group.coloring}
+                          onChange={(event) =>
+                            setGroupStyle({
+                              groupId: group.id,
+                              coloring:
+                                event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy',
+                            })
+                          }
+                        >
+                          <option value="hierarchy">Color by hierarchy</option>
+                          <option value="uniform">One color</option>
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        disabled={group.color === null}
+                        onClick={() => setGroupStyle({ groupId: group.id, color: null })}
+                      >
+                        Reset color
+                      </button>
+                    </SidebarPane>
                   </div>
                 </LanguagePreviewItem>
               )
