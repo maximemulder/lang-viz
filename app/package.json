@@ -24,6 +24,7 @@
     "test:prepared-browser": "npm run build && python3 tests/browser/prepared.py",
     "test:coverage-browser": "npm run build && python3 tests/browser/coverage.py",
     "test": "node --test --test-isolation=none tests/*.test.ts",
+    "test:etymology-snapshot": "node --test --test-isolation=none tests/integration/etymology.test.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",

@@ -1,0 +1,27 @@
+{
+  "snapshot": "diacl-2026-10-24",
+  "placeholderSourceId": 999,
+  "attribution": "Carling, Gerd (ed.). Diachronic Atlas of Comparative Linguistics Online. Goethe University Frankfurt. Original word and relationship citations are retained in the compiled data.",
+  "repository": "https://github.com/maximemulder/lang-viz",
+  "commit": "58a6c1a2a8a2ef02f433576bf15cd7b0e09c57fe",
+  "files": [
+    {
+      "name": "lexical-database.json",
+      "path": "etymology/data/lexical-database.json",
+      "url": "https://raw.githubusercontent.com/maximemulder/lang-viz/58a6c1a2a8a2ef02f433576bf15cd7b0e09c57fe/etymology/data/lexical-database.json",
+      "upstreamUrl": "https://diacl.uni-frankfurt.de/Lexical/Db/JSON",
+      "exportedAt": "2026-10-24T05:04:49Z",
+      "bytes": 55250359,
+      "sha256": "afc87a38a473c191719266818dd823fcada2de9dda8190451f8ac2019e35062b"
+    },
+    {
+      "name": "language-tree.json",
+      "path": "etymology/data/language-tree.json",
+      "url": "https://raw.githubusercontent.com/maximemulder/lang-viz/58a6c1a2a8a2ef02f433576bf15cd7b0e09c57fe/etymology/data/language-tree.json",
+      "upstreamUrl": "https://diacl.uni-frankfurt.de/LanguageTree/JSON",
+      "exportedAt": "2026-10-23T06:58:27Z",
+      "bytes": 5883571,
+      "sha256": "73211efaf8a5eefd39a297d95f97e314d2a249c4164d7a55d0277f8bc2626255"
+    }
+  ]
+}

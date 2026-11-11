@@ -4,8 +4,8 @@ Last updated: 2026-11-11.
 
 This is the execution checklist for bringing Word Trails from `feature/etymology`
 into the current atlas. Port the work in reviewable commits on `port/etymology`,
-created from the reviewed `main` revision. ETY-00 is complete; feature
-implementation starts with ETY-01 and has not started.
+created from the reviewed `main` revision. ETY-00 and ETY-01 are complete;
+session state and navigation in ETY-02 are next. No etymology UI is integrated yet.
 
 Update an item's status, implementation notes, and validation evidence as work
 proceeds. Complete an item only when its acceptance checks pass. Record skipped
@@ -77,7 +77,7 @@ etymological inference are outside this port.
 | Item | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
 | ETY-00 | Port branch and baseline | — | Complete; browser failure recorded |
-| ETY-01 | Source contract, adapter, and domain logic | ETY-00 | Not started |
+| ETY-01 | Source contract, adapter, and domain logic | ETY-00 | Complete |
 | ETY-02 | Session state and navigation | ETY-01 | Not started |
 | ETY-03 | Explorer UI and app shell | ETY-02 | Not started |
 | ETY-04 | Map overlay and atlas bridge | ETY-03 | Not started |
@@ -189,36 +189,88 @@ Source candidates on the feature commit:
 
 Tasks:
 
-- [ ] Define the lexical schema and source snapshot contract. Record source URLs,
+- [x] Define the lexical schema and source snapshot contract. Record source URLs,
   export dates, checksums, attribution, and adapter/schema versions.
-- [ ] Preserve the exact inputs needed to reproduce the reviewed snapshot outside
+- [x] Preserve the exact inputs needed to reproduce the reviewed snapshot outside
   Git, with a pinned restoration path. Do not introduce mutable upstream downloads
   as the only way to recover this snapshot. ETY-05 completes deployment delivery.
-- [ ] Port the adapter with explicit errors for invalid joins and values. Validate
+- [x] Port the adapter with explicit errors for invalid joins and values. Validate
   word-language joins, edge endpoints/types, concept membership, and source refs.
-- [ ] Preserve UTF-8, valid zero coordinates, optional-field behavior, provenance,
+- [x] Preserve UTF-8, valid zero coordinates, optional-field behavior, provenance,
   and the distinction between word and relationship references. Reject invalid
   coordinates or report their omission explicitly.
-- [ ] Produce deterministic output with input-content-based freshness checks and
+- [x] Produce deterministic output with input-content-based freshness checks and
   atomic publication; modification times alone must not decide validity.
-- [ ] Port traversal, indexing, normalized search, layout, and coordinate helpers.
+- [x] Port traversal, indexing, normalized search, layout, and coordinate helpers.
   Preserve cycle termination, multiple parents, the form cap, and placeholder
   interruption without inventing shortcut edges.
-- [ ] Adapt matching to the current catalog's `classification` metadata. Prefer an
+- [x] Adapt matching to the current catalog's `classification` metadata. Prefer an
   explicit Glottocode; use ISO only when no Glottocode exists and the ISO is unique
   on both full catalogs. Reverse navigation requires a unique exact Glottocode.
-- [ ] Use complete current atlas types in test fixtures. Split lightweight tests
+- [x] Use complete current atlas types in test fixtures. Split lightweight tests
   from full-snapshot integration checks.
 
 Acceptance:
 
-- [ ] Synthetic tests run without external datasets and cover invalid data,
+- [x] Synthetic tests run without external datasets and cover invalid data,
   identifier ambiguity, cycles, multiple parents, caps, placeholders, and coordinates.
-- [ ] A separate real-data check validates the known wine chain and its borrowing
+- [x] A separate real-data check validates the known wine chain and its borrowing
   evidence. Record the reviewed snapshot's 74,635 words, 46,351 relationships, and
   466 lexical language records as snapshot expectations, not universal schema rules.
-- [ ] Rebuilding identical inputs produces identical output.
-- [ ] Existing atlas schemas and geometry output remain unchanged.
+- [x] Rebuilding identical inputs produces identical output.
+- [x] Existing atlas schemas and geometry output remain unchanged.
+
+#### ETY-01 execution record — 2026-11-11
+
+Implementation and reproduction instructions:
+[pipeline/etymology/README.md](pipeline/etymology/README.md). The source pin is
+[pipeline/etymology/sources.json](pipeline/etymology/sources.json). Selected code
+was ported from feature commit `58a6c1a2a8a2ef02f433576bf15cd7b0e09c57fe`;
+the original commit and its raw datasets were not merged.
+
+- Restored both exact exports with `python3 -m pipeline.etymology.sources restore
+  --from-git .` into ignored `data/etymology/diacl-2026-10-24/`. Both immutable
+  GitHub download URLs also returned HTTP 200 with the expected content lengths.
+  Full HTTP downloads were not repeated; mocked HTTP tests cover installation
+  and checksum failure. Independent release hosting remains ETY-05 work.
+- Replaced assertion-based validation with explicit contextual errors, including
+  under optimized Python. Added duplicate-key, type/join, tree-placement, time,
+  coordinate, concept, and source-reference checks. Optional text is normalized;
+  UTF-8, zero coordinates, and separate word/relationship evidence are retained.
+- Every explicit build validates source contents and serializes deterministically.
+  Atomic output replacement preserves a working bundle on failure. Identical
+  output is left untouched; no modification-time freshness shortcut is used.
+- Kept layout/geography helpers in `app/src/domain/`, alongside traversal/search,
+  rather than creating a UI feature directory prematurely. Matching uses current
+  atlas classification metadata; reverse matching requires a unique Glottocode.
+- Improved traversal omissions to count unique unseen forms, restricted expansions
+  to reachable forms, made nested expansions independent of set insertion order,
+  and handled equivalent -180/+180 meridians without division by zero.
+- Added no dependencies, app lifecycle hooks, UI integration, or atlas schema changes.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| Python format/lint on new adapter/tests | Passed |
+| Lexical adapter/source tests | 31 passed; synthetic inputs, including optimized Python and atomic replacement failures |
+| Lexical plus existing data-release Python tests | 53 passed |
+| `npm run check` / `npm run typecheck` | Passed |
+| Strict typecheck of both new TypeScript test files | Passed using bundler resolution and Node types |
+| `npm test` | 221 passed, zero failed/skipped; includes 15 synthetic lexical tests |
+| `npm run test:etymology-snapshot` | Three passed against real lexical and current atlas data |
+| Two independent snapshot rebuilds | Identical bytes; another identical build preserved output modification time |
+| `npm run build` | Passed; existing large-chunk warning remains |
+| Geographic baseline content comparison | All 62,629 active files unchanged |
+
+Compiled output: 21,794,225 bytes; SHA-256
+`a5d02a88885dad90ec2fd8dbe14d3ffc5b6c52eaa37dee63966d1cdfbe0494a6`.
+Logs, reproducibility outputs, and geographic comparison evidence are under ignored
+[app/test-results/etymology-01/](app/test-results/etymology-01/).
+
+The full Python pipeline and browser suites were not rerun for these isolated
+domain/data additions. ETY-00's browser republication failure remains unresolved;
+it is not counted as passing here. App shell and map integration remain later work.
 
 ### ETY-02 — Establish session state and URL navigation
 
@@ -382,6 +434,7 @@ the following in each completed item or in the PR validation record:
 | Item | Code revision | Data pins/checksums | Checks and results | Evidence / remaining work |
 | --- | --- | --- | --- | --- |
 | ETY-00 | `35ee521a88dd80c1bf1f62d5901d1b56449cd09d` | `atlas-data-2026-11-10-metadata`; full hashes above | Lint/typecheck/206 tests/build/data verification passed; browser warm republication failed | See ETY-00 execution record and local `app/test-results/etymology-baseline/`; feature implementation not started |
+| ETY-01 | Based on `b34860f`; source `58a6c1a` | `diacl-2026-10-24`; source hashes in pin; output hash above; unchanged geography | 53 relevant Python tests, 221 frontend tests, three snapshot tests, lint/typechecks/build/reproducibility passed | See ETY-01 execution record and local `app/test-results/etymology-01/`; state/UI/map port pending |
 
 ## Separate portability fix
 

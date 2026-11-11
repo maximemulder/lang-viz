@@ -4,5 +4,7 @@ datasets
 __pycache__/
 *.py[cod]
 data/processed/
+data/etymology/
 app/public/data/
+app/public/etymology/
 .data-releases/
