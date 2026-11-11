@@ -134,6 +134,10 @@ const Explorer = ({ repository }: { readonly repository: EtymologyRepository }) 
         <div className="word-about">
           <p>
             {data.provenance.attribution}{' '}
+            <a href={`${import.meta.env.BASE_URL}licenses/DIACL-LEXICAL-NOTICE.md`}>
+              Source and license notice
+            </a>
+            .{' '}
             <a href="https://diacl.uni-frankfurt.de/" target="_blank" rel="noreferrer">
               Diachronic Atlas of Comparative Linguistics Online
             </a>

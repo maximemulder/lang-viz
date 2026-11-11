@@ -31,6 +31,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 -m pipeline.atlas.data_release restore
 
+      - name: Download and verify independently pinned lexical data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m pipeline.etymology.data_release restore
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -45,6 +50,8 @@ jobs:
         run: |
           npm test
           npm run check
+          npm run typecheck
+          npm run test:etymology-snapshot
 
       - name: Build frontend
         working-directory: app

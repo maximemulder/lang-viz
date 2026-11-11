@@ -365,7 +365,8 @@ the synthetic geometry tests run without it.
 ## Deploy to GitHub Pages
 
 The `Deploy to GitHub Pages` workflow downloads the prebuilt data selected by
-`data-release.json`, verifies its SHA-256, then tests, builds and deploys the Vite
+`data-release.json` and independently pinned lexical data in
+`etymology-release.json`, verifies their checksums, then tests, builds and deploys the Vite
 application whenever `main` is pushed. Deployment does not fetch source datasets,
 install Python pipeline dependencies, build Tippecanoe, or run preprocessing.
 Generated browser data lives in GitHub Release assets, outside Git history.
@@ -428,3 +429,9 @@ There are no data migrations: rebuild and publish a new bundle when needed.
 Before the first deployment, open the repository's **Settings → Pages** and set
 **Source** to **GitHub Actions**. The project site is built with `/lang-viz/` as
 its base path and is published at `https://maximemulder.github.io/lang-viz/`.
+
+Word histories use a separately versioned browser bundle and raw-source archive.
+See [lexical restoration, review status, and publication](pipeline/etymology/README.md#independent-release-delivery).
+The current lexical candidate must be published before merging this port's
+workflow change; its offline archives are ready for local review. Lexical updates
+never require rebuilding or republishing the geographic bundle.

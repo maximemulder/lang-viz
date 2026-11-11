@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createEtymologyLoader } from '../src/data/etymologyRepository.ts'
+import { prepareEtymology } from '../src/data/prepareEtymology.ts'
 import { validateEtymologyData } from '../src/domain/etymologyValidation.ts'
 import { explorerRepository } from './fixtures/explorer.ts'
 
@@ -95,4 +96,37 @@ test('HTTP, parse, validation, and network errors are retryable without replacin
     assert.ok((await load()).data.lexemes['69562'])
     assert.equal(requests, 2)
   }
+})
+
+test('transferred bytes prepare a repository with linked Map indexes', () => {
+  const bytes = new TextEncoder().encode(JSON.stringify(explorerRepository().data)).buffer
+  const { repository, timings } = prepareEtymology(bytes)
+  assert.strictEqual(repository.index.incoming.get('69562')?.[0], repository.data.edges[0])
+  assert.deepEqual(repository.index.byLanguage.get('2'), ['69421'])
+  assert.ok(Object.values(timings).every((duration) => duration >= 0))
+})
+
+test('asynchronous preparation failure is shared and retryable', async () => {
+  let preparations = 0
+  let reject!: (reason: Error) => void
+  const expected = explorerRepository()
+  const load = createEtymologyLoader(
+    async () => Response.json(expected.data),
+    async () => {
+      preparations++
+      if (preparations === 1)
+        return new Promise((_, fail) => {
+          reject = fail
+        })
+      return expected
+    },
+  )
+  const first = load()
+  assert.strictEqual(first, load())
+  await new Promise((done) => setImmediate(done))
+  const rejected = assert.rejects(first, /worker stopped/)
+  reject(new Error('worker stopped'))
+  await rejected
+  assert.strictEqual(await load(), expected)
+  assert.equal(preparations, 2)
 })

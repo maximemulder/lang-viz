@@ -5,7 +5,8 @@ Last updated: 2026-11-11.
 This is the execution checklist for bringing Word Trails from `feature/etymology`
 into the current atlas. Port the work in reviewable commits on `port/etymology`,
 created from the reviewed `main` revision. ETY-00 through ETY-04 are complete;
-independent data delivery and measured performance in ETY-05 are next.
+ETY-05 implementation and local validation are ready for review; its release
+publication and real remote-restore gate remain pending.
 
 Update an item's status, implementation notes, and validation evidence as work
 proceeds. Complete an item only when its acceptance checks pass. Record skipped
@@ -81,7 +82,7 @@ etymological inference are outside this port.
 | ETY-02 | Session state and navigation | ETY-01 | Complete |
 | ETY-03 | Explorer UI and app shell | ETY-02 | Complete |
 | ETY-04 | Map overlay and atlas bridge | ETY-03 | Complete |
-| ETY-05 | Data delivery and performance | ETY-01; final checks need ETY-04 | Not started |
+| ETY-05 | Data delivery and performance | ETY-01; final checks need ETY-04 | Implementation validated locally; publication/remote restore pending |
 | ETY-06 | Regression checks and documentation | ETY-04, ETY-05 | Not started |
 
 Commit each completed item separately; split an item further when it improves
@@ -623,24 +624,24 @@ are in [app/README.md](app/README.md#word-histories-port-preview).
 
 ### ETY-05 — Complete data delivery and measure performance
 
-- [ ] Publishable artifacts include an independently versioned lexical browser
+- [x] Publishable artifacts include an independently versioned lexical browser
   bundle, a checksum/schema/provenance manifest, and source notices. Preserve the
   pinned raw inputs needed for reproduction outside Git.
-- [ ] Reuse appropriate release utilities while keeping lexical validation and pins
+- [x] Reuse appropriate release utilities while keeping lexical validation and pins
   separate from geographic manifest validation. A lexical update must not require
   rebuilding or republishing geography.
-- [ ] Provide explicit source restore, lexical build, and browser-bundle restore
+- [x] Provide explicit source restore, lexical build, and browser-bundle restore
   commands. Document their final names and destinations here and in setup docs.
-- [ ] Extend `.github/workflows/deploy-pages.yml` to restore and verify the lexical
+- [x] Extend `.github/workflows/deploy-pages.yml` to restore and verify the lexical
   bundle alongside geography before testing/building. Use the project base path.
-- [ ] Avoid the branch's full-data `predev`, `pretest`, and `prebuild` hooks. Keep
+- [x] Avoid the branch's full-data `predev`, `pretest`, and `prebuild` hooks. Keep
   lightweight tests independent; run full-snapshot checks explicitly in CI.
-- [ ] Verify bundle checksums and referenced contents before exposing installation.
+- [x] Verify bundle checksums and referenced contents before exposing installation.
   Interrupted/invalid restores must not replace a working dataset.
-- [ ] Measure transfer bytes/time, parse/index cost, first usable render, long tasks,
+- [x] Measure transfer bytes/time, parse/index cost, first usable render, long tasks,
   and search latency for first and repeat visits. Record browser, device, cache state,
   and any network/CPU throttling alongside results.
-- [ ] Use those results to decide whether indexing needs a worker or the payload
+- [x] Use those results to decide whether indexing needs a worker or the payload
   needs splitting. Record the decision and acceptable responsiveness before closing
   this item; neither adding a worker nor keeping one JSON file is assumed upfront.
 
@@ -651,6 +652,154 @@ incompatible data fail clearly. Performance evidence and any resulting fixes exi
 Release publication and site deployment are explicit actions after the artifacts
 and implementation are ready for review; they are not prerequisites for the early
 local port stages.
+
+#### ETY-05 execution record — 2026-11-11
+
+Based on `80fd8fa`; selected source remains `58a6c1a`. Implementation and local
+acceptance checks are complete. **Do not mark the release gate complete yet:**
+publication was explicitly separated from local port work above, and this candidate
+has not been uploaded. The workflow now requires it, so publish before merging.
+The producer commit must also be reachable on GitHub (push `port/etymology` first).
+No remote push, release creation, site deployment, or changes to geographic data
+were performed in this stage.
+
+Delivery:
+
+- `etymology-release.json` independently pins
+  `word-trails-diacl-2026-10-24-v1`, lexical schema/adapter 1, source snapshot
+  `diacl-2026-10-24`, and producer `80fd8fa913e1f106e4f926a443ea14d97db9cd45`.
+  That producer contains the adapter that reproduces the reviewed bytes.
+- Browser archive: 2,368,385 bytes, SHA-256
+  `ab92976293566024407c135cae4cfab710be987138d000fbdef14bc6e7ad2042`.
+  It includes compiled JSON, a checksum/schema/counts/provenance manifest, the
+  source pin, and source notice. The JSON stays 21,794,225 bytes with SHA-256
+  `a5d02a88885dad90ec2fd8dbe14d3ffc5b6c52eaa37dee63966d1cdfbe0494a6`.
+- Raw-source archive: 3,253,568 bytes, SHA-256
+  `38bd395831dcc9eea06ae795a722d9c7cdb8933f81c9b3bb7c13cde47af12876`.
+  It includes both unchanged pinned inputs, the source pin, and notice; deployment
+  never downloads it. Restoring it and running the adapter reproduced the exact
+  browser JSON above. Immutable original-commit restoration remains available.
+- `pipeline.release_utils` shares only archive/path/hash primitives; lexical
+  manifest validation stays separate from geographic validation. Geographic
+  release behavior is unchanged and its 22 existing release tests pass.
+- Packaging reproduces the pinned build and rejects stale output. Restoration
+  verifies archive size/hash, member names/types/sizes, exact file set, individual
+  hashes, manifest/schema/provenance/counts, and input hashes before staged rename.
+  Existing valid directories are no-ops; differing/modified directories are
+  preserved with an explicit error. Source and browser destinations are separate.
+- The publisher's [CompLing portal](https://compling.eu/) declares CC BY-NC-SA 4.0
+  for the databank. The lexical notice preserves that declaration, attribution,
+  export dates, original citations, and describes adaptations. The exports embed
+  no snapshot-specific license; the notice uses the databank-level declaration.
+  `About the data` links to the notice through the configured base path.
+- The Pages workflow restores both prebuilt pins, runs typecheck and the explicit
+  lexical snapshot gate, then builds with `/lang-viz/`. No npm preprocessing hooks
+  or new dependencies were added. Generated lexical assets are excluded from Vite
+  file watching alongside geographic assets.
+
+Final commands and destinations are documented in
+[pipeline/etymology/README.md](pipeline/etymology/README.md#independent-release-delivery).
+Artifacts are prepared under ignored
+`.data-releases/word-trails-diacl-2026-10-24-v1/`. The installed lexical directory
+now contains the complete verified browser release; its former single-file version
+is preserved as `previous-browser/` beside those archives.
+
+Performance decision:
+
+The first instrumented production visit showed 59ms parsing + 52ms validation +
+71ms indexing consecutively on the main thread, after loading a 21.8 MB expanded
+JSON. A worker now receives transferred response bytes, decodes/parses/validates/
+indexes, returns a prepared repository through structured clone, then terminates.
+Successful repositories remain cached across workspace switches. Fetch, worker,
+parse, and validation errors evict failed attempts and permit Retry. The explorer
+regression suite exercises incompatible-data failure inside the real worker.
+
+An initial worker probe also exposed a roughly 490ms input-to-render delay for
+`a`. Reusing one `Intl.Collator('en', {numeric: true})` preserves ranked numeric ID
+ordering and avoids repeatedly constructing collation options while sorting.
+
+Measurement environment: Linux x86_64, AMD Ryzen AI 7 350 / Radeon 860M,
+16 reported logical processors, Firefox 156.0/geckodriver 0.37.1 headless,
+1440×1000 requested outer window, software rendering, native CPU speed with no
+CPU throttle. Node 24.14.0/npm 11.9.0; restoration/build scripting used Python
+3.12.3 and pytest used the existing venv's Python 3.13.5. No mobile CPU was tested.
+
+A test-only proxy observes the production app from before startup, serves the
+lexical response with gzip level 9 and explicit HTTP caching, and optionally
+throttles **that response only** to 10 Mbit/s +150ms TTFB. JS/CSS are unthrottled.
+Three independent origins per network condition, each with cold + cached load,
+yielded 12 samples. These are controlled local measurements; actual Pages/CDN
+compression and caching were not measured. First usable means the graph exists
+followed by two animation frames; search latency similarly ends after result DOM
+changes and two frames.
+
+| Measurement | Observed range |
+| --- | --- |
+| Gzip lexical response body | 2,365,310 bytes; 21,794,225 decoded |
+| Cold loopback response transfer | 6–11ms |
+| Cold throttled response transfer | 2,073–2,076ms |
+| First usable graph, cold loopback | 941–2,336ms |
+| First usable graph, cold throttled | 3,000–3,800ms |
+| First usable graph, HTTP-cache reload | 940–959ms; zero lexical HTTP requests/transfer bytes |
+| Worker decode / parse | 20–44ms / 52–97ms |
+| Worker validation / index | 54–104ms / 69–134ms |
+| Input-to-render search, including repeated `wine` and broad `a` | Maximum 116ms |
+| Largest >50ms timer gap across samples | 150ms |
+
+Firefox does not expose Long Tasks entries. The harness explicitly reports this
+and records 10ms timer gaps >50ms as a scheduling/GC/blocking proxy, rather than
+claiming direct Long Tasks measurements. Timer gaps around repository handoff/rendering still reach roughly 140–150ms;
+the timer probe cannot isolate structured-clone cost from rendering, GC, and
+scheduling. Worker preparation does not remove all main-thread pauses.
+The observed results meet this stage's desktop review budgets: first usable graph
+under 5s locally / 7s with the lexical throttle, search rendering under 250ms,
+and pre-ready event-loop gaps below 250ms. The harness asserts those budgets.
+In-session revisits reuse a single prepared repository with no lexical request
+or new worker. HTTP-cache reloads prepare again, as expected for a new document.
+
+Keep one lazy JSON for this release: the compressed size and throttled first-use
+measurements meet these budgets. Retain the worker to move the measured preparation
+work off the main thread. Payload partitioning or a worker-owned repository API
+would need evidence from slower/mobile CPUs, memory measurements, or a tighter
+handoff budget; this stage does not establish phone responsiveness or eliminate
+all >50ms work. No worker was added before the initial timing probe.
+
+Validation:
+
+- 259 frontend tests passed, zero skipped; three real-snapshot checks passed.
+- 75 relevant Python checks passed: 31 adapter/source, 22 lexical release, and
+  22 geographic release tests. Full pipeline tests remain ETY-06.
+- Lint, app and strict changed-test typechecks, Ruff checks/format, and production
+  build passed. The existing large-chunk warning remains.
+- Twelve performance samples and 16 production explorer checkpoints passed;
+  the explorer checks include independent failures/retry, navigation, state
+  retention, keyboard interaction and narrow layouts. All 17 map integration
+  checkpoints also passed with the worker-prepared repository, including areas,
+  cross-navigation, cancellation, projections, style restoration, and narrow layout.
+- A fresh source tree with no raw lexical inputs installed both pinned local
+  geographic/browser archives, passed the snapshot gate, and built `/lang-viz/`
+  without preprocessing. It reused installed `node_modules`; a fresh `npm ci`
+  and real GitHub downloads were not performed. Firefox checked the actual
+  project paths for the payload/worker, notice/manifest, independent loading,
+  and incompatible-data rejection/retry on that build.
+- All 62,629 active geographic file sizes/hashes still match ETY-00, and the
+  lexical JSON remains byte-identical. The added lexical manifest/notices/source
+  pin are verified against the separate lexical release.
+
+Evidence: ignored `app/test-results/etymology-05/` contains checks, builds,
+`python.log`, `source-archive-rebuild.log`, `data-preservation.json`, the initial
+probes, final `performance/report.json`, `explorer-regression/report.json`, and
+`project-delivery/report.json`, and `map-regression/report.json`. Early performance probes that failed the search
+budget are preserved separately from the final passing measurements.
+
+Remaining release gate, after reviewing and authorizing the external actions:
+
+- [ ] Push the port branch so producer commit `80fd8fa` is available on GitHub.
+- [ ] Publish the exact prepared browser + raw-source archives and pin using the
+  documented `pipeline.etymology.data_release publish` command.
+- [ ] From a clean checkout, run real `restore` downloads and the `/lang-viz/`
+  build/snapshot check. Record the published tag and evidence, then mark ETY-05
+  complete. Site deployment remains a separate action.
 
 ### ETY-06 — Validate the integrated feature and document it
 
@@ -705,7 +854,8 @@ the following in each completed item or in the PR validation record:
 | ETY-01 | Based on `b34860f`; source `58a6c1a` | `diacl-2026-10-24`; source hashes in pin; output hash above; unchanged geography | 53 relevant Python tests, 221 frontend tests, three snapshot tests, lint/typechecks/build/reproducibility passed | See ETY-01 execution record and local `app/test-results/etymology-01/`; state/UI/map port pending |
 | ETY-02 | Based on `86aedf7`; source-state reference `58a6c1a` | Existing lexical and geographic pins unchanged; navigation checks use synthetic data | 243 frontend tests, three snapshot tests, 11 Firefox checkpoints, lint/typechecks/build passed | See ETY-02 execution record and local `app/test-results/etymology-02/`; app shell/UI/map integration pending |
 | ETY-03 | Based on `15b26f6`; presentation reference `58a6c1a` | Existing lexical/geographic pins and generated bytes unchanged | 247 frontend tests, three snapshot tests, 16 integrated Firefox checkpoints, existing catalog/focus suites, lint/typechecks/build passed | See ETY-03 execution record and local `app/test-results/etymology-03/`; map overlay/cross-navigation pending |
-| ETY-04 | Based on `74d3809`; prerequisite `63870b7`; source presentation `58a6c1a` | Existing geographic/lexical pins and generated bytes unchanged; labeled coordinate fixtures for edge cases | 257 frontend tests, three snapshot tests, 17 map + 16 explorer Firefox checkpoints, geographic regression evidence in execution record | Map overlay/cross-navigation complete; independent delivery/performance next |
+| ETY-04 | Based on `74d3809`; prerequisite `63870b7`; source presentation `58a6c1a` | Existing geographic/lexical pins and generated bytes unchanged; labeled coordinate fixtures for edge cases | 257 frontend tests, three snapshot tests, 17 map + 16 explorer Firefox checkpoints, geographic regression evidence in execution record | Map overlay/cross-navigation complete |
+| ETY-05 | Based on `80fd8fa`; same source reference | Candidate lexical release `word-trails-diacl-2026-10-24-v1`; archive hashes above; geographic pin unchanged | 259 frontend + three snapshot + 75 Python checks; 12 performance samples, 16 explorer + 17 map checks, fresh-tree project-path build and delivery checks | Implementation validated locally; branch push, publication, and actual remote restore remain pending |
 
 ## Separate portability fix
 

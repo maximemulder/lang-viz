@@ -239,6 +239,8 @@ export const matchLexicalLanguage = (
   return matches.length === 1 ? matches[0]?.[0] : undefined
 }
 
+const compareWordIds = new Intl.Collator('en', { numeric: true }).compare
+
 export const searchLexemes = (
   { data, index }: EtymologyRepository,
   query: string,
@@ -267,9 +269,7 @@ export const searchLexemes = (
                   : 99
     if (score < 99) results.push({ id: entry.id, score })
   }
-  return results.sort(
-    (a, b) => a.score - b.score || a.id.localeCompare(b.id, 'en', { numeric: true }),
-  )
+  return results.sort((a, b) => a.score - b.score || compareWordIds(a.id, b.id))
 }
 
 export const hasLanguagePoint = (language: LexicalLanguage) =>

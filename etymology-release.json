@@ -1,0 +1,57 @@
+{
+  "adapterVersion": 1,
+  "assets": {
+    "browser": {
+      "bytes": 2368385,
+      "files": {
+        "NOTICE.md": {
+          "bytes": 1735,
+          "sha256": "82462f1e25f2d5dd832b4fc10a8aa39fac5faf03462a4e378ae616a79644eadd"
+        },
+        "manifest.json": {
+          "bytes": 1777,
+          "sha256": "7293ec31505c0bea65b3e226ba5ee1af672240824ab66cad30e2af86e1efb239"
+        },
+        "sources.json": {
+          "bytes": 1348,
+          "sha256": "b2f22c8ecceb0b78d54f13ad88874cdf425863e67c1c8d83b7b544ac599a559c"
+        },
+        "word-trails.json": {
+          "bytes": 21794225,
+          "sha256": "a5d02a88885dad90ec2fd8dbe14d3ffc5b6c52eaa37dee63966d1cdfbe0494a6"
+        }
+      },
+      "name": "word-trails.tar.gz",
+      "sha256": "ab92976293566024407c135cae4cfab710be987138d000fbdef14bc6e7ad2042"
+    },
+    "sources": {
+      "bytes": 3253568,
+      "files": {
+        "NOTICE.md": {
+          "bytes": 1735,
+          "sha256": "82462f1e25f2d5dd832b4fc10a8aa39fac5faf03462a4e378ae616a79644eadd"
+        },
+        "language-tree.json": {
+          "bytes": 5883571,
+          "sha256": "73211efaf8a5eefd39a297d95f97e314d2a249c4164d7a55d0277f8bc2626255"
+        },
+        "lexical-database.json": {
+          "bytes": 55250359,
+          "sha256": "afc87a38a473c191719266818dd823fcada2de9dda8190451f8ac2019e35062b"
+        },
+        "sources.json": {
+          "bytes": 1348,
+          "sha256": "b2f22c8ecceb0b78d54f13ad88874cdf425863e67c1c8d83b7b544ac599a559c"
+        }
+      },
+      "name": "word-trails-sources.tar.gz",
+      "sha256": "38bd395831dcc9eea06ae795a722d9c7cdb8933f81c9b3bb7c13cde47af12876"
+    }
+  },
+  "lexicalSchemaVersion": 1,
+  "pipelineCommit": "80fd8fa913e1f106e4f926a443ea14d97db9cd45",
+  "repository": "maximemulder/lang-viz",
+  "schemaVersion": 1,
+  "snapshot": "diacl-2026-10-24",
+  "tag": "word-trails-diacl-2026-10-24-v1"
+}

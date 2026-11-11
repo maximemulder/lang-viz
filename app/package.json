@@ -35,7 +35,8 @@
     "preview": "vite preview",
     "test:etymology-browser": "npm run build && python3 tests/browser/etymology.py",
     "test:word-trail-browser": "npm run build && python3 tests/browser/word_trail.py",
-    "test:coverage-selection-browser": "npm run build && python3 tests/browser/coverage_selection.py"
+    "test:coverage-selection-browser": "npm run build && python3 tests/browser/coverage_selection.py",
+    "measure:etymology-browser": "npm run build && python3 tests/browser/etymology_performance.py"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",

@@ -316,6 +316,22 @@ Main columns:
 
 ---
 
+### 3.4 Current Word Trails snapshot
+
+The Word histories workspace uses the complete lexical JSON export dated
+2026-10-24 and language tree dated 2026-10-23, rather than the older Lexibank
+CLDF conversion described above. Its 74,635 words and 46,351 recorded links span
+466 lexeme-bearing language records and 1,269 concepts. Word and relationship
+citations remain separate. `pipeline/etymology/sources.json` pins both raw inputs;
+`etymology-release.json` independently pins browser and raw-source release archives.
+
+The publisher's [CompLing portal](https://compling.eu/) declares CC BY-NC-SA 4.0
+for the databank. This declaration is the basis of the lexical release notice;
+the raw exports embed no snapshot-specific license. See the
+[lexical source notice](app/public/licenses/DIACL-LEXICAL-NOTICE.md) for attribution,
+source URLs, and adaptations, and the [release commands](pipeline/etymology/README.md).
+Geographic polygon datasets retain their separate licenses.
+
 ## 4. Glottography (language territories)
 
 ### 4.1 Description

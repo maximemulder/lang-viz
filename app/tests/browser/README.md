@@ -14,6 +14,7 @@ npm run test:explorer-navigation-browser
 npm run test:etymology-browser
 npm run test:word-trail-browser
 npm run test:coverage-selection-browser
+npm run measure:etymology-browser
 
 npm run test:colors-browser
 npm run test:source-browser
@@ -77,6 +78,43 @@ new selection's check. The old observer recorded one false-positive blank frame
 per switch on the pre-overlay revision. Coverage that disappears after it has
 been displayed for an unchanged selection is still an error. Reports are saved
 to `test-results/etymology-04/coverage-selection/`.
+
+`measure:etymology-browser` builds and measures the shipped lexical explorer.
+`python3 tests/browser/etymology_performance.py --runs 3 --output test-results/lexical-performance`
+reuses a production build. Three fresh origins for each network condition yield
+12 samples: cold load and HTTP-cache reload, over loopback and with only the
+lexical response throttled to 10 Mbit/s plus 150ms TTFB. A test proxy injects a
+small observer before app startup and serves gzip level 9 with explicit caching;
+it does not alter the app, dataset, or installed assets. These are local controlled
+measurements, not deployed-CDN measurements. CPU runs at native desktop speed.
+
+The report includes actual encoded/decoded transfer bytes and Resource Timing,
+worker decode/parse/validation/index timings, first graph render plus two animation
+frames, input-to-result-render search times for `wine`, `english`, `a`, `water`,
+and `wine` again, and in-session repository reuse. Each cached reload must produce
+zero lexical HTTP requests; each workspace round trip must reuse one preparation.
+Firefox lacks the Long Tasks API: the report states this and records 10ms timer
+gaps exceeding 50ms as a scheduling/GC/blocking proxy, not equivalent Long Tasks
+measurements. Other browsers that expose the API also record its entries.
+
+Desktop review budgets: first usable graph under 5s on loopback and 7s with the
+lexical throttle; search render under 250ms; pre-ready event-loop gaps below 250ms.
+These guard measured regressions on this environment, not responsiveness guarantees
+for mobile or slower CPUs. Structured-clone delivery remains a measurable main-thread
+pause. Reports go to `test-results/etymology-05/performance/`.
+
+To check a production project-site build and its lexical worker/data paths:
+
+```sh
+GITHUB_PAGES=true npm run build
+GITHUB_PAGES=true python3 tests/browser/etymology_delivery.py
+```
+
+`--out-dir` selects another production output. It checks `/lang-viz/` lexical and
+worker requests, independent geographic loading, notice and manifest delivery,
+and incompatible-data rejection/retry. Reports go to
+`test-results/etymology-05/delivery/`. The explicit snapshot gate in deployment
+still validates the full lexical contract and atlas joins.
 
 `test:inspection-browser` checks real pointer hover, shared contributors, empty
 space, pin/close, canvas exit, selection clearing, aggregate source outlines, style

@@ -11,3 +11,7 @@ Source and build instructions:
 
 The package metadata declares LGPL-3.0-or-later, while the distributed license
 text is LGPL 2.1. These notes preserve that distinction and the upstream text.
+
+The DiACL lexical snapshot and adapted Word Trails dataset use the publisher's
+CC BY-NC-SA 4.0 databank declaration. Attribution, source links, export dates, and
+adaptations are in [DIACL-LEXICAL-NOTICE.md](DIACL-LEXICAL-NOTICE.md).

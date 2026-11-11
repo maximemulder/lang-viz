@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-The dev server excludes generated `public/data/` assets from file watching to
+The dev server excludes generated `public/data/` and `public/etymology/` assets from file watching to
 avoid exhausting OS watcher limits on precomputed coverage tiles. These files
 are still served normally. After regenerating data, restart the dev server and
 reload the browser to pick up the new assets.
@@ -45,7 +45,18 @@ compare expressions for a concept. The lexical code and dataset load on the firs
 visit; geographic data is not needed to use this workspace. Geography loads on its
 first visit and keeps the existing map and camera across workspace switches.
 
-The lexical bundle is generated explicitly. From the repository root:
+Restore the independently pinned lexical browser bundle from the repository root
+once the candidate release has been published:
+
+```sh
+python3 -m pipeline.etymology.data_release restore
+```
+
+During this local review, the candidate is in
+`.data-releases/word-trails-diacl-2026-10-24-v1/`; see the
+[release instructions](../pipeline/etymology/README.md#independent-release-delivery)
+for offline installation and publication status. To compile from the pinned
+sources instead:
 
 ```sh
 python3 -m pipeline.etymology.sources restore --from-git .
@@ -54,8 +65,11 @@ python3 -m pipeline.etymology.build
 
 Alternatively, omit `--from-git .` to restore the checksum-pinned sources from their
 immutable URLs. See [source and compilation contracts](../pipeline/etymology/README.md).
-No source processing runs automatically during npm commands. Independent release
-restoration and deployment integration are still planned in ETY-05.
+No source processing runs automatically during npm commands. Deployment restores
+the prebuilt lexical and geographic artifacts independently. The lexical response
+is decoded, parsed, validated, and indexed in a short-lived worker; the prepared
+repository is reused in memory when returning to the workspace. See **About the
+data** for the lexical source and CC BY-NC-SA 4.0 notice.
 
 Start `npm run dev` in `app/`, open **Word histories**, and choose **wine**, **water**,
 or **tooth**. `/` focuses search; Arrow Down moves into results, Enter traces a form,

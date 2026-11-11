@@ -5,14 +5,15 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import hashlib
 import json
 import re
 import shutil
 import subprocess
 import tarfile
 import tempfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
+
+from pipeline.release_utils import digest, local_path
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "app/public/data"
@@ -22,16 +23,6 @@ ASSET = "atlas-data.tar.gz"
 
 def read_json(path: Path):
     return json.loads(path.read_text())
-
-
-def local_path(root: Path, name: str) -> Path:
-    path = PurePosixPath(name)
-    if not name or path.is_absolute() or ".." in path.parts or "\\" in name:
-        raise ValueError(f"Invalid data path: {name}")
-    result = root.joinpath(*path.parts)
-    if not result.resolve().is_relative_to(root.resolve()):
-        raise ValueError(f"Data path escapes its directory: {name}")
-    return result
 
 
 def release_files(root: Path) -> list[Path]:
@@ -125,11 +116,6 @@ def audit(root: Path) -> dict:
             "groups": groups,
         }
     return result
-
-
-def digest(path: Path) -> str:
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def pack(root: Path, output: Path, repository: str, tag: str, commit: str) -> Path:

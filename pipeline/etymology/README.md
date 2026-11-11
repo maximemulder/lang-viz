@@ -1,7 +1,7 @@
 # Lexical data and domain port
 
-ETY-01 prepares lexical data and pure domain helpers. It adds no workspace UI,
-URL handling, or map integration. The atlas pipeline and schema remain independent.
+The lexical adapter, independent release commands, and browser domain helpers
+share a pinned source contract. The atlas pipeline and schema remain independent.
 Port reference: `58a6c1a2a8a2ef02f433576bf15cd7b0e09c57fe`.
 
 ## Reproduce the reviewed snapshot
@@ -31,16 +31,18 @@ Use the builder's `--source-dir` for a non-default source directory.
 [sources.json](sources.json) records exact file paths, byte sizes, checksums,
 upstream URLs, export timestamps, attribution, and the placeholder source ID.
 It recovers the supplied exports from the original commit without merging or
-copying the large data files into the port's history. ETY-05 will establish
-independent release delivery of raw sources and the compiled browser bundle.
+copying the large data files into the port's history. The independent lexical
+release also archives both files; either recovery path verifies their exact hashes.
 
 The sources are the complete lexical export from 2026-10-24T05:04:49Z and the
 language tree from 2026-10-23T06:58:27Z. Attribution follows the supplied prototype:
 Carling, Gerd (ed.), *Diachronic Atlas of Comparative Linguistics Online*, Goethe
 University Frankfurt. Original bibliographic citations remain attached to words
-and relationships. This lexical export's redistribution terms have not been
-independently verified here; do not infer them from the atlas polygon dataset's
-license. Source notices and release publication remain part of ETY-05.
+and relationships. The publisher's [CompLing portal](https://compling.eu/) declares CC BY-NC-SA 4.0
+for the databank. The [lexical source notice](../../app/public/licenses/DIACL-LEXICAL-NOTICE.md)
+records that declaration, attribution, export dates, and our adaptations. The
+exports contain no snapshot-specific license; the notice uses the publisher's
+databank-level terms, independently of polygon data licensing.
 
 ## Compilation contract
 
@@ -119,3 +121,89 @@ That explicit integration command fails if data is missing. It checks source
 hashes/counts, the English → Middle English → Old English → Proto-Germanic → Latin
 wine chain and its separate borrowing evidence, geographic helpers, and English
 matching against the current atlas catalog. No npm lifecycle hook prepares data.
+
+## Independent release delivery
+
+`etymology-release.json` pins the lexical release independently of `data-release.json`.
+Its schema version, lexical schema/adapter versions, snapshot, producer commit,
+and two asset inventories include archive and individual file sizes/SHA-256.
+The browser archive contains `word-trails.json`, `manifest.json`, `sources.json`,
+and `NOTICE.md`. The manifest records counts, complete provenance, and hashes of
+its other files. The separate source archive contains the unchanged raw JSON,
+the source pin, and notice. The raw archive is not copied into the deployed site.
+
+**Review status:** `word-trails-diacl-2026-10-24-v1` is prepared locally but has
+not been published. The commands below that download from GitHub require that
+publication first. The checked-in pin is the exact candidate, not a claim that
+the remote release exists. Publish before merging the deployment change.
+
+Once published, restore without compiling sources (Python 3.12+, authenticated
+GitHub CLI for the repository):
+
+```sh
+python3 -m pipeline.etymology.data_release restore
+python3 -m pipeline.etymology.data_release verify
+python3 -m pipeline.etymology.data_release restore --kind sources --output /tmp/word-trails-sources
+```
+
+Browser destination: `app/public/etymology/`; source destination when omitted:
+`data/etymology/diacl-2026-10-24/`. Existing installations must match the complete
+selected release; valid directories are a no-op and different/modified ones are
+preserved with an error. For a different pin or an older single-file development
+build, choose an unused `--output`, review it, and move the old directory aside
+before installing at the default path. Roll back by selecting an earlier pin
+and installing it into a fresh directory. Keep referenced releases available.
+
+To review this candidate offline from the repository root:
+
+```sh
+python3 -m pipeline.etymology.data_release install \
+  .data-releases/word-trails-diacl-2026-10-24-v1/word-trails.tar.gz \
+  --output /tmp/word-trails-browser-review
+python3 -m pipeline.etymology.data_release verify --output /tmp/word-trails-browser-review
+```
+
+For a new release, first commit adapter changes, restore the pinned sources, and
+build explicitly. Packaging reproduces the source build and rejects a stale or
+modified compiled bundle. Normal restoration never calls the source adapter.
+
+```sh
+python3 -m pipeline.etymology.data_release pack \
+  --tag word-trails-SNAPSHOT-vN --pipeline-commit FULL_BUILD_COMMIT \
+  --output .data-releases/word-trails-SNAPSHOT-vN
+```
+
+Use an unused tag and output directory. Packaging verifies both archives and
+writes deterministic gzip/tar metadata. Installation checks the archive, member
+names/types/sizes, complete file set, each file hash, manifest/schema/provenance,
+and source hashes before renaming a staged directory into place. Invalid or
+interrupted downloads/extractions do not replace working data. Full field and
+join validation also runs in the browser worker and explicit CI snapshot check.
+
+After reviewing the archives and approving publication, first push the producer
+commit to the repository (the port branch includes it), then:
+
+```sh
+python3 -m pipeline.etymology.data_release publish \
+  .data-releases/word-trails-diacl-2026-10-24-v1/etymology-release.json
+```
+
+Publication verifies both local archives, uploads a draft with the pin and source
+notice, publishes without making it the repository's latest application release,
+and only then updates the selected pin. Failed publication preserves the selected
+pin; an incomplete draft may require removal before retrying. The GitHub Pages
+workflow restores both independent pins, runs the explicit lexical snapshot gate,
+and builds with `/lang-viz/`. It never restores raw sources or preprocesses them.
+
+## Browser preparation and measurement
+
+The lexical JSON remains one lazy payload. Its response bytes transfer to a
+short-lived module worker for decoding, parsing, runtime validation, and indexing.
+The prepared repository returns through structured clone, then stays cached for
+workspace round trips. Failed fetches or preparation attempts are retryable.
+Search uses one cached numeric collator to preserve deterministic ranking without
+recreating expensive collation options for each comparison.
+
+From `app/`, `npm run measure:etymology-browser` builds and measures the production
+app. See [browser measurements](../../app/tests/browser/README.md) and the ETY-05
+execution record for device, cache/network settings, budgets, results, and limits.

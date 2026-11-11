@@ -75,6 +75,21 @@ Tools: `pycldf` (reading CLDF; `cldf createdb` for SQLite if useful), `pyglottog
 
 ### 3.3 Exports for the browser
 
+Word histories use an independent lexical schema and release pin
+(`etymology-release.json`). The geographic catalog IDs and lexical numeric IDs
+remain separate. `pipeline.etymology.data_release` restores a prebuilt browser
+bundle, manifest, source pin, and notice; its separate raw archive is retained for
+reproduction and omitted from deployment. It never invokes the source adapter
+while restoring. CI verifies both dataset pins and runs the explicit lexical
+snapshot gate before building. See [lexical delivery](pipeline/etymology/README.md).
+
+On first lexical visit, response bytes transfer to a short-lived module worker
+for decoding, parsing, validation, and indexing. The prepared repository returns
+through structured clone and is cached above the workspace lifecycle. Errors
+remain local and retryable. Search uses a cached numeric collator; no npm lifecycle
+hook downloads or preprocesses lexical sources. Worker timings and remaining
+handoff cost are recorded by the production browser measurement command.
+
 The current geographic atlas uses:
 
 - `manifest.json`: catalog counts, source archive profiles, prepared coverage profiles and per-profile zoom limits.
