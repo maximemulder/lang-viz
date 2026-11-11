@@ -3,6 +3,7 @@ import { Popup } from 'react-map-gl/maplibre'
 import { temporalQualityLabel } from '../../domain/temporal'
 import { atlasDataAtom, languageColorsAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { openLanguageDetailsAtom } from '../../state/languageControls'
+import { LanguageWordsButton } from '../languages/LanguageWordsButton.tsx'
 
 export interface MapInspection {
   readonly longitude: number
@@ -115,21 +116,24 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                   </small>
                 )}
                 {inspection.pinned && (
-                  <button
-                    type="button"
-                    className="language-inspector__details"
-                    aria-label={`Details for ${language.name}`}
-                    onClick={() => {
-                      openDetails({
-                        languageId: language.id,
-                        ...(area ? { entryId: area.id } : {}),
-                        moveMap: false,
-                      })
-                      onClose()
-                    }}
-                  >
-                    View details
-                  </button>
+                  <>
+                    <LanguageWordsButton language={language} onNavigate={onClose} />
+                    <button
+                      type="button"
+                      className="language-inspector__details"
+                      aria-label={`Details for ${language.name}`}
+                      onClick={() => {
+                        openDetails({
+                          languageId: language.id,
+                          ...(area ? { entryId: area.id } : {}),
+                          moveMap: false,
+                        })
+                        onClose()
+                      }}
+                    >
+                      View details
+                    </button>
+                  </>
                 )}
               </div>
             </article>

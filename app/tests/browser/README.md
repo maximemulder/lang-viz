@@ -12,6 +12,8 @@ npm run test:selection-browser
 npm run test:focus-browser
 npm run test:explorer-navigation-browser
 npm run test:etymology-browser
+npm run test:word-trail-browser
+npm run test:coverage-selection-browser
 
 npm run test:colors-browser
 npm run test:source-browser
@@ -50,8 +52,31 @@ malformed/unknown links, retry, and narrow layouts. Same-origin frames exercise
 320/390px viewports because headless Firefox clamps the outer window to 500px.
 Reports/screenshots are saved to `test-results/etymology-03/browser/`.
 To reuse an existing build, run `python3 tests/browser/etymology.py`; use `--output`
-to change the artifact directory. This does not close ETY-04 map-overlay acceptance
-or the previously recorded geographic warm-republication failure.
+to change the artifact directory. This is the explorer UI suite; map integration has its own gate below.
+
+`test:word-trail-browser` builds and checks independent lexical layers, canonical
+trail round trips, historical-stage inspection, actual additions/repeat dedup,
+current source/period availability, unchanged polygon/cache identities on clear,
+and reverse navigation from exact/ambiguous/aggregate/source-defined entries and
+pinned map popups. It exercises stale profile-bounds cancellation, explicit focus,
+both projections, style replacement, and a narrow sidebar. Real lexical/atlas
+snapshots are used; an explicitly modified in-memory response tests missing points
+and antimeridian links because the pinned lexical snapshot has no missing points.
+Installed assets are never modified. Reports/screenshots go to
+`test-results/etymology-04/browser/`; use `python3 tests/browser/word_trail.py` to
+reuse a build, and `--output` to change the destination. Browser errors fail checks.
+The earlier geographic warm-republication failure was separately repaired by
+retaining the active coverage during forced recomputation; the ordinary overlap
+runner remains the independent regression gate for that behavior.
+
+`test:coverage-selection-browser` checks eight contemporary/time-of-contact
+selection replacements and an unchanged-selection recomputation. The continuity
+observer reads the current store selection (cached as an atom), rather than a
+selection ref updated after rendering; previous-selection layers cannot prime a
+new selection's check. The old observer recorded one false-positive blank frame
+per switch on the pre-overlay revision. Coverage that disappears after it has
+been displayed for an unchanged selection is still an error. Reports are saved
+to `test-results/etymology-04/coverage-selection/`.
 
 `test:inspection-browser` checks real pointer hover, shared contributors, empty
 space, pin/close, canvas exit, selection clearing, aggregate source outlines, style

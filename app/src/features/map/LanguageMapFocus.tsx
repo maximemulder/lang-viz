@@ -16,6 +16,7 @@ import {
   languagePanelAtom,
   languagePointerPreviewAtom,
 } from '../../state/languageControls'
+import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { searchCoverageAtom } from '../../state/searchSelection'
 import { GeometryHighlight } from './GeometryHighlight'
 import { useGeometryDisplay } from './geometry/display'
@@ -89,13 +90,20 @@ export const LanguageMapCamera = () => {
   const map = current?.getMap()
   const request = useAtomValue(languageMapNavigationAtom)
   const store = useStore()
+  const intent = useAtomValue(mapCameraIntentAtom)
   useEffect(() => {
-    if (!map || !request) return
+    if (!map || !request || intent !== request) return
     let cancelled = false
+    let moved = false
+    const settled = () => {
+      moved = false
+    }
+    map.on('moveend', settled)
+    const current = () => !cancelled && store.get(mapCameraIntentAtom) === request
     map.stop()
     const navigate = async () => {
       const data = await store.get(atlasDataAtom)
-      if (cancelled) return
+      if (!current()) return
       const variants = targetGeometry(
         request.target,
         data,
@@ -106,7 +114,7 @@ export const LanguageMapCamera = () => {
       )
       if (!variants.length) return
       const index = await loadGeometryBounds(data.manifest)
-      if (cancelled) return
+      if (!current()) return
       const currentVariants = targetGeometry(
         request.target,
         data,
@@ -132,6 +140,8 @@ export const LanguageMapCamera = () => {
       const padding = Math.min(48, canvas.clientWidth / 8, canvas.clientHeight / 8)
       const camera = map.cameraForBounds(areaBounds, { padding })
       if (camera?.zoom === undefined) return
+      if (!current()) return
+      moved = true
       map.fitBounds(areaBounds, {
         padding,
         // Leave room for the surrounding region, even for a very small footprint.
@@ -143,7 +153,10 @@ export const LanguageMapCamera = () => {
     void navigate().catch(() => {})
     return () => {
       cancelled = true
+      map.off('moveend', settled)
+      if (moved && (!store.get(mapCameraIntentAtom) || store.get(mapCameraIntentAtom) === request))
+        map.stop()
     }
-  }, [map, request, store])
+  }, [map, request, store, intent])
   return null
 }

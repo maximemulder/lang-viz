@@ -170,6 +170,14 @@ const Explorer = ({ repository }: { readonly repository: EtymologyRepository }) 
           <button type="button" aria-pressed={view === 'family'} onClick={() => setView('family')}>
             Family comparison
           </button>
+          <button
+            type="button"
+            disabled={!rootWord}
+            title={rootWord ? `Show the current trail for ${rootWord.f}` : 'Trace a word first'}
+            onClick={() => dispatch({ type: 'show-trail' })}
+          >
+            Show current word trail
+          </button>
         </nav>
         <div className="word-concept-controls">
           <label>

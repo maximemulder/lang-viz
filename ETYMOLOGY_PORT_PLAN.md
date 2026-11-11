@@ -4,8 +4,8 @@ Last updated: 2026-11-11.
 
 This is the execution checklist for bringing Word Trails from `feature/etymology`
 into the current atlas. Port the work in reviewable commits on `port/etymology`,
-created from the reviewed `main` revision. ETY-00 through ETY-03 are complete;
-map overlay and atlas cross-navigation in ETY-04 are next.
+created from the reviewed `main` revision. ETY-00 through ETY-04 are complete;
+independent data delivery and measured performance in ETY-05 are next.
 
 Update an item's status, implementation notes, and validation evidence as work
 proceeds. Complete an item only when its acceptance checks pass. Record skipped
@@ -76,11 +76,11 @@ etymological inference are outside this port.
 
 | Item | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| ETY-00 | Port branch and baseline | — | Complete; browser failure recorded |
+| ETY-00 | Port branch and baseline | — | Complete; baseline republication failure repaired in ETY-04 |
 | ETY-01 | Source contract, adapter, and domain logic | ETY-00 | Complete |
 | ETY-02 | Session state and navigation | ETY-01 | Complete |
 | ETY-03 | Explorer UI and app shell | ETY-02 | Complete |
-| ETY-04 | Map overlay and atlas bridge | ETY-03 | Not started |
+| ETY-04 | Map overlay and atlas bridge | ETY-03 | Complete |
 | ETY-05 | Data delivery and performance | ETY-01; final checks need ETY-04 | Not started |
 | ETY-06 | Regression checks and documentation | ETY-04, ETY-05 | Not started |
 
@@ -488,22 +488,22 @@ merge has occurred.
 Port `WordTrailLayer` and `WordTrailMapSummary` against current map APIs. Add small
 integration points to current `WorldMap` and `LanguageInspector`.
 
-- [ ] Render lexical points/links in separate layers, preserving current geometry
+- [x] Render lexical points/links in separate layers, preserving current geometry
   display, inspection highlights, backgrounds, and polygon hit testing.
-- [ ] Use the canonical trail specification; map state controls overlay visibility
+- [x] Use the canonical trail specification; map state controls overlay visibility
   and explicit navigation, not a second stale trail snapshot.
-- [ ] Fit the map on an explicit show/focus action. Prevent delayed camera requests
+- [x] Fit the map on an explicit show/focus action. Prevent delayed camera requests
   from overriding newer actions, and respect reduced-motion preferences.
-- [ ] Preserve antimeridian splitting and access to overlapping historical stages.
+- [x] Preserve antimeridian splitting and access to overlapping historical stages.
   Report absent coordinates without removing those words from the graph.
-- [ ] Label the map action as showing the current word trail. Concept-wide mapping
+- [x] Label the map action as showing the current word trail. Concept-wide mapping
   is outside this port. Returning from the map restores the same trail session.
-- [ ] Resolve atlas matches against the full catalog, then use current availability
+- [x] Resolve atlas matches against the full catalog, then use current availability
   and pinning actions, including `showLanguagesAtom` or a narrowly extended action.
   Respect source/period filters, overrides, and supported area representations.
-- [ ] Preserve existing pinned entries and count actual additions. Distinguish
+- [x] Preserve existing pinned entries and count actual additions. Distinguish
   added, already-present, unmatched, and currently unavailable entries.
-- [ ] Add lexical navigation alongside existing pinned-inspector actions. Use the
+- [x] Add lexical navigation alongside existing pinned-inspector actions. Use the
   represented catalog entry, including for aggregate and source-defined areas.
   Missing or ambiguous lexical matches must leave a useful search path available.
 
@@ -513,6 +513,113 @@ pre-existing comparisons, repeat additions, overlay clearing, and navigation rou
 trips. Verify that lexical overlay actions alone do not change polygon selections,
 geometry/cache identities, or trigger polygon recomputation. Adding areas should
 use the normal atlas selection pipeline.
+
+#### ETY-04 execution record — 2026-11-11
+
+Implemented from the reviewed ETY-03 commit `74d3809`, with the separate geographic
+republication prerequisite in `63870b7` (see the ETY-00 follow-up). Presentation
+references remain from `58a6c1a`; its stale trail snapshots, raw-variant polygon
+filtering, unconditional camera effects, and misleading addition counts were not
+ported.
+
+- `WordTrailLayer` reads the same derived trail as the graph. Independent GeoJSON
+  layers and HTML markers do not enter polygon selection, coverage/cache keys, or
+  hit-testing layers. Existing map settings, inspection highlights, and backgrounds
+  remain. `WordTrailMapSummary` sits above the existing finder in a bounded sidebar.
+- **Show current word trail** maps the currently traced root, even from comparison
+  view. It never maps an entire concept. Markers and the complete form list inspect
+  evidence without changing root, depth, expansion, or comparison preferences.
+  The list exposes overlapping stages and forms without coordinates. Ordinary
+  **Return to exploration** preserves the chosen view. Clearing only removes the
+  lexical overlay; polygon comparisons and colors stay pinned.
+- Camera focus is an explicit, one-shot request, using the existing minimal-arc
+  bounds helper and antimeridian-split links. `mapCameraIntentAtom` arbitrates
+  profile, trail, and user-originated navigation. Camera consumers recheck request
+  identity after bounds/style/frame readiness; newer intent cancels older work.
+  Reduced-motion requests use zero duration. Style restoration does not refit, and
+  completed-camera cleanup leaves subsequent user motion alone. Browser checks
+  require actual focus movement and no map/browser errors, including Firefox's
+  native frame callback receiver requirements.
+- `planTrailAreas` resolves identities on full catalogs first, then uses current
+  availability, overrides and preferred own/descendant modes. The explicit async
+  addition action rechecks the captured session/trail and reads current geography
+  settings before calling `showLanguagesAtom`. It counts actual entry additions,
+  deduplicates repeats, and reports already-present, unavailable, and unmatched
+  records. Pre-existing comparisons retain their identity/color/provenance. A
+  same-turn workspace change cancels an in-flight addition before it writes.
+- **Browse word entries** appears alongside existing profile/pinned-popup actions.
+  It passes the represented catalog identity, including aggregates and source
+  entries, and navigates before lexical loading. Exact unique Glottocodes scope
+  search; ambiguous or missing matches explain the fallback. Real checks include
+  English, Ancient Greek's multiple lexical stages, the Indo-European aggregate's
+  exact lexical match, and source-defined Danzhou with no exact match.
+
+Validation and limits:
+
+| Check | Result |
+| --- | --- |
+| Frontend lint/typecheck, strict standalone typecheck of new tests | Passed |
+| `npm test` | 257 passed, no skips; includes nine new bridge/camera checks plus the prerequisite controller regression |
+| `npm run test:etymology-snapshot` | Three passed against unchanged real data |
+| Production build | Passed; existing large-chunk warning remains |
+| Production `tests/browser/word_trail.py` | 17 integrated checkpoints passed; canonical trail, actual focus, area addition/cancellation, pinned comparisons, reverse joins, style/projection/narrow behavior |
+| Existing production explorer UI suite | All 16 checkpoints passed, including independent load/error/retry and exact mobile viewports |
+| Existing production catalog and focus suites | Passed; the catalog's unsupported full Sino-Tibetan source comparison remains an explicitly reported pre-existing limitation |
+| Existing production geometry suite | Passed for direct/aggregate outlines through fast LOD changes |
+| Final cold/warm republication | Passed, including coverage/fallback injected-failure recovery |
+| Selection continuity observer | Eight period/selection transitions and unchanged-selection recomputation passed with zero counted blank frames |
+| Broader inspection lifecycle/benchmark | Passed after observer correction: lifecycle plus 12 period/projection/view cases (48 hover samples) |
+| Data preservation | All 62,629 baseline geographic files and the compiled lexical bundle retain their recorded hashes |
+| Python browser-script lint/format | Passed |
+
+The broader inspection run passed hover, pin/close, style replacement, aggregate
+outlines and contemporary hover cases, then exposed a period-transition diagnostic
+race. An isolated build of pre-overlay `63870b7`, using the same data, reproduced
+one counted frame at every small contemporary/time-of-contact transition (seven
+across eight selections). The rendered selection changes before the observer's
+old effect-updated ref. Diagnostics now read a cached current-selection atom and
+prime continuity only with coverage committed for that selection; production
+geometry behavior is unchanged by this observer correction. The initial forced
+recompute repair remains a separate real coverage-lifecycle fix. An unchanged
+selection's actual disappearance still fails the continuity gate.
+
+The isolated full-catalog baseline benchmark also hit its existing computation
+deadline; the final integrated run completed all 12 cases after the observer fix.
+The baseline deadline is recorded as a baseline limitation rather than an etymology
+regression or a performance result. Baseline build/probe evidence is in
+`pre-overlay-{inspection,transition}/`; the scratch build only skipped copying
+public assets and served the same installed data through a link. Diagnostic probe
+instrumentation was confined to that scratch archive.
+
+The pinned lexical snapshot has no missing focal points. Missing-point and
+antimeridian browser cases therefore use a clearly labeled, in-memory modified
+response through the test proxy; installed source/bundle files are never edited.
+Own/descendant preferences and geometry overrides have focused pure-domain checks;
+real area additions use the existing pinning action. Geometry identity/no-recompute
+checks compare fixed-camera workspace/clear/repeat actions. Explicit camera moves
+may load normal viewport/LOD coverage; no lexical action changes polygon membership
+except **Add matched language areas**.
+
+The full Python pipeline and unrelated geographic browser suites were not rerun.
+Data delivery, source notices, deployment and measured performance remain ETY-05;
+this stage makes no slower-device performance claim and publishes nothing.
+Ignored evidence is under `app/test-results/etymology-04/`, with existing catalog,
+focus and geometry reports in their normal test-results directories.
+
+For review, use the already installed data:
+
+```sh
+cd app
+npm run dev
+# Reproduce the dedicated production gate:
+npm run test:word-trail-browser
+```
+
+Choose wine, customize depth/branches, then **Show current word trail**. Inspect a
+historical stage from the panel, return, and try adding areas twice with other
+comparisons present. Clear the overlay, then use **Browse word entries** in a
+language profile or pinned polygon popup. Detailed commands and expected behavior
+are in [app/README.md](app/README.md#word-histories-port-preview).
 
 ### ETY-05 — Complete data delivery and measure performance
 
@@ -598,6 +705,7 @@ the following in each completed item or in the PR validation record:
 | ETY-01 | Based on `b34860f`; source `58a6c1a` | `diacl-2026-10-24`; source hashes in pin; output hash above; unchanged geography | 53 relevant Python tests, 221 frontend tests, three snapshot tests, lint/typechecks/build/reproducibility passed | See ETY-01 execution record and local `app/test-results/etymology-01/`; state/UI/map port pending |
 | ETY-02 | Based on `86aedf7`; source-state reference `58a6c1a` | Existing lexical and geographic pins unchanged; navigation checks use synthetic data | 243 frontend tests, three snapshot tests, 11 Firefox checkpoints, lint/typechecks/build passed | See ETY-02 execution record and local `app/test-results/etymology-02/`; app shell/UI/map integration pending |
 | ETY-03 | Based on `15b26f6`; presentation reference `58a6c1a` | Existing lexical/geographic pins and generated bytes unchanged | 247 frontend tests, three snapshot tests, 16 integrated Firefox checkpoints, existing catalog/focus suites, lint/typechecks/build passed | See ETY-03 execution record and local `app/test-results/etymology-03/`; map overlay/cross-navigation pending |
+| ETY-04 | Based on `74d3809`; prerequisite `63870b7`; source presentation `58a6c1a` | Existing geographic/lexical pins and generated bytes unchanged; labeled coordinate fixtures for edge cases | 257 frontend tests, three snapshot tests, 17 map + 16 explorer Firefox checkpoints, geographic regression evidence in execution record | Map overlay/cross-navigation complete; independent delivery/performance next |
 
 ## Separate portability fix
 

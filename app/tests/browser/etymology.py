@@ -17,7 +17,13 @@ from run import APP, SCENARIOS, browser_session, wait_for
 @contextmanager
 def controlled_server(upstream):
     """Proxy only for test-owned failures/delays; never modify installed data or app code."""
-    control = {"lexical": "ready", "atlas": "ready", "release": threading.Event()}
+    control = {
+        "lexical": "ready",
+        "atlas": "ready",
+        "release": threading.Event(),
+        "bounds": "ready",
+        "lexicalBody": None,
+    }
     hits = Counter()
 
     class Handler(BaseHTTPRequestHandler):
@@ -29,7 +35,13 @@ def controlled_server(upstream):
             hits[path] += 1
             lexical = path.endswith("/etymology/word-trails.json")
             mode = (
-                control["lexical"] if lexical else control["atlas"] if "/data/" in path else "ready"
+                control["lexical"]
+                if lexical
+                else control["bounds"]
+                if path.endswith("/geometry-bounds.json")
+                else control["atlas"]
+                if "/data/" in path
+                else "ready"
             )
             if mode == "delay":
                 control["release"].wait(40)
@@ -45,6 +57,13 @@ def controlled_server(upstream):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(b'{"schemaVersion":999}')
+                return
+            if lexical and control["lexicalBody"] is not None:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(control["lexicalBody"])
                 return
             request = urllib.request.Request(
                 upstream + self.path,

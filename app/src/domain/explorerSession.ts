@@ -67,6 +67,7 @@ export const sessionRoute = (session: ExplorerSession): ExplorerRoute => ({
 export type ExplorerAction =
   | { readonly type: 'workspace'; readonly workspace: Workspace }
   | { readonly type: 'trace'; readonly id: string }
+  | { readonly type: 'inspect-trail-word'; readonly id: string }
   | { readonly type: 'view'; readonly view: WordView }
   | { readonly type: 'select'; readonly selection: EvidenceSelection }
   | { readonly type: 'expand'; readonly id: string }
@@ -111,6 +112,14 @@ export const reduceExplorerSession = (
         selection: { kind: 'word', id: action.id },
         comparison: { ...session.comparison, conceptId: null, collectionId: null },
         search: { query: '', languageId: null, atlasTarget: null },
+        overlay: cancelledFocus,
+      }
+    case 'inspect-trail-word':
+      return {
+        ...session,
+        workspace: 'etymology',
+        view: 'history',
+        selection: { kind: 'word', id: action.id },
         overlay: cancelledFocus,
       }
     case 'view':

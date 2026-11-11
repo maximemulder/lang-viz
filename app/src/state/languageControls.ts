@@ -1,15 +1,18 @@
 import { atom } from 'jotai'
 import type { LanguageMapTarget } from '../domain/languageFocus'
+import { mapCameraIntentAtom } from './mapCameraIntent.ts'
 
 export const languageMapNavigationAtom = atom<{
   readonly target: LanguageMapTarget
   readonly requestId: number
 } | null>(null)
 export const focusLanguageOnMapAtom = atom(null, (get, set, target: LanguageMapTarget) => {
-  set(languageMapNavigationAtom, {
+  const request = {
     target,
     requestId: (get(languageMapNavigationAtom)?.requestId ?? 0) + 1,
-  })
+  }
+  set(languageMapNavigationAtom, request)
+  set(mapCameraIntentAtom, request)
 })
 
 type Preview = { readonly owner: string; readonly target: LanguageMapTarget }
@@ -68,6 +71,7 @@ export const openLanguageDetailsAtom = atom(
 )
 
 export const closeLanguageDetailsAtom = atom(null, (get, set) => {
+  if (get(mapCameraIntentAtom) === get(languageMapNavigationAtom)) set(mapCameraIntentAtom, null)
   set(languageMapNavigationAtom, null)
   set(languagePanelAtom, {
     ...get(languagePanelAtom),

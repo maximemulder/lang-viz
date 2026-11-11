@@ -1,6 +1,7 @@
-import { useAtomValue, useSetAtom, useStore } from 'jotai'
+import { atom, useAtomValue, useSetAtom, useStore } from 'jotai'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { type RefObject, useEffect } from 'react'
+import { mapAreaSelectionKey } from '../../../../domain/aggregation.ts'
 import {
   areaModesAtom,
   atlasDataAtom,
@@ -28,14 +29,17 @@ import {
 } from '../../../../state/searchSelection'
 import { installOverlapTestApi } from './testBridge'
 
+// Cached per store; reading during render observation must not reserialize a full catalog each frame.
+const diagnosticsSelectionKeyAtom = atom((get) =>
+  mapAreaSelectionKey(get(selectedMapAreasAtom), get(overlapModeAtom)),
+)
+
 /** Browser fixtures and observers load only with the explicit overlap-test flag. */
 export default function OverlapTestControls({
   map,
-  configRef,
   refreshRef,
 }: {
   readonly map: MapLibreMap
-  readonly configRef: RefObject<{ selectionKey: string }>
   readonly refreshRef: RefObject<(() => void) | null>
 }) {
   const data = useAtomValue(atlasDataAtom)
@@ -74,7 +78,7 @@ export default function OverlapTestControls({
           map.jumpTo({ center: options.center, zoom: options.zoom })
         },
         () => refreshRef.current?.(),
-        () => configRef.current.selectionKey,
+        () => store.get(diagnosticsSelectionKeyAtom),
         {
           configureColors: (config) => store.set(colorConfigurationAtom, config),
           mapEntryState: () => {
@@ -112,7 +116,7 @@ export default function OverlapTestControls({
         },
         () => store.get(overlapStatusAtom),
       ),
-    [map, data, store, configRef, refreshRef, setPeriod, setDatasetFilter, setMode, showLanguages],
+    [map, data, store, refreshRef, setPeriod, setDatasetFilter, setMode, showLanguages],
   )
 
   return null

@@ -190,7 +190,7 @@ export const OverlapHatching = ({
     <>
       {diagnosticsEnabled && map && (
         <Suspense fallback={null}>
-          <OverlapTestControls map={map} configRef={configRef} refreshRef={refreshRef} />
+          <OverlapTestControls map={map} refreshRef={refreshRef} />
         </Suspense>
       )}
       {(state.status === 'loading' || state.status === 'error') && (

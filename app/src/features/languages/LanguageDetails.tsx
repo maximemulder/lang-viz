@@ -36,6 +36,7 @@ import {
 import { GeographyFilterSummary } from './GeographyFilters'
 import { GeometrySourceRecords } from './GeometrySourceRecords'
 import { useLanguagePreview } from './LanguagePreview'
+import { LanguageWordsButton } from './LanguageWordsButton.tsx'
 import { PinnedMapEntries } from './PinnedMapEntries'
 
 export const LanguageDetails = () => {
@@ -226,6 +227,7 @@ export const LanguageDetails = () => {
               : 'No mapped area for this representation.'}
           </p>
         )}
+        <LanguageWordsButton language={detail} />
         <SidebarPane className="finder-detail__more" title="More details">
           {classification.kind === 'source' && (
             <div className="finder-detail__classification">

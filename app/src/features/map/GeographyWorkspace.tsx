@@ -3,6 +3,7 @@ import { Suspense, useEffect } from 'react'
 import { useMap } from 'react-map-gl/maplibre'
 import { WorkspaceBoundary } from '../../components/WorkspaceBoundary.tsx'
 import { atlasDataAtom } from '../../state/atlasState.ts'
+import { WordTrailMapSummary } from '../etymology/WordTrailMapSummary.tsx'
 import { LanguageFinder, LanguageFinderFallback } from '../languages/LanguageFinder.tsx'
 import { WorldMap } from './WorldMap.tsx'
 
@@ -20,9 +21,12 @@ export default function GeographyWorkspace({ visible }: { readonly visible: bool
       <section className="map-shell" aria-label="Language map">
         <WorldMap />
       </section>
-      <Suspense fallback={<LanguageFinderFallback />}>
-        <LanguageFinder />
-      </Suspense>
+      <div className="geography-sidebar">
+        <WordTrailMapSummary />
+        <Suspense fallback={<LanguageFinderFallback />}>
+          <LanguageFinder />
+        </Suspense>
+      </div>
     </WorkspaceBoundary>
   )
 }

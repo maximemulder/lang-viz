@@ -26,6 +26,8 @@ import {
   viewportLanguageIdsAtom,
 } from '../../state/atlasState'
 import { languageMapNavigationAtom, languagePointerPreviewAtom } from '../../state/languageControls'
+import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
+import { WordTrailLayer } from '../etymology/WordTrailLayer.tsx'
 import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { InspectionHighlight } from './InspectionHighlight'
 import { visibleVariantIds } from './inspection'
@@ -162,6 +164,7 @@ const MapHint = () => {
 export const WorldMap = () => {
   const sidebarPointer = useAtomValue(languagePointerPreviewAtom)
   const navigation = useAtomValue(languageMapNavigationAtom)
+  const setCameraIntent = useSetAtom(mapCameraIntentAtom)
   const lastNavigation = useRef(navigation)
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('terrain')
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
@@ -280,7 +283,8 @@ export const WorldMap = () => {
           ),
         )
       }}
-      onMoveStart={() => {
+      onMoveStart={(event) => {
+        if (event.originalEvent) setCameraIntent(null)
         inspectionDirtyRef.current = true
         viewportDirtyRef.current = true
       }}
@@ -322,6 +326,7 @@ export const WorldMap = () => {
         <LanguageMapPreview mapInspectionActive={Boolean(inspection)} />
         <LanguageMapCamera />
       </Suspense>
+      <WordTrailLayer />
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
 

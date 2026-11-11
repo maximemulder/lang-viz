@@ -117,5 +117,29 @@ Geography remains mounted after its first visit and is resized on return. Data
 failures retry independently; a rejected atlas request is evicted and its async
 atom can refresh without resetting the exploration store.
 
-For real-data UI acceptance use `npm run test:etymology-browser`. Map overlays and
-cross-navigation remain ETY-04 work. See [frontend review instructions](../../README.md#word-histories-port-preview).
+For real-data UI acceptance use `npm run test:etymology-browser`; map integration
+uses `npm run test:word-trail-browser`. ETY-04 derives map points/links directly
+from `atlasWordTrailAtom`; the graph
+and map never keep separate trail snapshots. Marker/panel inspection changes
+selected evidence while preserving the trail root/options and comparison filters.
+The panel's ordinary return action preserves the current view. Showing/focusing a
+trail creates an explicit request; clearing, newer navigation, and workspace changes
+invalidate it.
+
+`mapCameraIntentAtom` holds the identity of the latest explicit atlas/trail camera
+request. Both camera consumers check ownership after asynchronous readiness/bounds
+work; user-originated map movement invalidates pending navigation. Finished focus
+cleanup does not stop later user motion. Style replacement does not replay a fit.
+
+`addTrailAreasAtom` reads the complete catalogs before availability, awaits atlas
+readiness, checks that the captured session/trail is still current, then reads the
+latest source/period/override/mode state and calls `showLanguagesAtom`. Actual entry
+count differences determine additions; existing representation keys determine
+already-present counts. Stale results are hidden after trail or geography-setting
+changes. There is no polygon state write when showing, inspecting, focusing, or
+clearing the lexical overlay.
+
+Language profiles/popups dispatch `language-words` with the represented catalog
+name/classification immediately. Lexical loading resolves that request against the
+latest session, including ambiguous/no-match fallbacks.
+See [frontend review instructions](../../README.md#word-histories-port-preview).

@@ -85,7 +85,35 @@ The last two commands require the generated lexical bundle; the browser suite al
 uses the existing atlas data and installed Firefox/geckodriver. It runs the
 production app with controlled HTTP failures/delays and writes reports/screenshots
 under `test-results/etymology-03/browser/`. See [browser checks](tests/browser/README.md).
-Map overlays and atlas/lexical cross-navigation are the next port stage (ETY-04).
+Use **Show current word trail** to draw the current graph's forms and recorded
+relationships on Geography. It focuses the map only on that explicit action;
+ordinary workspace switches, style changes, and tracing a different word do not
+refocus automatically. **Focus current trail** requests another fit. Reduced-motion
+preferences are respected, and newer profile/trail/manual camera actions cancel
+older pending moves.
+
+The trail panel lists every displayed form, including overlapping historical stages
+and entries without focal points. Markers and **Inspect** buttons select evidence
+without changing the trail root or its controls. **Return to exploration** restores
+the current view and comparison filters. **Clear word overlay** removes the lexical
+layers while preserving pinned polygon entries.
+
+**Add matched language areas** is a separate action through the atlas's normal
+pinning pipeline. It uses current source/period filters, geometry overrides, and
+own/descendant representation settings. Results distinguish actual additions,
+already-present representations, currently unavailable records, and records with
+no unique catalog match. Existing comparisons and colors remain intact. Atlas
+areas are the chosen dataset representations; focal links are not historical routes.
+
+**Browse word entries** is available in language profiles and pinned map popups.
+It uses the represented catalog entry, including aggregates and source-defined
+entries. A unique exact Glottocode scopes lexical search; ambiguous or missing
+matches leave an explanation and the full search available. It preserves the
+current exploration until you explicitly trace another form.
+
+`npm run test:word-trail-browser` checks this integration against production code,
+real catalogs, and explicitly labeled coordinate fixtures. Artifact delivery and
+performance measurement remain ETY-05 work.
 
 ## Language controls
 

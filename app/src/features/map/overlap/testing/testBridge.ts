@@ -168,7 +168,12 @@ export const installOverlapTestApi = (
       observedSelection = key
       observedGeometry = false
     }
-    if (active) observedGeometry = true
+    if (active && !observedGeometry) {
+      // A new selection can reach the store before React removes the old layers.
+      // Only coverage committed for this selection primes its continuity check.
+      const display = geometryDisplay(map).getSnapshot()
+      if (display.selectionKey === key && display.snapshot) observedGeometry = true
+    }
     if (observedGeometry && selectedIds().length && !active) {
       if (styleReloading) styleReloadBlankFrames++
       else blankLayerFrames++
@@ -330,6 +335,12 @@ export const installOverlapTestApi = (
       const gl = map.getCanvas().getContext('webgl2')
       const debug = gl?.getExtension('WEBGL_debug_renderer_info')
       return {
+        wordTrail: {
+          layers: map.getLayersOrder().filter((id) => id.startsWith('word-trail-')),
+          links:
+            (map.getSource('word-trail-links')?.serialize() as { data?: unknown } | undefined)
+              ?.data ?? null,
+        },
         geometryFrames,
         status: status.status,
         message: status.message,
