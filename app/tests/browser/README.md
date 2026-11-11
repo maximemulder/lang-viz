@@ -10,6 +10,7 @@ npm run test:browser -- --headed --hardware
 npm run test:catalog-browser
 npm run test:selection-browser
 npm run test:focus-browser
+npm run test:explorer-navigation-browser
 
 npm run test:colors-browser
 npm run test:source-browser
@@ -23,11 +24,19 @@ npm run build && python3 tests/browser/dropdowns.py
 npm run build && python3 tests/browser/stripes.py
 ```
 
-Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, existing npm
-dependencies, and generated atlas data under `public/data/`. The runner uses
+Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, and existing npm
+dependencies. Atlas checks also require generated data under `public/data/`. The runner uses
 Python's standard library and geckodriver's W3C WebDriver API. It installs and
 downloads nothing. Firefox/geckodriver setup is described in
 [Mozilla's documentation](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html).
+
+`test:explorer-navigation-browser` is an independent development fixture with
+synthetic lexical data; it requires no atlas/lexical downloads or production build.
+It checks persistent exploration settings, live hash changes, native Back/Forward,
+refresh, explicit comparison URLs, shared graph/overlay state, and invalid IDs.
+Reports/screenshots go to `test-results/explorer-navigation/` (override with
+`--output`). See [session and URL contracts](../../src/state/EXPLORER_SESSION.md)
+for manual fixture instructions and the remaining app integration work.
 
 `test:inspection-browser` checks real pointer hover, shared contributors, empty
 space, pin/close, canvas exit, selection clearing, aggregate source outlines, style

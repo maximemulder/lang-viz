@@ -4,8 +4,8 @@ Last updated: 2026-11-11.
 
 This is the execution checklist for bringing Word Trails from `feature/etymology`
 into the current atlas. Port the work in reviewable commits on `port/etymology`,
-created from the reviewed `main` revision. ETY-00 and ETY-01 are complete;
-session state and navigation in ETY-02 are next. No etymology UI is integrated yet.
+created from the reviewed `main` revision. ETY-00 through ETY-02 are complete;
+explorer UI and app-shell integration in ETY-03 are next.
 
 Update an item's status, implementation notes, and validation evidence as work
 proceeds. Complete an item only when its acceptance checks pass. Record skipped
@@ -78,7 +78,7 @@ etymological inference are outside this port.
 | --- | --- | --- | --- |
 | ETY-00 | Port branch and baseline | — | Complete; browser failure recorded |
 | ETY-01 | Source contract, adapter, and domain logic | ETY-00 | Complete |
-| ETY-02 | Session state and navigation | ETY-01 | Not started |
+| ETY-02 | Session state and navigation | ETY-01 | Complete |
 | ETY-03 | Explorer UI and app shell | ETY-02 | Not started |
 | ETY-04 | Map overlay and atlas bridge | ETY-03 | Not started |
 | ETY-05 | Data delivery and performance | ETY-01; final checks need ETY-04 | Not started |
@@ -278,24 +278,82 @@ Use the feature's `explorerState.ts` as a reference; replace its module-time
 `window.location` parsing and scattered component state with explicit state and
 navigation boundaries.
 
-- [ ] Define the canonical trail specification and session state described above.
+- [x] Define the canonical trail specification and session state described above.
   Keep repository data/cache ownership separate from navigation state.
-- [ ] Define actions for tracing a word, selecting evidence, expanding connections,
+- [x] Define actions for tracing a word, selecting evidence, expanding connections,
   changing comparison scope, opening language words, switching workspaces, showing
   the trail on the atlas, and clearing the overlay.
-- [ ] Make tracing/navigation reset only state that should change intentionally.
+- [x] Make tracing/navigation reset only state that should change intentionally.
   Plain workspace switching must preserve both lexical and geographic sessions.
-- [ ] Implement pure URL parsing/serialization plus an explicit browser adapter.
-- [ ] Handle initial load, Back/Forward, hash changes, malformed parameters, unknown
+- [x] Implement pure URL parsing/serialization plus an explicit browser adapter.
+- [x] Handle initial load, Back/Forward, hash changes, malformed parameters, unknown
   IDs, and legacy `#word=...&view=...` links without event/write loops.
-- [ ] Use history entries for meaningful navigation and replacement for incidental
+- [x] Use history entries for meaningful navigation and replacement for incidental
   updates/canonicalization. Changing to Geography must produce a Geography URL.
-- [ ] Ensure comparison URLs restore the chosen concept, not merely the root word's
+- [x] Ensure comparison URLs restore the chosen concept, not merely the root word's
   default concept. Document that unencoded session detail is not restored on reload.
 
 Acceptance: state-transition and routing tests cover round trips, direct links,
 invalid links, Back/Forward, and stale asynchronous responses. The graph and map
 derive the same forms and links from the same trail specification.
+
+#### ETY-02 execution record — 2026-11-11
+
+Contracts, transitions, URL semantics, and review commands are documented in
+[app/src/state/EXPLORER_SESSION.md](app/src/state/EXPLORER_SESSION.md).
+This step implements state/navigation independently of the app shell; ETY-03
+will connect the browser adapter once above both real workspaces. The original
+feature's module-time browser parsing and component-local exploration state were
+replaced by explicit interfaces rather than copied into main.
+
+- Added a pure session reducer and store-scoped Jotai atoms. The session retains
+  evidence, trail settings/expansions, search/scope, and comparison filters across
+  workspace switches. New-word tracing has documented, limited reset behavior.
+- Repository readiness is separate from navigation. Current word/concept/language
+  resolution is derived after data arrives; loading callbacks never select a word
+  or overwrite newer navigation. Unknown IDs and ambiguous matches stay explicit.
+- Graph and enabled atlas overlay selectors return the same derived trail object.
+  Explicit show actions issue camera request identities; delayed consumers must
+  verify the request is current after awaiting readiness. No real map consumer
+  or camera movement is integrated in this step.
+- Added pure fragment parsing/serialization and a lifecycle-managed browser
+  connection for initial load, hash changes, and Back/Forward. Canonicalization
+  replaces the current entry, encoded navigation pushes history, and unencoded
+  settings do not write it. The pathname, query, and host history state survive.
+- Guarded a queued-event race: an incidental search edit cannot overwrite a new
+  fragment before its asynchronous `hashchange` event arrives.
+- Explicit comparison IDs restore the chosen concept/collection. Unencoded detail
+  persists in memory but is not promised on reload or when returning to a different
+  root through history. Overlay visibility and camera requests are not URL state.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| New synthetic session/navigation tests | 22 passed; no downloaded data or browser globals needed |
+| `npm test` | 243 passed, zero failed/skipped |
+| `npm run check` / `npm run typecheck` | Passed |
+| Strict typecheck of new unit tests and browser fixture | Passed |
+| `npm run test:etymology-snapshot` | Three passed against the existing lexical/atlas data |
+| Firefox navigation fixture | 11 checkpoints passed, including native Back/Forward, refresh, pending hash events, invalid IDs, and customized workspace round trips |
+| Browser runner Python format/lint | Passed |
+| `npm run build` | Passed; existing large-chunk warning remains |
+| Production JS comparison | All chunks remain byte-identical to ETY-00; app shell, geographic state, schemas, and data pins are untouched |
+
+Full logs, browser report/screenshots, and production isolation evidence are under
+ignored [app/test-results/etymology-02/](app/test-results/etymology-02/).
+The browser test uses synthetic records in a development-only fixture; it is not
+integrated UI/map acceptance. No full Python pipeline or geographic browser suite
+was rerun. ETY-00's geographic republication failure remains unresolved.
+
+For manual review, run `npm run dev` from `app/` and open
+`/tests/browser/explorer-navigation.html` on Vite's displayed origin. The buttons
+and session readout allow tracing, workspace switching, fragment edits, refresh,
+and native history navigation. Automated entry point from `app/`:
+
+```sh
+npm run test:explorer-navigation-browser
+```
 
 ### ETY-03 — Port the explorer UI into the current shell
 
@@ -435,6 +493,7 @@ the following in each completed item or in the PR validation record:
 | --- | --- | --- | --- | --- |
 | ETY-00 | `35ee521a88dd80c1bf1f62d5901d1b56449cd09d` | `atlas-data-2026-11-10-metadata`; full hashes above | Lint/typecheck/206 tests/build/data verification passed; browser warm republication failed | See ETY-00 execution record and local `app/test-results/etymology-baseline/`; feature implementation not started |
 | ETY-01 | Based on `b34860f`; source `58a6c1a` | `diacl-2026-10-24`; source hashes in pin; output hash above; unchanged geography | 53 relevant Python tests, 221 frontend tests, three snapshot tests, lint/typechecks/build/reproducibility passed | See ETY-01 execution record and local `app/test-results/etymology-01/`; state/UI/map port pending |
+| ETY-02 | Based on `86aedf7`; source-state reference `58a6c1a` | Existing lexical and geographic pins unchanged; navigation checks use synthetic data | 243 frontend tests, three snapshot tests, 11 Firefox checkpoints, lint/typechecks/build passed | See ETY-02 execution record and local `app/test-results/etymology-02/`; app shell/UI/map integration pending |
 
 ## Separate portability fix
 
