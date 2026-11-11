@@ -1,8 +1,27 @@
 # Interactive atlas of the world's languages
 
-The browser application lives in `app/`; its static data is generated from the
-downloaded Glottolog, Glottography, and Digital Language Atlas of China datasets
-by the offline Python pipeline.
+The browser application lives in `app/`. Geography explores the Glottolog,
+Glottography, and Digital Language Atlas of China catalogs and areas. Word histories
+searches DiACL forms, recorded relationships, and concept comparisons, with an
+optional focal-point overlay alongside pinned atlas areas.
+
+## Run with published data
+
+Use Python 3.12+, the authenticated GitHub CLI, and Node.js 24+. From the repository
+root, restore the two independently pinned browser bundles:
+
+```sh
+python3 -m pipeline.atlas.data_release restore
+python3 -m pipeline.etymology.data_release restore
+cd app
+npm ci
+npm run dev
+```
+
+Open **Word histories** in the header. Each workspace loads its data on first use.
+See [frontend interactions and checks](app/README.md#word-histories) and
+[lexical source and release contracts](pipeline/etymology/README.md).
+The offline build below is for changing geographic data.
 
 ## Build the proof of concept
 
@@ -431,7 +450,6 @@ Before the first deployment, open the repository's **Settings → Pages** and se
 its base path and is published at `https://maximemulder.github.io/lang-viz/`.
 
 Word histories use a separately versioned browser bundle and raw-source archive.
-See [lexical restoration, review status, and publication](pipeline/etymology/README.md#independent-release-delivery).
-The current lexical candidate must be published before merging this port's
-workflow change; its offline archives are ready for local review. Lexical updates
-never require rebuilding or republishing the geographic bundle.
+See [lexical restoration and publication](pipeline/etymology/README.md#independent-release-delivery).
+The selected lexical release is published and supports clean-checkout restoration.
+Lexical updates never require rebuilding or republishing the geographic bundle.

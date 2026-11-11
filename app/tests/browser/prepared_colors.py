@@ -169,7 +169,11 @@ with metadata_session() as (browser,origin):
     # Required metadata fails the catalog as a whole instead of substituting another palette.
     for mode in ['missing','corrupt']:
         browser.call('POST','/url',{'url':origin+'/?overlap-test=1&overlap-basemap=off&metadata-test='+mode})
-        wait_for(lambda: browser.js("return document.querySelector('[role=alert]')?.textContent.includes('Unable to load atlas data')"),20,'invalid metadata error')
+        wait_for(lambda: browser.js("return document.querySelector('.workspace-error[role=alert] h2')?.textContent === 'Unable to open atlas data'"),20,'invalid metadata error')
+        error = browser.js("return document.querySelector('.workspace-error p').textContent")
+        assert '404' in error if mode == 'missing' else 'Invalid dataset metadata' in error, error
+        assert browser.js("return [...document.querySelectorAll('.workspace-error button')].some(button => button.textContent === 'Retry atlas data')")
+        assert browser.js("return document.querySelectorAll('.workspace-nav button').length === 2")
         assert not browser.js('return !!window.overlapTest')
         assert not browser.js("return performance.getEntriesByType('resource').some(r=>r.name.includes('.pmtiles'))")
     (out/'report.json').write_text(json.dumps({'preparedProfiles':list(profiles),'defaultUndoOverridesNavigation':'passed','globalEqualsPrecomputedAllCatalogColors':'passed','metadataBeforeGeometryAndSynchronousSelection':'passed','invalidMetadataRejectsCatalog':'passed'},indent=2))

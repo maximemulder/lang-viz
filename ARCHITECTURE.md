@@ -90,6 +90,16 @@ remain local and retryable. Search uses a cached numeric collator; no npm lifecy
 hook downloads or preprocesses lexical sources. Worker timings and remaining
 handoff cost are recorded by the production browser measurement command.
 
+Lexical navigation lives in a store-scoped session above both workspaces. The graph
+and enabled map overlay derive the same bounded trail specification. Geography
+stays mounted after its first visit, preserving its map and pinned comparisons.
+The URL encodes workspace, root word, view, concept, and collection; other controls
+persist only within the session. Explicit trail/profile camera actions share one
+current-intent identity, preventing delayed bounds requests from overriding newer
+navigation. Lexical area additions resolve identity against the complete catalogs,
+then use current atlas availability and normal pinning/deduplication. See
+[session and navigation contracts](app/src/state/EXPLORER_SESSION.md).
+
 The current geographic atlas uses:
 
 - `manifest.json`: catalog counts, source archive profiles, prepared coverage profiles and per-profile zoom limits.

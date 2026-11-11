@@ -132,13 +132,11 @@ and `NOTICE.md`. The manifest records counts, complete provenance, and hashes of
 its other files. The separate source archive contains the unchanged raw JSON,
 the source pin, and notice. The raw archive is not copied into the deployed site.
 
-**Review status:** `word-trails-diacl-2026-10-24-v1` is prepared locally but has
-not been published. The commands below that download from GitHub require that
-publication first. The checked-in pin is the exact candidate, not a claim that
-the remote release exists. Publish before merging the deployment change.
-
-Once published, restore without compiling sources (Python 3.12+, authenticated
-GitHub CLI for the repository):
+The selected release is
+[`word-trails-diacl-2026-10-24-v1`](https://github.com/maximemulder/lang-viz/releases/tag/word-trails-diacl-2026-10-24-v1),
+published on 2026-11-11. Its browser and source archives match the checked-in pin.
+Restore without compiling sources (Python 3.12+, authenticated GitHub CLI for the
+repository):
 
 ```sh
 python3 -m pipeline.etymology.data_release restore
@@ -154,7 +152,7 @@ build, choose an unused `--output`, review it, and move the old directory aside
 before installing at the default path. Roll back by selecting an earlier pin
 and installing it into a fresh directory. Keep referenced releases available.
 
-To review this candidate offline from the repository root:
+For an already downloaded archive, install offline from the repository root:
 
 ```sh
 python3 -m pipeline.etymology.data_release install \

@@ -4,9 +4,11 @@ Last updated: 2026-11-11.
 
 This is the execution checklist for bringing Word Trails from `feature/etymology`
 into the current atlas. Port the work in reviewable commits on `port/etymology`,
-created from the reviewed `main` revision. ETY-00 through ETY-04 are complete;
-ETY-05 implementation and local validation are ready for review; its release
-publication and real remote-restore gate remain pending.
+created from the reviewed `main` revision. ETY-00 through ETY-05 are complete;
+ETY-06 final regression checks and documentation are complete. The lexical
+release is published and clean-checkout remote restoration has passed. Main
+integration is authorized as a normal fast-forward push; deployment status is
+reported separately from these local acceptance checks.
 
 Update an item's status, implementation notes, and validation evidence as work
 proceeds. Complete an item only when its acceptance checks pass. Record skipped
@@ -82,8 +84,8 @@ etymological inference are outside this port.
 | ETY-02 | Session state and navigation | ETY-01 | Complete |
 | ETY-03 | Explorer UI and app shell | ETY-02 | Complete |
 | ETY-04 | Map overlay and atlas bridge | ETY-03 | Complete |
-| ETY-05 | Data delivery and performance | ETY-01; final checks need ETY-04 | Implementation validated locally; publication/remote restore pending |
-| ETY-06 | Regression checks and documentation | ETY-04, ETY-05 | Not started |
+| ETY-05 | Data delivery and performance | ETY-01; final checks need ETY-04 | Complete; release published and remote restore verified in ETY-06 |
+| ETY-06 | Regression checks and documentation | ETY-04, ETY-05 | Complete |
 
 Commit each completed item separately; split an item further when it improves
 reviewability. Record the source commit in the port's commit/PR descriptions.
@@ -792,34 +794,114 @@ probes, final `performance/report.json`, `explorer-regression/report.json`, and
 `project-delivery/report.json`, and `map-regression/report.json`. Early performance probes that failed the search
 budget are preserved separately from the final passing measurements.
 
-Remaining release gate, after reviewing and authorizing the external actions:
+Release gate, completed in ETY-06 after user authorization:
 
-- [ ] Push the port branch so producer commit `80fd8fa` is available on GitHub.
-- [ ] Publish the exact prepared browser + raw-source archives and pin using the
+- [x] Push the port branch so producer commit `80fd8fa` is available on GitHub.
+- [x] Publish the exact prepared browser + raw-source archives and pin using the
   documented `pipeline.etymology.data_release publish` command.
-- [ ] From a clean checkout, run real `restore` downloads and the `/lang-viz/`
+- [x] From a clean checkout, run real `restore` downloads and the `/lang-viz/`
   build/snapshot check. Record the published tag and evidence, then mark ETY-05
   complete. Site deployment remains a separate action.
 
 ### ETY-06 — Validate the integrated feature and document it
 
-- [ ] Run the full frontend checks and relevant Python tests after integration.
-- [ ] Run the new etymology browser suite against real lexical and current atlas data.
-- [ ] Run affected existing catalog, selection, focus, inspection, and geometry
+- [x] Run the full frontend checks and relevant Python tests after integration.
+- [x] Run the new etymology browser suite against real lexical and current atlas data.
+- [x] Run affected existing catalog, selection, focus, inspection, and geometry
   browser suites. Include prepared coverage checks if geometry delivery changes.
-- [ ] Exercise style restoration, both projections, narrow layouts, keyboard focus,
+- [x] Exercise style restoration, both projections, narrow layouts, keyboard focus,
   and simultaneous pinned comparisons plus a lexical overlay.
-- [ ] Verify geographic and lexical failures independently, URL refresh/Back/Forward,
+- [x] Verify geographic and lexical failures independently, URL refresh/Back/Forward,
   and repeated workspace round trips with customized exploration state.
-- [ ] Update `README.md`, `app/README.md`, `ARCHITECTURE.md`, and `DATASETS.md` as
+- [x] Update `README.md`, `app/README.md`, `ARCHITECTURE.md`, and `DATASETS.md` as
   applicable: setup, commands, state ownership, source provenance, payload behavior,
   supported interactions, and known limits.
-- [ ] Review the final diff for copied legacy shell/map behavior, unused exports,
+- [x] Review the final diff for copied legacy shell/map behavior, unused exports,
   duplicate implementations, and unrelated changes. Update this checklist/evidence.
 
 Acceptance: all applicable checks pass against recorded code and data revisions;
 remaining limitations are documented. A compile-only compatibility check or a run
 without geographic data does not satisfy integrated map acceptance.
+
+#### ETY-06 execution record — 2026-11-11
+
+Application revision: `ba2313f106d07ce6ded81a5121f1952b8357a476`.
+Original feature reference: `58a6c1a`; reviewed main remains `35ee521` after a
+fresh fetch. This stage changes documentation and one browser assertion; it
+makes no production behavior, dependency-version, geometry-delivery, or data changes.
+
+The user authorized proceeding and normal pushes to main, without force. Pushed
+`port/etymology`, then published the exact prepared
+[word-trails-diacl-2026-10-24-v1 release](https://github.com/maximemulder/lang-viz/releases/tag/word-trails-diacl-2026-10-24-v1).
+GitHub reports both uploaded archive sizes and SHA-256 digests matching the pin.
+The release targets producer `80fd8fa`; it is published, not a draft, and was not
+made the repository's latest application release. ETY-05's remote release gate
+is now complete. The historical ETY-05 record above describes its earlier local-only state.
+
+A separate clean Git checkout of the application revision downloaded the actual
+geographic browser release, lexical browser release, and lexical source archive
+from GitHub through the real restore commands. No local archives substituted for
+downloads. Restoring/building the source archive reproduced the exact published
+lexical JSON hash. Fresh `npm ci`, frontend tests, lint, typecheck, explicit snapshot
+checks, and the `/lang-viz/` build passed. Firefox verified project-path worker/data
+requests, lazy geographic loading, source notice/manifest delivery, and incompatible
+schema rejection followed by successful Retry. Installed geographic files were
+also compared against the fresh verified remote bundle: 62,629 files, no differences.
+
+| Final check | Result |
+| --- | --- |
+| Frontend unit tests | 259 passed, zero skipped |
+| Full Python pipeline suite | 136 passed |
+| Real lexical/atlas snapshot | Three passed |
+| Lint, typecheck, production build | Passed locally and in the clean checkout |
+| Explorer / lexical map browser suites | 16 / 17 checkpoints passed |
+| Session/URL fixture | 11 checkpoints passed |
+| Catalog and selection | Passed, including pinned source/period comparisons and colors |
+| Profile focus and geometry | Passed, including asynchronous camera navigation and outline continuity |
+| Inspection | Interaction lifecycle and all 12 period/projection/view benchmark cases passed; 48 hover samples |
+| Prepared colors | Defaults, overrides, undo, global/regional solves, source switching, and failure isolation passed |
+| Coverage selection | Eight period transitions plus unchanged-selection recomputation passed |
+| Ordinary overlap suite | All six scenarios cold/warm passed; slow-publication and zoom checks recorded zero disappearing coverage; both injected failures recovered through Retry |
+| Clean project-path browser delivery | Three checks passed |
+
+Initial failures are retained, not counted as passes:
+
+- The first full Python collection lacked installed `mapbox-vector-tile` and
+  `shapely`. `uv sync --locked` installed locked dependencies without changing the
+  lockfile; the complete suite then passed.
+- The first inspection benchmark hit `request-deadline` in a dense Asian view while
+  other checkout/build work was running. Interaction checks had passed. A full
+  isolated rerun passed all cases without changing production code or relaxing
+  deadlines. The concurrent work is a possible contributor, not a proven cause.
+- Prepared-color failure checks still expected the removed atlas error heading.
+  Updated the assertion for the workspace boundary and additionally checked the
+  specific underlying error, Retry, and workspace navigation. The full suite then
+  passed, including missing and corrupt metadata.
+
+Final diff review checked state ownership, independent loading/retry, stale camera
+cancellation, atlas identity/availability/pinning, runtime data validation, source
+and release boundaries, and unrelated geographic changes. No additional production
+fix was required. There are no raw exports or standalone prototype in the port's
+history; the original feature commit is not an ancestor. Existing helper exports
+remain used by production or focused tests. The optional macOS bootstrap change
+was left for its separate portability review.
+
+Documentation now provides the shortest published-data setup, lexical interactions
+and review commands, session/navigation ownership, provenance, and performance
+limits. `DATASETS.md` and the lexical notice already document the reviewed source
+contract and remain applicable. ETY-05 performance evidence remains valid because
+this stage does not change production code. Slower/mobile CPU behavior and real
+Pages/CDN compression/cache timings remain unmeasured. The existing full mixed-source
+Sino-Tibetan renderer budget limit is explicitly reported by catalog/selection checks;
+it is not counted as successful complete mixed-source coverage.
+
+Evidence is under ignored `app/test-results/etymology-06/`: `checks.json`,
+`python-complete.log`, `browser-checks.json`, `reruns.json`, `clean-checks.json`,
+`final-review.json`, `data-preservation.json`, individual logs, and browser reports
+and screenshots. First-attempt failures are preserved separately from successful
+reruns. A direct main integration was authorized, so this execution record serves
+as the final review description instead of opening a PR. A normal main push starts
+the existing Pages workflow; its remote outcome is reported separately.
 
 ## Validation commands and evidence
 
@@ -855,7 +937,8 @@ the following in each completed item or in the PR validation record:
 | ETY-02 | Based on `86aedf7`; source-state reference `58a6c1a` | Existing lexical and geographic pins unchanged; navigation checks use synthetic data | 243 frontend tests, three snapshot tests, 11 Firefox checkpoints, lint/typechecks/build passed | See ETY-02 execution record and local `app/test-results/etymology-02/`; app shell/UI/map integration pending |
 | ETY-03 | Based on `15b26f6`; presentation reference `58a6c1a` | Existing lexical/geographic pins and generated bytes unchanged | 247 frontend tests, three snapshot tests, 16 integrated Firefox checkpoints, existing catalog/focus suites, lint/typechecks/build passed | See ETY-03 execution record and local `app/test-results/etymology-03/`; map overlay/cross-navigation pending |
 | ETY-04 | Based on `74d3809`; prerequisite `63870b7`; source presentation `58a6c1a` | Existing geographic/lexical pins and generated bytes unchanged; labeled coordinate fixtures for edge cases | 257 frontend tests, three snapshot tests, 17 map + 16 explorer Firefox checkpoints, geographic regression evidence in execution record | Map overlay/cross-navigation complete |
-| ETY-05 | Based on `80fd8fa`; same source reference | Candidate lexical release `word-trails-diacl-2026-10-24-v1`; archive hashes above; geographic pin unchanged | 259 frontend + three snapshot + 75 Python checks; 12 performance samples, 16 explorer + 17 map checks, fresh-tree project-path build and delivery checks | Implementation validated locally; branch push, publication, and actual remote restore remain pending |
+| ETY-05 | Based on `80fd8fa`; same source reference | Candidate lexical release `word-trails-diacl-2026-10-24-v1`; archive hashes above; geographic pin unchanged | 259 frontend + three snapshot + 75 Python checks; 12 performance samples, 16 explorer + 17 map checks, fresh-tree project-path build and delivery checks | Complete; published release and clean-checkout real remote restore verified in ETY-06 |
+| ETY-06 | Application `ba2313f`; source `58a6c1a`; final documentation/assertion commit follows | Published lexical release and existing geographic pin; bytes unchanged | 259 frontend + 136 Python + three snapshot tests; integrated browser suites; clean remote restore, source reproduction, project-path build/delivery | Complete; initial failures and successful reruns recorded above; deployment status separate |
 
 ## Separate portability fix
 
@@ -867,13 +950,14 @@ This fix should not be mixed into lexical feature behavior.
 
 ## Completion checklist
 
-- [ ] ETY-00 through ETY-06 satisfy their acceptance checks.
-- [ ] Word histories and family comparison work with the recorded real snapshot.
-- [ ] Graph, map overlay, URL, and workspace navigation behave consistently.
-- [ ] Existing geography, colors, inspections, and pinned comparisons retain their
+- [x] ETY-00 through ETY-06 satisfy their acceptance checks.
+- [x] Word histories and family comparison work with the recorded real snapshot.
+- [x] Graph, map overlay, URL, and workspace navigation behave consistently.
+- [x] Existing geography, colors, inspections, and pinned comparisons retain their
   behavior with current atlas data.
-- [ ] Clean-checkout data restoration and production build are reproducible.
-- [ ] Raw source exports and the standalone prototype have not been imported into
+- [x] Clean-checkout data restoration and production build are reproducible.
+- [x] Raw source exports and the standalone prototype have not been imported into
   main's history through a merge of the original feature commit.
-- [ ] The PR describes the resulting behavior, source commit, validation, and known
-  limits. Data publication and deployment status are stated separately.
+- [x] The final execution record describes the resulting behavior, source commit,
+  validation, and known limits. Direct integration replaces a PR under user
+  authorization. Data publication and deployment status are stated separately.

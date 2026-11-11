@@ -37,7 +37,7 @@ Semantic genealogy palettes are enabled by default. See the
 [color infrastructure](src/domain/COLORS.md) for programmatic custom colors,
 subtree anchors, comparison roots, categorical mode, and rendering behavior.
 
-## Word histories (port preview)
+## Word histories
 
 Use the header's **Word histories** workspace to search recorded forms, meanings,
 or languages, trace a word, inspect separate word/relationship citations, and
@@ -45,18 +45,15 @@ compare expressions for a concept. The lexical code and dataset load on the firs
 visit; geographic data is not needed to use this workspace. Geography loads on its
 first visit and keeps the existing map and camera across workspace switches.
 
-Restore the independently pinned lexical browser bundle from the repository root
-once the candidate release has been published:
+Restore the independently pinned lexical browser bundle from the repository root:
 
 ```sh
 python3 -m pipeline.etymology.data_release restore
 ```
 
-During this local review, the candidate is in
-`.data-releases/word-trails-diacl-2026-10-24-v1/`; see the
-[release instructions](../pipeline/etymology/README.md#independent-release-delivery)
-for offline installation and publication status. To compile from the pinned
-sources instead:
+See the [release instructions](../pipeline/etymology/README.md#independent-release-delivery)
+for checksum verification, offline installation, and source recovery. To compile
+from the pinned sources instead:
 
 ```sh
 python3 -m pipeline.etymology.sources restore --from-git .
@@ -126,8 +123,12 @@ matches leave an explanation and the full search available. It preserves the
 current exploration until you explicitly trace another form.
 
 `npm run test:word-trail-browser` checks this integration against production code,
-real catalogs, and explicitly labeled coordinate fixtures. Artifact delivery and
-performance measurement remain ETY-05 work.
+real catalogs, and explicitly labeled coordinate fixtures. Use
+`npm run measure:etymology-browser` for desktop performance measurements;
+see [measurement conditions and limits](tests/browser/README.md). The lexical
+snapshot is one 21.8 MB expanded JSON payload (about 2.4 MB compressed in local
+measurements). Preparation runs in a worker, but repository delivery and rendering
+still incur main-thread work; mobile and slower-CPU performance remain unmeasured.
 
 ## Language controls
 
