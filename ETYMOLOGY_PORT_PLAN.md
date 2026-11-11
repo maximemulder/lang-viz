@@ -178,6 +178,23 @@ the active geographic file set. On a fresh checkout, restore the pinned bundle
 first with `python3 -m pipeline.atlas.data_release restore`; this also verifies
 the archive checksum. No full source preprocessing is needed for this baseline.
 
+#### Geographic republication follow-up — 2026-11-11
+
+Before ETY-04, the `world-small` cold/warm check reproduced the failure on the
+ETY-03 build: cold rendered stripes; forced warm republication recorded nine blank
+frames, without map/browser errors. The cause was the diagnostic recompute action
+using the full selection reset, releasing active coverage immediately.
+Recomputation now retains that coverage until a complete replacement source loads,
+while still requesting fresh worker output. Selection resets retain their meaning.
+
+The controller regression suite passed 17 tests, including a new atomic replacement
+check. The production build and cold/warm browser run then passed, with coverage
+and fallback injected-failure retry recovery also passing. Evidence is in ignored
+`app/test-results/etymology-04/{baseline-republication,republication-fixed}/` and
+`controller.log`. This repair is a separate prerequisite commit; ETY-04 must still
+check its final integrated build. Earlier execution records describe historical
+failures rather than the repaired behavior.
+
 ### ETY-01 — Port the data adapter and domain logic
 
 Source candidates on the feature commit:

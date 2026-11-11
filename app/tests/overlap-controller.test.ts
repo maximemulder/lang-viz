@@ -177,6 +177,31 @@ test('publication waits for the composite source, retains the old snapshot, and 
   assert.equal(f.sent.length, count, 'returning inside retained coverage does not dispatch')
 })
 
+test('forced recomputation retains active coverage until its complete replacement loads', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = fixture(true)
+  context.after(() => f.controller.dispose())
+  f.initial()
+  const previous = f.state.snapshots[f.state.activeBuffer ?? 0]
+  const coverage = f.coverage
+  f.readiness.loaded = false
+  f.controller.recompute()
+  assert.equal(f.state.snapshots[f.state.activeBuffer ?? 0], previous)
+  assert.equal(f.coverage, coverage)
+  f.controller.refresh([coordinate(0)])
+  assert.deepEqual(f.sent.at(-1)?.knownTiles, [], 'worker must produce fresh output')
+  context.mock.timers.tick(100)
+  assert.equal(f.registered.size, 1, 'no partial fallback replaces the displayed coverage')
+  f.receive(tile(0))
+  f.finish()
+  assert.equal(f.state.snapshots[f.state.activeBuffer ?? 0], previous)
+  f.publish()
+  assert.equal(f.state.status, 'ready')
+  assert.notEqual(f.state.snapshots[f.state.activeBuffer ?? 0], previous)
+  assert.equal(f.registered.size, 1)
+  assert.equal(f.coverage, coverage)
+})
+
 test('a failed staging source cannot publish even when loaded; retry reuses geometry', (context) => {
   const f = fixture()
   context.after(() => f.controller.dispose())

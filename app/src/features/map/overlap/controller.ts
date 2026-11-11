@@ -82,6 +82,7 @@ export const createOverlapController = (options: {
   let deadline: ReturnType<typeof setTimeout> | undefined
   let disposed = false
   let failedSource = false
+  let forceReplacement = false
 
   const report = () => diagnostics?.reports.findLast((entry) => entry.requestId === request?.id)
   const update = (values: Parameters<NonNullable<typeof diagnostics>['update']>[1]) => {
@@ -174,7 +175,7 @@ export const createOverlapController = (options: {
     // A prefix at a new detail level can replace previously striped areas with
     // solid fallback. Keep the old snapshot until the whole replacement succeeds;
     // a failed prefix stays cached for Retry without degrading the current view.
-    if (changesDetail() && request.phase !== 'complete') return
+    if ((changesDetail() || forceReplacement) && request.phase !== 'complete') return
     if (
       request.phase === 'computing' &&
       [...results.values()].every((tile) => !tile.features && !tile.fallback)
@@ -226,6 +227,7 @@ export const createOverlapController = (options: {
     if (!resources.isReady(staging.snapshot, staging.buffer)) return
     const previous = active
     active = staging
+    forceReplacement = false
     failedSource = false
     staging = null
     const finished = request.phase === 'complete' && active.version === request.version
@@ -244,6 +246,7 @@ export const createOverlapController = (options: {
     if (active.version !== request.version) batch = setTimeout(stage, 32)
   }
   const reset = () => {
+    forceReplacement = false
     failedSource = false
     supersede()
     worker.cancel()
@@ -284,7 +287,7 @@ export const createOverlapController = (options: {
       // Reversing a zoom can return to the still-visible snapshot before its
       // replacement finishes. Reuse those native tiles instead of fetching them again.
       let vertices = [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0)
-      for (const [key, tile] of active?.tiles ?? []) {
+      for (const [key, tile] of (forceReplacement ? [] : active?.tiles) ?? []) {
         if (
           !desired.has(key) ||
           tile.fallback ||
@@ -432,7 +435,17 @@ export const createOverlapController = (options: {
     retry() {
       previousKey = ''
     },
-    recompute: reset,
+    recompute() {
+      supersede()
+      worker.cancel()
+      request = null
+      previousKey = ''
+      results.clear()
+      // Force fresh worker output while the displayed revision stays coherent.
+      // Unlike a selection reset, recomputation must not expose blank/fallback frames.
+      forceReplacement = active !== null
+      emit()
+    },
     dispose() {
       reset()
       disposed = true
