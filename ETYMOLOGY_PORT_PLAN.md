@@ -4,8 +4,8 @@ Last updated: 2026-11-11.
 
 This is the execution checklist for bringing Word Trails from `feature/etymology`
 into the current atlas. Port the work in reviewable commits on `port/etymology`,
-created from the reviewed `main` revision. ETY-00 through ETY-02 are complete;
-explorer UI and app-shell integration in ETY-03 are next.
+created from the reviewed `main` revision. ETY-00 through ETY-03 are complete;
+map overlay and atlas cross-navigation in ETY-04 are next.
 
 Update an item's status, implementation notes, and validation evidence as work
 proceeds. Complete an item only when its acceptance checks pass. Record skipped
@@ -79,7 +79,7 @@ etymological inference are outside this port.
 | ETY-00 | Port branch and baseline | — | Complete; browser failure recorded |
 | ETY-01 | Source contract, adapter, and domain logic | ETY-00 | Complete |
 | ETY-02 | Session state and navigation | ETY-01 | Complete |
-| ETY-03 | Explorer UI and app shell | ETY-02 | Not started |
+| ETY-03 | Explorer UI and app shell | ETY-02 | Complete |
 | ETY-04 | Map overlay and atlas bridge | ETY-03 | Not started |
 | ETY-05 | Data delivery and performance | ETY-01; final checks need ETY-04 | Not started |
 | ETY-06 | Regression checks and documentation | ETY-04, ETY-05 | Not started |
@@ -361,17 +361,17 @@ Source candidates are `EtymologyExplorer`, `WordHistoryGraph`, `WordDetails`,
 `FamilyComparison`, and feature styles. Split discovery, controls, and orchestration
 into smaller components where that makes state ownership easier to understand.
 
-- [ ] Preserve current `App.tsx` structure, `MapProvider`, and geography behavior.
+- [x] Preserve current `App.tsx` structure, `MapProvider`, and geography behavior.
   Add workspace navigation and lazy loading for lexical code/data.
-- [ ] Keep session state above workspace mounting/unmounting. Preserve the existing
+- [x] Keep session state above workspace mounting/unmounting. Preserve the existing
   map instance and resize it appropriately when it becomes visible.
-- [ ] Place boundaries so either workspace can recover independently. Retain useful
+- [x] Place boundaries so either workspace can recover independently. Retain useful
   error details and retry behavior; keep developer setup instructions in docs.
-- [ ] Port search, keyboard interaction, examples, graph controls, word/edge selection,
+- [x] Port search, keyboard interaction, examples, graph controls, word/edge selection,
   evidence, concept/collection selection, family filtering, and missing-entry states.
-- [ ] Keep source evidence, reconstruction, placeholders, and omitted connections
+- [x] Keep source evidence, reconstruction, placeholders, and omitted connections
   explicit. Do not reinterpret unspecified links as confirmed inheritance/borrowing.
-- [ ] Scope styles and adapt to the current shell and sidebar rather than replacing
+- [x] Scope styles and adapt to the current shell and sidebar rather than replacing
   main's global CSS. Check keyboard focus and narrow-screen scrolling.
 
 Acceptance: browser checks cover search and tracing, edge evidence, comparison
@@ -379,6 +379,92 @@ changes, graph expansion, keyboard operation, loading/error/retry, and desktop/n
 layouts. Switching away and back preserves selected evidence, trail settings,
 expansions, concept, collection, and filters. Test lexical use without atlas data
 and geographic use when lexical loading fails.
+
+#### ETY-03 execution record — 2026-11-11
+
+Implemented on `port/etymology`, based on `15b26f6`. Presentation was adapted from
+`58a6c1a` rather than importing its app shell or map implementation.
+
+- `App.tsx` connects URL navigation once before either workspace mounts. Both
+  workspaces load code lazily; a direct lexical link makes no atlas requests,
+  and starting in Geography makes no lexical data request. The existing
+  `MapProvider`, `WorldMap`, finder, inspection, and selection behavior remain.
+- `GeographyWorkspace` remains mounted after its first visit, hides while lexical
+  exploration is active, and resizes the same map on return. Browser checks
+  preserve the exact canvas, pinned map entries/colors, and camera.
+- `EtymologyExplorer` uses the shared store for root, evidence selection, trail
+  settings/expansion, comparison, search, and filters. `WordDiscovery` owns the
+  search presentation and keyboard interactions; graph camera and the About
+  disclosure remain local display state. No asynchronous default-word writes
+  or component-local comparison resets were copied from the prototype.
+- Search normalizes accents; `/`, Arrow Up/Down, Escape, Enter, and graph
+  Enter/Space are supported. Examples are explicit actions. Word and relationship
+  citations stay separate. Expansion increases graph membership, missing-entry
+  filters reveal absent records, and hidden placeholder-only entries are labeled.
+  Unknown IDs never silently become wine or another concept.
+- The lexical loader caches in-flight/successful requests, retries failures,
+  validates schema/adapter/provenance structures, field types and joins before
+  indexing, and publishes only ready data. Unmounted consumers ignore completion;
+  newer navigation is never overwritten. Runtime contract checks supplement
+  build-time validation; independent release checksums remain ETY-05. Requests
+  start in a committed effect with rejection handling attached immediately,
+  including when React abandons or replays a workspace render.
+- Dataset failures recover within the affected workspace. Atlas request failures
+  previously stayed cached forever; failed promises are now evicted and
+  `atlasDataAtom` supports refresh. Retrying atlas data preserves the lexical store.
+  Unexpected render errors have workspace boundaries; unrecoverable code-load
+  failures retain a full reload action.
+- Feature styles are nested under `.lexical-panel`; current global/map styling
+  was not replaced. Keyboard focus and scrolling were checked on desktop, a
+  500px native window, and exact 320/390px same-origin frames. Firefox headless
+  clamps the outer window to 500px, so reports record actual sizes.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| `npm run check`, `npm run typecheck` | Passed |
+| `npm test` | 247 passed, no skips; four new loader/validation tests include malformed payload variants, request sharing, and retry |
+| Strict standalone typecheck of new loader tests and snapshot tests | Passed |
+| `npm run test:etymology-snapshot` | Three passed, including runtime validation of the complete real bundle |
+| `npm run build` | Passed; existing large-chunk warning remains |
+| Production `tests/browser/etymology.py` | 16 checkpoints passed against real lexical/current atlas data; screenshots and request counts saved |
+| Existing production `tests/browser/catalog.py` | Passed, including working selection, source/period groups, comparisons, exact inspection, pinned coverage, and narrow sidebar checks |
+| Existing production `tests/browser/focus.py` | Passed, including pointer/keyboard previews, profile camera, pinned context, style recovery, and aggregate framing |
+| Python browser-script Ruff formatting/lint | Passed |
+| Data preservation | All 62,629 baseline geographic files and compiled lexical bundle retain their recorded hashes |
+
+The lexical browser suite uses a local HTTP proxy for failed/delayed/incompatible
+responses without editing installed assets or adding application test hooks.
+The catalog suite still reports the existing unsupported full Sino-Tibetan source
+comparison as informational coverage; this stage does not claim that case works.
+The full Python pipeline and remaining geographic browser suites were not rerun.
+The ETY-00 warm-republication failure remains unresolved and must still be addressed
+before closing the later geographic integration gates.
+
+Logs, data-preservation verification, and browser reports/screenshots are under
+ignored `app/test-results/etymology-03/`; existing regression reports are in
+`app/test-results/catalog/` and `app/test-results/sidebar-focus/`. The production
+JS now changes intentionally because the explorer is integrated; ETY-02's
+byte-identical production-JS criterion no longer applies.
+
+For manual review, run `npm run dev` in `app/`, select **Word histories**, and try
+wine/water/tooth, search, word/link evidence, expansion, and comparison controls.
+Switch to Geography and back with customized selections and filters; use native
+Back/Forward and refresh. Generated data from ETY-01 is already installed locally.
+Setup and reproduction commands are in
+[app/README.md](app/README.md#word-histories-port-preview):
+
+```sh
+cd app
+npm run test:etymology-snapshot
+npm run test:etymology-browser
+```
+
+Map overlay rendering, show-current-trail actions, and language cross-navigation
+are deliberately left to ETY-04. Artifact delivery/deployment and performance
+measurement remain ETY-05. No publication, deployment, push, or original-branch
+merge has occurred.
 
 ### ETY-04 — Integrate map overlays and cross-navigation
 
@@ -494,6 +580,7 @@ the following in each completed item or in the PR validation record:
 | ETY-00 | `35ee521a88dd80c1bf1f62d5901d1b56449cd09d` | `atlas-data-2026-11-10-metadata`; full hashes above | Lint/typecheck/206 tests/build/data verification passed; browser warm republication failed | See ETY-00 execution record and local `app/test-results/etymology-baseline/`; feature implementation not started |
 | ETY-01 | Based on `b34860f`; source `58a6c1a` | `diacl-2026-10-24`; source hashes in pin; output hash above; unchanged geography | 53 relevant Python tests, 221 frontend tests, three snapshot tests, lint/typechecks/build/reproducibility passed | See ETY-01 execution record and local `app/test-results/etymology-01/`; state/UI/map port pending |
 | ETY-02 | Based on `86aedf7`; source-state reference `58a6c1a` | Existing lexical and geographic pins unchanged; navigation checks use synthetic data | 243 frontend tests, three snapshot tests, 11 Firefox checkpoints, lint/typechecks/build passed | See ETY-02 execution record and local `app/test-results/etymology-02/`; app shell/UI/map integration pending |
+| ETY-03 | Based on `15b26f6`; presentation reference `58a6c1a` | Existing lexical/geographic pins and generated bytes unchanged | 247 frontend tests, three snapshot tests, 16 integrated Firefox checkpoints, existing catalog/focus suites, lint/typechecks/build passed | See ETY-03 execution record and local `app/test-results/etymology-03/`; map overlay/cross-navigation pending |
 
 ## Separate portability fix
 

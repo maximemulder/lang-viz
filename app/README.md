@@ -37,6 +37,56 @@ Semantic genealogy palettes are enabled by default. See the
 [color infrastructure](src/domain/COLORS.md) for programmatic custom colors,
 subtree anchors, comparison roots, categorical mode, and rendering behavior.
 
+## Word histories (port preview)
+
+Use the header's **Word histories** workspace to search recorded forms, meanings,
+or languages, trace a word, inspect separate word/relationship citations, and
+compare expressions for a concept. The lexical code and dataset load on the first
+visit; geographic data is not needed to use this workspace. Geography loads on its
+first visit and keeps the existing map and camera across workspace switches.
+
+The lexical bundle is generated explicitly. From the repository root:
+
+```sh
+python3 -m pipeline.etymology.sources restore --from-git .
+python3 -m pipeline.etymology.build
+```
+
+Alternatively, omit `--from-git .` to restore the checksum-pinned sources from their
+immutable URLs. See [source and compilation contracts](../pipeline/etymology/README.md).
+No source processing runs automatically during npm commands. Independent release
+restoration and deployment integration are still planned in ETY-05.
+
+Start `npm run dev` in `app/`, open **Word histories**, and choose **wine**, **water**,
+or **tooth**. `/` focuses search; Arrow Down moves into results, Enter traces a form,
+and Escape clears search and scope. Graph nodes and links accept Enter/Space.
+Selected entries expose **Expand connections**, keeping the 60-form display limit.
+**Family comparison** offers collection, concept, family, and missing-entry controls.
+Reconstruction, placeholders, missing evidence, and unspecified relationships remain
+explicit. A shared concept does not establish cognacy.
+
+For review, customize trail controls, select a link, switch to Geography and back,
+then customize comparison filters and repeat. These settings and selected evidence
+persist in the session. Graph pan/zoom and the About disclosure are local display
+state. Try Back/Forward, refresh, and a direct link such as
+`/#workspace=etymology&word=69562&view=history`. A Geography link with a word remains
+in Geography on refresh. Malformed links and unknown IDs show diagnostics.
+Only workspace, word, view, concept, and collection are encoded in the URL; other
+settings reset on reload. Dataset failures show the actual error and a retry in
+the affected workspace, while header navigation remains available.
+
+```sh
+npm test
+npm run test:etymology-snapshot
+npm run test:etymology-browser
+```
+
+The last two commands require the generated lexical bundle; the browser suite also
+uses the existing atlas data and installed Firefox/geckodriver. It runs the
+production app with controlled HTTP failures/delays and writes reports/screenshots
+under `test-results/etymology-03/browser/`. See [browser checks](tests/browser/README.md).
+Map overlays and atlas/lexical cross-navigation are the next port stage (ETY-04).
+
 ## Language controls
 
 The sidebar has Explore and On map views, with a persistent, collapsible details

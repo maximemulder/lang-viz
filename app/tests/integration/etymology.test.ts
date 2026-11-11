@@ -9,6 +9,7 @@ import {
   matchAtlasLanguage,
   searchLexemes,
 } from '../../src/domain/etymology.ts'
+import { validateEtymologyData } from '../../src/domain/etymologyValidation.ts'
 import { trailLineFeatures, trailLocations } from '../../src/domain/wordTrailGeography.ts'
 
 // Deliberately fail when data is absent: this command is an explicit snapshot gate.
@@ -19,6 +20,7 @@ const repository = { data, index: indexEtymology(data) }
 const options = { depth: 4, branches: false, placeholders: false, expanded: new Set<string>() }
 
 test('reviewed snapshot retains its schema, source hashes, and recorded counts', () => {
+  validateEtymologyData(data)
   assert.equal(data.schemaVersion, 1)
   assert.equal(data.provenance.adapterVersion, 1)
   assert.equal(data.provenance.snapshot, 'diacl-2026-10-24')

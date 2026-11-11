@@ -1,5 +1,5 @@
 import { atom } from 'jotai'
-import { selectAtom, unwrap } from 'jotai/utils'
+import { atomWithRefresh, selectAtom, unwrap } from 'jotai/utils'
 import { loadAtlasData } from '../data/atlasRepository'
 import {
   type AreaMode,
@@ -37,7 +37,7 @@ import {
 import { type GroupColoring, groupMapEntries, type MapGroup, mapGroupId } from '../domain/mapGroups'
 import { selectGlobalColorProfile } from '../domain/preparedColors'
 
-export const atlasDataAtom = atom(async () => loadAtlasData())
+export const atlasDataAtom = atomWithRefresh(async () => loadAtlasData())
 
 export const languageQueryAtom = atom('')
 export const geographyDatasetFilterAtom = atom<GeographyDatasetSelection>(['asher2007world'])

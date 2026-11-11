@@ -17,42 +17,47 @@ const fetchJson = async <T>(fileName: string): Promise<T> => {
 let atlasDataPromise: Promise<AtlasData> | undefined
 
 export const loadAtlasData = (): Promise<AtlasData> => {
-  atlasDataPromise ??= fetchJson<AtlasManifest>('manifest.json').then(async (manifest) => {
-    if (!manifest.datasetMetadata)
-      throw new Error('Dataset metadata is missing. Rebuild atlas data with precompute:colors.')
-    const [languages, variants, metadata] = await Promise.all([
-      fetchJson<readonly Language[]>('languages.json'),
-      fetchJson<readonly GeometryVariant[]>(manifest.geometryIndex ?? 'geometry-variants.json'),
-      fetchJson<DatasetMetadata>(manifest.datasetMetadata),
-    ])
-    if (manifest.schemaVersion !== 5) {
-      throw new Error(`Unsupported atlas schema version: ${manifest.schemaVersion}`)
-    }
-    if (languages.length !== manifest.languoidCount) {
-      throw new Error('Languoid catalog does not match its manifest')
-    }
-    if (variants.length !== manifest.geometryVariantCount) {
-      throw new Error('Geometry catalog does not match its manifest')
-    }
+  atlasDataPromise ??= fetchJson<AtlasManifest>('manifest.json')
+    .then(async (manifest) => {
+      if (!manifest.datasetMetadata)
+        throw new Error('Dataset metadata is missing. Rebuild atlas data with precompute:colors.')
+      const [languages, variants, metadata] = await Promise.all([
+        fetchJson<readonly Language[]>('languages.json'),
+        fetchJson<readonly GeometryVariant[]>(manifest.geometryIndex ?? 'geometry-variants.json'),
+        fetchJson<DatasetMetadata>(manifest.datasetMetadata),
+      ])
+      if (manifest.schemaVersion !== 5) {
+        throw new Error(`Unsupported atlas schema version: ${manifest.schemaVersion}`)
+      }
+      if (languages.length !== manifest.languoidCount) {
+        throw new Error('Languoid catalog does not match its manifest')
+      }
+      if (variants.length !== manifest.geometryVariantCount) {
+        throw new Error('Geometry catalog does not match its manifest')
+      }
 
-    const { datasets, palettes } = await decodeDatasetMetadata(
-      metadata,
-      languages,
-      variants,
-      manifest,
-    )
-    return {
-      manifest,
-      languages,
-      variants,
-      datasets,
-      palettes,
-      languageById: new Map(languages.map((language) => [language.id, language])),
-      variantById: new Map(variants.map((variant) => [variant.id, variant])),
-      languageSearchIndex: buildLanguageSearchIndex(languages),
-    }
-  })
-
+      const { datasets, palettes } = await decodeDatasetMetadata(
+        metadata,
+        languages,
+        variants,
+        manifest,
+      )
+      return {
+        manifest,
+        languages,
+        variants,
+        datasets,
+        palettes,
+        languageById: new Map(languages.map((language) => [language.id, language])),
+        variantById: new Map(variants.map((variant) => [variant.id, variant])),
+        languageSearchIndex: buildLanguageSearchIndex(languages),
+      }
+    })
+    .catch((error: unknown) => {
+      // A failed request may be retried without reloading the other workspace.
+      atlasDataPromise = undefined
+      throw error
+    })
   return atlasDataPromise
 }
 

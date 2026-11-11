@@ -108,5 +108,14 @@ For manual review, run `npm run dev` and open
 page has Wine/Water and workspace buttons plus a session readout. Edit fragments,
 use Back/Forward, and refresh Geography. A link with `concept=1001&collection=1`
 must retain that comparison rather than defaulting to the focused wine concept.
-This fixture is not part of the production app. Full UI, loading/error boundaries,
-and real-data graph/map browser acceptance remain ETY-03/ETY-04 work.
+This fixture is not part of the production app. ETY-03 now connects the same
+adapter once in `App.tsx`, before mounting either workspace. The lexical loader
+validates the compiled browser contract, caches successful/in-flight requests,
+and publishes only ready data. Unmounted consumers ignore completion; remounts
+reuse the request. It never writes session defaults from asynchronous callbacks.
+Geography remains mounted after its first visit and is resized on return. Data
+failures retry independently; a rejected atlas request is evicted and its async
+atom can refresh without resetting the exploration store.
+
+For real-data UI acceptance use `npm run test:etymology-browser`. Map overlays and
+cross-navigation remain ETY-04 work. See [frontend review instructions](../../README.md#word-histories-port-preview).

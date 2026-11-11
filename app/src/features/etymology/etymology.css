@@ -1,0 +1,399 @@
+.lexical-panel {
+  .etymology-workspace {
+    min-height: 0;
+    overflow: auto;
+    padding: 1.15rem;
+    border: 1px solid rgb(29 43 39 / 12%);
+    border-radius: 1rem;
+    background: var(--paper);
+  }
+  .etymology-workspace button,
+  .word-loading button {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid #bec8c0;
+    border-radius: 0.4rem;
+    color: var(--ink);
+    background: #fffdf5;
+    font-size: 0.78rem;
+  }
+  .etymology-workspace button:hover,
+  .word-loading button:hover {
+    border-color: var(--accent);
+    background: #f6e9de;
+  }
+  .etymology-workspace button:focus-visible,
+  .etymology-workspace :is(input, select, summary):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .etymology-workspace button[aria-pressed="true"] {
+    color: #fffdf5;
+    background: #315c4b;
+    border-color: #315c4b;
+  }
+  .word-explorer-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 1rem;
+  }
+  .word-explorer-heading h2 {
+    font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+    line-height: 1.1;
+  }
+  .word-explorer-heading p:not(.eyebrow) {
+    margin: 0.5rem 0 0;
+    color: var(--muted-ink);
+    font-size: 0.85rem;
+  }
+  .word-explorer-heading > button {
+    flex-shrink: 0;
+  }
+  .word-about,
+  .word-notice {
+    border-left: 3px solid var(--accent);
+    padding: 0.5rem 0.8rem;
+    background: #edece2;
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+  .word-about a {
+    color: #315c4b;
+  }
+  .word-discovery {
+    display: flex;
+    align-items: end;
+    gap: 0.8rem;
+    margin: 1.2rem 0;
+    flex-wrap: wrap;
+  }
+  .word-discovery .search-field {
+    flex: 1 1 16rem;
+    margin: 0;
+  }
+  .word-language-scope,
+  .word-concept-controls label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    color: var(--muted-ink);
+  }
+  .word-discovery select,
+  .word-toolbar select,
+  .word-controls select {
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.4rem;
+    border: 1px solid #bec8c0;
+    border-radius: 0.35rem;
+    background: #fffdf5;
+    color: var(--ink);
+    font-size: 0.78rem;
+  }
+  .word-language-scope {
+    max-width: 15rem;
+  }
+  .word-examples {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+  }
+  .word-search-results {
+    max-height: 20rem;
+    overflow: auto;
+    padding: 0.6rem;
+    margin-bottom: 1rem;
+    background: #e9eee6;
+    border-radius: 0.6rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 0.4rem;
+  }
+  .word-search-results > p {
+    grid-column: 1 / -1;
+    margin: 0 0 0.3rem;
+    font-size: 0.8rem;
+  }
+  .word-search-results button {
+    text-align: left;
+  }
+  .word-search-results small {
+    display: block;
+    margin-top: 0.3rem;
+  }
+  .word-toolbar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .word-concept-controls {
+    display: flex;
+    gap: 0.5rem;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .word-concept-controls label {
+    min-width: 0;
+    max-width: 19rem;
+  }
+  .word-workspace-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 21rem);
+    gap: 1rem;
+    align-items: start;
+  }
+  .word-visual-panel,
+  .word-details {
+    border: 1px solid #d2d8cb;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #fffdf6;
+    min-width: 0;
+  }
+  .word-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.65rem 0.9rem;
+    border-bottom: 1px solid #d2d8cb;
+    font-size: 0.75rem;
+  }
+  .word-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .word-controls input {
+    accent-color: #315c4b;
+  }
+  .word-graph {
+    position: relative;
+    height: clamp(24rem, 53vh, 38rem);
+    background: radial-gradient(#d9ded1 0.7px, transparent 0.7px) 0 0 / 18px 18px;
+  }
+  .word-graph svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: grab;
+  }
+  .word-graph-tools {
+    position: absolute;
+    bottom: 2.3rem;
+    right: 0.7rem;
+    display: flex;
+    gap: 0.25rem;
+  }
+  .word-graph-direction {
+    position: absolute;
+    bottom: 0.5rem;
+    left: 0.8rem;
+    margin: 0;
+    font-size: 0.63rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted-ink);
+    pointer-events: none;
+  }
+  .word-node {
+    cursor: pointer;
+    outline: none;
+  }
+  .word-node rect {
+    fill: #fffdf6;
+    stroke: #c0cbbb;
+    stroke-width: 1.5;
+  }
+  .word-node.is-root rect {
+    fill: #eaf1e6;
+  }
+  .word-node.is-placeholder rect {
+    stroke-dasharray: 5 4;
+  }
+  .word-node.is-selected rect,
+  .word-node:focus-visible rect {
+    stroke: var(--accent);
+    stroke-width: 3;
+  }
+  .word-node__form {
+    font-family: "Newsreader", serif;
+    font-size: 22px;
+    fill: var(--ink);
+  }
+  .word-node__language {
+    font-size: 11px;
+    fill: var(--muted-ink);
+  }
+  .word-edge-hit {
+    stroke: transparent;
+    stroke-width: 18;
+    fill: none;
+    cursor: pointer;
+  }
+  .word-edge-hit:hover,
+  .word-edge-hit:focus-visible {
+    stroke: rgb(203 93 62 / 15%);
+    outline: none;
+  }
+  .word-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1rem;
+    padding: 0.8rem 1rem;
+    border-top: 1px solid #d2d8cb;
+    font-size: 0.65rem;
+  }
+  .word-legend span {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .word-legend i {
+    width: 1.2rem;
+    height: 3px;
+  }
+  .word-note {
+    margin: 0;
+    padding: 0.7rem 1rem;
+    background: #f0f1e7;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: var(--muted-ink);
+  }
+  .word-details {
+    padding: 1rem;
+    max-height: 70vh;
+    overflow: auto;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .word-details h2 {
+    margin-top: 0.7rem;
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+  .word-details h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+  }
+  .word-details p {
+    margin: 0.5rem 0;
+  }
+  .word-badge {
+    display: inline-block;
+    border: 1px solid #d2d8cb;
+    border-radius: 0.3rem;
+    padding: 0.1rem 0.35rem;
+    margin: 0 0.25rem 0.3rem 0;
+    font-size: 0.65rem;
+  }
+  .word-detail-actions {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.7rem;
+  }
+  .word-detail-actions button:first-child {
+    background: #315c4b;
+    color: #fffdf5;
+  }
+  .word-detail-block {
+    border-top: 1px solid #d2d8cb;
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+  .word-details .word-link {
+    display: block;
+    width: 100%;
+    text-align: left;
+    margin: 0.35rem 0;
+  }
+  .word-link small {
+    display: block;
+  }
+  .word-sources {
+    padding-left: 1.2rem;
+  }
+  .word-sources li {
+    margin: 0.7rem 0;
+    font-size: 0.72rem;
+  }
+  .word-table-scroll {
+    max-height: 55vh;
+    overflow: auto;
+  }
+  .word-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+  }
+  .word-table th {
+    position: sticky;
+    top: 0;
+    background: #e9eee6;
+    text-align: left;
+    z-index: 1;
+  }
+  .word-table th,
+  .word-table td {
+    padding: 0.7rem;
+    border-bottom: 1px solid #d2d8cb;
+    vertical-align: top;
+  }
+  .word-table small {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.68rem;
+  }
+  .word-table button {
+    margin: 0 0.25rem 0.25rem 0;
+  }
+  .word-loading {
+    min-height: 0;
+    padding: 2rem;
+    border-radius: 1rem;
+    background: var(--paper);
+  }
+  @media (max-width: 1000px) {
+    .word-workspace-grid {
+      grid-template-columns: minmax(0, 1fr) 17rem;
+    }
+    .word-concept-controls label {
+      max-width: 14rem;
+    }
+  }
+  @media (max-width: 800px) {
+    .etymology-workspace {
+      padding: 0.8rem;
+    }
+    .word-workspace-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .word-details {
+      max-height: none;
+    }
+    .word-explorer-heading {
+      flex-wrap: wrap;
+    }
+    .word-concept-controls {
+      width: 100%;
+    }
+    .word-concept-controls label {
+      flex: 1;
+      max-width: 50%;
+    }
+    .word-language-scope {
+      flex: 1;
+      max-width: 100%;
+    }
+    .word-graph {
+      height: 26rem;
+    }
+  }
+}

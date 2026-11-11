@@ -1925,3 +1925,57 @@ h2 {
   gap: 0.4rem;
   align-items: center;
 }
+
+.workspace-host,
+.workspace-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.workspace-panel[hidden] {
+  display: none;
+}
+.workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.workspace-nav button {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #bec8c0;
+  border-radius: 0.4rem;
+  color: var(--ink);
+  background: #fffdf5;
+  font-size: 0.78rem;
+}
+.workspace-nav button[aria-pressed="true"] {
+  color: #fffdf5;
+  background: #315c4b;
+}
+.workspace-nav button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.workspace-error,
+.workspace-loading {
+  padding: 1.25rem;
+  overflow: auto;
+}
+.lexical-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1000px) {
+  .app-header .app-summary {
+    display: none;
+  }
+}
+@media (max-width: 500px) {
+  .app-header {
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .app-header h1 {
+    font-size: 1.6rem;
+  }
+}

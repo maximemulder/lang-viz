@@ -1,51 +1,97 @@
-import { Component, type ReactNode, Suspense } from 'react'
+import { useAtomValue, useSetAtom, useStore } from 'jotai'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { MapProvider } from 'react-map-gl/maplibre'
-import { LanguageFinder, LanguageFinderFallback } from './features/languages/LanguageFinder.tsx'
-import { WorldMap } from './features/map/WorldMap.tsx'
+import { WorkspaceBoundary } from './components/WorkspaceBoundary.tsx'
+import { connectExplorerNavigation } from './state/explorerNavigation.ts'
+import { explorerActionAtom, explorerSessionAtom } from './state/explorerState.ts'
 
-class AtlasDataBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state: { error: Error | null } = { error: null }
+const GeographyWorkspace = lazy(() => import('./features/map/GeographyWorkspace.tsx'))
+const EtymologyExplorer = lazy(() => import('./features/etymology/EtymologyExplorer.tsx'))
 
-  static getDerivedStateFromError(error: Error) {
-    return { error }
-  }
-
-  render() {
-    return this.state.error ? (
-      <div role="alert">
-        <h2>Unable to load atlas data</h2>
-        <p>{this.state.error.message}</p>
-        <button type="button" onClick={() => window.location.reload()}>
-          Reload
-        </button>
+export const App = () => {
+  const store = useStore()
+  const session = useAtomValue(explorerSessionAtom)
+  const dispatch = useSetAtom(explorerActionAtom)
+  const [connected, setConnected] = useState(false)
+  const [lexicalAttempt, setLexicalAttempt] = useState(0)
+  const [geographyVisited, setGeographyVisited] = useState(false)
+  useEffect(() => {
+    const disconnect = connectExplorerNavigation(store, window)
+    setConnected(true)
+    return disconnect
+  }, [store])
+  useEffect(() => {
+    if (connected && session.workspace === 'geography') setGeographyVisited(true)
+  }, [connected, session.workspace])
+  const geography = session.workspace === 'geography'
+  return (
+    <MapProvider>
+      <div className="app-shell">
+        <header className="app-header">
+          <div>
+            <p className="eyebrow">Interactive atlas</p>
+            <h1>Languages of the world</h1>
+          </div>
+          <nav className="workspace-nav" aria-label="Workspace">
+            <button
+              type="button"
+              aria-pressed={geography}
+              onClick={() => dispatch({ type: 'workspace', workspace: 'geography' })}
+            >
+              Geography
+            </button>
+            <button
+              type="button"
+              aria-pressed={!geography}
+              onClick={() => dispatch({ type: 'workspace', workspace: 'etymology' })}
+            >
+              Word histories
+            </button>
+          </nav>
+          <p className="app-summary">Explore where languages are spoken and how they relate.</p>
+        </header>
+        <main className="workspace-host">
+          {connected ? (
+            <>
+              {(geographyVisited || geography) && (
+                <div className="workspace-panel atlas-workspace" hidden={!geography}>
+                  <WorkspaceBoundary name="the geography workspace">
+                    <Suspense
+                      fallback={
+                        <p className="workspace-loading" role="status">
+                          Loading geography…
+                        </p>
+                      }
+                    >
+                      <GeographyWorkspace visible={geography} />
+                    </Suspense>
+                  </WorkspaceBoundary>
+                </div>
+              )}
+              {!geography && (
+                <div className="workspace-panel lexical-panel">
+                  <WorkspaceBoundary
+                    name="word histories"
+                    onRetry={() => setLexicalAttempt((value) => value + 1)}
+                  >
+                    <Suspense
+                      fallback={
+                        <p className="workspace-loading" role="status">
+                          Loading word histories…
+                        </p>
+                      }
+                    >
+                      <EtymologyExplorer key={lexicalAttempt} />
+                    </Suspense>
+                  </WorkspaceBoundary>
+                </div>
+              )}
+            </>
+          ) : (
+            <p role="status">Opening workspace…</p>
+          )}
+        </main>
       </div>
-    ) : (
-      this.props.children
-    )
-  }
+    </MapProvider>
+  )
 }
-
-export const App = () => (
-  <MapProvider>
-    <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">Interactive atlas</p>
-          <h1>Languages of the world</h1>
-        </div>
-        <p className="app-summary">Explore where languages are spoken and how they relate.</p>
-      </header>
-
-      <main className="atlas-workspace">
-        <AtlasDataBoundary>
-          <section className="map-shell" aria-label="Language map">
-            <WorldMap />
-          </section>
-          <Suspense fallback={<LanguageFinderFallback />}>
-            <LanguageFinder />
-          </Suspense>
-        </AtlasDataBoundary>
-      </main>
-    </div>
-  </MapProvider>
-)

@@ -11,6 +11,7 @@ npm run test:catalog-browser
 npm run test:selection-browser
 npm run test:focus-browser
 npm run test:explorer-navigation-browser
+npm run test:etymology-browser
 
 npm run test:colors-browser
 npm run test:source-browser
@@ -36,7 +37,21 @@ It checks persistent exploration settings, live hash changes, native Back/Forwar
 refresh, explicit comparison URLs, shared graph/overlay state, and invalid IDs.
 Reports/screenshots go to `test-results/explorer-navigation/` (override with
 `--output`). See [session and URL contracts](../../src/state/EXPLORER_SESSION.md)
-for manual fixture instructions and the remaining app integration work.
+for manual fixture instructions and the state contract.
+
+`test:etymology-browser` builds and checks the **production application** using
+real lexical and atlas data. Generate lexical data with the commands in
+[frontend setup](../../README.md#word-histories-port-preview). A test-only HTTP proxy
+injects delayed, failed, and incompatible dataset responses without changing the
+installed data or adding application test hooks. Checks cover lazy independent
+loading, word/edge evidence, expansion, comparison controls, session round trips,
+map/camera/selection retention, native keyboard navigation, Back/Forward, refresh,
+malformed/unknown links, retry, and narrow layouts. Same-origin frames exercise
+320/390px viewports because headless Firefox clamps the outer window to 500px.
+Reports/screenshots are saved to `test-results/etymology-03/browser/`.
+To reuse an existing build, run `python3 tests/browser/etymology.py`; use `--output`
+to change the artifact directory. This does not close ETY-04 map-overlay acceptance
+or the previously recorded geographic warm-republication failure.
 
 `test:inspection-browser` checks real pointer hover, shared contributors, empty
 space, pin/close, canvas exit, selection clearing, aggregate source outlines, style
