@@ -68,8 +68,9 @@ One script per dataset:
   `app/public/wals/features.json` with source records, seven feature definitions,
   categories, observations, references, examples, provenance and source caveats.
   Full source recovery and explicit snapshot checks are separate from ordinary
-  tests. Atlas matching, frontend consumption and release delivery are later
-  stages; see the [schema and commands](pipeline/wals/README.md).
+  tests. The frontend repository and catalog/session contracts are implemented;
+  release delivery and mounted UI remain later stages. See the
+  [schema and commands](pipeline/wals/README.md).
 - **Grambank:** a separate CLDF adapter remains future work.
 - **DiACL:** CLDF + raw XML / JSON → `forms`, `word_links`, date ranges. The word-history links exist only in the raw files.
 - **Glottography:** `pyglottography` for merged polygons at the three levels → `geometries`.
@@ -80,6 +81,19 @@ One script per dataset:
 Tools: `pycldf` (reading CLDF; `cldf createdb` for SQLite if useful), `pyglottography`, `mapshaper`.
 
 ### 3.3 Exports for the browser
+
+WALS uses a separate, lazy `data/walsRepository.ts` with runtime validation and
+source/feature/category/identifier indexes. `integrations/wals/` resolves declared
+classification Glottocodes or conservative unique ISO associations against the
+complete loaded atlas catalog. Broader family/group scope stays explicit; source
+observations are never inherited. WALS source IDs, per-profile variety/feature
+choices and the optional overlay specification belong to `features/wals/`, above
+component lifetimes. Loading cannot write navigation. Explicit show/focus actions
+share the map camera intent with atlas and lexical navigation; inspection opens
+associated profiles without moving the map and retains unmatched source evidence
+separately. These contracts are fixture-tested but have no mounted UI or map
+consumer yet. See [WALS frontend contracts](app/src/features/wals/README.md) and the
+[association review](app/src/integrations/wals/ASSOCIATION_REVIEW.md).
 
 Word histories use an independent lexical schema and release pin
 (`etymology-release.json`). The geographic catalog IDs and lexical numeric IDs

@@ -23,10 +23,11 @@ See [frontend interactions and checks](app/README.md#word-histories) and
 [lexical source and release contracts](pipeline/etymology/README.md).
 The offline build below is for changing geographic data.
 
-The WALS port currently provides a reproducible offline data adapter; its profile
-and map UI are not integrated yet. See [WALS source/build commands](pipeline/wals/README.md)
-and the [port roadmap](WALS_PORT_PLAN.md). It uses an independent pinned snapshot
-and does not rebuild geographic or lexical data.
+The WALS port provides a reproducible offline adapter, a validated lazy repository,
+conservative catalog associations and source-aware session/navigation contracts.
+Its profile and map UI are not integrated yet. See [source/build commands](pipeline/wals/README.md),
+[frontend contracts](app/src/features/wals/README.md) and the [port roadmap](WALS_PORT_PLAN.md).
+It uses an independent pinned snapshot and does not rebuild geographic or lexical data.
 
 ## Build the proof of concept
 

@@ -7,8 +7,8 @@ independently reviewable changes. Do not merge or cherry-pick the original
 data-heavy commit wholesale. Fix the data, identity, navigation, and delivery
 issues as their corresponding pieces are introduced.
 
-This document is the execution checklist. WALS-00 and WALS-01 are complete;
-frontend WALS integration has not started.
+This document is the execution checklist. WALS-00 through WALS-02 are complete;
+WALS frontend data/navigation contracts are implemented without mounted UI.
 Update each item's status, implementation decisions, and validation evidence as
 work proceeds. Mark an item complete only when its acceptance checks pass.
 Record skipped checks and pre-existing failures separately from regressions.
@@ -114,7 +114,7 @@ Initial review evidence:
 | --- | --- | --- | --- |
 | WALS-00 | Baseline and port setup | — | Complete |
 | WALS-01 | Reproducible sources and validated supplement | WALS-00 | Complete |
-| WALS-02 | Repository, matching, and session/navigation model | WALS-01 | Planned |
+| WALS-02 | Repository, matching, and session/navigation model | WALS-01 | Complete |
 | WALS-03 | Independent release delivery and CI | WALS-01; join checks need WALS-02 | Planned |
 | WALS-04 | Language profile cards | WALS-02, WALS-03 | Planned |
 | WALS-05 | Shared-feature selection and map design | WALS-04 | Planned |
@@ -181,24 +181,24 @@ Candidate material: `app/src/domain/wals.ts` and the matching logic in the branc
 builder. Suggested owners are `data/walsRepository.ts`, `domain/wals.ts`,
 `features/wals/state.ts`, and `integrations/wals/`.
 
-- [ ] Create a lazy, retryable repository loader with runtime schema validation
+- [x] Create a lazy, retryable repository loader with runtime schema validation
   and reusable indexes by source ID, feature/category, and identifiers. Share
   successful/in-flight work without letting loading callbacks change navigation.
-- [ ] Implement the association policy above in the atlas integration. Produce
+- [x] Implement the association policy above in the atlas integration. Produce
   diagnostics by match method, ambiguity, and catalog level. Explicitly review
   the old 37 family associations and ten ISO fallbacks; count changes need reasons,
   not forced agreement with the prototype.
-- [ ] Keep broad associations visibly scoped to the recorded variety. Do not
+- [x] Keep broad associations visibly scoped to the recorded variety. Do not
   automatically substitute a descendant catalog language for a family node.
-- [ ] Model actions for selecting a variety, inspecting a source observation,
+- [x] Model actions for selecting a variety, inspecting a source observation,
   showing/focusing examples, and clearing the overlay. Preserve per-profile
   choices above component lifetimes; keep WALS state separate from lexical state.
-- [ ] Specify inspection behavior for unmatched records: retain WALS evidence
+- [x] Specify inspection behavior for unmatched records: retain WALS evidence
   and show an explanation instead of opening an unrelated atlas profile.
-- [ ] Cover ambiguous IDs/ISO, unresolved explicit Glottocodes, source-defined
+- [x] Cover ambiguous IDs/ISO, unresolved explicit Glottocodes, source-defined
   atlas entries, broader scope, zero/missing coordinates, and multiple varieties.
   Include the Irish (Donegal), Kyuquot, and Eastern Aleut navigation regressions.
-- [ ] Test HTTP failure, invalid JSON/schema, retry, concurrent consumers, late
+- [x] Test HTTP failure, invalid JSON/schema, retry, concurrent consumers, late
   completion, and store isolation with fixtures, without full datasets.
 
 Acceptance: navigating to an observation preserves its exact source record and
@@ -539,6 +539,96 @@ atlas/lexical pins and application code are unchanged. The work is local and
 uncommitted; no release publication, main integration or deployment occurred.
 Independent release packaging/restoration remains WALS-03.
 
-WALS-00 and WALS-01 are complete. WALS-02 through WALS-07 remain planned. The next
-stage is the retryable frontend repository, conservative atlas matching and
-source-identity-aware session/navigation model.
+WALS-01 completed the source/adapter stage. WALS-02 follows below; independent
+release delivery remains WALS-03.
+
+
+## WALS-02 execution record
+
+Completed 2026-11-12 on `port/wals-identity`, based on the user's committed
+WALS-01 revision `c1b6f33`. The working tree was clean before this stage.
+The reviewed source branch remains
+`3b7078614efcfebc1c471fea2c4ab7fb336745a6`; no branch code was merged wholesale.
+
+Implemented:
+
+- `domain/wals.ts` and `walsValidation.ts` define and validate schema/adapter v1
+  before indexing source records, observations by feature/category and complete
+  source identifiers. Coordinates, citations, examples, category membership,
+  foreign keys and duplicate observations are checked at the browser boundary.
+- `data/walsRepository.ts` loads lazily from the production base path, shares
+  in-flight/successful work and retries HTTP, network, JSON, schema or synchronous
+  request failures. `features/wals/state.ts` publishes only data/loading status;
+  its completion cannot initialize or overwrite navigation. Errors and pending
+  publication remain scoped to each Jotai store.
+- `integrations/wals/languageMatching.ts` resolves classification metadata against
+  complete catalogs. Explicit unresolved Glottocodes never fall back to ISO.
+  Primary ISO requires an absent Glottocode and uniqueness on both complete sides.
+  Source-defined entries and broader family/group links have explicit scope;
+  observations remain on source varieties, with no descendant substitution.
+  Optional reviewed overrides require reasons and unchanged expected identifiers;
+  none are shipped.
+- `features/wals/session.ts` stores per-profile source/feature choices, standalone
+  inspection and one source/feature/visibility/max-example overlay specification.
+  `integrations/wals/state.ts` validates explicit actions, inspects associated
+  profiles without moving the map and retains unmatched/ambiguous evidence with
+  an explanation. Late catalog resolution cannot open a profile. Choices survive
+  profile closure, component remounts and workspace switches; stores stay isolated.
+- Show/focus models use shared camera-intent identity. Newer navigation/manual
+  motion, workspace changes, hide/clear and overlay replacement invalidate older
+  requests. Unhide, workspace return and data completion never replay focus.
+  Sampling, geometry and the actual map consumer remain WALS-05/WALS-06.
+
+The [association review](app/src/integrations/wals/ASSOCIATION_REVIEW.md) explicitly
+records all 37 prototype family associations and ten ISO fallbacks. All retain
+their targets and methods. The only target availability change is Albanian
+(`alb`): absent Glottocode, unique primary ISO `sqi`, associated with family node
+`alba1267` with broader scope. The prototype's language-only ISO lookup omitted
+that node. No identifier was edited and no variety merged to obtain these counts.
+
+| Association check | Current result |
+| --- | --- |
+| Source records | 2,662 |
+| Associated / unmatched / ambiguous | 2,656 / 6 / 0 |
+| Glottocode / unique ISO / overrides | 2,645 / 11 / 0 |
+| Catalog language / dialect / family | 2,572 / 46 / 38 |
+| Exact identifier scope / broader scope | 2,618 / 38 |
+| Changed prototype target availability | Albanian only |
+
+The six unmatched records have neither a Glottocode nor a primary ISO: Arrernte,
+Azerbaijani, Lesser Antillean French Creole, Mambila, Marquesan and Tasmanian.
+Their evidence is retained. Fixture tests exercise ambiguous and source-defined
+cases absent from this snapshot; matching the counts alone is insufficient.
+
+Validation in the WALS-00 Node/frontend environment:
+
+| Command/check from `app/` | Result |
+| --- | --- |
+| `node --test --test-isolation=none tests/wals-*.test.ts` | 23 fixture tests passed; no generated data/download prerequisite |
+| `node --test --test-isolation=none tests/integration/wals.test.ts` | 2 full-data checks passed; complete association report and real navigation regressions |
+| `npm test` | All 284 tests passed, including the 261 existing tests; subprocess access used as in WALS-00 |
+| `npm run check` | Passed; generated WALS directory excluded alongside other generated data |
+| `npm run build` | Passed, including TypeScript; existing chunk-size/plugin-timing warnings |
+
+Tests cover retry/concurrency, malformed payloads, late completion, store isolation,
+ambiguous source/target IDs and ISO codes, unresolved explicit Glottocodes,
+source-defined catalog entries, broader scope, zero/missing coordinates, per-profile
+choices and the Donegal / 12A, Kyuquot / 37A and Eastern Aleut / 12A regressions.
+The explicit full-data check also verifies these cases against actual source
+observations whose default associated varieties lack the requested value.
+
+Evidence is in ignored `app/test-results/wals-02/`: `unit.log`, `build.log` and
+`associations.json`. The latter records input SHA-256 fingerprints, every source
+association/reason and the prototype comparison. Local Node validation, indexing
+and matching timings are included as diagnostics; they are not browser performance
+acceptance. Browser UI checks were not rerun because no WALS controls, map effects
+or production imports were mounted and existing behavior was unchanged.
+
+[Frontend contracts](app/src/features/wals/README.md) document action behavior,
+unmatched evidence, catalog publication, loading ownership and the later camera
+consumer's cancellation obligation. Existing geographic/lexical pins, application
+entry points and URL schemas remain unchanged. The work is local and uncommitted;
+no release was published, no main integration or deployment occurred.
+
+WALS-00 through WALS-02 are complete. WALS-03 is next: independent release
+packaging, publication, restoration and deployment checks before profile UI.

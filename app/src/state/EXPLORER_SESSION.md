@@ -167,3 +167,11 @@ Language profiles/popups dispatch `language-words` with the represented catalog
 name/classification immediately. Lexical loading resolves that request against the
 latest session, including ambiguous/no-match fallbacks.
 See [frontend review instructions](../../README.md#word-histories-port-preview).
+
+WALS-02 adds a separate source-variety session in `features/wals/`, with ready-data
+navigation and catalog association owned by `integrations/wals/`. It adds no URL
+fields or shared lexical session fields. Explicit WALS show/focus actions use the
+same `mapCameraIntentAtom`; inspection/variety navigation cancels pending intent
+without moving the camera. WALS visibility/clear only cancels a request it still
+owns. Data completion and workspace return never issue WALS focus. No WALS UI or
+map consumer is mounted yet. See [WALS contracts](../features/wals/README.md).

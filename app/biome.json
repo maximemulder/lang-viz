@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!public/data", "!public/etymology"]
+    "includes": ["**", "!public/data", "!public/etymology", "!public/wals"]
   },
   "formatter": {
     "enabled": true,
