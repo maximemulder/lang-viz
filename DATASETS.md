@@ -181,8 +181,15 @@ The [adapter contract](pipeline/wals/README.md) describes immutable source hashe
 the seven-feature supplement, full-snapshot reconciliation, source notices and
 errata. All source varieties retain their own identity; no atlas matching or
 language-level aggregation occurs in this build. The complete upstream archive
-is retained outside Git under `data/wals/wals-v2020.6/`. Frontend integration and
-independent browser release delivery remain later port stages.
+is retained outside Git under `data/wals/wals-v2020.6/`. Independent browser and
+source archives are published and pinned by `wals-release.json`; deployment
+restores only the browser asset. Profile/map UI remains a later stage. Restore
+without compiling source data:
+
+```sh
+python3 -m pipeline.wals.data_release restore
+python3 -m pipeline.wals.data_release verify
+```
 
 For upstream exploration separately:
 

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { createStore } from 'jotai/vanilla'
 import type { Language } from '../../src/domain/atlas.ts'
 import { indexWals } from '../../src/domain/wals.ts'
@@ -17,7 +20,10 @@ import { languagePanelAtom } from '../../src/state/languageControls.ts'
 import { mapCameraIntentAtom } from '../../src/state/mapCameraIntent.ts'
 
 // Explicit, local full-data check. Not matched by npm test; never downloads or generates data.
-const bytes = readFileSync(new URL('../../public/wals/features.json', import.meta.url))
+const root = fileURLToPath(new URL('../../../', import.meta.url))
+const browserDirectory = resolve(process.env.WALS_BROWSER_DATA ?? join(root, 'app/public/wals'))
+const releasePin = resolve(process.env.WALS_RELEASE_PIN ?? join(root, 'wals-release.json'))
+const bytes = readFileSync(join(browserDirectory, 'features.json'))
 const catalogBytes = readFileSync(new URL('../../public/data/languages.json', import.meta.url))
 const data: unknown = JSON.parse(bytes.toString())
 const start = performance.now()
@@ -28,6 +34,65 @@ const indexed = performance.now()
 const catalog: Language[] = JSON.parse(catalogBytes.toString())
 const associations = associateWals(repository, catalog)
 const associated = performance.now()
+
+test('WALS release verifies independently and contains the reviewed seven-feature snapshot', () => {
+  const result = spawnSync(
+    'python3',
+    [
+      '-m',
+      'pipeline.wals.data_release',
+      'verify',
+      '--pin',
+      releasePin,
+      '--output',
+      browserDirectory,
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    },
+  )
+  assert.equal(result.status, 0, `${result.error ?? ''}\n${result.stdout}\n${result.stderr}`)
+  const expected = JSON.parse(
+    readFileSync(new URL('../../../pipeline/wals/snapshot.json', import.meta.url), 'utf8'),
+  )
+  const pin = JSON.parse(readFileSync(releasePin, 'utf8'))
+  const sourcePin = JSON.parse(readFileSync(join(root, 'pipeline/wals/sources.json'), 'utf8'))
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(browserDirectory, 'sources.json'), 'utf8')),
+    sourcePin,
+  )
+  assert.equal(data.provenance.snapshot, pin.snapshot)
+  assert.equal(data.provenance.commit, pin.sourceCommit)
+  assert.deepEqual(Object.keys(data.features).sort(), [
+    '12A',
+    '13A',
+    '30A',
+    '37A',
+    '81A',
+    '87A',
+    '92A',
+  ])
+  assert.deepEqual(data.diagnostics.counts, expected.counts)
+  assert.deepEqual(data.diagnostics.observationsByFeature, expected.observationsByFeature)
+  assert.deepEqual(
+    Object.fromEntries(
+      [...repository.index.byFeature].map(([id, observations]) => [id, observations.length]),
+    ),
+    expected.observationsByFeature,
+  )
+  for (const [table, count] of [
+    ['records', 'sourceRecords'],
+    ['features', 'exportedFeatures'],
+    ['categories', 'exportedCategories'],
+    ['observations', 'exportedObservations'],
+    ['references', 'exportedReferences'],
+    ['examples', 'exportedExamples'],
+  ] as const)
+    assert.equal(Object.keys(data[table]).length, expected.counts[count])
+  for (const record of Object.values(data.records))
+    assert.equal(Object.hasOwn(record, 'atlasId'), false)
+})
 
 /** Reproduce only the reviewed prototype policy, including its language-only ISO lookup. */
 const prototype = () => {

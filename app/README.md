@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-The dev server excludes generated `public/data/` and `public/etymology/` assets from file watching to
+The dev server excludes generated `public/data/`, `public/etymology/` and `public/wals/` assets from file watching to
 avoid exhausting OS watcher limits on precomputed coverage tiles. These files
 are still served normally. After regenerating data, restart the dev server and
 reload the browser to pick up the new assets.
@@ -63,7 +63,7 @@ python3 -m pipeline.etymology.build
 Alternatively, omit `--from-git .` to restore the checksum-pinned sources from their
 immutable URLs. See [source and compilation contracts](../pipeline/etymology/README.md).
 No source processing runs automatically during npm commands. Deployment restores
-the prebuilt lexical and geographic artifacts independently. The lexical response
+the prebuilt lexical, geographic and WALS artifacts independently. The lexical response
 is decoded, parsed, validated, and indexed in a short-lived worker; the prepared
 repository is reused in memory when returning to the workspace. See **About the
 data** for the lexical source and CC BY-NC-SA 4.0 notice.

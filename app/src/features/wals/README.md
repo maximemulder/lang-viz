@@ -1,8 +1,9 @@
 # WALS repository, session, and atlas integration
 
 WALS-02 introduces data and navigation contracts without mounting controls or
-fetching WALS from the running application. WALS-03 supplies independent release
-delivery; WALS-04 mounts the first profile UI. Source/schema instructions remain
+fetching WALS from the running application. WALS-03 supplies the published,
+independently pinned release and deployment gate; WALS-04 mounts the first profile
+UI. Source/schema instructions remain
 in [the pipeline documentation](../../../../pipeline/wals/README.md).
 
 `data/walsRepository.ts` fetches `wals/features.json` relative to Vite's production
@@ -118,15 +119,16 @@ data. They cover retry/concurrency, late completion, store isolation, ambiguous
 identifiers, source-defined catalogs, broad scope, missing/zero coordinates,
 multiple varieties, exact observation navigation and camera arbitration.
 
-After explicitly restoring/building WALS and restoring atlas data, run the separate
+After restoring the complete WALS browser release and atlas data, run the separate
 full-snapshot check:
 
 ```sh
-node --test --test-isolation=none tests/integration/wals.test.ts
+npm run test:wals-snapshot
 ```
 
 This writes `test-results/wals-02/associations.json`, including input fingerprints,
 all associations and reasons, prototype comparison and Node timing measurements.
-It checks the reviewed v2020.6 counts/changes and the real Donegal, Kyuquot and
-Eastern Aleut regressions. A future source/catalog update must review those
+It verifies the complete release inventory/provenance, current source pin and
+seven-feature counts, then the reviewed v2020.6 associations and the real Donegal,
+Kyuquot and Eastern Aleut regressions. A future source/catalog update must review those
 expectations. It does not fetch/build datasets and is excluded from `npm test`.

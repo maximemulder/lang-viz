@@ -7,8 +7,9 @@ independently reviewable changes. Do not merge or cherry-pick the original
 data-heavy commit wholesale. Fix the data, identity, navigation, and delivery
 issues as their corresponding pieces are introduced.
 
-This document is the execution checklist. WALS-00 through WALS-02 are complete;
-WALS frontend data/navigation contracts are implemented without mounted UI.
+This document is the execution checklist. WALS-00 through WALS-03 are complete;
+source/data/navigation contracts and independent delivery are implemented without
+mounted WALS UI.
 Update each item's status, implementation decisions, and validation evidence as
 work proceeds. Mark an item complete only when its acceptance checks pass.
 Record skipped checks and pre-existing failures separately from regressions.
@@ -115,7 +116,7 @@ Initial review evidence:
 | WALS-00 | Baseline and port setup | — | Complete |
 | WALS-01 | Reproducible sources and validated supplement | WALS-00 | Complete |
 | WALS-02 | Repository, matching, and session/navigation model | WALS-01 | Complete |
-| WALS-03 | Independent release delivery and CI | WALS-01; join checks need WALS-02 | Planned |
+| WALS-03 | Independent release delivery and CI | WALS-01; join checks need WALS-02 | Complete |
 | WALS-04 | Language profile cards | WALS-02, WALS-03 | Planned |
 | WALS-05 | Shared-feature selection and map design | WALS-04 | Planned |
 | WALS-06 | Map integration and navigation | WALS-05 | Planned |
@@ -207,23 +208,23 @@ remain explicit. These contracts pass without rendering the map or profile UI.
 
 ### WALS-03 — Complete delivery before exposing the feature
 
-- [ ] Add an independent `wals-release.json` and ignored browser/source output
+- [x] Add an independent `wals-release.json` and ignored browser/source output
   directories, proposed as `app/public/wals/` and `data/wals/`.
-- [ ] Implement explicit pack, verify, restore, and offline-install operations
+- [x] Implement explicit pack, verify, restore, and offline-install operations
   under `pipeline/wals/`, reusing appropriate `pipeline/release_utils.py` helpers.
   Keep source recovery separate from the browser asset. Avoid a broad release
   framework refactor merely to add this dataset.
-- [ ] Record source/schema/adapter versions, producer commit, file inventory,
+- [x] Record source/schema/adapter versions, producer commit, file inventory,
   sizes, hashes, and notices. Verify complete bundles before exposing restored
   output; preserve existing modified installations on mismatch.
-- [ ] Prepare and publish the reproducible artifacts through the repository's
+- [x] Prepare and publish the reproducible artifacts through the repository's
   release workflow; verify restoration from the actual published pin.
-- [ ] Add restoration to deployment and an explicit `test:wals-snapshot` gate.
+- [x] Add restoration to deployment and an explicit `test:wals-snapshot` gate.
   Keep `npm test` fixture-based; no npm hook should silently download or compile
   WALS. Data restore must not rebuild or republish geographic/lexical bundles.
-- [ ] Check the seven-feature snapshot and current catalog associations together.
+- [x] Check the seven-feature snapshot and current catalog associations together.
   If joins are embedded, enforce the catalog fingerprint contract here as well.
-- [ ] Verify the production base path, a clean installation, corrupted/missing
+- [x] Verify the production base path, a clean installation, corrupted/missing
   artifacts, and rollback to a retained pin. Do not replace unrelated data pins.
 
 Acceptance: a clean checkout can obtain the complete WALS browser data from its
@@ -630,5 +631,113 @@ consumer's cancellation obligation. Existing geographic/lexical pins, applicatio
 entry points and URL schemas remain unchanged. The work is local and uncommitted;
 no release was published, no main integration or deployment occurred.
 
-WALS-00 through WALS-02 are complete. WALS-03 is next: independent release
-packaging, publication, restoration and deployment checks before profile UI.
+WALS-02 completed the repository/identity contracts. Independent delivery follows
+in the WALS-03 record below.
+
+
+## WALS-03 execution record
+
+Completed 2026-11-12 on `port/wals-release`, based on the user's committed WALS-02
+revision `edd09ee446c46f7bc1749fdfb5e8e4582722112d`. The working tree was clean
+before this stage. That unchanged adapter producer was already available on
+GitHub; publication required no code push or main merge.
+
+Published independent data release:
+[`wals-v2020.6-v1`](https://github.com/maximemulder/lang-viz/releases/tag/wals-v2020.6-v1).
+It targets the adapter producer above, uses upstream v2020.6 commit
+`81298aa26d01fdc11b769bcc7fa87ad9e43d7ccd`, and did not become the repository's
+latest application release. Both actual published archives and the uploaded pin
+were downloaded and verified, independently of the local packaging directory.
+The selected `wals-release.json` was written only after publication succeeded.
+
+| Asset | Compressed bytes | SHA-256 |
+| --- | --- | --- |
+| `wals-browser.tar.gz` | 849,232 | `cbcbbe0920841485c574414258d4655af2cb1a9ee8a17353b832aa23343da35e` |
+| `wals-sources.tar.gz` | 14,162,857 | `97ec60b3ab83bc35e85b389aaa5373e4da920846351fda6936c2b0e069f5cdb2` |
+
+Implementation and decisions:
+
+- `pipeline/wals/data_release.py` implements explicit pack, verify, restore,
+  offline install and publish operations using the existing shared archive/hash
+  utilities. The atlas and lexical release implementations are unchanged.
+- The browser archive has six files: compiled source evidence, a provenance/count/
+  inventory manifest, source pin, attribution notice, complete license and errata.
+  The separate source archive has all 20 pinned extracted inputs, the complete
+  original upstream archive, source pin and notice. Neither raw inputs nor a source
+  archive are deployed. Source restoration/building remains independent of release
+  installation.
+- Packaging recompiles the pinned sources and rejects stale/modified compiled
+  output. Repeated packaging produces identical archive and pin bytes. The release
+  pin records source/schema/adapter versions, producer commit and complete per-file
+  and archive inventories. Verification cross-checks schema, source identity,
+  manifest counts, provenance, notices and sizes/hashes before installing.
+- Installation stages within the destination filesystem, rejects unsafe/duplicate/
+  missing/extra archive members, links and corrupt bytes, and exposes only a
+  verified complete directory. Existing different/modified installations are
+  preserved. The previous one-file local browser build was retained at ignored
+  `.data-releases/wals-03-before-release/` before installing the published files.
+- Publication rejects existing tags, verifies both assets before external writes,
+  uploads a draft, publishes with `--latest=false`, then selects the pin. Failed
+  create/publish operations leave the selected pin unchanged. No unrelated data
+  release or pin was rebuilt or published.
+- Deployment now restores the WALS browser pin independently and runs the explicit
+  `npm run test:wals-snapshot` gate. It authenticates the full release, checks the
+  current source pin, seven feature/count expectations, complete current catalog
+  associations and exact-variety navigation. No joins are embedded in the source
+  bundle, so no atlas fingerprint is needed to invalidate stale precomputed joins.
+- `npm test` remains fixture-only. No npm lifecycle hook downloads/builds WALS.
+  The development watcher excludes generated WALS files alongside other data.
+  A separate production-build test consumer exercises the real repository loader;
+  it adds no application route or WALS controls.
+
+Validation:
+
+| Check | Result |
+| --- | --- |
+| WALS adapter/release fixture tests | 39 + 35 passed; no data/download prerequisites |
+| WALS plus existing lexical/geographic release tests | 118 passed |
+| Ruff lint and format checks | Passed for WALS pipeline/tests and browser runner |
+| `npm test` | All 284 frontend tests passed |
+| `npm run check` / typecheck | Passed; production builds also run TypeScript |
+| `npm run test:wals-snapshot` | 3 full-data checks passed against installed published data and isolated clean installation |
+| Existing `npm run test:etymology-snapshot` | 3 checks passed in the isolated clean installation |
+| Package twice with identical producer/source | Both archives and pin byte-identical |
+| Restore/build from packaged complete upstream archive | Output byte-identical to selected browser payload |
+| Rebuild directly from downloaded published source asset | Output byte-identical to selected browser payload |
+| Restore both actual published assets and download published pin | Complete inventories and pin bytes verified |
+| Missing/corrupt installation through actual npm snapshot gate | Both failed as expected with missing-file/checksum diagnostics |
+| Firefox delivery under `/lang-viz/` | Five checkpoints passed for candidate and downloaded published data |
+| Main and isolated clean `GITHUB_PAGES=true npm run build` | Passed; existing chunk-size/plugin-timing warnings |
+| Both production `dist/wals/` inventories | Exact release matches; no raw/source archives or test-only consumer shipped |
+
+The isolated check used a local clean clone with the candidate code changes copied
+in, no generated datasets or dependencies, and a fresh `npm ci` with a temporary
+cache. It restored WALS from GitHub through the selected pin. Existing pinned atlas
+and lexical archives were installed offline and verified, without preprocessing or
+republishing them. The checkout had no WALS source directory. Frontend lint, both
+snapshot gates and the production project-path build passed. Dependency lockfile
+and existing atlas/lexical pins are byte-identical to the starting commit.
+
+The Firefox runner uses the actual production repository loader in a separate
+compiled fixture: lazy loading, concurrent request sharing and successful caching;
+manifest/pin/license/errata serving; HTTP 404, invalid JSON and incompatible schema;
+and retry. Requests use `/lang-viz/` and no geographic/lexical/source archives.
+This is delivery acceptance, not WALS profile/map UI or performance acceptance.
+
+Rollback was verified with two fixture releases containing different payloads:
+install the newer release, reject an attempted overwrite with the retained old
+pin, preserve newer data, and successfully restore/verify the old pin in a fresh
+directory. This is the first published WALS release, so there is no earlier live
+WALS pin to roll back to; retain v1 and its assets for future rollback.
+
+Evidence is under ignored `app/test-results/wals-03/`: publication metadata,
+verification summary, pipeline/unit/build/snapshot logs, association report,
+expected CI-failure logs, clean build/dependency logs and Firefox reports/screenshots.
+Local archives are under `.data-releases/wals-v2020.6-v1/`. Documentation in the
+pipeline, frontend contracts and root guides records restore, offline install,
+source recovery, production checks and rollback procedures.
+
+The data release is published and verified. Code, selected pin and workflow edits
+remain local and uncommitted; no main merge, remote CI run or Pages deployment was
+performed. WALS-00 through WALS-03 are complete. WALS-04 is next: mount the language
+profile cards using these repository/session/delivery contracts.

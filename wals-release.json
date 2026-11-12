@@ -1,0 +1,142 @@
+{
+  "adapterVersion": 1,
+  "assets": {
+    "browser": {
+      "bytes": 849232,
+      "files": {
+        "ERRATA.md": {
+          "bytes": 9454,
+          "sha256": "74517259b03cd1c6c1bab0d0b676cd771eecedf60bd34696e9b695670ff41e5d"
+        },
+        "LICENSE": {
+          "bytes": 18652,
+          "sha256": "945fbcb37deca05bccd7c3ca0e261679f1f5373515504fdbad68f6f3cf6f49b9"
+        },
+        "NOTICE.md": {
+          "bytes": 1519,
+          "sha256": "b2bc410e6d72fb17c248124c11852c8423cd9129ce421befea1ee82166633de1"
+        },
+        "features.json": {
+          "bytes": 4948094,
+          "sha256": "5ed6085ae55662cce317a0183fb122fad37caca026b43c6a1b9a57e2a3c0a580"
+        },
+        "manifest.json": {
+          "bytes": 5532,
+          "sha256": "e6a209857ea3b6c45a5debd4daa813da1a82f9ef60f4ea181dba410a4297b371"
+        },
+        "sources.json": {
+          "bytes": 3651,
+          "sha256": "b1b5403b89db08ee84bb22c6ff1e14141e250ea59f59c74655980cb3dfb8493c"
+        }
+      },
+      "name": "wals-browser.tar.gz",
+      "sha256": "cbcbbe0920841485c574414258d4655af2cb1a9ee8a17353b832aa23343da35e"
+    },
+    "sources": {
+      "bytes": 14162857,
+      "files": {
+        "CHANGES.md": {
+          "bytes": 10507,
+          "sha256": "83622f9cdb42bd079557ffe472c84f71af344ff3b1dfa8891c43cf4481b8b65b"
+        },
+        "ERRATA.md": {
+          "bytes": 9454,
+          "sha256": "74517259b03cd1c6c1bab0d0b676cd771eecedf60bd34696e9b695670ff41e5d"
+        },
+        "LICENSE": {
+          "bytes": 18652,
+          "sha256": "945fbcb37deca05bccd7c3ca0e261679f1f5373515504fdbad68f6f3cf6f49b9"
+        },
+        "NOTICE.md": {
+          "bytes": 1519,
+          "sha256": "b2bc410e6d72fb17c248124c11852c8423cd9129ce421befea1ee82166633de1"
+        },
+        "README.md": {
+          "bytes": 965,
+          "sha256": "0533386f68ddc9001ca6a20e58c3b66eddd73e40cbc2d151f85801641065e0b0"
+        },
+        "cldf/StructureDataset-metadata.json": {
+          "bytes": 35896,
+          "sha256": "96f4881b6c29c3349e22f22e4058b6b5025595c03f8cbfb66fb203ba2a8b4307"
+        },
+        "cldf/areas.csv": {
+          "bytes": 455,
+          "sha256": "9359569e6d675c792c4ba982d4a8a495b5d9497c334e42cd044de5244228352f"
+        },
+        "cldf/chapters.csv": {
+          "bytes": 87476,
+          "sha256": "371fbb25c18b1d3a6188e1c862f0099fc461a247245880e8e18349b58511a100"
+        },
+        "cldf/codes.csv": {
+          "bytes": 84416,
+          "sha256": "fbcc50b8ab6a71cb38f64d65fd06f2ee7f1c0fe33fa33c4ae91debbe10980f6d"
+        },
+        "cldf/contributors.csv": {
+          "bytes": 3639,
+          "sha256": "87d6efe4d2d181b39e675c0d5089b9bbdfddf9282f9d9ef4449740e738062c5e"
+        },
+        "cldf/countries.csv": {
+          "bytes": 2633,
+          "sha256": "798cf5f78412e97f0a50c778ba7093a031f7f7553005dde9aa0db94a68f86b3b"
+        },
+        "cldf/docs/credits.md": {
+          "bytes": 4518,
+          "sha256": "d5412b0b866514bd2a30f1e7a50a6ec9857d8e753e7f46fb3a87726d330af7b4"
+        },
+        "cldf/docs/genealogy.md": {
+          "bytes": 4690,
+          "sha256": "839b7e3285ecbaa91bc3a1886cd5d1a0715061064b556e3c122e6e6c23ded275"
+        },
+        "cldf/examples.csv": {
+          "bytes": 383576,
+          "sha256": "b9ce3c46a774047046325f96f2ddcb933354bb44c218c8e595b7b6f0e068d0d1"
+        },
+        "cldf/genealogy.csv": {
+          "bytes": 29424,
+          "sha256": "26e186fb2e998d2394c5dc5382ceb9298aad364eeafd67985e3640ee3193c6f4"
+        },
+        "cldf/language_names.csv": {
+          "bytes": 211305,
+          "sha256": "2e0d6702a0e7caa6d98d6445ede76f772ec473af7380b63c77f627151ef19dac"
+        },
+        "cldf/languages.csv": {
+          "bytes": 475225,
+          "sha256": "1eaaf032d1d14bcd50c998f5452fde6ba4766043506568dab6e21c31a13d6189"
+        },
+        "cldf/media.csv": {
+          "bytes": 8381,
+          "sha256": "407954b68cd09e965809e8af2f381c64125e407275966959b6af5f1eeb8ed0af"
+        },
+        "cldf/parameters.csv": {
+          "bytes": 8377,
+          "sha256": "c9bd5960007a0b342bd9cf4206c906f096ff44321a8fa5ba06cc7d57327462b5"
+        },
+        "cldf/sources.bib": {
+          "bytes": 3042068,
+          "sha256": "015c0b4bc01f12ac90cd98ed62746d3551ba5198a9a43d55237896c38cacb8db"
+        },
+        "cldf/values.csv": {
+          "bytes": 4718338,
+          "sha256": "47b85f2f9bc9f26d8c6037886cfa32bd45b7042e5ab8815d5a8bf7d933aaf9f4"
+        },
+        "sources.json": {
+          "bytes": 3651,
+          "sha256": "b1b5403b89db08ee84bb22c6ff1e14141e250ea59f59c74655980cb3dfb8493c"
+        },
+        "upstream.tar.gz": {
+          "bytes": 12264263,
+          "sha256": "1dcc2ff4f10e76cd6320dc169533e4821345b4f38b6b21a6a019beb2e28d1ae0"
+        }
+      },
+      "name": "wals-sources.tar.gz",
+      "sha256": "97ec60b3ab83bc35e85b389aaa5373e4da920846351fda6936c2b0e069f5cdb2"
+    }
+  },
+  "pipelineCommit": "edd09ee446c46f7bc1749fdfb5e8e4582722112d",
+  "repository": "maximemulder/lang-viz",
+  "schemaVersion": 1,
+  "snapshot": "wals-v2020.6",
+  "sourceCommit": "81298aa26d01fdc11b769bcc7fa87ad9e43d7ccd",
+  "tag": "wals-v2020.6-v1",
+  "walsSchemaVersion": 1
+}

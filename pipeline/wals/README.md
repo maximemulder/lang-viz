@@ -1,4 +1,4 @@
-# WALS source adapter
+# WALS source adapter and independent delivery
 
 WALS-01 compiles an independent, versioned typology supplement. It does not
 change atlas or lexical releases, create atlas associations, or add frontend UI.
@@ -74,7 +74,8 @@ All keyed objects use original WALS IDs. There are no atlas IDs or inferred join
 
 The export scope is 12A, 13A, 30A, 37A, 81A, 87A, and 92A. This is a selection
 of features, not a card-selection policy. Editorial labels, English examples,
-regional priorities, atlas matching and profile navigation are later stages.
+regional priorities and mounted UI are later stages. Catalog matching and session
+contracts are implemented separately under `app/src/integrations/wals/`.
 There are 5,517 exported observations, 33 categories, 46 cited examples and 5,915
 referenced bibliography entries. All 935 varieties without shortlisted values
 remain in `records`. Absence of an observation means missing data, not a category.
@@ -108,8 +109,8 @@ caveats. This adapter does not silently apply editorial corrections.
 Ordinary tests use only small synthetic inputs:
 
 ```sh
-uv run pytest -q pipeline/tests/test_wals.py
-uv run ruff check pipeline/wals pipeline/tests/test_wals.py
+uv run pytest -q pipeline/tests/test_wals.py pipeline/tests/test_wals_release.py
+uv run ruff check pipeline/wals pipeline/tests/test_wals.py pipeline/tests/test_wals_release.py
 ```
 
 The explicit snapshot gate requires restored real inputs and the historical
@@ -139,5 +140,123 @@ unexplained audit hashes fail the gate after saving its evidence. Updating a
 source pin requires reviewing the report and any adapter/schema changes, not
 merely replacing expected counts.
 
-Independent browser release packaging, restore pins, deployment integration and
-frontend loading are WALS-03/WALS-02 work. No npm hook restores or compiles WALS.
+## Independent release delivery
+
+The selected release is
+[`wals-v2020.6-v1`](https://github.com/maximemulder/lang-viz/releases/tag/wals-v2020.6-v1),
+published on 2026-11-12. `wals-release.json` pins it independently of the atlas and
+lexical pins. The pin records release/schema/adapter versions, source snapshot and
+commit, adapter producer commit, and complete archive/file byte sizes and SHA-256.
+The producer is `edd09ee446c46f7bc1749fdfb5e8e4582722112d`, which contains the
+unchanged adapter used to reproduce `features.json`. Delivery tooling can evolve
+without changing that source-build identity.
+
+| Asset | Contents | Deployment |
+| --- | --- | --- |
+| `wals-browser.tar.gz` | `features.json`, provenance/count/inventory `manifest.json`, upstream `sources.json`, attribution `NOTICE.md`, full upstream `LICENSE` and `ERRATA.md` | Restore to `app/public/wals/`; 849,232 compressed bytes |
+| `wals-sources.tar.gz` | All 20 pinned extracted inputs, the complete `upstream.tar.gz`, `sources.json` and `NOTICE.md` | Separate recovery archive; 14,162,857 bytes; never deployed |
+
+Restore prebuilt data without compiling or downloading raw inputs (Python 3.12+
+and authenticated GitHub CLI):
+
+```sh
+python3 -m pipeline.wals.data_release restore
+python3 -m pipeline.wals.data_release verify
+python3 -m pipeline.wals.data_release restore --kind sources --output /tmp/wals-release-sources
+```
+
+The default source destination is `data/wals/wals-v2020.6/`. Use an unused output
+when that directory already contains a source-only development restore. A release
+installation includes additional source pin/notice files and has its own complete
+inventory. Restoring an existing valid release directory is a no-op. Different,
+modified, incomplete or linked installations are rejected and preserved. For an
+older single-file browser build, move that directory aside after review and
+restore into an absent destination; do not overlay individual release files.
+
+Install an already downloaded asset offline:
+
+```sh
+python3 -m pipeline.wals.data_release install /path/to/wals-browser.tar.gz \
+  --pin /path/to/wals-release.json --output /tmp/wals-browser
+python3 -m pipeline.wals.data_release verify \
+  --pin /path/to/wals-release.json --output /tmp/wals-browser
+```
+
+Installation authenticates the archive before extraction, rejects unsafe paths,
+links, duplicates and wrong member sizes/sets, checks every extracted file and
+cross-checks manifest versions, counts, notices and source provenance before an
+atomic staged rename. Download/extraction/verification failures leave working data
+intact. Verification never invokes the source adapter or touches geographic/lexical
+releases. The browser and CI additionally validate runtime fields and joins.
+
+The source asset can independently reproduce the browser data:
+
+```sh
+python3 -m pipeline.wals.build --source-dir /tmp/wals-release-sources \
+  --output /tmp/reproduced-features.json
+```
+
+Its retained `upstream.tar.gz` also works with `pipeline.wals.sources restore
+--archive`, independently of the extracted source copies or an upstream checkout.
+
+To create a future release, commit and make the adapter producer available on
+GitHub, explicitly restore/build the pinned sources, and choose a new tag/output:
+
+```sh
+python3 -m pipeline.wals.data_release pack \
+  --tag wals-SNAPSHOT-vN --pipeline-commit FULL_ADAPTER_PRODUCER_COMMIT \
+  --output .data-releases/wals-SNAPSHOT-vN
+```
+
+Packaging recompiles the source data, rejects a stale/modified browser payload,
+creates deterministic tar/gzip bytes, and verifies both archives. It does not
+update the selected pin. Review the complete candidate and checks before the
+explicit publication command:
+
+```sh
+python3 -m pipeline.wals.data_release publish \
+  .data-releases/wals-SNAPSHOT-vN/wals-release.json
+```
+
+Publication rejects an existing tag, uploads both archives and the pin to a draft,
+then publishes with `--latest=false`; it never replaces another release. Only
+successful publication updates the selected pin atomically. A failed publication
+preserves the pin; an incomplete draft may remain and needs explicit review before
+retrying. Retain old releases and pins. To roll back, select a retained pin and
+install into a fresh directory, verify, then switch directories; an older pin must
+not overwrite a newer or locally modified installation. This is the first WALS
+release, so there is no earlier published WALS pin; fixture checks exercise a real
+payload change followed by rollback to a retained prior fixture pin.
+
+## Deployment and snapshot checks
+
+The GitHub Pages workflow restores all three independent browser pins, then runs
+`npm run test:wals-snapshot` before its `/lang-viz/` production build. No source
+archive, historical comparison, source compilation, geographic preprocessing or
+new release publication is involved. Missing/corrupt files fail before deployment.
+Ordinary `npm test` stays fixture-only; no npm lifecycle hook downloads or compiles
+WALS. Source reconciliation remains the separate explicit Python check above.
+
+From `app/`, after restoring WALS and atlas data:
+
+```sh
+npm run test:wals-snapshot
+```
+
+This verifies the selected release, current source pin, all seven features and
+counts, complete catalog associations and exact source-variety navigation. For
+an isolated candidate, set `WALS_RELEASE_PIN` and `WALS_BROWSER_DATA` to explicit
+paths. Associations are computed against the loaded atlas, never embedded in the
+browser artifact, so a precomputed-join fingerprint is unnecessary.
+
+The separate Firefox delivery check builds only a test consumer of the production
+repository loader and exercises the actual Vite production base path:
+
+```sh
+python3 app/tests/browser/wals_delivery.py
+```
+
+It checks lazy/concurrent/cached loading, all served release notices, missing data,
+invalid JSON/schema and retry under `/lang-viz/`. It loads no atlas/lexical data or
+source archive and does not mount WALS UI in the application. Reports and screenshots
+are ignored under `app/test-results/wals-03/`.

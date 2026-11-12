@@ -483,3 +483,22 @@ The unit geometry suites cover boundary adjacency, unions, holes, native fallbac
 LOD/parent delivery (including mixed composed/fallback seams), preview commit coordination, shared fetch cancellation, and
 worker restart replay. The focus/inspection browser suites additionally exercise
 pinned source/period previews, style replacement, and pointer/keyboard lifecycle.
+
+
+### WALS release delivery
+
+After restoring the independently pinned WALS browser release, run from the
+repository root:
+
+```sh
+python3 app/tests/browser/wals_delivery.py
+```
+
+This builds a separate test-only consumer of the production repository loader;
+it does not add a route or controls to the application. Firefox checks the
+`/lang-viz/` production base, lazy/concurrent/cached loading, manifest and source
+notices, HTTP 404, invalid JSON/schema and retry. The fixture loads no atlas,
+lexical data, raw sources or release archives. `--pin`, `--data` and `--output`
+allow isolated candidate review. The report and screenshot are ignored under
+`app/test-results/wals-03/browser/` by default. The script builds and previews with
+the same project base; no WALS profile/map acceptance is claimed at this stage.

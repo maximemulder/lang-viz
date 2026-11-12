@@ -15,11 +15,12 @@ from pathlib import Path
 from pipeline.release_utils import digest, local_path
 
 ROOT = Path(__file__).resolve().parents[2]
+PIN = Path(__file__).with_name("sources.json")
 
 
 def read_pin(comparison: bool = False) -> dict:
     return json.loads(
-        Path(__file__).with_name("comparison.json" if comparison else "sources.json").read_text()
+        (Path(__file__).with_name("comparison.json") if comparison else PIN).read_text()
     )
 
 
