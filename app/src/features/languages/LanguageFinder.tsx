@@ -1,7 +1,14 @@
-import { useAtom, useAtomValue } from 'jotai'
-import { type KeyboardEvent, useRef } from 'react'
-import { mapEntriesAtom, mapGroupsAtom, selectedMapAreasAtom } from '../../state/atlasState'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { type KeyboardEvent, useEffect, useRef } from 'react'
+import { walsAtlasCatalogAtom } from '../../integrations/wals/state.ts'
+import {
+  atlasDataAtom,
+  mapEntriesAtom,
+  mapGroupsAtom,
+  selectedMapAreasAtom,
+} from '../../state/atlasState'
 import { type LanguagePanelView, languagePanelAtom } from '../../state/languageControls'
+import { WalsStandaloneInspection } from '../wals/LanguageFeatures.tsx'
 import { ExploreLanguages } from './ExploreLanguages'
 import { LanguageDetails } from './LanguageDetails'
 import { OnMapView } from './OnMapView'
@@ -11,6 +18,9 @@ const LABELS = { explore: 'Explore', map: 'On map' }
 
 export const LanguageFinder = () => {
   const [panel, setPanel] = useAtom(languagePanelAtom)
+  const atlas = useAtomValue(atlasDataAtom)
+  const publishCatalog = useSetAtom(walsAtlasCatalogAtom)
+  useEffect(() => publishCatalog(atlas.languages), [atlas.languages, publishCatalog])
   const selected = useAtomValue(mapEntriesAtom)
   const groups = useAtomValue(mapGroupsAtom)
   const displayed = useAtomValue(selectedMapAreasAtom)
@@ -62,7 +72,10 @@ export const LanguageFinder = () => {
           </button>
         ))}
       </div>
-      <div className="language-finder__inspection">{panel.detailId && <LanguageDetails />}</div>
+      <div className="language-finder__inspection">
+        {panel.detailId && <LanguageDetails />}
+        <WalsStandaloneInspection />
+      </div>
       {/* Keep list views mounted so their searches, expansion and scroll positions survive inspection. */}
       <section
         className="language-panel"

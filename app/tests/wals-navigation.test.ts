@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createStore } from 'jotai/vanilla'
-import { walsRepositoryAtom, walsSessionAtom } from '../src/features/wals/state.ts'
+import { walsActionAtom, walsRepositoryAtom, walsSessionAtom } from '../src/features/wals/state.ts'
 import { associateWals } from '../src/integrations/wals/languageMatching.ts'
 import { resolveWalsProfile } from '../src/integrations/wals/profile.ts'
 import {
@@ -117,10 +117,28 @@ test('missing catalog can resolve evidence later but never initiates deferred pr
   const session = store.get(walsSessionAtom)
   store.set(walsAtlasCatalogAtom, walsCatalog())
   assert.equal(store.get(walsInspectionAtom)?.association?.status, 'associated')
+  assert.equal(store.get(walsInspectionAtom)?.profileId, undefined)
   assert.equal(store.get(languagePanelAtom).detailId, null)
   assert.strictEqual(store.get(walsSessionAtom), session)
   store.set(inspectWalsObservationAtom, { sourceId: 'ird', featureId: '12A' })
   assert.equal(store.get(languagePanelAtom).detailId, 'atlas:irish')
+  assert.equal(store.get(walsInspectionAtom)?.profileId, 'atlas:irish')
+})
+
+test('closing standalone source inspection preserves profile choices, overlay and navigation', () => {
+  const store = readyStore()
+  store.set(inspectWalsObservationAtom, { sourceId: 'ird', featureId: '12A' })
+  store.set(showWalsExamplesAtom, { sourceId: 'ird', featureId: '12A' })
+  store.set(inspectWalsObservationAtom, { sourceId: 'orphan', featureId: '12A' })
+  const before = store.get(walsSessionAtom)
+  const panel = store.get(languagePanelAtom)
+  const explorer = store.get(explorerSessionAtom)
+  store.set(walsActionAtom, { type: 'clear-inspection' })
+  assert.equal(store.get(walsInspectionAtom), null)
+  assert.strictEqual(store.get(walsSessionAtom).profiles, before.profiles)
+  assert.strictEqual(store.get(walsSessionAtom).overlay, before.overlay)
+  assert.strictEqual(store.get(languagePanelAtom), panel)
+  assert.strictEqual(store.get(explorerSessionAtom), explorer)
 })
 
 test('broader-scope inspection opens the family itself and retains an explicit source-only explanation', () => {

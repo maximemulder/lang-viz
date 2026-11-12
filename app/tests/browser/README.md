@@ -501,4 +501,33 @@ notices, HTTP 404, invalid JSON/schema and retry. The fixture loads no atlas,
 lexical data, raw sources or release archives. `--pin`, `--data` and `--output`
 allow isolated candidate review. The report and screenshot are ignored under
 `app/test-results/wals-03/browser/` by default. The script builds and previews with
-the same project base; no WALS profile/map acceptance is claimed at this stage.
+the same project base. This suite covers delivery; profile acceptance uses its own
+command below.
+
+### WALS profile cards
+
+After restoring the atlas, lexical and WALS browser releases, run from `app/`:
+
+```sh
+npm run test:wals-profile-browser
+```
+
+The command builds a separate fixture that mounts the production WALS components
+with synthetic source data, then builds and exercises the real application against
+the installed published releases. Both use `/lang-viz/`. No generated source data
+is changed, and no fixture is included in the deployed build.
+
+Fixture checks cover lazy loading, a local HTTP failure/retry, delayed completion
+after changing profiles, multiple varieties, an unknown regional card that stays
+rendered, an inspected fourth card, missing observation references, safe plain-text
+bibliography, absent/unobserved records, broader scope, unmatched inspection, late
+catalog completion, and native keyboard selection/disclosure/link navigation.
+
+Production checks cover Donegal's exact observation, profile closure/reopening,
+workspace trips, Albanian's broader association, Orok's published 87A value with
+its erratum, and existing map pinning and profile-to-word navigation. They also
+check that inspection preserves the camera and pinned entries. Same-origin frames
+run the production UI at exact 320px and 390px CSS widths because Firefox clamps
+the outer headless window to 500px. Cards, variety selects and source evidence must
+remain reachable without horizontal overflow. Reports, screenshots, test bundles
+and browser logs are ignored under `app/test-results/wals-04/`.

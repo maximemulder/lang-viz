@@ -26,8 +26,10 @@ The offline build below is for changing geographic data.
 
 The WALS port provides published data delivery, a reproducible offline adapter,
 a validated lazy repository, conservative catalog associations and source-aware
-session/navigation contracts.
-Its profile and map UI are not integrated yet. See [source/build commands](pipeline/wals/README.md),
+session/navigation contracts. Open a language profile and choose **Load WALS features**
+to see recorded varieties, feature cards and citations. Variety choices survive profile
+and workspace navigation for the session; shared-feature map exploration is a later step.
+See [source/build commands](pipeline/wals/README.md),
 [frontend contracts](app/src/features/wals/README.md) and the [port roadmap](WALS_PORT_PLAN.md).
 It uses an independent pinned snapshot and does not rebuild geographic or lexical data.
 

@@ -7,9 +7,9 @@ independently reviewable changes. Do not merge or cherry-pick the original
 data-heavy commit wholesale. Fix the data, identity, navigation, and delivery
 issues as their corresponding pieces are introduced.
 
-This document is the execution checklist. WALS-00 through WALS-03 are complete;
-source/data/navigation contracts and independent delivery are implemented without
-mounted WALS UI.
+This document is the execution checklist. WALS-00 through WALS-04 are complete;
+source/data/navigation contracts, independent delivery and language-profile cards
+are implemented. Shared-feature map exploration remains a later increment.
 Update each item's status, implementation decisions, and validation evidence as
 work proceeds. Mark an item complete only when its acceptance checks pass.
 Record skipped checks and pre-existing failures separately from regressions.
@@ -117,7 +117,7 @@ Initial review evidence:
 | WALS-01 | Reproducible sources and validated supplement | WALS-00 | Complete |
 | WALS-02 | Repository, matching, and session/navigation model | WALS-01 | Complete |
 | WALS-03 | Independent release delivery and CI | WALS-01; join checks need WALS-02 | Complete |
-| WALS-04 | Language profile cards | WALS-02, WALS-03 | Planned |
+| WALS-04 | Language profile cards | WALS-02, WALS-03 | Complete |
 | WALS-05 | Shared-feature selection and map design | WALS-04 | Planned |
 | WALS-06 | Map integration and navigation | WALS-05 | Planned |
 | WALS-07 | Final acceptance and documentation | WALS-03, WALS-04, WALS-06 | Planned |
@@ -236,25 +236,25 @@ Source recovery remains possible without shipping raw tables to the browser.
 Candidate material: `features/wals/LanguageFeatures.tsx`, explanatory copy, and
 styles. Rebuild their loading and state ownership using WALS-02.
 
-- [ ] Add the section to the current profile layout without obscuring pinned-area
+- [x] Add the section to the current profile layout without obscuring pinned-area
   actions, classification, or lexical navigation. Load WALS on first feature use;
   failures and retry stay inside the feature section.
-- [ ] Use one documented card policy: word order and the regional comparison
+- [x] Use one documented card policy: word order and the regional comparison
   feature retain their slots with explicit unknown values; the optional third
   slot selects an observed shortlisted feature deterministically. Display source
   region and explain that the shortlist is editorial, not a uniqueness ranking.
-- [ ] Preserve the selected variety per profile. Keep its identity and any
+- [x] Preserve the selected variety per profile. Keep its identity and any
   broader catalog association visible, rather than only inside a disclosure.
-- [ ] When inspecting a particular observation, reveal that feature even if it
+- [x] When inspecting a particular observation, reveal that feature even if it
   is outside the summary's three slots. Distinguish an unrecorded value from a
   recorded observation whose reference is unavailable.
-- [ ] Provide usable citations, source/version information, definitions, and
+- [x] Provide usable citations, source/version information, definitions, and
   accurate English-only word-order illustrations. Retain unknown/non-dominant
   categories without fabricating an example.
-- [ ] Add keyboard and narrow-layout checks, plus browser coverage for multiple
+- [x] Add keyboard and narrow-layout checks, plus browser coverage for multiple
   varieties, broader associations, absent records/values, delayed loading, retry,
   profile closure/reopening, and workspace round trips.
-- [ ] Check actual rendered cards as well as selection helpers: the prototype's
+- [x] Check actual rendered cards as well as selection helpers: the prototype's
   helper tests did not detect that the UI hid an unknown comparison slot.
 
 Acceptance: cards and citations work in the deployed-data build; session choices
@@ -739,5 +739,82 @@ source recovery, production checks and rollback procedures.
 
 The data release is published and verified. Code, selected pin and workflow edits
 remain local and uncommitted; no main merge, remote CI run or Pages deployment was
-performed. WALS-00 through WALS-03 are complete. WALS-04 is next: mount the language
-profile cards using these repository/session/delivery contracts.
+performed at that checkpoint. WALS-00 through WALS-03 were complete; WALS-04 was
+the next planned increment.
+
+## WALS-04 execution record — profile cards
+
+Completed locally on 2026-11-12 on `port/wals-profile`, starting from the clean
+user-committed WALS-03 checkout `d4052335917c799e9aba2f50e762937c44a1d01e`.
+The independent WALS v2020.6 release and all three selected data pins are unchanged.
+
+`LanguageDetails` mounts the WALS section after the existing word-entry action,
+inside its existing scrollable body. The explicit **Load WALS features** button
+starts the first request; subsequent profiles reuse the validated repository.
+Loading/failure/retry stay local. `LanguageFinder` publishes the complete ready
+atlas catalog for associations, independent of map visibility and filters.
+
+`features/wals/cards.ts` owns one deterministic editorial policy, documented in
+the UI and frontend contracts:
+
+- Keep word order (81A) and the most-covered other shortlisted feature in the
+  source macroarea. Count WALS varieties once each, including unmatched records;
+  break coverage ties by 13A, 12A, 30A, 87A, 37A, 92A. A zero-coverage region still
+  keeps the first available comparison slot. Unknown observations never remove
+  these required cards.
+- Use the first observed extra in priority order 13A, 30A, 12A, 37A, 92A, 87A for
+  the optional third card. Append an exact inspected observation outside these
+  slots without duplication. This is not a uniqueness ranking.
+
+The selected variety name/ID, source region, selector and broader catalog scope
+remain visible outside disclosures. Choices and inspected features use existing
+session/navigation actions and survive closure, reopening and workspace trips.
+An unavailable saved source ID is explicit. Source evidence without a ready unique
+association appears separately under its own identity. Inspection now remembers
+which profile the original explicit action opened, if any, so later catalog
+completion cannot hide standalone evidence or open a profile. Closing standalone
+inspection clears only that inspection.
+
+Cards distinguish unrecorded observations from recorded values without an
+observation reference. Definitions, feature/chapter/observation links, chapter
+citations, reference titles/authors/pages and supplied examples are available in
+native disclosures. Variety bibliography is separate. Missing titles remain
+explicit; bibliography, examples and supplied Markdown/LaTeX strings render as
+plain text. Six English word-order illustrations identify subject/verb/object and
+make no translation claim; non-dominant/unknown categories get no invented example.
+Source/version/commit/license/notice/errata remain accessible, and Orok 87A retains
+the published Noun-Adjective value beside an explicit erratum warning.
+
+Validation completed:
+
+- **290 frontend tests pass**, including five new card-policy/illustration tests
+  and a new inspection-dismissal isolation test. The late-catalog regression also
+  checks that only an explicit inspection records an opened profile.
+- Biome checks pass; TypeScript and the production `GITHUB_PAGES=true` build pass.
+  Existing build chunk-size and plugin-timing warnings remain.
+- All three full WALS release/catalog snapshot checks pass against the selected
+  published release.
+- `npm run test:wals-profile-browser` passes in Firefox using a separate fixture
+  with production components and the full deployed-data application, both at
+  `/lang-viz/`. Fixture checks exercise actual rendered unknown comparison cards,
+  multiple varieties, inspected fourth cards, absent/unobserved records, missing
+  references, safe bibliography text, local failure/retry, delayed completion after
+  changing profiles, broader scope, unmatched/late-catalog standalone inspection,
+  native keyboard variety selection, disclosures and citation links.
+- The full application checks real Donegal selection and exact observation,
+  closure/reopening, workspace round trips, Albanian broader scope, Orok errata,
+  existing Add to map and profile-to-word navigation. WALS inspection leaves
+  pinned areas and the camera unchanged. Same-origin production frames at exact
+  **320px and 390px** widths reach cards/evidence without horizontal overflow;
+  Firefox's outer headless window itself is clamped to 500px.
+- Ruff checks/formatting pass for the browser runner; `git diff --check` passes.
+
+Ignored evidence lives under `app/test-results/wals-04/`: `report.json`, fixture and
+production screenshots/logs, separate fixture build and unit/snapshot logs. The
+runner's build/output log is `app/test-results/wals-04-browser.log`. The fixture
+does not enter the deployable application build and does not alter installed data.
+
+No WALS map control or map consumer is exposed. No source rebuild, release
+publication, code commit/push, main merge, remote CI run or Pages deployment was
+performed in this step. WALS-04 is complete locally. WALS-05 is next: define
+shared-feature example selection and decide its map representation.

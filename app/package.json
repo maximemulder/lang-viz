@@ -26,6 +26,7 @@
     "test": "node --test --test-isolation=none tests/*.test.ts",
     "test:etymology-snapshot": "node --test --test-isolation=none tests/integration/etymology.test.ts",
     "test:wals-snapshot": "node --test --test-isolation=none tests/integration/wals.test.ts",
+    "test:wals-profile-browser": "python3 tests/browser/wals_profile.py",
     "test:explorer-navigation-browser": "python3 tests/browser/explorer_navigation.py",
     "dev": "vite",
     "build": "tsc -b && vite build",

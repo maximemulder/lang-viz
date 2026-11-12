@@ -10,7 +10,8 @@ export interface WalsOverlaySpecification {
 }
 export interface WalsSession {
   readonly profiles: ReadonlyMap<string, WalsSelection>
-  readonly inspection: WalsSelection | null
+  /** Profile opened by this explicit inspection, never filled by late catalog completion. */
+  readonly inspection: (WalsSelection & { readonly profileId?: string }) | null
   readonly overlay: WalsOverlaySpecification | null
 }
 export const createWalsSession = (): WalsSession => ({
@@ -29,6 +30,7 @@ export type WalsAction =
   | { readonly type: 'show-examples'; readonly sourceId: string; readonly featureId: string }
   | { readonly type: 'overlay-visibility'; readonly visible: boolean }
   | { readonly type: 'clear-overlay' }
+  | { readonly type: 'clear-inspection' }
 
 /** Store source IDs, never copied records, atlas-deduplicated values, or sampled targets. */
 export const reduceWalsSession = (session: WalsSession, action: WalsAction): WalsSession => {
@@ -44,7 +46,14 @@ export const reduceWalsSession = (session: WalsSession, action: WalsAction): Wal
       const selection = { sourceId: action.sourceId, featureId: action.featureId }
       const profiles = new Map(session.profiles)
       if (action.profileId) profiles.set(action.profileId, selection)
-      return { ...session, profiles, inspection: selection }
+      return {
+        ...session,
+        profiles,
+        inspection: {
+          ...selection,
+          ...(action.profileId ? { profileId: action.profileId } : {}),
+        },
+      }
     }
     case 'show-examples':
       return {
@@ -62,5 +71,7 @@ export const reduceWalsSession = (session: WalsSession, action: WalsAction): Wal
         : session
     case 'clear-overlay':
       return { ...session, overlay: null }
+    case 'clear-inspection':
+      return { ...session, inspection: null }
   }
 }

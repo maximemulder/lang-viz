@@ -1,9 +1,9 @@
 # WALS repository, session, and atlas integration
 
-WALS-02 introduces data and navigation contracts without mounting controls or
-fetching WALS from the running application. WALS-03 supplies the published,
-independently pinned release and deployment gate; WALS-04 mounts the first profile
-UI. Source/schema instructions remain
+WALS-02 supplies data and navigation contracts; WALS-03 supplies the published,
+independently pinned release and deployment gate. WALS-04 mounts the profile
+cards, loading data only after the first **Load WALS features** action. Retry and
+errors stay inside this section. Source/schema instructions remain
 in [the pipeline documentation](../../../../pipeline/wals/README.md).
 
 `data/walsRepository.ts` fetches `wals/features.json` relative to Vite's production
@@ -34,9 +34,9 @@ Do not clear session atoms when a component unmounts or a request finishes.
 
 `integrations/wals/languageMatching.ts` receives the complete ready atlas catalog
 and computes associations in memory. The integration's `walsAtlasCatalogAtom`
-holds that catalog reference; the eventual UI/composition owner must publish
+holds that catalog reference; `LanguageFinder` publishes the complete ready
 `atlas.languages` there, independently of geometry, filters and visible profiles.
-There is currently no production caller. `walsAssociationsAtom` recomputes if the
+`walsAssociationsAtom` recomputes if the
 repository or catalog reference changes. No atlas IDs are saved in the source
 bundle and no join can outlive its catalog reference.
 
@@ -66,7 +66,43 @@ ISO association. Do not edit identifiers or collapse source records to force a m
 writing session state. Saved choices take precedence. An unavailable saved choice
 remains identifiable with an explanation; it does not silently select another
 variety. A saved inspected feature is exposed even when outside a later UI card
-summary. There is no feature inheritance or card policy in this stage.
+summary. There is no feature inheritance.
+
+## Profile cards
+
+`LanguageDetails` places `LanguageFeatures` after the existing profile actions and
+word-entry navigation, within the existing scrollable profile body. Selected
+varieties and inspected features live in session atoms, never component state.
+The variety selector, recorded source name/ID, source macroarea and any broader
+catalog association remain outside disclosures. A saved unavailable source ID is
+shown explicitly and is never silently replaced.
+
+`cards.ts` owns the single editorial summary policy. Word order (81A) always has
+a slot. The other required slot is the best-covered shortlisted feature in the
+source macroarea, counting each WALS variety once, including unmatched records.
+Equal coverage follows 13A, 12A, 30A, 87A, 37A, 92A. Even a zero-coverage region
+retains the first available comparison feature. Neither required slot is removed
+when its observation is absent. An optional third card is the first observed
+extra in priority order 13A, 30A, 12A, 37A, 92A, 87A. An inspected observation
+outside these slots is appended, without duplication. Coverage is cached per
+validated repository identity. This is an editorial shortlist, not a uniqueness
+ranking or a representative sample; the UI explains the policy.
+
+Each card provides a plain-language definition, chapter citation and links, plus
+the exact observation's references, pages, comments and supplied examples.
+Missing observations and recorded values without references have distinct copy.
+The source bibliography stays separate from observation references. Missing
+reference titles remain explicit; bibliography/LaTeX/errata strings render as
+plain React text. Reordered English words illustrate only the six dominant 81A
+categories, with explicit subject/verb/object roles and no translation claim.
+Unknown and non-dominant values receive no invented illustration. Orok 87A keeps
+its published value alongside the source-erratum warning. Version, original source
+commit, citation, license, adapter notice and full supplied errata remain accessible.
+
+The observation selector uses the validated inspection action to preserve exact
+source/feature IDs. No map action is exposed. Keyboard controls use native buttons,
+selects, disclosures and links. Narrow profiles retain the existing internal
+scrolling and keep cards and selects within their container.
 
 ## Session and navigation actions
 
@@ -88,11 +124,14 @@ UI callers should use the validated actions in `integrations/wals/state.ts`:
 
 Inspection with an unmatched/ambiguous association, or before the atlas catalog
 is ready, retains the WALS record and observation in `walsInspectionAtom` with an
-explanation. It leaves the current atlas profile untouched. The forthcoming UI
-must present this standalone source evidence, labelled with its source identity,
+explanation. It leaves the current atlas profile untouched. The UI
+uses `WalsStandaloneInspection` to present this source evidence, labelled with its source identity,
 rather than render it as evidence for that previous profile. A later catalog
 completion may resolve the explanation but cannot open a profile; another explicit
-inspection is required. Inspection and variety selection stay in the current
+inspection is required. The inspection stores the profile ID opened by the
+original explicit action, if any, so late association cannot hide a standalone
+inspection or reopen a closed profile. Closing standalone inspection clears only
+that inspection, preserving profile choices and the overlay. Inspection and variety selection stay in the current
 workspace; show/focus explicitly opens Geography.
 
 The overlay stores only source/feature IDs, visibility and a maximum of 12 examples.
@@ -114,7 +153,7 @@ npm run check
 npm run build
 ```
 
-The ordinary 23 WALS tests use synthetic fixtures without downloads or generated
+The ordinary WALS tests use synthetic fixtures without downloads or generated
 data. They cover retry/concurrency, late completion, store isolation, ambiguous
 identifiers, source-defined catalogs, broad scope, missing/zero coordinates,
 multiple varieties, exact observation navigation and camera arbitration.
@@ -132,3 +171,12 @@ It verifies the complete release inventory/provenance, current source pin and
 seven-feature counts, then the reviewed v2020.6 associations and the real Donegal,
 Kyuquot and Eastern Aleut regressions. A future source/catalog update must review those
 expectations. It does not fetch/build datasets and is excluded from `npm test`.
+
+Run `npm run test:wals-profile-browser` after restoring all three browser datasets
+and installing Firefox/geckodriver. It builds a separate acceptance fixture using
+the production components and a production `/lang-viz/` application build. The
+fixture checks missing values/references, delayed/error/retry loading, multiple
+varieties, inspected extra cards, safe bibliography text, standalone evidence and
+keyboard/narrow-layout behavior. The full app checks the published snapshot,
+Donegal navigation, broader Albanian scope, Orok errata and workspace/profile
+round trips. Reports and screenshots are ignored under `test-results/wals-04/`.

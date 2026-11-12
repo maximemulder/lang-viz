@@ -37,6 +37,26 @@ Semantic genealogy palettes are enabled by default. See the
 [color infrastructure](src/domain/COLORS.md) for programmatic custom colors,
 subtree anchors, comparison roots, categorical mode, and rendering behavior.
 
+## WALS profile features
+
+Open a language profile in Geography, then choose **Load WALS features**. Data loads
+on this first action and is reused for the session; failures offer a local retry.
+Cards keep missing values explicit and show the recorded variety, source region,
+and any broader catalog association. Select among recorded varieties or inspect a
+particular observation; these choices survive profile closure and workspace trips.
+
+Definitions, observation references, chapter citations, supplied examples, dataset
+version and source errata are available in disclosures. The card shortlist and its
+regional comparison policy are editorial choices, not a uniqueness ranking. No
+shared-feature map control is exposed in this increment.
+
+Restore the independent browser release from the repository root with
+`python3 -m pipeline.wals.data_release restore`. Run `npm run test:wals-snapshot`
+for the full release/catalog checks and `npm run test:wals-profile-browser` for
+Firefox acceptance with fixtures and published data, including exact 320/390px
+layouts. The browser command builds its own production artifacts and requires all
+three installed browser datasets. See [WALS frontend contracts](src/features/wals/README.md).
+
 ## Word histories
 
 Use the header's **Word histories** workspace to search recorded forms, meanings,

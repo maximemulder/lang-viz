@@ -1,0 +1,102 @@
+.wals-panel {
+  min-width: 0;
+  padding-block: 0.75rem;
+  border-top: 1px solid #d9ded7;
+  overflow-wrap: anywhere;
+}
+
+.wals-panel h4,
+.wals-panel h5 {
+  margin: 0 0 0.5rem;
+}
+
+.wals-panel h5 {
+  font-size: 0.9rem;
+}
+
+.wals-panel p,
+.wals-panel li {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.wals-panel a {
+  color: #235a57;
+  text-decoration: underline;
+}
+
+.wals-context,
+.wals-illustration {
+  color: #485b59;
+}
+
+.wals-cards {
+  display: grid;
+  gap: 0.6rem;
+  margin-block: 0.75rem;
+}
+
+.wals-card {
+  min-width: 0;
+  padding: 0.75rem;
+  background: #f5f7f2;
+  border: 1px solid #d9ded7;
+  border-radius: 0.5rem;
+}
+
+.wals-card > strong {
+  font-size: 0.9rem;
+}
+
+.wals-panel summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-block: 0.5rem;
+}
+
+.wals-select {
+  display: grid;
+  gap: 0.35rem;
+  margin-block: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.wals-select select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.4rem;
+  font: inherit;
+}
+
+.wals-caveat {
+  padding: 0.5rem;
+  border-left: 3px solid #94702a;
+  background: #fff9e9;
+}
+
+.wals-references {
+  padding-left: 1.1rem;
+}
+
+.wals-source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+
+.wals-card blockquote {
+  margin-inline: 0;
+  padding-left: 0.6rem;
+  border-left: 2px solid #b7c9c1;
+}
+
+.wals-panel :is(button, a, summary, select):focus-visible {
+  outline: 2px solid #235a57;
+  outline-offset: 3px;
+}
+
+.wals-standalone {
+  max-height: 25dvh;
+  padding: 0.75rem;
+  overflow: auto;
+}

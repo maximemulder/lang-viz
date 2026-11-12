@@ -33,6 +33,7 @@ import {
   searchSelectionAtom,
   toggleSearchSelectionAtom,
 } from '../../state/searchSelection'
+import { LanguageFeatures } from '../wals/LanguageFeatures.tsx'
 import { GeographyFilterSummary } from './GeographyFilters'
 import { GeometrySourceRecords } from './GeometrySourceRecords'
 import { useLanguagePreview } from './LanguagePreview'
@@ -228,6 +229,7 @@ export const LanguageDetails = () => {
           </p>
         )}
         <LanguageWordsButton language={detail} />
+        <LanguageFeatures profileId={detail.id} />
         <SidebarPane className="finder-detail__more" title="More details">
           {classification.kind === 'source' && (
             <div className="finder-detail__classification">

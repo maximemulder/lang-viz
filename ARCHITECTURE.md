@@ -69,8 +69,8 @@ One script per dataset:
   categories, observations, references, examples, provenance and source caveats.
   Full source recovery and explicit snapshot checks are separate from ordinary
   tests. The frontend repository and catalog/session contracts are implemented;
-  independent release delivery is pinned by `wals-release.json`. Mounted UI remains
-  a later stage. See the
+  independent release delivery is pinned by `wals-release.json`. Profile cards load
+  this supplement on explicit first use. See the
   [schema and commands](pipeline/wals/README.md).
 - **Grambank:** a separate CLDF adapter remains future work.
 - **DiACL:** CLDF + raw XML / JSON → `forms`, `word_links`, date ranges. The word-history links exist only in the raw files.
@@ -92,8 +92,12 @@ choices and the optional overlay specification belong to `features/wals/`, above
 component lifetimes. Loading cannot write navigation. Explicit show/focus actions
 share the map camera intent with atlas and lexical navigation; inspection opens
 associated profiles without moving the map and retains unmatched source evidence
-separately. These contracts are fixture-tested but have no mounted UI or map
-consumer yet. The separate browser/source release inventories include checksums,
+separately. The profile UI publishes the complete ready atlas catalog, independent
+of map filters, before resolving associations. Cards retain unknown word-order and
+regional comparison slots, select one observed extra deterministically, and reveal
+the exact inspected feature. Broader scope and source variety identity remain visible;
+citations, version and source errata are available in native disclosures. No WALS
+map control or consumer is mounted yet. The separate browser/source release inventories include checksums,
 schema/adapter/source versions, producer identity, license and errata. Deployment
 restores the verified browser asset without compiling or copying raw sources,
 then checks the seven-feature snapshot and current catalog associations together.
