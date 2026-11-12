@@ -1,5 +1,6 @@
 import { atom } from 'jotai'
 import type { Language } from '../../domain/atlas.ts'
+import { selectWalsExamples, walsExampleGeometry } from '../../domain/walsExamples.ts'
 import type { WalsOverlaySpecification } from '../../features/wals/session.ts'
 import { walsActionAtom, walsRepositoryAtom, walsSessionAtom } from '../../features/wals/state.ts'
 import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
@@ -13,6 +14,24 @@ export const walsAssociationsAtom = atom((get) => {
   const repository = get(walsRepositoryAtom)
   const catalog = get(walsAtlasCatalogAtom)
   return repository && catalog ? associateWals(repository, catalog) : null
+})
+// Primitive dependencies prevent profile inspection, visibility and catalog changes
+// from resampling or rebuilding geometry. No sampled records are stored in session state.
+const exampleSourceAtom = atom((get) => get(walsSessionAtom).overlay?.sourceId ?? null)
+const exampleFeatureAtom = atom((get) => get(walsSessionAtom).overlay?.featureId ?? null)
+const exampleLimitAtom = atom((get) => get(walsSessionAtom).overlay?.maxExamples)
+export const walsExampleSelectionAtom = atom((get) => {
+  const repository = get(walsRepositoryAtom)
+  const sourceId = get(exampleSourceAtom)
+  const featureId = get(exampleFeatureAtom)
+  const limit = get(exampleLimitAtom)
+  return repository && sourceId && featureId
+    ? selectWalsExamples(repository, sourceId, featureId, limit)
+    : null
+})
+export const walsExampleGeometryAtom = atom((get) => {
+  const selection = get(walsExampleSelectionAtom)
+  return selection ? walsExampleGeometry(selection) : null
 })
 export const walsInspectionAtom = atom((get) => {
   const selection = get(walsSessionAtom).inspection

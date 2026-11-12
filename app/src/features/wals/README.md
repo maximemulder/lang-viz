@@ -135,9 +135,14 @@ that inspection, preserving profile choices and the overlay. Inspection and vari
 workspace; show/focus explicitly opens Geography.
 
 The overlay stores only source/feature IDs, visibility and a maximum of 12 examples.
-Targets, counts, display design and geometry remain WALS-05. No map consumer is
-mounted yet. WALS-06 must re-read `walsCameraRequestAtom` and compare the original
-request identity after every asynchronous step, before moving the camera. It is
+WALS-05 derives exact-category examples and static point geometry through
+`walsExampleSelectionAtom` and `walsExampleGeometryAtom`. Selection uses the source
+ID, feature ID and limit, independently of atlas associations and UI visibility.
+No map consumer is mounted yet. See the [exploration design](EXPLORATION_DESIGN.md)
+for the points-versus-arcs decision, deterministic spacing, all count definitions,
+colocation policy and WALS-06 requirements. WALS-06 must re-read
+`walsCameraRequestAtom` and compare the original request identity after every
+asynchronous step, before moving the camera. It is
 null after newer manual/profile/lexical/WALS navigation, a workspace switch,
 overlay replacement, hide or clear. Style/projection changes, rendering and loading
 must not create a request. Workspace return and unhide do not replay it.
@@ -180,3 +185,10 @@ varieties, inspected extra cards, safe bibliography text, standalone evidence an
 keyboard/narrow-layout behavior. The full app checks the published snapshot,
 Donegal navigation, broader Albanian scope, Orok errata and workspace/profile
 round trips. Reports and screenshots are ignored under `test-results/wals-04/`.
+
+For the offline WALS-05 points/arcs design review, run `npm run review:wals-examples`
+with restored WALS/atlas browser data and the reviewed source Git object present.
+It writes five real comparisons and exact observation tables to
+`test-results/wals-05/review.html` and fingerprinted evidence to `review.json`. The
+full-snapshot gate also checks example selection and point geometry for every
+exported observation. Ordinary tests remain fixture-only.

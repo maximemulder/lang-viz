@@ -1,3 +1,5 @@
+import { WALS_MAX_EXAMPLES } from '../../domain/walsExamples.ts'
+
 export interface WalsSelection {
   readonly sourceId: string
   readonly featureId: string | null
@@ -62,7 +64,7 @@ export const reduceWalsSession = (session: WalsSession, action: WalsAction): Wal
           sourceId: action.sourceId,
           featureId: action.featureId,
           visible: true,
-          maxExamples: 12,
+          maxExamples: WALS_MAX_EXAMPLES,
         },
       }
     case 'overlay-visibility':

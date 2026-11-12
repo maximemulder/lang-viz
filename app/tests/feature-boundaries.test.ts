@@ -57,3 +57,7 @@ test('lexical traversal and search run without atlas or map implementation', () 
     [],
   )
 })
+
+test('WALS example selection and point geometry run without UI, catalog, navigation or loaders', () => {
+  assert.deepEqual(runtimeDependencies('domain/walsExamples.ts'), ['domain/walsExamples.ts'])
+})

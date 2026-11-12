@@ -97,7 +97,13 @@ of map filters, before resolving associations. Cards retain unknown word-order a
 regional comparison slots, select one observed extra deterministically, and reveal
 the exact inspected feature. Broader scope and source variety identity remain visible;
 citations, version and source errata are available in native disclosures. No WALS
-map control or consumer is mounted yet. The separate browser/source release inventories include checksums,
+map control or consumer is mounted yet. `domain/walsExamples.ts` selects at most
+12 exact-category source observations with deterministic spherical spacing,
+independently of catalog matches. Derived integration atoms build static point
+geometry once per selection; colocated points retain each exact source ID. The
+[exploration design](app/src/features/wals/EXPLORATION_DESIGN.md) documents count
+meanings and the choice of points over relationship-like arcs. The separate
+browser/source release inventories include checksums,
 schema/adapter/source versions, producer identity, license and errata. Deployment
 restores the verified browser asset without compiling or copying raw sources,
 then checks the seven-feature snapshot and current catalog associations together.

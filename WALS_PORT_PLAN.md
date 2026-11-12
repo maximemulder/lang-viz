@@ -7,9 +7,10 @@ independently reviewable changes. Do not merge or cherry-pick the original
 data-heavy commit wholesale. Fix the data, identity, navigation, and delivery
 issues as their corresponding pieces are introduced.
 
-This document is the execution checklist. WALS-00 through WALS-04 are complete;
-source/data/navigation contracts, independent delivery and language-profile cards
-are implemented. Shared-feature map exploration remains a later increment.
+This document is the execution checklist. WALS-00 through WALS-05 are complete;
+source/data/navigation contracts, independent delivery, language-profile cards and
+shared-feature selection/design are implemented. Mounting the map exploration
+controls and overlay remains WALS-06.
 Update each item's status, implementation decisions, and validation evidence as
 work proceeds. Mark an item complete only when its acceptance checks pass.
 Record skipped checks and pre-existing failures separately from regressions.
@@ -118,7 +119,7 @@ Initial review evidence:
 | WALS-02 | Repository, matching, and session/navigation model | WALS-01 | Complete |
 | WALS-03 | Independent release delivery and CI | WALS-01; join checks need WALS-02 | Complete |
 | WALS-04 | Language profile cards | WALS-02, WALS-03 | Complete |
-| WALS-05 | Shared-feature selection and map design | WALS-04 | Planned |
+| WALS-05 | Shared-feature selection and map design | WALS-04 | Complete |
 | WALS-06 | Map integration and navigation | WALS-05 | Planned |
 | WALS-07 | Final acceptance and documentation | WALS-03, WALS-04, WALS-06 | Planned |
 
@@ -268,24 +269,24 @@ Candidate material: `domain/featureConnections.ts`. Keep reusable pure selection
 and geometry functions after repair; remove the unused regional-comparison helper
 unless a concrete caller is introduced within this scope.
 
-- [ ] Compare categorized points with the prototype's arcs using the same real
+- [x] Compare categorized points with the prototype's arcs using the same real
   examples. Recommended default: points and an explicit origin, with a list of
   observations. Retain arcs only if their explanatory value warrants the visual
   similarity to word-history links. Record the chosen representation and rationale
   before implementing the final map UI.
-- [ ] Keep exact feature/category matching and a maximum of 12 examples with
+- [x] Keep exact feature/category matching and a maximum of 12 examples with
   deterministic geographic spacing. State that this is an illustrative selection,
   not a representative sample, similarity ranking, or relationship graph.
-- [ ] Define eligibility and counts separately: matching source records, located
+- [x] Define eligibility and counts separately: matching source records, located
   records, grouped candidates, and displayed examples. Retain records without
   atlas matches where they have usable points; those can still open WALS evidence.
-- [ ] If grouping multiple records by atlas association, keep the exact selected
+- [x] If grouping multiple records by atlas association, keep the exact selected
   source record and disclose grouping. Do not present an atlas-deduplicated count
   as a count of all WALS observations. Handle colocated records explicitly.
-- [ ] Test stable selection, missing/invalid locations, no candidates, limits,
+- [x] Test stable selection, missing/invalid locations, no candidates, limits,
   and distinct varieties. For retained arcs, repair the exact +/-180 case and
   cover identical points, antipodes, poles, and both dateline directions.
-- [ ] Derive static geometry once per selection; if animation is retained,
+- [x] Derive static geometry once per selection; if animation is retained,
   measure its update cost and honor reduced motion. Avoid recomputing full
   great-circle paths on every animation frame.
 
@@ -818,3 +819,87 @@ No WALS map control or map consumer is exposed. No source rebuild, release
 publication, code commit/push, main merge, remote CI run or Pages deployment was
 performed in this step. WALS-04 is complete locally. WALS-05 is next: define
 shared-feature example selection and decide its map representation.
+
+## WALS-05 execution record — shared-category selection and map design
+
+Completed locally on 2026-11-12 on `port/wals-examples`, based on the clean
+user-committed WALS-04 revision `8c13dfc24d71a6b8a79a99d7979da921ad8ea4fb`.
+The existing profile UI and all three selected data pins remain unchanged.
+
+The [exploration design](app/src/features/wals/EXPLORATION_DESIGN.md) chooses static
+points, a distinct origin and an accessible list of exact source observations.
+The offline review compares the actual source commit's arcs against points on
+identical current-release selections for English 81A, Donegal 12A, Kyuquot 37A,
+Eastern Aleut 12A and unmatched Mambila 81A. Each pair has the same 12 observations,
+projection and origin. Firefox rendered all ten diagrams and 60 observation rows;
+representative English and Eastern Aleut screenshots were visually inspected.
+Arcs add relationship-like connections without evidence, overlap with the meaning
+of recorded DiACL word-history edges and distract from geographic distribution.
+They and the unused regional-comparison helper are deliberately not ported. The
+review reproduces the legacy exact -180/+180 nonfinite path; no claim is made to
+have repaired or retained that discarded path. Static points have no animation
+loop or path-update cost; WALS-06 camera motion still needs reduced-motion support.
+
+`domain/walsExamples.ts` selects only exact feature/category observations, retaining
+separate source IDs independently of atlas matching or polygon availability. A
+maximum of 12 examples excludes the separately retained origin. Greedy spherical
+farthest-first spacing uses precomputed unit vectors, incrementally updated
+nearest distances, stable code-unit source-ID ordering and documented floating
+point ties. Missing/invalid origin locations do not suppress other located
+observations. Zero locations remain valid. No inferred or substituted locations
+are used. The selected observations are illustrative, not a representative sample,
+similarity ranking or evidence of ancestry/contact.
+
+Counts separately describe all matching records, located records, located
+candidate records excluding the origin, distinct candidate positions and displayed
+source observations. No atlas deduplication is performed. Colocated selected
+records share a rendering point with every exact source/observation ID retained;
+canonicalization handles signed zero, dateline spellings and pole longitudes.
+Selection still bounds observations, including those sharing a point, to 12.
+The design requires disclosure of shared points and access to every displayed
+observation through the future list. English 81A, for example, has 488 matching
+records and 487 eligible candidates; the prototype's 485 total excluded records
+under different grouping/eligibility rules.
+
+`walsExampleSelectionAtom` and `walsExampleGeometryAtom` derive selection and
+static GeoJSON from source/feature/limit primitives. They retain object identity
+through inspection, catalog completion, visibility and workspace changes. The
+session still stores only source/feature IDs and display settings. There is no
+map consumer, control, camera effect, new fetch or geography-core dependency.
+
+Validation completed:
+
+- **300 frontend tests pass**, including nine example-selection/geometry/state
+  tests and a runtime architectural-boundary test. Coverage includes input-order
+  stability, ties, limits, exact categories, distinct/unmatched varieties,
+  missing/invalid/zero locations, no candidates, missing origin locations,
+  colocation, dateline spellings, poles, antipodes, non-mutation and derived
+  object identity through unrelated navigation/visibility changes.
+- **Four full WALS snapshot checks pass.** The added gate checks all **5,517**
+  exported observations, including **14** observations from unmatched origins,
+  for exact source/category identities, count meanings, the display bound and
+  finite point geometry. Selection and geometry for all observations completed
+  within about 1.2 seconds in Node on this machine (including assertions); this
+  is a local domain measurement, not production-map performance acceptance.
+- Biome checks all 232 frontend files without errors; TypeScript passes. The
+  production `GITHUB_PAGES=true npm run build` passes with the existing
+  chunk-size/plugin-timing warnings.
+- `npm run review:wals-examples` generates fingerprinted HTML/JSON comparisons
+  from restored local WALS/atlas data and the immutable reviewed Git object.
+  Firefox review rendering checks pass with no horizontal overflow at 1600px.
+  This is a standalone design review, not WALS-06 map/browser acceptance.
+- `git diff --check` passes. Release pins and dependency lockfile match the
+  starting commit; no source compilation or release operation was needed.
+
+Ignored evidence is under `app/test-results/wals-05/`: `unit.log`, `snapshot.log`,
+`snapshot.json`, `build.log`, `review.log`, `review.html`, `review.json` and
+`visual-review/` with five screenshots and a rendering report. The design review
+has no deployed route and adds no dependency or generated data requirement to
+ordinary tests. Existing profile browser acceptance was not rerun because this
+stage changes no rendered profile component or style; the new unit checks cover
+its shared-state integration.
+
+Changes remain local and uncommitted. No code push, main merge, remote CI run,
+release publication or deployment occurred. WALS-06 is next: mount the points and
+accessible list, expose working show/focus/inspect/clear controls, and validate
+camera cancellation and existing map/word-history behavior in the browser.

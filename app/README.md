@@ -55,7 +55,12 @@ Restore the independent browser release from the repository root with
 for the full release/catalog checks and `npm run test:wals-profile-browser` for
 Firefox acceptance with fixtures and published data, including exact 320/390px
 layouts. The browser command builds its own production artifacts and requires all
-three installed browser datasets. See [WALS frontend contracts](src/features/wals/README.md).
+three installed browser datasets. WALS-05 adds tested example selection and static
+point geometry without map controls. Its representation/count policy is in the
+[exploration design](src/features/wals/EXPLORATION_DESIGN.md); run
+`npm run review:wals-examples` to generate the offline points/arcs comparison with
+restored WALS/atlas data and the source Git object present. See
+[WALS frontend contracts](src/features/wals/README.md).
 
 ## Word histories
 

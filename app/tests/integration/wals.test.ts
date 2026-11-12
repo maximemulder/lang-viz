@@ -8,6 +8,11 @@ import { fileURLToPath } from 'node:url'
 import { createStore } from 'jotai/vanilla'
 import type { Language } from '../../src/domain/atlas.ts'
 import { indexWals } from '../../src/domain/wals.ts'
+import {
+  selectWalsExamples,
+  walsExampleGeometry,
+  walsPoint,
+} from '../../src/domain/walsExamples.ts'
 import { validateWalsData } from '../../src/domain/walsValidation.ts'
 import { walsRepositoryAtom, walsSessionAtom } from '../../src/features/wals/state.ts'
 import { associateWals } from '../../src/integrations/wals/languageMatching.ts'
@@ -196,4 +201,90 @@ test('full WALS snapshot: Donegal, Kyuquot and Eastern Aleut inspection never su
     assert.equal(store.get(languagePanelAtom).detailId, profileId)
     assert.equal(store.get(mapCameraIntentAtom), null)
   }
+})
+
+test('full WALS snapshot: every exported observation yields bounded exact-category examples and finite points', () => {
+  const start = performance.now()
+  const summaries = []
+  let maximumMs = 0
+  let matchedSelections = 0
+  let unmatchedOrigins = 0
+  const categories = new Map(
+    [...repository.index.byCategory].map(([categoryId, ids]) => {
+      const located = ids.flatMap((id) => {
+        const value = data.observations[id]
+        const point = value ? walsPoint(data.records[value.sourceId]?.coordinates ?? null) : null
+        return value && point ? [{ sourceId: value.sourceId, key: point.join(',') }] : []
+      })
+      return [categoryId, { matching: ids.length, located }]
+    }),
+  )
+  for (const observation of Object.values(data.observations)) {
+    const begin = performance.now()
+    const selection = selectWalsExamples(repository, observation.sourceId, observation.featureId)
+    const geometry = selection ? walsExampleGeometry(selection) : null
+    maximumMs = Math.max(maximumMs, performance.now() - begin)
+    assert.ok(selection && geometry)
+    const category = categories.get(observation.categoryId)
+    assert.ok(category)
+    const candidates = category.located.filter((record) => record.sourceId !== observation.sourceId)
+    assert.deepEqual(selection.counts, {
+      matchingRecords: category.matching,
+      locatedRecords: category.located.length,
+      candidateRecords: candidates.length,
+      groupedCandidates: new Set(candidates.map((record) => record.key)).size,
+      displayedExamples: Math.min(12, candidates.length),
+    })
+    assert.equal(
+      new Set(selection.examples.map((example) => example.sourceId)).size,
+      selection.examples.length,
+    )
+    for (const example of selection.examples) {
+      const value = data.observations[example.observationId]
+      assert.equal(value?.sourceId, example.sourceId)
+      assert.equal(value?.featureId, observation.featureId)
+      assert.equal(value?.categoryId, observation.categoryId)
+      assert.notEqual(example.sourceId, observation.sourceId)
+    }
+    assert.ok(geometry.features.length <= 13)
+    for (const feature of geometry.features) {
+      assert.ok(feature.geometry.coordinates.every(Number.isFinite))
+      assert.equal(feature.properties.categoryId, observation.categoryId)
+    }
+    const geometryIds = geometry.features.flatMap((feature) => feature.properties.sourceIds).sort()
+    assert.deepEqual(
+      geometryIds,
+      [
+        ...(selection.origin.coordinates ? [observation.sourceId] : []),
+        ...selection.examples.map((example) => example.sourceId),
+      ].sort(),
+    )
+    if (associations.bySource.get(observation.sourceId)?.status !== 'associated') unmatchedOrigins++
+    matchedSelections++
+    if (['eng', 'ird', 'kyq', 'aea', 'mla'].includes(observation.sourceId))
+      summaries.push({
+        sourceId: observation.sourceId,
+        featureId: observation.featureId,
+        counts: selection.counts,
+      })
+  }
+  assert.equal(matchedSelections, 5517)
+  assert.equal(unmatchedOrigins, 14)
+  const output = new URL('../../test-results/wals-05/', import.meta.url)
+  mkdirSync(output, { recursive: true })
+  writeFileSync(
+    new URL('snapshot.json', output),
+    `${JSON.stringify(
+      {
+        snapshot: data.provenance.snapshot,
+        bundleSha256: createHash('sha256').update(bytes).digest('hex'),
+        checkedObservations: matchedSelections,
+        unmatchedOrigins,
+        timingsMs: { total: performance.now() - start, maximumSelectionAndGeometry: maximumMs },
+        summaries,
+      },
+      null,
+      2,
+    )}\n`,
+  )
 })
