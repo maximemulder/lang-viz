@@ -63,13 +63,3 @@
 .word-map-marker.is-root span {
   background: var(--accent);
 }
-.geography-sidebar {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-.geography-sidebar > .language-finder {
-  flex: 1;
-}

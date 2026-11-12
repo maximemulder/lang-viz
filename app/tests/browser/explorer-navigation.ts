@@ -1,15 +1,17 @@
 import { createStore } from 'jotai/vanilla'
 import type { ExplorerAction } from '../../src/domain/explorerSession.ts'
 import { sessionRoute } from '../../src/domain/explorerSession.ts'
-import { etymologyRepositoryAtom } from '../../src/state/etymologyData.ts'
-import { connectExplorerNavigation } from '../../src/state/explorerNavigation.ts'
 import {
   atlasWordTrailAtom,
+  etymologyRepositoryAtom,
+  resolvedExplorerAtom,
+  wordTrailAtom,
+} from '../../src/features/etymology/state.ts'
+import { connectExplorerNavigation } from '../../src/state/explorerNavigation.ts'
+import {
   explorerActionAtom,
   explorerRouteIssuesAtom,
   explorerSessionAtom,
-  resolvedExplorerAtom,
-  wordTrailAtom,
 } from '../../src/state/explorerState.ts'
 import { explorerRepository } from '../fixtures/explorer.ts'
 

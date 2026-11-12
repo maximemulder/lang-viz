@@ -6,11 +6,11 @@ import {
   buildWordTrail,
   type EtymologyData,
   indexEtymology,
-  matchAtlasLanguage,
   searchLexemes,
 } from '../../src/domain/etymology.ts'
 import { validateEtymologyData } from '../../src/domain/etymologyValidation.ts'
 import { trailLineFeatures, trailLocations } from '../../src/domain/wordTrailGeography.ts'
+import { matchAtlasLanguage } from '../../src/integrations/etymology/languageMatching.ts'
 
 // Deliberately fail when data is absent: this command is an explicit snapshot gate.
 const data = JSON.parse(

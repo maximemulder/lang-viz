@@ -1,16 +1,12 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { hasLanguagePoint } from '../../domain/etymology.ts'
-import { trailLanguageGroups } from '../../domain/wordTrailAtlas.ts'
-import { etymologyRepositoryAtom } from '../../state/etymologyData.ts'
-import {
-  atlasWordTrailAtom,
-  explorerActionAtom,
-  explorerSessionAtom,
-} from '../../state/explorerState.ts'
-import { addTrailAreasAtom, trailAreaOperationAtom } from '../../state/wordTrailAtlas.ts'
+import { atlasWordTrailAtom, etymologyRepositoryAtom } from '../../features/etymology/state.ts'
+import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
+import { addTrailAreasAtom, trailAreaOperationAtom } from './state.ts'
+import { trailLanguageGroups } from './trailAreas.ts'
 import './wordTrailMap.css'
 
-export const WordTrailMapSummary = () => {
+export default function WordTrailMapSummary() {
   const repository = useAtomValue(etymologyRepositoryAtom)
   const trail = useAtomValue(atlasWordTrailAtom)
   const session = useAtomValue(explorerSessionAtom)

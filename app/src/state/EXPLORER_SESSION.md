@@ -11,11 +11,17 @@ URL, or touch geographic selections.
 send typed actions through `explorerActionAtom`. The session survives workspace
 component unmounts; a new Jotai store starts a new session. Existing geography
 atoms retain ownership of pinned entries, representation, filters, and camera.
-No geography atom is imported or written by these modules.
+The session action adapter coordinates camera intent with language navigation;
+geographic selection and filters remain outside it.
 
-The lexical data loader publishes ready data to `etymologyRepositoryAtom` in a
-separate module. Repository caching/loading/retry remains data-layer work; session
-actions and URL parsing do not wait for it. `resolvedExplorerAtom` resolves the
+The lexical data loader publishes ready data to `etymologyRepositoryAtom` in
+`features/etymology/state.ts`. That feature module owns `trailSpecificationAtom`,
+`wordTrailAtom`, `atlasWordTrailAtom`, and `resolvedExplorerAtom`; its pure
+resolution helpers live in `features/etymology/session.ts`. The shared session
+contract, reducer, state, and URL adapter have no runtime dependency on lexical
+traversal, resolution, or data loading. Repository caching/loading/retry remains
+data-layer work; session actions and URL parsing do not wait for it.
+`resolvedExplorerAtom` resolves the
 **current** IDs and language target against ready data. A loading callback must
 never initialize the word, comparison, scope, or workspace: that could overwrite
 navigation performed while loading.
@@ -54,7 +60,7 @@ Only `show-trail` creates a camera request. After any asynchronous preparation,
 the map consumer must call `isCurrentTrailFocus` with the original request and
 the latest session before moving the camera. A newer focus, trail change,
 workspace/view/comparison navigation, evidence selection, or clear invalidates it.
-The real camera consumer remains ETY-04 work.
+The camera consumer lives in `integrations/etymology/WordTrailLayer.tsx`.
 
 ## URL contract
 
@@ -117,6 +123,23 @@ Geography remains mounted after its first visit and is resized on return. Data
 failures retry independently; a rejected atlas request is evicted and its async
 atom can refresh without resetting the exploration store.
 
+## Feature integration boundary
+
+`integrations/etymology/GeographyWithWordTrail.tsx` composes the generic
+`GeographyWorkspace` using its optional `mapLayers` and `sidebarHeader` slots.
+`WorldMap` renders injected children within the map context. Neither geography
+component imports the lexical feature. The integration lazily loads the trail
+layer and summary only when the session enables the overlay, so ordinary geography
+loads no lexical traversal or resolution code. Geography stays mounted while the
+optional overlay is added or removed.
+
+The integration directory owns the trail layer, summary, camera helper, area
+planning/pinning, and catalog matching. `languageMatching.ts` bridges atlas and
+lexical identities; the core lexical domain has no atlas dependency. Language
+profiles can still dispatch the shared `language-words` navigation action without
+loading the lexical implementation. Language locations and data releases retain
+their current contracts.
+
 For real-data UI acceptance use `npm run test:etymology-browser`; map integration
 uses `npm run test:word-trail-browser`. ETY-04 derives map points/links directly
 from `atlasWordTrailAtom`; the graph
@@ -131,8 +154,9 @@ request. Both camera consumers check ownership after asynchronous readiness/boun
 work; user-originated map movement invalidates pending navigation. Finished focus
 cleanup does not stop later user motion. Style replacement does not replay a fit.
 
-`addTrailAreasAtom` reads the complete catalogs before availability, awaits atlas
-readiness, checks that the captured session/trail is still current, then reads the
+`addTrailAreasAtom` in `integrations/etymology/state.ts` reads the complete catalogs
+before availability, awaits atlas readiness, checks that the captured session/trail
+is still current, then reads the
 latest source/period/override/mode state and calls `showLanguagesAtom`. Actual entry
 count differences determine additions; existing representation keys determine
 already-present counts. Stale results are hidden after trail or geography-setting

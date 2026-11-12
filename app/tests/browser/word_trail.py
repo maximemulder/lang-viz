@@ -97,6 +97,18 @@ def main():
         try:
             open_page("#workspace=geography")
             map_ready()
+            assert hits["/etymology/word-trails.json"] == 0
+            assert browser.js(r"""
+                const sidebar = document.querySelector('.geography-sidebar');
+                const finder = sidebar.querySelector('.language-finder');
+                const style = getComputedStyle(sidebar);
+                return style.display === 'flex' && style.flexDirection === 'column' &&
+                    style.overflow === 'hidden' && getComputedStyle(finder).flexGrow === '1' &&
+                    !document.querySelector('.word-map-summary') &&
+                    !performance.getEntriesByType('resource').some(entry =>
+                        /\/assets\/(?:EtymologyExplorer|WordTrailLayer|WordTrailMapSummary)-/.test(entry.name));
+            """), "Geography owns its sidebar layout before lexical code or overlay styles load"
+            check("geography layout is ready before lexical feature or trail overlay loads")
             browser.js("window.overlapTest.configure(arguments[0])", SCENARIOS[0])
             browser.settled(60, fail_on_error=True)
             initial_entries = browser.js("return window.overlapTest.mapEntryState()")

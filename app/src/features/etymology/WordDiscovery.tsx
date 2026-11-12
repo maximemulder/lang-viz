@@ -1,11 +1,8 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useDeferredValue, useEffect, useMemo, useRef } from 'react'
 import { type EtymologyRepository, searchLexemes } from '../../domain/etymology.ts'
-import {
-  explorerActionAtom,
-  explorerSessionAtom,
-  resolvedExplorerAtom,
-} from '../../state/explorerState.ts'
+import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
+import { resolvedExplorerAtom } from './state.ts'
 
 export const WordDiscovery = ({ repository }: { readonly repository: EtymologyRepository }) => {
   const { data } = repository

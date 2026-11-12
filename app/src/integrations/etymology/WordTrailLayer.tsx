@@ -5,17 +5,13 @@ import type { EtymologyRepository, WordTrail } from '../../domain/etymology.ts'
 import { isCurrentTrailFocus } from '../../domain/explorerSession.ts'
 import { combinedBounds } from '../../domain/languageFocus.ts'
 import { trailLineFeatures, trailLocations } from '../../domain/wordTrailGeography.ts'
-import { etymologyRepositoryAtom } from '../../state/etymologyData.ts'
-import {
-  atlasWordTrailAtom,
-  explorerActionAtom,
-  explorerSessionAtom,
-} from '../../state/explorerState.ts'
+import { atlasWordTrailAtom, etymologyRepositoryAtom } from '../../features/etymology/state.ts'
+import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { startTrailCamera } from './trailCamera.ts'
 import './wordTrailMap.css'
 
-export const WordTrailLayer = () => {
+export default function WordTrailLayer() {
   const repository = useAtomValue(etymologyRepositoryAtom)
   const trail = useAtomValue(atlasWordTrailAtom)
   return repository && trail ? <TrailLayer repository={repository} trail={trail} /> : null

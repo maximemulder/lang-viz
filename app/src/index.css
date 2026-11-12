@@ -90,6 +90,14 @@ h1 {
   min-height: 0;
 }
 
+.geography-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .map-shell,
 .language-finder {
   position: relative;
@@ -104,6 +112,10 @@ h1 {
   grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
   border-left: 1px solid rgb(29 43 39 / 12%);
   background: var(--paper);
+}
+
+.geography-sidebar > .language-finder {
+  flex: 1;
 }
 
 .language-finder__inspection {

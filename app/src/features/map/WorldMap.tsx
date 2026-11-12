@@ -3,7 +3,7 @@ import type { FilterSpecification, MapLayerMouseEvent } from 'maplibre-gl'
 import { addProtocol, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { Protocol } from 'pmtiles'
-import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
@@ -27,7 +27,6 @@ import {
 } from '../../state/atlasState'
 import { languageMapNavigationAtom, languagePointerPreviewAtom } from '../../state/languageControls'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
-import { WordTrailLayer } from '../etymology/WordTrailLayer.tsx'
 import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { InspectionHighlight } from './InspectionHighlight'
 import { visibleVariantIds } from './inspection'
@@ -161,7 +160,7 @@ const MapHint = () => {
   )
 }
 
-export const WorldMap = () => {
+export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
   const sidebarPointer = useAtomValue(languagePointerPreviewAtom)
   const navigation = useAtomValue(languageMapNavigationAtom)
   const setCameraIntent = useSetAtom(mapCameraIntentAtom)
@@ -326,7 +325,7 @@ export const WorldMap = () => {
         <LanguageMapPreview mapInspectionActive={Boolean(inspection)} />
         <LanguageMapCamera />
       </Suspense>
-      <WordTrailLayer />
+      {children}
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
 

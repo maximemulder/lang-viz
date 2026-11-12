@@ -1,14 +1,21 @@
 import { useSetAtom } from 'jotai'
-import { Suspense, useEffect } from 'react'
+import { type ReactNode, Suspense, useEffect } from 'react'
 import { useMap } from 'react-map-gl/maplibre'
 import { WorkspaceBoundary } from '../../components/WorkspaceBoundary.tsx'
 import { atlasDataAtom } from '../../state/atlasState.ts'
-import { WordTrailMapSummary } from '../etymology/WordTrailMapSummary.tsx'
 import { LanguageFinder, LanguageFinderFallback } from '../languages/LanguageFinder.tsx'
 import { WorldMap } from './WorldMap.tsx'
 
 /** Remains mounted after first use, retaining the map, camera, and finder state. */
-export default function GeographyWorkspace({ visible }: { readonly visible: boolean }) {
+export default function GeographyWorkspace({
+  visible,
+  mapLayers,
+  sidebarHeader,
+}: {
+  readonly visible: boolean
+  readonly mapLayers?: ReactNode
+  readonly sidebarHeader?: ReactNode
+}) {
   const maps = useMap()
   const retry = useSetAtom(atlasDataAtom)
   useEffect(() => {
@@ -19,10 +26,10 @@ export default function GeographyWorkspace({ visible }: { readonly visible: bool
   return (
     <WorkspaceBoundary name="atlas data" onRetry={retry}>
       <section className="map-shell" aria-label="Language map">
-        <WorldMap />
+        <WorldMap>{mapLayers}</WorldMap>
       </section>
       <div className="geography-sidebar">
-        <WordTrailMapSummary />
+        {sidebarHeader}
         <Suspense fallback={<LanguageFinderFallback />}>
           <LanguageFinder />
         </Suspense>

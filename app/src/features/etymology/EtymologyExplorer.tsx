@@ -3,15 +3,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { loadEtymology } from '../../data/etymologyRepository.ts'
 import type { EtymologyRepository } from '../../domain/etymology.ts'
 import { RELATIONSHIP_COLORS } from '../../domain/wordTrailGeography.ts'
-import { etymologyRepositoryAtom } from '../../state/etymologyData.ts'
 import {
   explorerActionAtom,
   explorerRouteIssuesAtom,
   explorerSessionAtom,
-  resolvedExplorerAtom,
-  wordTrailAtom,
 } from '../../state/explorerState.ts'
 import { FamilyComparison } from './FamilyComparison.tsx'
+import { etymologyRepositoryAtom, resolvedExplorerAtom, wordTrailAtom } from './state.ts'
 import { WordDetails } from './WordDetails.tsx'
 import { WordDiscovery } from './WordDiscovery.tsx'
 import { WordHistoryGraph } from './WordHistoryGraph.tsx'

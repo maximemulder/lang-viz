@@ -8,8 +8,6 @@ import {
   indexEtymology,
   type Lexeme,
   type LexicalLanguage,
-  matchAtlasLanguage,
-  matchLexicalLanguage,
   searchLexemes,
   type WordRelationship,
 } from '../src/domain/etymology.ts'
@@ -19,6 +17,10 @@ import {
   trailLocations,
 } from '../src/domain/wordTrailGeography.ts'
 import { layoutTrail } from '../src/domain/wordTrailLayout.ts'
+import {
+  matchAtlasLanguage,
+  matchLexicalLanguage,
+} from '../src/integrations/etymology/languageMatching.ts'
 
 const language = (overrides: Partial<LexicalLanguage> = {}): LexicalLanguage => ({
   name: 'Latin',

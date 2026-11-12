@@ -93,6 +93,13 @@ handoff cost are recorded by the production browser measurement command.
 Lexical navigation lives in a store-scoped session above both workspaces. The graph
 and enabled map overlay derive the same bounded trail specification. Geography
 stays mounted after its first visit, preserving its map and pinned comparisons.
+Shared session/navigation modules contain the data-free contract and reducer.
+Lexical resolution and derived trail state belong to `features/etymology/`.
+`integrations/etymology/` composes optional map layers and sidebar content through
+generic geography slots, and owns catalog matching, area additions, and trail
+camera behavior. The map and geography workspace import no lexical implementation;
+the integration loads it only when the overlay is enabled.
+
 The URL encodes workspace, root word, view, concept, and collection; other controls
 persist only within the session. Explicit trail/profile camera actions share one
 current-intent identity, preventing delayed bounds requests from overriding newer

@@ -1,7 +1,8 @@
-import { type AreaMode, areaStatus, type GeographyAvailability } from './aggregation.ts'
-import type { Language } from './atlas.ts'
-import { type EtymologyData, matchAtlasLanguage, type WordTrail } from './etymology.ts'
-import { draftRepresentationKey, type MapEntry, mapEntryKey } from './mapEntries.ts'
+import { type AreaMode, areaStatus, type GeographyAvailability } from '../../domain/aggregation.ts'
+import type { Language } from '../../domain/atlas.ts'
+import type { EtymologyData, WordTrail } from '../../domain/etymology.ts'
+import { draftRepresentationKey, type MapEntry, mapEntryKey } from '../../domain/mapEntries.ts'
+import { matchAtlasLanguage } from './languageMatching.ts'
 
 export const trailLanguageGroups = (data: EtymologyData, trail: WordTrail) => {
   const groups = new Map<string, string[]>()

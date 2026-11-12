@@ -1,7 +1,7 @@
 import { atom } from 'jotai'
-import type { WordTrail } from '../domain/etymology.ts'
-import { geographyContextKey } from '../domain/mapEntries.ts'
-import { planTrailAreas } from '../domain/wordTrailAtlas.ts'
+import type { WordTrail } from '../../domain/etymology.ts'
+import { geographyContextKey } from '../../domain/mapEntries.ts'
+import { atlasWordTrailAtom, etymologyRepositoryAtom } from '../../features/etymology/state.ts'
 import {
   areaModesAtom,
   atlasDataAtom,
@@ -10,9 +10,9 @@ import {
   geometryOverridesAtom,
   mapEntriesAtom,
   showLanguagesAtom,
-} from './atlasState.ts'
-import { etymologyRepositoryAtom } from './etymologyData.ts'
-import { atlasWordTrailAtom, explorerSessionAtom } from './explorerState.ts'
+} from '../../state/atlasState.ts'
+import { explorerSessionAtom } from '../../state/explorerState.ts'
+import { planTrailAreas } from './trailAreas.ts'
 
 const operationAtom = atom<{
   readonly trail: WordTrail

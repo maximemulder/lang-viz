@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { startTrailCamera } from '../src/features/etymology/trailCamera.ts'
+import { startTrailCamera } from '../src/integrations/etymology/trailCamera.ts'
 
 const fixture = () => {
   const events = new Map<string, Set<() => void>>()

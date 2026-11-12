@@ -6,16 +6,15 @@ import {
   type ExplorerAction,
   isCurrentTrailFocus,
   reduceExplorerSession,
-  resolveExplorerSession,
 } from '../src/domain/explorerSession.ts'
-import { etymologyRepositoryAtom } from '../src/state/etymologyData.ts'
+import { resolveExplorerSession } from '../src/features/etymology/session.ts'
 import {
   atlasWordTrailAtom,
-  explorerActionAtom,
-  explorerSessionAtom,
+  etymologyRepositoryAtom,
   resolvedExplorerAtom,
   wordTrailAtom,
-} from '../src/state/explorerState.ts'
+} from '../src/features/etymology/state.ts'
+import { explorerActionAtom, explorerSessionAtom } from '../src/state/explorerState.ts'
 import { explorerRepository } from './fixtures/explorer.ts'
 
 const english = {
