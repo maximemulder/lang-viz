@@ -174,10 +174,17 @@ name/classification immediately. Lexical loading resolves that request against t
 latest session, including ambiguous/no-match fallbacks.
 See [frontend review instructions](../../README.md#word-histories-port-preview).
 
-WALS-02 adds a separate source-variety session in `features/wals/`, with ready-data
+WALS has a separate source-variety session in `features/wals/`, with ready-data
 navigation and catalog association owned by `integrations/wals/`. It adds no URL
 fields or shared lexical session fields. Explicit WALS show/focus actions use the
 same `mapCameraIntentAtom`; inspection/variety navigation cancels pending intent
 without moving the camera. WALS visibility/clear only cancels a request it still
-owns. Data completion and workspace return never issue WALS focus. No WALS UI or
-map consumer is mounted yet. See [WALS contracts](../features/wals/README.md).
+owns. Data completion and workspace return never issue WALS focus. Profiles keep
+source/feature choices above component lifetimes, including exact observations
+outside their usual card summary. Standalone evidence retains unmatched source
+records. One overlay specification keeps its origin through inspection and
+workspace trips; clearing it leaves lexical state and pinned comparisons intact.
+`integrations/GeographyExplorations.tsx` composes both lazy layers/summaries;
+neither feature owns the other. Choices reset on reload, with no new WALS URL
+fields. See [WALS contracts](../features/wals/README.md) and the
+[final port handoff](../../../WALS_PORT_PLAN.md).

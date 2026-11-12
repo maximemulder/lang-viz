@@ -1,5 +1,27 @@
 # Browser overlap checks and measurements
 
+The WALS final acceptance/handoff is recorded in the
+[port roadmap](../../../WALS_PORT_PLAN.md). After restoring all three pinned
+browser datasets, `npm run measure:wals-browser` builds the production
+`/lang-viz/` app and measures cold WALS loading plus profile/variety and overlay
+paint in Firefox. Three cold origins per network scenario use actual gzip
+delivery, with WALS-only 10 Mbit/s +150 ms latency in the slow case. There is no
+CPU throttling; software WebGL and native desktop CPU limit generalization to
+mobile devices. Input-to-paint clocks run inside the browser, exclude WebDriver
+polling and wait two frames after the matching DOM commit. Camera animation
+completion is outside overlay-paint timing. Timer gaps include unrelated map/GC
+work and are not Long Tasks API results.
+
+To reuse an existing production build, run
+`python3 tests/browser/wals_performance.py --runs 3`; `--output` selects the
+evidence directory (default `test-results/wals-07/performance/`). The report
+contains environment/capabilities, payload hash and compressed/decoded sizes,
+resource timings, loader preparation phases, no-eager-load/cache assertions,
+raw samples and errors. Run `npm run measure:wals` separately for fingerprinted
+Node domain/association/card-policy/selection timings; it needs restored WALS
+and atlas data but no browser. Neither measurement command publishes data or
+changes an installed release.
+
 Run from `app/`:
 
 ```sh

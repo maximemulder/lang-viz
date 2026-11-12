@@ -117,6 +117,15 @@ then checks the seven-feature snapshot and current catalog associations together
 See [WALS frontend contracts](app/src/features/wals/README.md) and the
 [association review](app/src/integrations/wals/ASSOCIATION_REVIEW.md).
 
+WALS preparation stays on the main thread with one shared successful repository.
+The loader emits local User Timing entries `wals:receive`, `wals:parse`,
+`wals:validate`, `wals:index` and a `wals:prepared` mark once per successful load;
+cache hits add no preparation work. These timings do not transmit telemetry or
+change session/navigation. Explicit domain and browser measurement commands are
+documented in the [frontend guide](app/README.md#wals-profile-features).
+Workers or sharding require evidence from slower devices; the local acceptance
+measurements and their limits are in [the handoff](WALS_PORT_PLAN.md).
+
 Word histories use an independent lexical schema and release pin
 (`etymology-release.json`). The geographic catalog IDs and lexical numeric IDs
 remain separate. `pipeline.etymology.data_release` restores a prebuilt browser

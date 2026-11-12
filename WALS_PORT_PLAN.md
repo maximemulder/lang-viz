@@ -7,10 +7,11 @@ independently reviewable changes. Do not merge or cherry-pick the original
 data-heavy commit wholesale. Fix the data, identity, navigation, and delivery
 issues as their corresponding pieces are introduced.
 
-This document is the execution checklist. WALS-00 through WALS-06 are complete;
+This document is the execution checklist. WALS-00 through WALS-07 are complete locally;
 source/data/navigation contracts, independent delivery, language-profile cards,
 shared-feature selection/design and map exploration are implemented locally.
-Final acceptance, measurements and clean-restoration handoff remain WALS-07.
+Final acceptance, measurements and clean-restoration handoff are recorded under
+WALS-07 below. Code integration and site deployment are separate outcomes.
 Update each item's status, implementation decisions, and validation evidence as
 work proceeds. Mark an item complete only when its acceptance checks pass.
 Record skipped checks and pre-existing failures separately from regressions.
@@ -121,7 +122,7 @@ Initial review evidence:
 | WALS-04 | Language profile cards | WALS-02, WALS-03 | Complete |
 | WALS-05 | Shared-feature selection and map design | WALS-04 | Complete |
 | WALS-06 | Map integration and navigation | WALS-05 | Complete |
-| WALS-07 | Final acceptance and documentation | WALS-03, WALS-04, WALS-06 | Planned |
+| WALS-07 | Final acceptance and documentation | WALS-03, WALS-04, WALS-06 | Complete locally |
 
 Use short-lived branches based on current main, such as `port/wals-data`,
 `port/wals-profiles`, and `port/wals-map`, or separately reviewable commits on
@@ -331,22 +332,22 @@ camera ownership, or the user's projection. The map increment can now ship.
 
 ### WALS-07 — Finish acceptance, documentation, and handoff
 
-- [ ] Run frontend unit/lint/typecheck/build gates, WALS pipeline/release tests,
+- [x] Run frontend unit/lint/typecheck/build gates, WALS pipeline/release tests,
   the explicit snapshot gate, and the WALS production browser suite against the
   final pins. Run affected profile-focus, selection, and word-trail regressions.
   Broaden testing when changed shared code or failures justify it.
-- [ ] Measure cold feature loading, parsing/indexing, profile switching, selection,
+- [x] Measure cold feature loading, parsing/indexing, profile switching, selection,
   and overlay rendering on a recorded environment. Check that unrelated browsing
   does not eagerly load WALS. Add workers/sharding only if measurements warrant
   them; the prototype's 1.1 MB size alone does not justify either.
-- [ ] Repeat clean-checkout restoration and deployment preparation for the final
+- [x] Repeat clean-checkout restoration and deployment preparation for the final
   app/data combination. Record actual publication and deployment outcomes.
-- [ ] Update root/frontend READMEs, `DATASETS.md`, architecture/session ownership
+- [x] Update root/frontend READMEs, `DATASETS.md`, architecture/session ownership
   documentation, and `pipeline/wals/README.md`. Explain matching scope, missingness,
   citations, sampling, session persistence, restoration, rebuild, and rollback.
-- [ ] Remove abandoned prototype paths, duplicate policy definitions, dead helpers,
+- [x] Remove abandoned prototype paths, duplicate policy definitions, dead helpers,
   and unnecessary map renames. Do not change unrelated geometry/color systems.
-- [ ] Record remaining limitations and the status of every stage in this roadmap.
+- [x] Record remaining limitations and the status of every stage in this roadmap.
 
 Acceptance: required checks pass or have an explicitly resolved scope decision;
 the final artifact can be restored and served independently of development data;
@@ -1003,3 +1004,142 @@ selections use the documented wider Mercator view. Final source/release fixture
 tests, performance measurements and clean-checkout deployment preparation remain
 WALS-07. No code commit/push, main merge, release publication, remote CI run or
 deployment occurred in this step. Changes remain local and uncommitted.
+
+## WALS-07 execution record — final acceptance and handoff
+
+Completed locally on 2026-11-12 on `port/wals-map`, starting from clean
+user-committed WALS-06 revision `d695fbbb825cc9081b34613339725346063fc701`.
+The reviewed source remains `3b7078614efcfebc1c471fea2c4ab7fb336745a6`.
+All three release pins and the dependency lockfile match that starting revision:
+atlas `atlas-data-2026-11-10-metadata`, lexical
+`word-trails-diacl-2026-10-24-v1`, WALS `wals-v2020.6-v1`.
+
+Delivered changes:
+
+- Added explicit, offline `npm run measure:wals` and production Firefox
+  `npm run measure:wals-browser` commands. Neither enters ordinary tests or
+  downloads data. The domain report fingerprints the complete WALS/atlas inputs;
+  the browser report records capabilities, compressed/decoded payload, resource
+  timing, raw samples, local preparation phases and actual UI transitions.
+- The production loader records local User Timing for receive/body/decode,
+  JSON parsing, validation and indexing, plus one successful preparation mark.
+  Cache hits do not repeat preparation. This adds no reporting service or
+  navigation writes. Existing shared-load, synchronous/network/HTTP/JSON/schema
+  failure, retry and late-completion contracts continue to pass.
+- Updated root/frontend/dataset/source documentation and architecture/session
+  ownership to describe the delivered cards and map, conservative association
+  scope, explicit missingness/citations, illustrative sampling, session-only
+  choices, independent restoration, rebuilds and rollback. Removed stale claims
+  that profile/map UI had not been mounted. Corrected the documented WALS matrix
+  coverage denominator to exclude classification-only rows (about 15%).
+- Audited the port paths and runtime boundaries. The prototype arcs, unused
+  regional-comparison helper, lexical-owned composition wrapper and superseded
+  lexical camera helper are already absent after WALS-05/06. Card policy has one
+  implementation; the map core imports no WALS implementation. No additional
+  helper removal or map rename was warranted. Geometry/color systems, dependency
+  versions, data pins and the existing profile layout remain unchanged.
+
+Final acceptance results:
+
+| Check | Result |
+| --- | --- |
+| Frontend unit suite | **304 passed** |
+| Biome / TypeScript / production build | Passed; **241** frontend files checked; existing build chunk-size/plugin-timing warnings only |
+| WALS Python source/release fixtures | **74 passed** with `.venv/bin/pytest -q pipeline/tests/test_wals.py pipeline/tests/test_wals_release.py` |
+| Python source reconciliation | Passed: **76,475** observations, every historical cleaned-table field reconciled, **zero** semantic differences |
+| Published WALS snapshot/catalog/selection gate | **4 passed**, including all **5,517** exported observations |
+| Lexical snapshot regression | **3 passed** |
+| Production WALS map suite | **22 checkpoints passed**: 13 synthetic-coordinate and nine actual published-data checkpoints |
+| Production WALS profile suite | **10 grouped checks passed**, including exact 320/390px layouts |
+| WALS delivery fixture | **5 grouped checks passed**: production base/lazy/shared cache, notices, HTTP failure, invalid JSON, invalid schema and retry |
+| Existing word-trail regression | **18 checkpoints passed**, production base |
+| Existing focus and selection scenarios | Passed after ready finder mount; pointer/keyboard/profile framing, pinned groups, coverage/colors and removal |
+| Clean restored artifact in Firefox | Passed: production base, lazy loading, real Donegal 12A keyboard inspection with origin retained, lexical/Geography round trip, one WALS request and no raw-source requests |
+| Ruff check/format and `git diff --check` | Passed |
+
+Performance environment: Linux x86_64, AMD Ryzen AI 7 350, Node 24.14.0,
+npm 11.9.0, Python 3.12.3, Firefox 156.0 and geckodriver 0.37.1. Firefox uses
+software WebGL and native desktop CPU with no CPU throttling. Three fresh
+origins per network scenario produce six cold browser samples; ordinary atlas
+search/profile browsing fetches no WALS data, and each sample retains exactly one
+WALS request/preparation through subsequent profile/variety/overlay changes.
+
+| Measurement | Recorded result |
+| --- | --- |
+| Actual JSON payload | **4,948,094 bytes** decoded; **836,639 bytes** gzip; SHA-256 `5ed6085ae55662cce317a0183fb122fad37caca026b43c6a1b9a57e2a3c0a580` |
+| Cold input → cards, loopback gzip | **126 ms median**, 107–182 ms |
+| Cold input → cards, WALS-only 10 Mbit/s +150 ms latency | **943 ms median**, 939–956 ms |
+| Browser parse / validate / index | 11–32 / 31–73 / 3–9 ms |
+| Cached atlas-profile switches → cards | **26 ms median** in both scenarios; 17–41 ms overall |
+| Cached source-variety switches → cards | 5–69 ms overall |
+| First explicit show → overlay paint, including lazy code | 328–340 ms |
+| Subsequent feature show → overlay paint | 20–28 ms |
+| Node parse including UTF-8 decode / validate / index | Medians 16.5 / 30.8 / 5.6 ms, five fresh repositories including warm-up |
+| Node complete-catalog association / first card policy | Medians 15.9 / 2.0 ms |
+| Node selection and point geometry, five real origins | Median per origin 0.044–0.207 ms; maximum 3.37 ms across 500 selections |
+
+Browser input/render clocks run inside the browser, with two animation frames
+after the matching DOM commit; WebDriver polling is excluded. Overlay paint
+does not include completion of its optional camera transition. Timer-gap samples
+during cold loading reached 148 ms; they include scheduling, map work and GC and
+are not Long Tasks API measurements. These desktop results support retaining one
+lazy main-thread WALS repository and static bounded geometry. No worker, sharding
+or animation loop was added. Slower/mobile CPU performance remains unmeasured;
+the network throttle is not mobile-device emulation.
+
+Clean restoration used an empty candidate source export containing tracked files
+and the pending WALS-07 files, with no ignored development data, source checkouts
+or dependencies. It independently downloaded and verified all three actual
+published browser pins, installed the locked dependencies with `npm ci --offline`
+from the package cache, and ran the workflow's unit/lint/typecheck, both snapshot
+gates and `GITHUB_PAGES=true npm run build`. Every restored data/notice file was
+compared byte-for-byte with its built counterpart. No raw source directory or
+recovery archive was needed or included in `dist/`. Firefox then served that
+artifact under `/lang-viz/`, including exact Donegal navigation and the lexical
+workspace. The accepted source files, pins and lockfile match the final worktree.
+
+The accepted source tree/dependencies/artifact were retained after browser
+acceptance at ignored `.data-releases/wals-07-acceptance/`; the deployable output
+is `app/dist/` inside it. Preview from the repository root with:
+
+```sh
+GITHUB_PAGES=true npm --prefix .data-releases/wals-07-acceptance/app run preview
+```
+
+Open `/lang-viz/` on the printed origin. The artifact is a local handoff,
+independent of the original development datasets. A normal fresh checkout uses
+the [documented restore/build commands](pipeline/wals/README.md#deployment-and-snapshot-checks).
+
+Ignored evidence is under `app/test-results/wals-07/`: `acceptance.json`,
+`environment.json`, unit/lint/typecheck/build/pipeline/source/snapshot logs,
+`domain-performance.json`, `performance/report.json`, `map-report.json`,
+`profile-report.json`, `word-trail/`, `delivery/`, `focus/`, `selection/`,
+`clean-report.json`, `clean-browser/`, and clean preparation logs. The full
+refreshed map/profile screenshots also remain in the runners' `wals-06/` and
+`wals-04/` directories. The clean report records both the checked location and
+the later retained artifact location.
+
+Initial attempts are recorded separately: restricted Node subprocesses caused a
+sandbox-only architecture-test failure, resolved by running the gate with the
+required process access. An initial temporary source export built successfully
+but its directory was unavailable to the later preview; that preview returned
+404. Clean restoration/build and browser acceptance were repeated successfully
+in a retained workspace directory. Neither failed attempt is counted as browser
+acceptance or required a production fallback change.
+
+All roadmap stages are complete **locally**. Remaining product limits are the
+explicitly deferred profile ergonomics redesign, session-only WALS persistence,
+seven exported features, representative source points, sparse/qualified source
+evidence, bounded illustrative examples, list inspection for hidden globe points
+and wider single-world Mercator framing across the dateline. Family/group
+associations do not imply inherited values. Arcs and regional comparison tables
+were deliberately excluded. This first WALS release has no earlier published
+WALS pin; changed-payload rollback is covered by release fixtures and the retained
+pin procedure is documented.
+
+Publication: the actual WALS data release was published in WALS-03 and verified
+again here; no new release was published. Integration: WALS-07 changes remain
+uncommitted on `port/wals-map`; no code push or main merge was performed.
+Deployment: the final artifact was restored, built and served locally; no remote
+CI run or GitHub Pages deployment was performed. User testing and any resulting
+fixes can precede the separate code-integration/deployment decision.

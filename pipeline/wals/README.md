@@ -1,7 +1,8 @@
 # WALS source adapter and independent delivery
 
-WALS-01 compiles an independent, versioned typology supplement. It does not
-change atlas or lexical releases, create atlas associations, or add frontend UI.
+This adapter compiles an independent, versioned typology supplement. It does not
+change atlas or lexical releases or create atlas associations. Profile cards and
+map exploration consume the separately restored browser release.
 Port reference: `3b7078614efcfebc1c471fea2c4ab7fb336745a6` (`swedha-wals`).
 
 ## Selected snapshot
@@ -73,9 +74,9 @@ All keyed objects use original WALS IDs. There are no atlas IDs or inferred join
 | `diagnostics` | Counts, observations per feature, absent/incomplete locations, sparse references and validation checks |
 
 The export scope is 12A, 13A, 30A, 37A, 81A, 87A, and 92A. This is a selection
-of features, not a card-selection policy. Editorial labels, English examples,
-regional priorities and mounted UI are later stages. Catalog matching and session
-contracts are implemented separately under `app/src/integrations/wals/`.
+of features, not a card-selection policy. Editorial labels, English illustrations
+and regional priorities belong to `app/src/features/wals/cards.ts`; catalog
+matching and navigation live separately under `app/src/integrations/wals/`.
 There are 5,517 exported observations, 33 categories, 46 cited examples and 5,915
 referenced bibliography entries. All 935 varieties without shortlisted values
 remain in `records`. Absence of an observation means missing data, not a category.
@@ -101,8 +102,9 @@ fields as executable markup. Full original markup remains in the source archive.
 
 [NOTICE.md](NOTICE.md) describes attribution, CC BY 4.0 and our adaptations.
 The upstream errata include a correction for **Orok / 87A**, within this shortlist.
-Published values are preserved with the errata; a later UI must expose the
-caveats. This adapter does not silently apply editorial corrections.
+Published values are preserved with the errata; the profile UI exposes the Orok
+caveat and the complete source errata. This adapter does not silently apply
+editorial corrections.
 
 ## Tests and reconciliation
 
@@ -236,6 +238,30 @@ archive, historical comparison, source compilation, geographic preprocessing or
 new release publication is involved. Missing/corrupt files fail before deployment.
 Ordinary `npm test` stays fixture-only; no npm lifecycle hook downloads or compiles
 WALS. Source reconciliation remains the separate explicit Python check above.
+
+For a fresh checkout, prepare the same deployable data/app combination without
+source datasets or geographic preprocessing:
+
+```sh
+python3 -m pipeline.atlas.data_release restore
+python3 -m pipeline.etymology.data_release restore
+python3 -m pipeline.wals.data_release restore
+cd app
+npm ci
+npm test
+npm run check
+npm run typecheck
+npm run test:etymology-snapshot
+npm run test:wals-snapshot
+GITHUB_PAGES=true npm run build
+GITHUB_PAGES=true npm run preview
+```
+
+Open the preview's `/lang-viz/` path. `dist/` includes all three verified browser
+datasets and notices; raw/recovery archives are not copied there. Building and
+previewing do not publish code, replace any release pin, merge main or deploy
+Pages. Actual release publication, main integration and site deployment are
+separate outcomes recorded in the [port handoff](../../WALS_PORT_PLAN.md).
 
 From `app/`, after restoring WALS and atlas data:
 

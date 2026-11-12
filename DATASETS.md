@@ -2,7 +2,9 @@
 
 Datasets used or considered for the project. See [OVERVIEW.md](OVERVIEW.md) for the project summary, and [ARCHITECTURE.md](ARCHITECTURE.md) for how they are combined.
 
-All datasets live in `datasets/`. Every download command below is meant to be run **from the project root**.
+Exploratory source checkouts live in `datasets/`; pinned application inputs and
+browser releases have separate ignored destinations described below. Every
+download command below is meant to be run **from the project root**.
 
 ```
 datasets/
@@ -161,7 +163,10 @@ Grammatical and phonological features of languages, with categorical values, com
 
 **Caveats**
 
-- **Very sparse: only 11% of the language × feature matrix is filled.** The median language has 19 features; only 158 languages have 100 or more; 787 have 5 or fewer. The median feature covers 257 languages (min 5, max 1,518).
+- **Sparse: about 15% of the source-variety × feature matrix is filled**
+  (76,475 / (2,662 × 192), excluding classification-only rows). The median language
+  has 19 features; only 158 languages have 100 or more; 787 have 5 or fewer. The
+  median feature covers 257 languages (min 5, max 1,518).
 - WALS defines two curated samples of 100 and 200 languages (`Samples_100`, `Samples_200`), which are much denser.
 - WALS uses **its own language codes** (e.g. `eng`); the Glottocode is a separate column.
 - 911 of the 3,573 rows in `languages.csv` are family / genus nodes, not languages (empty `Glottocode`, `Latitude`, `Macroarea`).
@@ -183,13 +188,42 @@ errata. All source varieties retain their own identity; no atlas matching or
 language-level aggregation occurs in this build. The complete upstream archive
 is retained outside Git under `data/wals/wals-v2020.6/`. Independent browser and
 source archives are published and pinned by `wals-release.json`; deployment
-restores only the browser asset. Profile/map UI remains a later stage. Restore
-without compiling source data:
+restores only the browser asset. Profile cards and optional geographic examples
+use this release. Restore without compiling source data:
 
 ```sh
 python3 -m pipeline.wals.data_release restore
 python3 -m pipeline.wals.data_release verify
 ```
+
+### Application interpretation
+
+The browser supplement contains all 2,662 source varieties, 5,517 observations
+across seven features (12A, 13A, 30A, 37A, 81A, 87A, 92A), 33 categories and the
+5,915 bibliography entries and 46 supplied examples they reference. The full
+76,475 observations remain recoverable in the separate source archive. A missing
+value stays unknown; 935 varieties have no shortlisted observations. Chapter
+citations and exact observation references/pages remain distinct. Published
+assignments are retained with source errata, including the Orok 87A caveat.
+
+Associations resolve against the complete current atlas catalog, independently
+of map polygons: 2,645 by declared Glottocode and 11 by conservative unique primary
+ISO fallback; six remain unmatched. The 2,656 associations cover 2,572 language,
+46 dialect and 38 broader family/group entries. These are associations of source
+records, never inherited feature values. Explicit unresolved Glottocodes do not
+fall back to ISO; ambiguous identifiers do not select an arbitrary target. See
+the [reviewed association policy](app/src/integrations/wals/ASSOCIATION_REVIEW.md).
+
+In Geography, open a profile, choose **Load WALS features**, and inspect its
+recorded varieties and citations. **Show recorded examples on map** displays an
+origin plus at most 12 geographically spaced observations of the exact category.
+This is an illustrative selection, not a representative sample or evidence of
+ancestry/contact. Shared locations keep separate records; unmatched records
+remain inspectable. WALS source coordinates are representative points, not atlas
+territories. Variety choices and overlays persist only within the current session.
+See the [frontend contract](app/src/features/wals/README.md) for missingness,
+sampling/counts and navigation, and the [release guide](pipeline/wals/README.md)
+for source rebuilds, verified independent restoration and rollback.
 
 For upstream exploration separately:
 
@@ -561,13 +595,14 @@ mappings now enabled by the production importer.
 
 | Link | Via | Coverage |
 |---|---|---|
-| WALS → Glottolog | `languages.csv` → `Glottocode` | 2,645 / 2,662 languages (2,562 at language level, 46 dialects, 37 family nodes) |
+| WALS → atlas | Declared classification Glottocode, then eligible unique primary ISO | 2,656 / 2,662 source varieties: 2,572 language, 46 dialect, 38 broader family/group associations; six unmatched |
 | DiACL → Glottolog | `languages.csv` → `Glottocode` | 371 / 422 varieties (340 languages, 29 dialects, 2 family nodes) |
 | WALS ∩ DiACL | shared Glottocode | ~205 languages: Indo-European 74, Austronesian 69, Nakh-Daghestanian 18, Turkic 8, Sino-Tibetan 8, … |
 | Glottography → Glottolog | `cldf:languageReference` in GeoJSON; `Glottocode` in CSV | every polygon; coverage in section 4.1 |
 
 - The 51 DiACL varieties without a Glottocode are mostly proto-languages. They can be matched by hand to Glottolog family nodes (e.g. Proto-Germanic → `germ1287`).
-- Data recorded at dialect level can be moved up to its language with glottolog-cldf's `Language_ID` column (or the `classification` path).
+- Classification parents can support browsing, but a WALS dialect observation
+  remains attached to its recorded variety and is never promoted to a parent value.
 - **Common concept IDs: Concepticon** (https://concepticon.clld.org). Word-list datasets tag concepts with shared IDs (`Concepticon_ID`), so "stone" in DiACL is the same concept as "stone" in WOLD or Lexibank.
 
 The decisions needed to actually combine the datasets (level mismatches, disagreeing sources, time) are in [ARCHITECTURE.md](ARCHITECTURE.md#2-integration-rules).

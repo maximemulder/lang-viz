@@ -69,6 +69,23 @@ The representation/count policy is in the
 restored WALS/atlas data and the source Git object present. See
 [WALS frontend contracts](src/features/wals/README.md).
 
+Variety choices, inspected features and overlays last for the current session;
+they reset on reload and add no URL fields. Globe uses the shortest longitude
+arc for focus; dateline selections use a wider view in the existing single-world
+Mercator projection. Sampling is illustrative and broader associations do not
+assert values for a family or its descendants. The current profile layout is
+retained; an ergonomics redesign remains separate work.
+
+After restoring the WALS/atlas datasets, `npm run measure:wals` records offline
+parsing, validation, indexing, full-catalog association, card-policy and selection
+timings. `npm run measure:wals-browser` builds the production app and measures
+actual cold gzip delivery, first cards, cached profile/variety changes and overlay
+paint in Firefox. It requires all three datasets and Firefox/geckodriver, makes
+no data downloads, and writes ignored evidence under `test-results/wals-07/`.
+Its slow-network scenario throttles only WALS to 10 Mbit/s plus 150 ms latency;
+CPU/mobile-device emulation is not applied. See the [handoff](../WALS_PORT_PLAN.md)
+for measured results and exact validation/deployment status.
+
 ## Word histories
 
 Use the header's **Word histories** workspace to search recorded forms, meanings,

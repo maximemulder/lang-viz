@@ -31,9 +31,16 @@ to see recorded varieties, feature cards and citations. Variety choices survive 
 and workspace navigation for the session. **Show recorded examples on map** on a
 recorded card opens static points and an inspection list for up to 12 exact-category
 examples, independently of word-history overlays and pinned comparisons.
+WALS uses an independent pinned snapshot and does not rebuild geographic or lexical data.
 See [source/build commands](pipeline/wals/README.md),
 [frontend contracts](app/src/features/wals/README.md) and the [port roadmap](WALS_PORT_PLAN.md).
-It uses an independent pinned snapshot and does not rebuild geographic or lexical data.
+
+The roadmap records final acceptance and remaining limitations. All three data
+pins restore independently; the [deployment preparation commands](pipeline/wals/README.md#deployment-and-snapshot-checks)
+build a fresh checkout without raw source datasets. WALS choices are session-only.
+The map examples are a bounded illustration of one recorded category, with no
+inferred linguistic relationship. `npm run measure:wals` and
+`npm run measure:wals-browser` in `app/` reproduce domain and browser measurements.
 
 ## Build the proof of concept
 

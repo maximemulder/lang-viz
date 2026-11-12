@@ -231,3 +231,33 @@ with the actual published data and explicitly labelled coordinate fixtures serve
 by a local proxy. Installed data is unchanged. Reports and screenshots are under
 `test-results/wals-06/`. The shared word-trail regression runner accepts
 `--base /lang-viz/` for use against this same production build.
+
+## Measurements and handoff
+
+`npm run measure:wals` explicitly reads the restored full snapshot and atlas
+catalog, fingerprints both, and measures parsing/UTF-8 decoding, validation,
+indexing, catalog association, first/cached card policy and selection/geometry for
+five real origins. It does not fetch data or enter ordinary tests.
+
+`npm run measure:wals-browser` builds the production application and performs
+three cold-origin runs for each of loopback gzip delivery and WALS-only
+10 Mbit/s +150 ms latency. It verifies no WALS request during ordinary atlas
+browsing, one successful preparation/request across subsequent use, and times
+first cards, cached atlas-profile and variety switches, and initial/subsequent
+overlay paints. Input and matching render commits are timed inside the browser;
+two animation frames include paint without WebDriver polling latency. Overlay
+paint excludes completion of the optional camera transition. The runner can reuse
+the final build directly with `python3 tests/browser/wals_performance.py`; use
+`--runs` and `--output` to select repetition and ignored evidence destinations.
+
+The production loader records `wals:receive` (request/body/decode), `wals:parse`,
+`wals:validate`, `wals:index` measures and a `wals:prepared` mark once per
+successful load. These are local User Timing entries with no reporting service.
+Cache hits add no timings. Firefox's 10ms timer-gap probe includes scheduling,
+garbage collection and map work; it is not a Long Tasks API measurement. The
+desktop software-WebGL scenario does not establish slower-device CPU performance.
+
+The [roadmap handoff](../../../../WALS_PORT_PLAN.md) records the environment,
+results, clean-restoration evidence, remaining limits and separate publication,
+integration and deployment statuses. URL/reload persistence and a profile
+ergonomics redesign remain outside this port.
