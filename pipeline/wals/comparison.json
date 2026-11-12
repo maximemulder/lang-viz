@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "snapshot": "swedha-wals-cleaned",
+  "repository": "maximemulder/lang-viz",
+  "commit": "3b7078614efcfebc1c471fea2c4ab7fb336745a6",
+  "files": [
+    {
+      "name": "audit.json",
+      "path": "data/wals-cleaned/audit.json",
+      "url": "https://raw.githubusercontent.com/maximemulder/lang-viz/3b7078614efcfebc1c471fea2c4ab7fb336745a6/data/wals-cleaned/audit.json",
+      "bytes": 3910,
+      "sha256": "7620b9ddfc93c3379b5365e87d36b59cf2fd469cbf1315a8995ef6e44407aa98"
+    },
+    {
+      "name": "category_codebook.csv",
+      "path": "data/wals-cleaned/category_codebook.csv",
+      "url": "https://raw.githubusercontent.com/maximemulder/lang-viz/3b7078614efcfebc1c471fea2c4ab7fb336745a6/data/wals-cleaned/category_codebook.csv",
+      "bytes": 119665,
+      "sha256": "d00c153779a06d03aa4506532bbc6127025c22e2dfa87f4a4aa2223c0685decf"
+    },
+    {
+      "name": "languages_clean.csv",
+      "path": "data/wals-cleaned/languages_clean.csv",
+      "url": "https://raw.githubusercontent.com/maximemulder/lang-viz/3b7078614efcfebc1c471fea2c4ab7fb336745a6/data/wals-cleaned/languages_clean.csv",
+      "bytes": 419435,
+      "sha256": "26219990a31069b63e1b76b969761246df7cb0d416096dd08f83e0da3de92e50"
+    },
+    {
+      "name": "wals_clean_long.csv",
+      "path": "data/wals-cleaned/wals_clean_long.csv",
+      "url": "https://raw.githubusercontent.com/maximemulder/lang-viz/3b7078614efcfebc1c471fea2c4ab7fb336745a6/data/wals-cleaned/wals_clean_long.csv",
+      "bytes": 18155084,
+      "sha256": "dddc1d19d350f7e2c5b00e3a61c88bf3dbe1be7e4aa1e19b58dda2f8ead79bfe"
+    }
+  ]
+}

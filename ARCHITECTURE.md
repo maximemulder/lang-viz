@@ -26,7 +26,7 @@ The key rule: **the front end only knows the internal schema, never the original
 The datasets share a format (CLDF) and a key (Glottocode), so format conversion is easy (see [DATASETS.md](DATASETS.md#5-how-the-datasets-link)). The real work is deciding what counts as the same thing. These are the rules to agree on:
 
 1. **Features with similar meaning are not directly comparable.** WALS and Grambank ask similar but not identical questions, with different value sets. We use one main source per topic and do not merge them.
-2. **Level mismatches.** Datasets record dialects, languages or groups of varieties. Data is rolled up to language level via the Glottolog tree (dialect → parent language). If two dialects of one language disagree, we keep both values and flag the conflict.
+2. **Level mismatches.** Datasets record dialects, languages or groups of varieties. WALS observations remain attached to their exact source varieties; an atlas association is separate and must not roll a value up to a parent language or family. Conflicting variety values remain distinct. See the [WALS contracts](WALS_PORT_PLAN.md#architecture-and-behavior-contracts).
 3. **Disagreeing sources.** A language may have several polygons or coordinates. We pick a default (Glottolog coordinates; asher2007world polygons where available) and keep the alternatives for the "compare sources" view. Never merge them silently.
 4. **Entries outside Glottolog.** Reviewed equivalents keep Glottocodes. Entries without equivalents use stable dataset-namespaced IDs and explicit source classification provenance. The atlas registry is `pipeline/atlas/source_languoids.json`; reviewed parent links place Tibeto-Burman under Sino-Tibetan and Shaozhou Tuhua/Danzhou under Sinitic. Family and parent-language metadata follow the combined ancestry. Existing Glottolog branches keep their parents; only entries with unresolved broader affiliations remain roots.
 5. **Time.** Each dataset has its own notion of time (DiACL date ranges, Glottography map years, *contemporary* / *traditional*). We keep a simple model: every geometry or variety gets an optional start / end year and a layer label. A finer time axis only if a view needs it.
@@ -64,7 +64,13 @@ catalog ID is one. Tables:
 One script per dataset:
 
 - **Glottolog:** from glottolog-cldf (preferred) or the `languoids/tree` `.ini` files → `languages`, `names`.
-- **WALS / Grambank:** CLDF → `features`, `values`.
+- **WALS:** `pipeline/wals/` validates a pinned CLDF snapshot and compiles an independent
+  `app/public/wals/features.json` with source records, seven feature definitions,
+  categories, observations, references, examples, provenance and source caveats.
+  Full source recovery and explicit snapshot checks are separate from ordinary
+  tests. Atlas matching, frontend consumption and release delivery are later
+  stages; see the [schema and commands](pipeline/wals/README.md).
+- **Grambank:** a separate CLDF adapter remains future work.
 - **DiACL:** CLDF + raw XML / JSON → `forms`, `word_links`, date ranges. The word-history links exist only in the raw files.
 - **Glottography:** `pyglottography` for merged polygons at the three levels → `geometries`.
 - **Wikidata:** normalized SPARQL extracts → speaker estimates, official status

@@ -168,6 +168,24 @@ Grammatical and phonological features of languages, with categorical values, com
 
 ### 2.2 Getting the data
 
+The application adapter pins **v2020.6** (2026-09-28), the latest release and
+upstream default-branch revision checked on 2026-11-12. Recover and validate it
+without relying on an existing `datasets/wals` checkout:
+
+```sh
+python3 -m pipeline.wals.sources restore
+python3 -m pipeline.wals.build
+```
+
+The [adapter contract](pipeline/wals/README.md) describes immutable source hashes,
+the seven-feature supplement, full-snapshot reconciliation, source notices and
+errata. All source varieties retain their own identity; no atlas matching or
+language-level aggregation occurs in this build. The complete upstream archive
+is retained outside Git under `data/wals/wals-v2020.6/`. Frontend integration and
+independent browser release delivery remain later port stages.
+
+For upstream exploration separately:
+
 ```sh
 git clone --depth 1 --single-branch --branch master https://github.com/cldf-datasets/wals datasets/wals
 ```

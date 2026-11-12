@@ -7,8 +7,8 @@ independently reviewable changes. Do not merge or cherry-pick the original
 data-heavy commit wholesale. Fix the data, identity, navigation, and delivery
 issues as their corresponding pieces are introduced.
 
-This document is the execution checklist. WALS-00 baseline validation is complete;
-WALS application implementation has not started.
+This document is the execution checklist. WALS-00 and WALS-01 are complete;
+frontend WALS integration has not started.
 Update each item's status, implementation decisions, and validation evidence as
 work proceeds. Mark an item complete only when its acceptance checks pass.
 Record skipped checks and pre-existing failures separately from regressions.
@@ -113,7 +113,7 @@ Initial review evidence:
 | Item | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
 | WALS-00 | Baseline and port setup | — | Complete |
-| WALS-01 | Reproducible sources and validated supplement | WALS-00 | Planned |
+| WALS-01 | Reproducible sources and validated supplement | WALS-00 | Complete |
 | WALS-02 | Repository, matching, and session/navigation model | WALS-01 | Planned |
 | WALS-03 | Independent release delivery and CI | WALS-01; join checks need WALS-02 | Planned |
 | WALS-04 | Language profile cards | WALS-02, WALS-03 | Planned |
@@ -148,28 +148,28 @@ Candidate material: `data/wals-cleaned/` and `scripts/build_wals.py` on the sour
 commit. Reimplement the adapter under `pipeline/wals/`; do not import the large
 cleaned CSVs into main's history.
 
-- [ ] Pin recoverable inputs by immutable revision, size, and checksum. Preserve
+- [x] Pin recoverable inputs by immutable revision, size, and checksum. Preserve
   the original cleaned snapshot as a comparison artifact outside Git. Include
   the raw tables and bibliography needed to reproduce observations and citations.
-- [ ] Implement source restoration/verification and an explicit build command.
+- [x] Implement source restoration/verification and an explicit build command.
   Reproduce the cleaning from pinned raw inputs, or independently compile raw
   inputs and reconcile every difference from the reviewed cleaned snapshot.
   A historical audit alone is not proof of reproducibility.
-- [ ] Define a versioned internal schema for source records, feature definitions,
+- [x] Define a versioned internal schema for source records, feature definitions,
   categories, observations, references/page locators, and provenance. Keep source
   identity independent of atlas IDs; retain records with no shortlisted values.
-- [ ] Validate IDs, duplicate observations, foreign keys, category membership,
+- [x] Validate IDs, duplicate observations, foreign keys, category membership,
   reference resolution, and finite/in-range coordinate pairs. Preserve valid
   zero coordinates and distinguish missing coordinates from invalid ones.
-- [ ] Separate factual feature definitions from editorial labels and the card
+- [x] Separate factual feature definitions from editorial labels and the card
   selection policy. Preserve source qualifications needed to interpret values;
   render source content safely without injecting raw HTML.
-- [ ] Generate deterministic output with atomic replacement and a report of
+- [x] Generate deterministic output with atomic replacement and a report of
   counts, omissions, provenance, and checks. Failures preserve the prior artifact.
-- [ ] Add source notices and resolvable bibliographic entries. Retain full source
+- [x] Add source notices and resolvable bibliographic entries. Retain full source
   observations in the recoverable archive even though the browser uses seven
   features. Document the scope of the export.
-- [ ] Add small synthetic pipeline tests and a separate full-snapshot check.
+- [x] Add small synthetic pipeline tests and a separate full-snapshot check.
 
 Acceptance: pinned sources reproduce the supplement; differences from branch
 data are explained; invalid inputs fail meaningfully; citations resolve. Ordinary
@@ -449,5 +449,96 @@ Evidence is under ignored `app/test-results/wals-00/`: `environment.json`,
 `browser-checks.json`, and the `focus/`, `selection/`, and `word-trail/` browser
 reports/screenshots.
 The sandboxed result in `checks.json` is superseded by `unit-unsandboxed.json`.
-WALS-00 is complete. WALS-01 through WALS-07 remain planned; the next stage is
-recovering the pinned WALS inputs and implementing the reproducible supplement.
+At the end of this baseline run, WALS-00 was complete and WALS-01 was next.
+See the subsequent execution record below for current progress.
+
+### WALS-01 execution — 2026-11-12
+
+Complete on local branch `port/wals-data`, based on main
+`ab16007a34999308c70670ff2704ff5b65f66b9c` (the baseline roadmap commit).
+The user explicitly requested the latest available WALS snapshot, regardless of
+the local checkout or prototype. Upstream's latest release, its annotated tag,
+and current `master` all resolve to **v2020.6**, commit
+`81298aa26d01fdc11b769bcc7fa87ad9e43d7ccd`, published 2026-09-28. The publisher's
+download page agrees. No newer default-branch data was available at verification.
+The version therefore happens to match the prototype audit; the local v2020.5
+checkout remains untouched and is not an adapter input.
+
+Delivered under `pipeline/wals/`:
+
+- `sources.json` pins the immutable upstream archive (12,264,263 bytes) and 20
+  extracted files by size/SHA-256. Restoration retains the complete archive,
+  including raw tables, full CLDF observations, bibliography, notices and errata.
+  Network and offline-archive restoration both verify before atomic installation;
+  an existing modified installation is rejected and preserved.
+- `comparison.json` separately pins all four historical cleaned/audit files from
+  source commit `3b7078614efcfebc1c471fea2c4ab7fb336745a6`. They are recovered outside
+  Git for comparison, not used to generate the new supplement.
+- `build.py` independently compiles the upstream CLDF tables into schema/adapter
+  version 1. It validates all IDs, declared foreign keys, category memberships,
+  value codes, bibliography references, unique observation pairs and coordinates
+  before applying the seven-feature export scope. No atlas dependency or joins
+  are embedded. Missing source values and all 2,662 source varieties are retained.
+- The bundle carries factual feature/chapter definitions, exact observations,
+  bibliography and page locators, cited examples, provenance, notices, errata
+  and validation diagnostics. Descriptive markup becomes plain text. The narrow
+  normalized-BibTeX reader rejects unsupported syntax rather than guessing;
+  five sparse published citations without titles remain explicit diagnostics.
+- `snapshot.py` independently reconstructs every field in all three historical
+  cleaned tables and writes complete added/removed/changed rows before enforcing
+  reviewed counts. It found **zero semantic differences** across 2,662 language
+  records, 76,475 observations and 1,143 categories. All 12 CSV hash discrepancies
+  are explained by LF versus CRLF endings; the metadata JSON and bibliography
+  hashes agree exactly. This is a fresh comparison, not reliance on the old audit.
+- Source/build/schema instructions and CC BY 4.0 attribution are in
+  `pipeline/wals/README.md` and `NOTICE.md`. Root documentation now describes
+  this stage and explicitly preserves source-variety scope instead of rolling
+  WALS values up to atlas parents.
+
+The supplement contains 5,517 observations, seven features, 33 categories,
+5,915 bibliography entries and 46 cited examples. All 935 varieties without
+shortlisted observations remain present. The 70,958 observations outside the
+shortlist are validated and retained in the recoverable source archive. The
+published errata flag Orok / 87A; this stage keeps the published value and its
+caveat rather than silently applying a correction. WALS-04 must make these
+caveats available alongside the cards.
+
+Validation on Python 3.12.3 and the WALS-00 frontend environment:
+
+| Command/check | Result |
+| --- | --- |
+| `python3 -m pipeline.wals.sources restore --archive /tmp/wals-01/upstream.tar.gz` | Passed; pinned offline recovery |
+| `python3 -m pipeline.wals.sources restore --output /tmp/wals-01/network-restore` | Passed; fresh download through the implemented restore path |
+| `python3 -m pipeline.wals.sources restore-comparison --from-git .` | Passed; verified four historical inputs |
+| `python3 -m pipeline.wals.build` | Passed; full validation and atomic supplement generation |
+| `python3 -m pipeline.wals.snapshot` | Passed; full counts and zero unexplained differences |
+| `.venv/bin/pytest -q pipeline/tests/test_wals.py` | 39 passed; fixture-only, no downloads/generated-data prerequisites |
+| `.venv/bin/ruff check pipeline/wals pipeline/tests/test_wals.py` | Passed |
+| `.venv/bin/ruff format --check pipeline/wals pipeline/tests/test_wals.py` | Passed |
+| `npm run build` from `app/` | Passed; existing chunk-size/plugin-timing warnings |
+| Repeated build and independent fresh-restoration build | Identical bytes; unchanged output mtime for an identical rebuild |
+
+Tests cover invalid/partial/nonfinite coordinates, evidence outside the shortlist,
+broken joins/references, duplicates, malformed bibliography, source identity and
+missingness, complete field-level comparison, modified installations, corrupted
+archives, unsafe members/paths, and preservation of the old output when validation
+or atomic replacement fails. No frontend code changed, so the WALS-00 browser
+baseline was not repeated. No new dependencies or npm hooks were added.
+
+The current bundle is 4,948,094 bytes (836,639 bytes with local gzip), SHA-256
+`5ed6085ae55662cce317a0183fb122fad37caca026b43c6a1b9a57e2a3c0a580`.
+It is larger than the prototype because it retains the bibliography, examples
+and source evidence. These are file-size measurements, not browser performance
+results; loading/indexing measurements remain for frontend integration.
+
+Generated evidence lives under ignored `app/test-results/wals-01/`, including
+`upstream-check.json`, `snapshot.json`, `reproducibility.json`, and build logs.
+Inputs are under ignored `data/wals/`; output is ignored
+`app/public/wals/features.json`. No large input tables were added to Git. Existing
+atlas/lexical pins and application code are unchanged. The work is local and
+uncommitted; no release publication, main integration or deployment occurred.
+Independent release packaging/restoration remains WALS-03.
+
+WALS-00 and WALS-01 are complete. WALS-02 through WALS-07 remain planned. The next
+stage is the retryable frontend repository, conservative atlas matching and
+source-identity-aware session/navigation model.

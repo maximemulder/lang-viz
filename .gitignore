@@ -5,6 +5,8 @@ __pycache__/
 *.py[cod]
 data/processed/
 data/etymology/
+data/wals/
 app/public/data/
 app/public/etymology/
+app/public/wals/
 .data-releases/

@@ -1,0 +1,28 @@
+{
+  "counts": {
+    "excludedClassificationNodes": 911,
+    "exportedCategories": 33,
+    "exportedExamples": 46,
+    "exportedFeatures": 7,
+    "exportedObservations": 5517,
+    "exportedReferences": 5915,
+    "omittedNonShortlistedObservations": 70958,
+    "recordsWithoutObservations": 2,
+    "recordsWithoutShortlistedValues": 935,
+    "sourceCategories": 1143,
+    "sourceFeatures": 192,
+    "sourceObservations": 76475,
+    "sourceRecords": 2662,
+    "sourceReferences": 7373
+  },
+  "observationsByFeature": {
+    "12A": 486,
+    "13A": 527,
+    "30A": 257,
+    "37A": 620,
+    "81A": 1376,
+    "87A": 1367,
+    "92A": 884
+  },
+  "differenceCount": 0
+}
