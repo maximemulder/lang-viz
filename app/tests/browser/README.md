@@ -531,3 +531,22 @@ run the production UI at exact 320px and 390px CSS widths because Firefox clamps
 the outer headless window to 500px. Cards, variety selects and source evidence must
 remain reachable without horizontal overflow. Reports, screenshots, test bundles
 and browser logs are ignored under `app/test-results/wals-04/`.
+
+## WALS map integration (WALS-06)
+
+Run `npm run test:wals-map-browser` with all three installed browser datasets and
+Firefox/geckodriver. It builds the production application at `/lang-viz/` and uses
+a local proxy for explicit coordinate fixtures and controlled delayed responses;
+no fixture route or source archive ships. `WALS_SKIP_BUILD=1` reuses an already
+prepared production build for targeted reruns. The same variable can reuse that
+application build for `test:wals-profile-browser` (its separate fixture still
+builds). `WALS_CASE=fixture` or `WALS_CASE=published` runs a labelled subset of the
+map suite; the default runs both.
+
+Checks cover lazy loading, exact observation inspection through markers and the
+keyboard list, source counts, shared points and their chooser, unmatched/broader
+records, missing origin locations, no candidates, dateline focus, independent
+word/WALS overlays, pin preservation, style/projection changes, reduced motion,
+manual interruption, late responses and workspace return. Reports/screenshots are
+ignored under `app/test-results/wals-06/`. Run the existing word-trail regression
+against the same build with `python3 tests/browser/word_trail.py --base /lang-viz/`.

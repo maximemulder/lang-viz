@@ -5,7 +5,7 @@ import { WorkspaceBoundary } from './components/WorkspaceBoundary.tsx'
 import { connectExplorerNavigation } from './state/explorerNavigation.ts'
 import { explorerActionAtom, explorerSessionAtom } from './state/explorerState.ts'
 
-const GeographyWorkspace = lazy(() => import('./integrations/etymology/GeographyWithWordTrail.tsx'))
+const GeographyWorkspace = lazy(() => import('./integrations/GeographyExplorations.tsx'))
 const EtymologyExplorer = lazy(() => import('./features/etymology/EtymologyExplorer.tsx'))
 
 export const App = () => {

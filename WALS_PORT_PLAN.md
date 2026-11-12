@@ -7,10 +7,10 @@ independently reviewable changes. Do not merge or cherry-pick the original
 data-heavy commit wholesale. Fix the data, identity, navigation, and delivery
 issues as their corresponding pieces are introduced.
 
-This document is the execution checklist. WALS-00 through WALS-05 are complete;
-source/data/navigation contracts, independent delivery, language-profile cards and
-shared-feature selection/design are implemented. Mounting the map exploration
-controls and overlay remains WALS-06.
+This document is the execution checklist. WALS-00 through WALS-06 are complete;
+source/data/navigation contracts, independent delivery, language-profile cards,
+shared-feature selection/design and map exploration are implemented locally.
+Final acceptance, measurements and clean-restoration handoff remain WALS-07.
 Update each item's status, implementation decisions, and validation evidence as
 work proceeds. Mark an item complete only when its acceptance checks pass.
 Record skipped checks and pre-existing failures separately from regressions.
@@ -120,7 +120,7 @@ Initial review evidence:
 | WALS-03 | Independent release delivery and CI | WALS-01; join checks need WALS-02 | Complete |
 | WALS-04 | Language profile cards | WALS-02, WALS-03 | Complete |
 | WALS-05 | Shared-feature selection and map design | WALS-04 | Complete |
-| WALS-06 | Map integration and navigation | WALS-05 | Planned |
+| WALS-06 | Map integration and navigation | WALS-05 | Complete |
 | WALS-07 | Final acceptance and documentation | WALS-03, WALS-04, WALS-06 | Planned |
 
 Use short-lived branches based on current main, such as `port/wals-data`,
@@ -297,30 +297,30 @@ are dropped, record that scope decision rather than claiming they were ported.
 
 ### WALS-06 — Integrate the map without replacing current behavior
 
-- [ ] Compose optional WALS layers and summary through `GeographyWorkspace`'s
+- [x] Compose optional WALS layers and summary through `GeographyWorkspace`'s
   existing slots. Move app-level composition to a neutral owner if necessary so
   it can host both lexical and WALS integrations. Preserve lazy loading and the
   mounted map; do not import WALS implementation into `WorldMap` or copy the old
   `InspectionHighlight` rename.
-- [ ] Add explicit show, focus, inspect, and clear controls. Show establishes the
+- [x] Add explicit show, focus, inspect, and clear controls. Show establishes the
   source/feature specification; inspection preserves it. Clearing WALS leaves
   lexical state, pinned entries, and profile choices intact.
-- [ ] Use shared camera intent, cancellation, and dateline-aware bounds. Opening
+- [x] Use shared camera intent, cancellation, and dateline-aware bounds. Opening
   a WALS example's atlas profile should use inspection without an automatic map
   move; focus remains an explicit action. No delayed bounds/data result may
   override a newer manual, profile, lexical, or WALS action.
-- [ ] Support the user's globe/Mercator choice without automatic projection
+- [x] Support the user's globe/Mercator choice without automatic projection
   switching. If the chosen visualization requires an exception, document and
   review that interaction before introducing it; do not restore a stale saved
   projection over a newer user choice.
-- [ ] Allow lexical and WALS overlays to retain independent visibility/state,
+- [x] Allow lexical and WALS overlays to retain independent visibility/state,
   with clearly distinct labels, legends, and clear controls. Define hit priority
   so an observation click does not also activate the underlying polygon inspector.
   Do not silently clear one exploration when showing the other.
-- [ ] Provide keyboard-equivalent inspection for every displayed record and an
+- [x] Provide keyboard-equivalent inspection for every displayed record and an
   understandable empty state. Avoid adding an unexamined dependency on the demo
   font server; use the existing marker approach or explicitly supplied font assets.
-- [ ] Run production browser scenarios for origin/feature changes, exact-variety
+- [x] Run production browser scenarios for origin/feature changes, exact-variety
   clicks, unmatched examples, simultaneous overlays, pinned polygons, style and
   projection changes, reduced motion, late loading, and interrupted camera moves.
 
@@ -356,9 +356,9 @@ not complete the port.
 ## Validation and execution records
 
 Use synthetic fixtures for normal tests and explicit integration commands for
-the full snapshot. New command names in this plan, including
-`test:wals-snapshot`, describe deliverables and do not exist yet. Record runnable
-commands when their stages are implemented. Existing frontend baseline commands
+the full snapshot. Runnable WALS commands now include `test:wals-snapshot`,
+`test:wals-profile-browser` and `test:wals-map-browser`; their requirements and
+evidence are recorded below and in the frontend/browser guides. Existing frontend baseline commands
 are `npm test`, `npm run check`, `npm run typecheck`, and `npm run build` from
 `app/`; existing browser runners are documented in `app/tests/browser/README.md`.
 
@@ -903,3 +903,103 @@ Changes remain local and uncommitted. No code push, main merge, remote CI run,
 release publication or deployment occurred. WALS-06 is next: mount the points and
 accessible list, expose working show/focus/inspect/clear controls, and validate
 camera cancellation and existing map/word-history behavior in the browser.
+
+## WALS-06 execution record — map integration and navigation
+
+Completed locally on 2026-11-12 on `port/wals-map`, starting from clean
+user-committed WALS-05 revision `9a9f88fa08210d3881212bf837a3baa468b8d178`.
+The source branch remains the reviewed `3b7078614efcfebc1c471fea2c4ab7fb336745a6`;
+WALS uses the independently published v2020.6 release. All geographic, lexical and
+WALS release pins and the dependency lockfile are unchanged.
+
+Delivered behavior and ownership:
+
+- Recorded profile cards offer **Show recorded examples on map**; unknown values
+  have no map action. The existing profile layout is retained. Explicit show
+  establishes one source/feature specification and focuses Geography. The summary
+  supplies **Focus WALS examples**, independent hide/show, **Clear WALS overlay**,
+  all count meanings, missing-location/empty-result explanations, the origin and
+  every selected observation in a keyboard-accessible inspection list.
+- Static system-font DOM markers use blue circles for examples and orange diamonds
+  for the origin. Names/feature/category/source IDs are in accessible labels and
+  tooltips; shared-point markers display a record count. Shared clicks open a
+  chooser rather than silently selecting a variety. Mouse events stop before
+  the polygon inspector; WALS marker stacking takes priority over lexical markers.
+  The list is the keyboard equivalent for every displayed record, including
+  records on the hidden side of the globe. No glyph/font-server dependency,
+  relationship arcs, animation loop or polygon recoloring was introduced.
+- `integrations/GeographyExplorations.tsx` replaces the lexical-owned composition
+  wrapper. It lazily composes both layers and summaries through Geography's
+  existing slots; `WorldMap` and `GeographyWorkspace` are unchanged. Geography
+  remains mounted. The combined summaries scroll within 45% of the sidebar so
+  the finder remains accessible. Neither feature imports the other.
+- The existing trail camera controller moved to neutral
+  `integrations/map/overlayCamera.ts` and is shared by both features; the old
+  lexical wrapper/helper were removed. WALS rechecks the current request identity
+  after style readiness and the frame wait and before resolving/fitting bounds.
+  Newer manual, profile, lexical or WALS navigation, hide, clear and workspace
+  changes invalidate old work. Inspection changes exact evidence/profile choices
+  without replacing the origin or moving the camera. Reduced-motion focus uses
+  zero animation duration. Workspace return, style changes and unhide do not
+  establish or replay a request.
+- Bounds derive from selected WALS points, with no geographic-bounds fetch. Globe
+  uses the shared shortest longitude arc. The existing single-world Mercator
+  setting cannot frame an unwrapped dateline arc, so those selections use
+  world-width longitude bounds. This choice resolves from the current projection
+  immediately before fitting. The summary explains it. Neither projection nor
+  world-copy settings are changed or saved/restored. Compact markers avoid the
+  edge clipping found with the initial text labels.
+- Lexical hide/show state lives independently in `integrations/etymology/visibility.ts`.
+  Hiding retains the trail and cancels only owned focus; unhide does not replay it.
+  A new explicit trail show/focus sequence restores visibility. Showing, hiding
+  or clearing WALS preserves lexical exploration, profile choices and pinned
+  entries, source/period settings and colors.
+
+Validation completed:
+
+| Check | Result |
+| --- | --- |
+| `npm test` | **304 passed**; includes dateline bounds and Mercator fallback, actual-store camera cancellation during style/frame waits, independent visibility and the neutral camera runtime boundary |
+| `npm run check` / `npm run typecheck` | Passed; Biome checks 240 files |
+| `GITHUB_PAGES=true npm run build` | Passed; existing chunk-size/plugin-timing warnings only |
+| `npm run test:wals-snapshot` | **4 passed**, including all 5,517 exported observations and independent published release verification |
+| `test:wals-map-browser` against the final production build | **22 checkpoints passed**: 13 coordinate-fixture and 9 published-data checkpoints at `/lang-viz/` |
+| Existing word-trail browser regression | **18 checkpoints passed** against that same build, including late bounds, area pinning, source/period filters, style/projection restoration and narrow round trips |
+| Existing profile-focus and pinned-selection scenarios | Passed using `check_focus` / `check_selection` after ready finder mount, under the production base |
+| `test:wals-profile-browser` against the final application build | Passed fixture and published-data checks, including exact **320px / 390px** frames |
+| Ruff check/format and `git diff --check` | Passed |
+
+The WALS map runner uses the full production app and an HTTP proxy, not a hidden
+WALS route or application test API. Fixtures explicitly label synthetic coordinates,
+categories, unmatched/broader records and shared locations; installed data stays
+unchanged. The separate published run clicks real Donegal 12A, Kyuquot 37A and
+Eastern Aleut 12A examples selected from other real origins, preserving the exact
+variety/feature and overlay origin. Keyboard inspection, physical shared/ordinary
+marker clicks over selected polygons, simultaneous overlays, pin retention, both
+projections, style reloads, emulated reduced motion, physical drag interruption,
+late WALS completion after profile closure and late older profile bounds all pass.
+
+Validation initially exposed browser-harness timing/configuration issues: the word
+runner needed the deployment base for its preview, and camera assertions needed
+to wait for the deferred focus frame and a stable view. Its new `--base /lang-viz/`
+option aligns preview configuration, and its readiness check waits for stability.
+Focus/selection helper acceptance waits for the independently lazy finder to mount.
+An earlier geometry-deadline failure occurred with zero pinned entries before a
+WALS map consumer mounted, while system memory/swap were heavily pressured; the
+complete serial rerun passed after pressure subsided. No geometry budget, pipeline
+or fallback behavior was changed. These attempts are not counted as passing checks.
+
+Ignored evidence is under `app/test-results/wals-06/`: unit/snapshot/build/profile/
+word-trail/focus-selection logs; `report.json`; `fixture/`, `published/`,
+`word-trail/`, `focus/`, `selection/` reports and screenshots; and retained initial
+failure reports. The map runner's output is `app/test-results/wals-06-browser.log`.
+The refreshed profile evidence lives under `app/test-results/wals-04/`, with its
+report copied to the WALS-06 directory. `WALS_SKIP_BUILD=1` reused the final app
+build for browser regressions; profile fixtures still build separately.
+
+Remaining scope: WALS choices are session-only, the example selection is bounded
+and illustrative, globe inspection has the list alternative, and dateline
+selections use the documented wider Mercator view. Final source/release fixture
+tests, performance measurements and clean-checkout deployment preparation remain
+WALS-07. No code commit/push, main merge, release publication, remote CI run or
+deployment occurred in this step. Changes remain local and uncommitted.

@@ -28,6 +28,7 @@
     "test:wals-snapshot": "node --test --test-isolation=none tests/integration/wals.test.ts",
     "review:wals-examples": "node scripts/review-wals-examples.ts",
     "test:wals-profile-browser": "python3 tests/browser/wals_profile.py",
+    "test:wals-map-browser": "python3 tests/browser/wals_map.py",
     "test:explorer-navigation-browser": "python3 tests/browser/explorer_navigation.py",
     "dev": "vite",
     "build": "tsc -b && vite build",

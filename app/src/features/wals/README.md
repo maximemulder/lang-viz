@@ -100,7 +100,8 @@ its published value alongside the source-erratum warning. Version, original sour
 commit, citation, license, adapter notice and full supplied errata remain accessible.
 
 The observation selector uses the validated inspection action to preserve exact
-source/feature IDs. No map action is exposed. Keyboard controls use native buttons,
+source/feature IDs. Each recorded card offers **Show recorded examples on map**;
+unrecorded values have no show action. Keyboard controls use native buttons,
 selects, disclosures and links. Narrow profiles retain the existing internal
 scrolling and keep cards and selects within their container.
 
@@ -138,11 +139,19 @@ The overlay stores only source/feature IDs, visibility and a maximum of 12 examp
 WALS-05 derives exact-category examples and static point geometry through
 `walsExampleSelectionAtom` and `walsExampleGeometryAtom`. Selection uses the source
 ID, feature ID and limit, independently of atlas associations and UI visibility.
-No map consumer is mounted yet. See the [exploration design](EXPLORATION_DESIGN.md)
-for the points-versus-arcs decision, deterministic spacing, all count definitions,
-colocation policy and WALS-06 requirements. WALS-06 must re-read
-`walsCameraRequestAtom` and compare the original request identity after every
-asynchronous step, before moving the camera. It is
+`integrations/GeographyExplorations.tsx` composes lazy WALS and word-trail layers
+and summaries through Geography's slots. `WalsLayer` renders static DOM markers;
+`WalsMapSummary` supplies counts, controls and an accessible list. Single markers
+inspect exact source/feature evidence; shared positions open a chooser with every
+displayed record. WALS markers sit above lexical markers; marker and popup mouse
+events stop before the underlying polygon inspector. See the
+[exploration design](EXPLORATION_DESIGN.md) for the points-versus-arcs decision,
+deterministic spacing, count definitions and colocation policy.
+
+`integrations/map/overlayCamera.ts` is shared by both overlays. The WALS consumer
+re-reads `walsCameraRequestAtom` and compares the original request identity after
+style readiness and the animation-frame wait, immediately before moving the
+camera. Projection-dependent bounds resolve only then. The request is
 null after newer manual/profile/lexical/WALS navigation, a workspace switch,
 overlay replacement, hide or clear. Style/projection changes, rendering and loading
 must not create a request. Workspace return and unhide do not replay it.
@@ -192,3 +201,33 @@ It writes five real comparisons and exact observation tables to
 `test-results/wals-05/review.html` and fingerprinted evidence to `review.json`. The
 full-snapshot gate also checks example selection and point geometry for every
 exported observation. Ordinary tests remain fixture-only.
+
+## Map controls and coexistence
+
+**Show recorded examples on map** establishes the overlay and explicitly focuses
+Geography. Subsequent inspection changes only source evidence/profile choices,
+never the overlay origin or camera. **Focus WALS examples** issues fresh intent.
+Hide/show preserves the selection and never replays focus; **Clear WALS overlay**
+leaves word-history state, profile choices and pinned comparisons intact. The
+keyboard list includes the origin (also when unlocated) and every selected source
+observation. Missing origin locations and zero candidates are explicit.
+
+The neutral composition keeps the mounted map and caps the combined summary
+container at 45% of the sidebar; it scrolls independently of the language finder.
+Word histories has its own hide/show control. Its hidden sequence lives in
+`integrations/etymology/visibility.ts`; hiding cancels only owned focus, and a fresh
+explicit show/focus restores visibility. Neither overlay changes the other's
+visibility, source specification or pinned map entries.
+
+Globe and Mercator are retained as selected. Focus uses shortest-arc longitude
+bounds on globe. The map's existing single-world Mercator cannot fit an unwrapped
+dateline arc, so those selections use world-width bounds, with a note in the
+summary. No projection or world-copy setting is temporarily changed/restored.
+WALS uses system-font DOM markers; it adds no map glyph/font-server dependency.
+Reduced-motion focus has zero animation duration.
+
+`npm run test:wals-map-browser` builds and exercises the deployed-base application
+with the actual published data and explicitly labelled coordinate fixtures served
+by a local proxy. Installed data is unchanged. Reports and screenshots are under
+`test-results/wals-06/`. The shared word-trail regression runner accepts
+`--base /lang-viz/` for use against this same production build.

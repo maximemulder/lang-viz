@@ -4,6 +4,7 @@ import { atlasWordTrailAtom, etymologyRepositoryAtom } from '../../features/etym
 import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
 import { addTrailAreasAtom, trailAreaOperationAtom } from './state.ts'
 import { trailLanguageGroups } from './trailAreas.ts'
+import { wordTrailVisibleAtom } from './visibility.ts'
 import './wordTrailMap.css'
 
 export default function WordTrailMapSummary() {
@@ -13,6 +14,8 @@ export default function WordTrailMapSummary() {
   const dispatch = useSetAtom(explorerActionAtom)
   const addAreas = useSetAtom(addTrailAreasAtom)
   const operation = useAtomValue(trailAreaOperationAtom)
+  const visible = useAtomValue(wordTrailVisibleAtom)
+  const setVisible = useSetAtom(wordTrailVisibleAtom)
   if (!repository || !trail) return null
   const { data } = repository
   const groups = trailLanguageGroups(data, trail)
@@ -33,6 +36,9 @@ export default function WordTrailMapSummary() {
       </p>
       <p>Matched areas use the current atlas source, period and representation settings.</p>
       <div className="word-map-summary-actions">
+        <button type="button" aria-pressed={visible} onClick={() => setVisible(!visible)}>
+          {visible ? 'Hide word overlay' : 'Show word overlay'}
+        </button>
         <button
           type="button"
           onClick={() => dispatch({ type: 'workspace', workspace: 'etymology' })}

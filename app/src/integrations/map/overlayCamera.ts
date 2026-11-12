@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import type { GeographicBounds } from '../../domain/languageFocus.ts'
 
-interface TrailCameraMap {
+interface OverlayCameraMap {
   isStyleLoaded: MapLibreMap['isStyleLoaded']
   on(type: 'style.load' | 'idle' | 'moveend', listener: () => void): unknown
   off(type: 'style.load' | 'idle' | 'moveend', listener: () => void): unknown
@@ -15,7 +15,7 @@ interface TrailCameraMap {
 }
 
 /** A one-shot explicit focus, guarded again after style readiness and the next frame. */
-export const startTrailCamera = ({
+export const startOverlayCamera = ({
   map,
   bounds,
   isCurrent,
@@ -23,8 +23,8 @@ export const startTrailCamera = ({
   reducedMotion,
   frames,
 }: {
-  readonly map: TrailCameraMap
-  readonly bounds: GeographicBounds | null
+  readonly map: OverlayCameraMap
+  readonly bounds: GeographicBounds | null | (() => GeographicBounds | null)
   readonly isCurrent: () => boolean
   readonly canStop: () => boolean
   readonly reducedMotion: boolean
@@ -43,6 +43,8 @@ export const startTrailCamera = ({
     frame = frames.request(() => {
       frame = null
       if (disposed || moved || !isCurrent() || !map.isStyleLoaded()) return
+      const currentBounds = typeof bounds === 'function' ? bounds() : bounds
+      if (!currentBounds || !isCurrent()) return
       map.resize()
       const canvas = map.getCanvas()
       if (!canvas.clientWidth || !canvas.clientHeight) return
@@ -51,8 +53,8 @@ export const startTrailCamera = ({
       animating = !reducedMotion
       map.fitBounds(
         [
-          [bounds[0], bounds[1]],
-          [bounds[2], bounds[3]],
+          [currentBounds[0], currentBounds[1]],
+          [currentBounds[2], currentBounds[3]],
         ],
         {
           padding: Math.min(64, canvas.clientWidth / 8, canvas.clientHeight / 8),

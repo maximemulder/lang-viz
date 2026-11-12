@@ -88,7 +88,7 @@ export const inspectWalsObservationAtom = atom(
 )
 
 const focusRequestAtom = atom<{ readonly specification: WalsOverlaySpecification } | null>(null)
-/** Camera consumers must check this again after any asynchronous work. No map effect yet. */
+/** Camera consumers must check this again after any asynchronous work. */
 export const walsCameraRequestAtom = atom((get) => {
   const request = get(focusRequestAtom)
   const overlay = get(walsSessionAtom).overlay

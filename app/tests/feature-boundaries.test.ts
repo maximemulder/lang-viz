@@ -61,3 +61,9 @@ test('lexical traversal and search run without atlas or map implementation', () 
 test('WALS example selection and point geometry run without UI, catalog, navigation or loaders', () => {
   assert.deepEqual(runtimeDependencies('domain/walsExamples.ts'), ['domain/walsExamples.ts'])
 })
+
+test('shared overlay camera runs without either exploration implementation or a map runtime', () => {
+  assert.deepEqual(runtimeDependencies('integrations/map/overlayCamera.ts'), [
+    'integrations/map/overlayCamera.ts',
+  ])
+})

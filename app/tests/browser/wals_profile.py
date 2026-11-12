@@ -224,9 +224,11 @@ def fixture_checks(output):
         assert "<img src=x" in browser.js(
             "return document.querySelector('.wals-card[data-feature-id=\"87A\"]').textContent"
         )
-        assert not browser.js("return !!document.querySelector('.wals-panel button[aria-pressed]')")
+        assert browser.js(
+            "return !!document.querySelector('.wals-card[data-observed=true] button') && !document.querySelector('.wals-card[data-observed=false] button')"
+        )
         report["checks"].append(
-            "rendered unknown comparison slot, English illustration, inspected fourth card, safe bibliography text, no map action"
+            "rendered unknown comparison slot, English illustration, inspected fourth card, safe bibliography text, map action only for recorded observations"
         )
 
         select(browser, "Recorded WALS variety", "ird")
@@ -300,7 +302,8 @@ def fixture_checks(output):
 
 
 def production_checks(output):
-    subprocess.run(["npm", "run", "build"], cwd=APP, check=True)
+    if not os.environ.get("WALS_SKIP_BUILD"):
+        subprocess.run(["npm", "run", "build"], cwd=APP, check=True)
     report = {"checks": []}
     with (
         browser_session(output / "production") as (browser, upstream),
@@ -400,7 +403,7 @@ def production_checks(output):
         assert not browser.snapshot()["errors"]
         assert not any(path.startswith("/wals/") or path.endswith(".tar.gz") for path in hits)
         report["checks"].append(
-            "scrollable narrow production profile retains existing controls; no map control, raw archive fetch or map error"
+            "scrollable narrow production profile retains existing controls; no raw archive fetch or map error"
         )
 
         search(browser, "stan1293", "stan1293")

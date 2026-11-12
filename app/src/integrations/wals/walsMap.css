@@ -1,0 +1,86 @@
+.wals-map-summary {
+  padding: 0.75rem;
+  border-bottom: 1px solid #bec8c0;
+  background: var(--paper);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.wals-map-summary h2 {
+  font-size: 1rem;
+  margin: 0.4rem 0;
+}
+.wals-map-summary p {
+  margin: 0.4rem 0;
+}
+.wals-map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.wals-map-summary button,
+.wals-map-marker,
+.wals-map-popup button {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #abc3cc;
+  border-radius: 0.4rem;
+  color: #173c50;
+  background: #f5fbff;
+  font: inherit;
+  cursor: pointer;
+}
+.wals-map-summary button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.wals-map-summary :is(button, summary, a):focus-visible,
+.wals-map-marker:focus-visible,
+.wals-map-popup button:focus-visible {
+  outline: 2px solid #23688b;
+  outline-offset: 3px;
+}
+.wals-map-list {
+  padding-left: 1.2rem;
+}
+.wals-map-list li {
+  margin: 0.5rem 0;
+}
+.wals-map-list button {
+  text-align: left;
+}
+.wals-map-list small {
+  display: block;
+}
+.wals-map-symbol {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #23688b;
+  border: 1px solid white;
+  flex: none;
+}
+.wals-map-marker.is-origin .wals-map-symbol,
+.wals-map-symbol.is-diamond {
+  border-radius: 0;
+  transform: rotate(45deg);
+  background: #ac491a;
+}
+.wals-map-marker {
+  min-width: 28px;
+  min-height: 28px;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  box-shadow: 0 1px 5px #0003;
+  font:
+    12px system-ui,
+    sans-serif;
+}
+.wals-map-popup button {
+  display: block;
+  margin: 0.3rem 0;
+}

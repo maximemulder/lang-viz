@@ -28,7 +28,9 @@ The WALS port provides published data delivery, a reproducible offline adapter,
 a validated lazy repository, conservative catalog associations and source-aware
 session/navigation contracts. Open a language profile and choose **Load WALS features**
 to see recorded varieties, feature cards and citations. Variety choices survive profile
-and workspace navigation for the session; shared-feature map exploration is a later step.
+and workspace navigation for the session. **Show recorded examples on map** on a
+recorded card opens static points and an inspection list for up to 12 exact-category
+examples, independently of word-history overlays and pinned comparisons.
 See [source/build commands](pipeline/wals/README.md),
 [frontend contracts](app/src/features/wals/README.md) and the [port roadmap](WALS_PORT_PLAN.md).
 It uses an independent pinned snapshot and does not rebuild geographic or lexical data.

@@ -5,6 +5,7 @@ import { resolveWalsProfile } from '../../integrations/wals/profile.ts'
 import {
   inspectWalsObservationAtom,
   selectWalsVarietyAtom,
+  showWalsExamplesAtom,
   walsAssociationsAtom,
   walsInspectionAtom,
 } from '../../integrations/wals/state.ts'
@@ -67,6 +68,7 @@ export const WalsFeatureCard = ({
   readonly featureId: string
   readonly inspected?: boolean
 }) => {
+  const showExamples = useSetAtom(showWalsExamplesAtom)
   const { data, index } = repository
   const feature = data.features[featureId]
   if (!feature) return null
@@ -83,6 +85,13 @@ export const WalsFeatureCard = ({
       </h5>
       {inspected && <p className="wals-context">Inspected observation</p>}
       <strong>{category?.name ?? 'Not recorded in this WALS snapshot'}</strong>
+      {observation && (
+        <p>
+          <button type="button" onClick={() => showExamples({ sourceId, featureId })}>
+            Show recorded examples on map
+          </button>
+        </p>
+      )}
       {illustration && (
         <p className="wals-illustration">
           “{illustration}” — reordered English words; Sam = subject, eats = verb, rice = object.

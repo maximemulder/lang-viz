@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { startTrailCamera } from '../src/integrations/etymology/trailCamera.ts'
+import { startOverlayCamera } from '../src/integrations/map/overlayCamera.ts'
 
 const fixture = () => {
   const events = new Map<string, Set<() => void>>()
@@ -49,7 +49,7 @@ const fixture = () => {
       for (const callback of callbacks) callback()
     },
     start: (reducedMotion = false) =>
-      startTrailCamera({
+      startOverlayCamera({
         map,
         bounds: [170, 0, 190, 10],
         isCurrent: () => current,

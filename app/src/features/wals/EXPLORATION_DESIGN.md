@@ -131,12 +131,18 @@ session state. Geometry has at most 13 points and no animation frame loop;
 reduced-motion handling for animated paths is therefore unnecessary. WALS-06
 camera motion must still honor reduced motion and shared intent cancellation.
 
-WALS-06 will consume these atoms through Geography's composition slots, provide
-show/focus/inspect/clear actions and the accessible observation list, label missing
-origin/empty results, disclose associations and shared points, and preserve the
+WALS-06 consumes these atoms through Geography's composition slots, providing
+show/focus/inspect/clear actions and the accessible observation list, labelling missing
+origin/empty results, disclosing associations and shared points, and preserving the
 current map projection. Hidden overlays retain their selection but must not render
 or replay focus on return. Camera consumers must check current request identity
-after asynchronous work. No map consumer or control is exposed by WALS-05.
+after asynchronous work. WALS-05 itself exposed no consumer; WALS-06 mounts it.
+
+WALS-06 retains the existing `renderWorldCopies=false`. In Mercator an unwrapped
+dateline arc cannot be framed in that single world, so focus uses world-width
+longitude bounds for that case. Globe uses the shortest arc. The camera resolves
+this choice after readiness from the current projection, without changing or
+restoring projection/world-copy settings. The summary explains the Mercator case.
 
 Fixture tests cover exact categories, ties/reordering, limits, invalid/missing/zero
 locations, no candidates, missing origin locations, distinct and unmatched

@@ -96,8 +96,15 @@ separately. The profile UI publishes the complete ready atlas catalog, independe
 of map filters, before resolving associations. Cards retain unknown word-order and
 regional comparison slots, select one observed extra deterministically, and reveal
 the exact inspected feature. Broader scope and source variety identity remain visible;
-citations, version and source errata are available in native disclosures. No WALS
-map control or consumer is mounted yet. `domain/walsExamples.ts` selects at most
+citations, version and source errata are available in native disclosures. Recorded
+cards expose explicit map exploration. `integrations/GeographyExplorations.tsx`
+composes independently visible WALS and word-trail overlays through the map/sidebar
+slots without remounting Geography. `integrations/map/overlayCamera.ts` supplies
+the shared guarded camera controller; neither overlay imports the other. WALS
+inspection preserves exact evidence without moving the camera or replacing its
+origin. Colocated markers open a source chooser, and the list supplies keyboard
+inspection. Single-world Mercator uses world-width bounds for dateline selections
+while globe uses the shortest arc, retaining the user's chosen projection. `domain/walsExamples.ts` selects at most
 12 exact-category source observations with deterministic spherical spacing,
 independently of catalog matches. Derived integration atoms build static point
 geometry once per selection; colocated points retain each exact source ID. The

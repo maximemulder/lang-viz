@@ -125,17 +125,23 @@ atom can refresh without resetting the exploration store.
 
 ## Feature integration boundary
 
-`integrations/etymology/GeographyWithWordTrail.tsx` composes the generic
+`integrations/GeographyExplorations.tsx` composes the generic
 `GeographyWorkspace` using its optional `mapLayers` and `sidebarHeader` slots.
 `WorldMap` renders injected children within the map context. Neither geography
-component imports the lexical feature. The integration lazily loads the trail
-layer and summary only when the session enables the overlay, so ordinary geography
+component imports the lexical or WALS feature. The neutral owner also composes
+WALS points and its summary independently of the lexical overlay. The integration
+lazily loads the trail layer and summary only when the session enables the overlay, so ordinary geography
 loads no lexical traversal or resolution code. Geography stays mounted while the
 optional overlay is added or removed.
 
-The integration directory owns the trail layer, summary, camera helper, area
-planning/pinning, and catalog matching. `languageMatching.ts` bridges atlas and
-lexical identities; the core lexical domain has no atlas dependency. Language
+The integration directory owns the trail layer, summary, area
+planning/pinning, and catalog matching. Both overlays use the neutral
+`integrations/map/overlayCamera.ts` controller, which checks current request
+identity after style/frame waits. Lexical hide/show state lives in
+`integrations/etymology/visibility.ts`; hiding cancels only owned focus and retains
+the trail. A new show/focus sequence makes the trail visible again. The combined
+summary container scrolls within 45% of the sidebar, preserving finder access.
+`languageMatching.ts` bridges atlas and lexical identities; the core lexical domain has no atlas dependency. Language
 profiles can still dispatch the shared `language-words` navigation action without
 loading the lexical implementation. Language locations and data releases retain
 their current contracts.

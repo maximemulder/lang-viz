@@ -47,16 +47,23 @@ particular observation; these choices survive profile closure and workspace trip
 
 Definitions, observation references, chapter citations, supplied examples, dataset
 version and source errata are available in disclosures. The card shortlist and its
-regional comparison policy are editorial choices, not a uniqueness ranking. No
-shared-feature map control is exposed in this increment.
+regional comparison policy are editorial choices, not a uniqueness ranking.
+
+Use **Show recorded examples on map** on a recorded card to show up to 12
+examples sharing its exact category. The WALS summary provides focus, hide/show,
+clear and an inspection list. Shared-location markers offer a record chooser.
+Inspection preserves the overlay origin and does not move the camera. WALS and
+word-history overlays can coexist with separate visibility and clear controls;
+pinned comparisons and the chosen projection are preserved.
 
 Restore the independent browser release from the repository root with
 `python3 -m pipeline.wals.data_release restore`. Run `npm run test:wals-snapshot`
 for the full release/catalog checks and `npm run test:wals-profile-browser` for
 Firefox acceptance with fixtures and published data, including exact 320/390px
 layouts. The browser command builds its own production artifacts and requires all
-three installed browser datasets. WALS-05 adds tested example selection and static
-point geometry without map controls. Its representation/count policy is in the
+three installed browser datasets. Run `npm run test:wals-map-browser` for WALS
+map/coexistence/camera acceptance with published data and coordinate fixtures.
+The representation/count policy is in the
 [exploration design](src/features/wals/EXPLORATION_DESIGN.md); run
 `npm run review:wals-examples` to generate the offline points/arcs comparison with
 restored WALS/atlas data and the source Git object present. See

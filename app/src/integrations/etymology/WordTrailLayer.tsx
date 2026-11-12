@@ -8,7 +8,7 @@ import { trailLineFeatures, trailLocations } from '../../domain/wordTrailGeograp
 import { atlasWordTrailAtom, etymologyRepositoryAtom } from '../../features/etymology/state.ts'
 import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
-import { startTrailCamera } from './trailCamera.ts'
+import { startOverlayCamera } from '../map/overlayCamera.ts'
 import './wordTrailMap.css'
 
 export default function WordTrailLayer() {
@@ -46,7 +46,7 @@ const TrailLayer = ({
   const request = session.overlay.focusRequest
   useEffect(() => {
     if (!map || !request || intent !== request) return
-    return startTrailCamera({
+    return startOverlayCamera({
       map,
       bounds,
       isCurrent: () =>

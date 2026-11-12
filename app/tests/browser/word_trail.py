@@ -3,11 +3,13 @@
 
 import argparse
 import json
+import os
+import time
 from itertools import pairwise
 from pathlib import Path
 
 from etymology import controlled_server
-from inspection import move
+from inspection import move, render_frames
 from run import APP, SCENARIOS, browser_session, wait_for
 from sidebar import search, select_control
 
@@ -15,7 +17,10 @@ from sidebar import search, select_control
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=APP / "test-results/etymology-04/browser")
+    parser.add_argument("--base", default="/", help="Production asset base, e.g. /lang-viz/")
     args = parser.parse_args()
+    if args.base.strip("/") == "lang-viz":
+        os.environ["GITHUB_PAGES"] = "true"
     args.output.mkdir(parents=True, exist_ok=True)
     report = {
         "passed": False,
@@ -27,7 +32,8 @@ def main():
         controlled_server(upstream) as (origin, control, hits),
     ):
         report["browser"] = browser.capabilities
-        url = origin + "/?overlap-test&overlap-basemap=off"
+        base = "/" + args.base.strip("/") + "/" if args.base.strip("/") else "/"
+        url = origin + base + "?overlap-test&overlap-basemap=off"
 
         def text(selector):
             return browser.js(
@@ -54,6 +60,22 @@ def main():
                 60,
                 "map readiness",
             )
+            render_frames(browser)
+            previous = None
+            stable_since = None
+
+            def stationary():
+                nonlocal previous, stable_since
+                state = browser.snapshot()
+                if state["moving"] or not state["tilesLoaded"]:
+                    stable_since = None
+                    return False
+                if state["camera"] != previous or stable_since is None:
+                    previous = state["camera"]
+                    stable_since = time.monotonic()
+                return time.monotonic() - stable_since >= 0.3
+
+            wait_for(stationary, 45, "deferred focus and stationary map")
             if browser.snapshot()["selectedCount"]:
                 browser.settled(60, fail_on_error=True)
             else:
@@ -97,7 +119,7 @@ def main():
         try:
             open_page("#workspace=geography")
             map_ready()
-            assert hits["/etymology/word-trails.json"] == 0
+            assert hits[base + "etymology/word-trails.json"] == 0
             assert browser.js(r"""
                 const sidebar = document.querySelector('.geography-sidebar');
                 const finder = sidebar.querySelector('.language-finder');
@@ -272,10 +294,12 @@ def main():
             control["release"].clear()
             open_page("#workspace=geography&word=69562")
             map_ready()
-            requests = hits["/data/geometry-bounds.json"]
+            requests = hits[base + "data/geometry-bounds.json"]
             select_result_details("stan1293", "stan1293")
             wait_for(
-                lambda: hits["/data/geometry-bounds.json"] > requests, 10, "delayed profile bounds"
+                lambda: hits[base + "data/geometry-bounds.json"] > requests,
+                10,
+                "delayed profile bounds",
             )
             workspace("Word histories")
             ready()
