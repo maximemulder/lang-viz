@@ -1,122 +1,87 @@
-import { useAtomValue, useSetAtom, useStore } from 'jotai'
-import { useEffect, useMemo, useState } from 'react'
-import { Marker, Popup, useMap } from 'react-map-gl/maplibre'
-import { walsRepositoryAtom } from '../../features/wals/state.ts'
-import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
-import { startOverlayCamera } from '../map/overlayCamera.ts'
-import { walsCameraBounds, walsExampleBounds } from './mapGeometry.ts'
-import {
-  inspectWalsObservationAtom,
-  walsCameraRequestAtom,
-  walsExampleGeometryAtom,
-} from './state.ts'
+import { useAtomValue, useStore } from 'jotai'
+import { useEffect, useMemo, useRef } from 'react'
+import { Layer, useMap } from 'react-map-gl/maplibre'
+import { loadGeometryBounds } from '../../data/atlasRepository'
+import { combinedBounds } from '../../domain/languageFocus'
+import { atlasDataAtom, languageColorsAtom } from '../../state/atlasState'
+import { isolatedLanguageIdAtom } from '../../state/mapInteraction'
+import { startOverlayCamera } from '../map/overlayCamera'
+import { walsAreaMatchesAtom } from './areaState'
+import { walsCameraBounds } from './mapGeometry'
+import { walsCameraRequestAtom } from './state'
 import './walsMap.css'
 
+/** Paint the exact existing language polygons. No points, lines, country fills,
+ * reconstructed boundaries, or writes to the pinned map selection.
+ */
 export default function WalsLayer() {
-  const repository = useAtomValue(walsRepositoryAtom)
-  const geometry = useAtomValue(walsExampleGeometryAtom)
+  const atlas = useAtomValue(atlasDataAtom)
+  const matches = useAtomValue(walsAreaMatchesAtom)
+  const colors = useAtomValue(languageColorsAtom)
+  const isolated = useAtomValue(isolatedLanguageIdAtom)
   const request = useAtomValue(walsCameraRequestAtom)
   const store = useStore()
-  const inspect = useSetAtom(inspectWalsObservationAtom)
-  const [chosenPoint, setChosenPoint] = useState<string | number | null>(null)
+  const focusedRequest = useRef<unknown>(null)
   const { current } = useMap()
   const map = current?.getMap()
-  const bounds = useMemo(() => (geometry ? walsExampleBounds(geometry) : null), [geometry])
+  const variants = useMemo(() => matches?.variants ?? [], [matches])
+  const ids = variants.filter((v) => !isolated || v.languageId === isolated).map((v) => v.id)
+  const colorTable = Object.fromEntries(
+    [...(matches?.mappedIds ?? [])].map((id) => [id, colors.get(id) ?? '#71ac85']),
+  )
   useEffect(() => {
-    if (!map || !request) return
-    return startOverlayCamera({
-      map,
-      bounds: () =>
-        walsCameraBounds(
-          bounds,
-          map.getProjection().type === 'mercator' && !map.getRenderWorldCopies(),
-        ),
-      isCurrent: () => store.get(walsCameraRequestAtom) === request,
-      canStop: () => !store.get(mapCameraIntentAtom) || store.get(mapCameraIntentAtom) === request,
-      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      frames: {
-        request: (callback) => window.requestAnimationFrame(callback),
-        cancel: (id) => window.cancelAnimationFrame(id),
-      },
-    })
-  }, [map, request, bounds, store])
-  if (!repository || !geometry) return null
-  const point = geometry.features.find((feature) => feature.id === chosenPoint)
-  return (
-    <>
-      {geometry.features.map(({ id, geometry: { coordinates }, properties }) => {
-        const [longitude, latitude] = coordinates
-        if (longitude === undefined || latitude === undefined) return null
-        const names = properties.sourceIds
-          .map((sourceId) => `${repository.data.records[sourceId]?.name} (${sourceId})`)
-          .join(', ')
-        const origin = properties.role !== 'example'
-        const shared = properties.sourceIds.length > 1
-        const label = `${origin ? 'WALS origin' : 'WALS example'}: ${names}. ${properties.featureId}: ${repository.data.categories[properties.categoryId]?.name}. ${shared ? `Choose among ${properties.sourceIds.length} displayed observations at this location.` : 'Inspect recorded observation.'}`
-        return (
-          <Marker
-            key={id}
-            longitude={longitude}
-            latitude={latitude}
-            anchor="center"
-            style={{ zIndex: 2 }}
-          >
-            <button
-              type="button"
-              className={`wals-map-marker${origin ? ' is-origin' : ''}`}
-              data-wals-sources={properties.sourceIds.join(' ')}
-              data-wals-feature={properties.featureId}
-              aria-label={label}
-              title={label}
-              onMouseMove={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation()
-                if (shared) setChosenPoint(id ?? null)
-                else {
-                  const sourceId = properties.sourceIds[0]
-                  if (sourceId) inspect({ sourceId, featureId: properties.featureId })
-                }
-              }}
-            >
-              <span className="wals-map-symbol" aria-hidden="true" />
-              {shared && properties.sourceIds.length}
-            </button>
-          </Marker>
+    if (!request || !map || focusedRequest.current === request) return
+    let cancelled = false
+    let stop: (() => void) | undefined
+    void loadGeometryBounds(atlas.manifest)
+      .then((index) => {
+        if (cancelled || store.get(walsCameraRequestAtom) !== request) return
+        const bounds = combinedBounds(
+          variants.flatMap((v) => {
+            const bounds = index[v.id]
+            return bounds ? [bounds] : []
+          }),
         )
-      })}
-      {point &&
-        point.geometry.coordinates[0] !== undefined &&
-        point.geometry.coordinates[1] !== undefined && (
-          <Popup
-            longitude={point.geometry.coordinates[0]}
-            latitude={point.geometry.coordinates[1]}
-            closeOnClick={false}
-            onClose={() => setChosenPoint(null)}
-            className="wals-map-popup"
-          >
-            <fieldset
-              onKeyDown={(event) => event.stopPropagation()}
-              onClick={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-              aria-label="Choose a WALS observation at this location"
-            >
-              <p>{point.properties.sourceIds.length} displayed observations at this location:</p>
-              {point.properties.sourceIds.map((sourceId) => (
-                <button
-                  type="button"
-                  key={sourceId}
-                  onClick={() => {
-                    inspect({ sourceId, featureId: point.properties.featureId })
-                    setChosenPoint(null)
-                  }}
-                >
-                  Inspect {repository.data.records[sourceId]?.name} ({sourceId})
-                </button>
-              ))}
-            </fieldset>
-          </Popup>
-        )}
-    </>
+        focusedRequest.current = request
+        stop = startOverlayCamera({
+          map,
+          bounds: () =>
+            walsCameraBounds(
+              bounds,
+              map.getProjection().type === 'mercator' && !map.getRenderWorldCopies(),
+            ),
+          isCurrent: () => !cancelled && store.get(walsCameraRequestAtom) === request,
+          canStop: () => true,
+          reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+          frames: {
+            request: (callback) => window.requestAnimationFrame(callback),
+            cancel: (id) => window.cancelAnimationFrame(id),
+          },
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      stop?.()
+    }
+  }, [map, request, atlas, variants, store])
+  if (!matches || !map) return null
+  return (
+    <Layer
+      id="wals-language-areas"
+      type="fill"
+      source="language-areas"
+      source-layer={atlas.manifest.vectorLayer}
+      filter={['in', ['get', 'variant_id'], ['literal', ids]]}
+      paint={{
+        'fill-color': [
+          'coalesce',
+          ['get', ['get', 'language_id'], ['literal', colorTable]],
+          '#71ac85',
+        ],
+        'fill-opacity': 0.78,
+        'fill-opacity-transition': { duration: 180 },
+      }}
+    />
   )
 }

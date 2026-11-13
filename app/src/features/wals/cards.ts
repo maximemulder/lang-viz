@@ -39,32 +39,35 @@ export const walsCardFeatures = (
 ) => {
   const record = repository.data.records[sourceId]
   if (!record) return []
-  const shared = ['81A', regionalWalsFeatures(repository).get(record.macroarea)].filter(
-    (id): id is string => Boolean(id && repository.data.features[id]),
-  )
   const observed = repository.index.bySource.get(sourceId)
-  const extra = EXTRA_PRIORITY.find((id) => !shared.includes(id) && observed?.has(id))
-  const cards = [...shared, ...(extra ? [extra] : [])]
-  if (inspectedFeature && observed?.has(inspectedFeature) && !cards.includes(inspectedFeature))
-    cards.push(inspectedFeature)
+  const shared = regionalWalsFeatures(repository).get(record.macroarea)
+  const available = ['81A', shared, ...EXTRA_PRIORITY].filter((id): id is string =>
+    Boolean(id && observed?.has(id)),
+  )
+  const cards = [...new Set(available)].slice(0, 3)
+  // An explicit inspection replaces the final slot, never creates a fourth card.
+  if (inspectedFeature && observed?.has(inspectedFeature) && !cards.includes(inspectedFeature)) {
+    if (cards.length === 3) cards[2] = inspectedFeature
+    else cards.push(inspectedFeature)
+  }
   return cards
 }
 
 export const WALS_DEFINITIONS: Readonly<Record<string, string>> = {
   '81A':
-    'The dominant order of subject (S), object (O) and verb (V) in clauses with a subject and an object. This is not a rule for every sentence.',
+    'The usual order of who does something, the action, and what is acted on. English commonly says “Sam eats rice”. Some languages allow several common orders.',
   '13A':
-    'Whether pitch differences help distinguish words or grammatical forms. This differs from using intonation to express emotion or ask a question.',
+    'In some languages, saying the same syllable at a different pitch can change its word or grammatical meaning. This is different from sounding excited or asking a question.',
   '12A':
-    'How syllables are built, including the consonant clusters they allow. See the chapter for the criteria behind simple, moderately complex and complex structures.',
+    'A syllable is a beat in a word. This feature describes how consonants and vowels can be grouped in one beat, not how difficult the language is to learn.',
   '30A':
-    'The number of grammatical gender classes, identified through agreement with nouns. These classes need not describe biological gender.',
+    'Some languages place nouns into grammar groups and change nearby words to match. These groups are often called “gender”, but they do not necessarily describe male or female people.',
   '87A':
-    'The order of an attributive adjective and the noun it describes, as in the English words “red house”. Some languages allow both orders or have no dominant order.',
+    'Whether words like “red” generally come before or after the thing they describe: “red house” or “house red”. These examples rearrange English words.',
   '37A':
-    'How a language marks an identifiable referent, including separate definite articles, affixes and other strategies. English “the” is one example.',
+    'How a language marks a particular person or thing that the listener can identify. English often uses “the”; other languages use different strategies.',
   '92A':
-    'Where particles marking yes/no questions occur. The categories also distinguish other positions and languages without a polar question particle.',
+    'Some languages use a small extra word when asking a question answered by yes or no. This feature records where it goes, or that there is no dedicated question word of this kind.',
 }
 
 /** Reordered English words only; no example for non-dominant/unknown categories. */
@@ -80,3 +83,55 @@ export const walsWordOrderIllustration = (category: string): string | null =>
   Object.hasOwn(WORD_ORDER_ILLUSTRATIONS, category)
     ? (WORD_ORDER_ILLUSTRATIONS[category] ?? null)
     : null
+
+export const WALS_TITLES: Readonly<Record<string, string>> = {
+  '81A': 'Sentence order',
+  '13A': 'Voice pitch',
+  '12A': 'Syllables',
+  '30A': 'Noun groups',
+  '87A': 'Describing words',
+  '37A': 'Words like “the”',
+  '92A': 'Yes/no questions',
+}
+export const readableWalsValue = (featureId: string, value: string) => {
+  const labels: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+    '81A': { 'No dominant order': 'No single usual order' },
+    '87A': {
+      'Adjective-Noun': 'Describing word before the noun',
+      'Noun-Adjective': 'Describing word after the noun',
+    },
+    '13A': {
+      'No tones': 'Pitch does not distinguish words',
+      'Simple tone system': 'Uses pitch to distinguish words',
+      'Complex tone system': 'Uses several pitch patterns',
+    },
+    '12A': {
+      Simple: 'Simple syllable shapes',
+      'Moderately complex': 'Moderately complex syllable shapes',
+      Complex: 'Complex syllable shapes',
+    },
+    '30A': {
+      None: 'No grammatical noun groups',
+      Two: 'Two grammatical noun groups',
+      Three: 'Three grammatical noun groups',
+      Four: 'Four grammatical noun groups',
+      'Five or more': 'Five or more grammatical noun groups',
+    },
+    '37A': {
+      'Definite word distinct from demonstrative': 'Uses a separate word like “the”',
+      'Demonstrative word used as definite article': 'Uses a word like “this” or “that”',
+      'Definite affix': 'Adds a marker to the word',
+      'No definite, but indefinite article': 'Marks “a”, but not “the”',
+      'No definite or indefinite article': 'No article markers like “a” or “the”',
+    },
+    '92A': {
+      Initial: 'At the start of a question',
+      Final: 'At the end of a question',
+      'Second position': 'After the first word or phrase',
+      'Other position': 'Elsewhere in the question',
+      'In either of two positions': 'Two possible positions',
+      'No question particle': 'No dedicated yes/no question word',
+    },
+  }
+  return labels[featureId]?.[value] ?? value
+}

@@ -100,3 +100,50 @@
   padding: 0.75rem;
   overflow: auto;
 }
+/* The summary is intentionally short; evidence remains available on demand. */
+.wals-card h5 {
+  font-weight: 500;
+  color: #51645e;
+  font-size: 0.82rem;
+  margin-bottom: 0.3rem;
+}
+.wals-card > strong {
+  display: block;
+  font-size: 1.02rem;
+  color: #254d43;
+  line-height: 1.4;
+}
+.wals-panel .wals-identity {
+  color: #53665e;
+  font-size: 0.75rem;
+}
+.wals-illustration {
+  font-size: 0.8rem;
+  margin: 0.4rem 0;
+}
+.wals-highlight-action {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.7rem;
+  margin-top: 0.5rem;
+  border: 1px solid #c0cfc1;
+  border-radius: 1rem;
+  background: #edf3e8;
+  color: #254d43;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.wals-highlight-action[aria-pressed="true"] {
+  background: #254d43;
+  color: white;
+}
+.wals-card details {
+  margin-top: 0.5rem;
+}
+.wals-panel details summary {
+  color: #52655e;
+  font-size: 0.75rem;
+}
+.wals-panel details p {
+  font-size: 0.78rem;
+}

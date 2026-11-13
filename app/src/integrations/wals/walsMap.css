@@ -84,3 +84,74 @@
   display: block;
   margin: 0.3rem 0;
 }
+.wals-map-summary {
+  position: relative;
+  border-radius: 0.6rem;
+  margin: 0.5rem;
+  background: #edf3e8;
+  border: 1px solid #cbd6c7;
+  padding: 0.8rem;
+  font-size: 0.78rem;
+}
+.wals-map-summary h2 {
+  padding-right: 1.3rem;
+  font-size: 0.98rem;
+  line-height: 1.4;
+}
+.wals-map-summary .eyebrow {
+  font-size: 0.65rem;
+}
+.wals-map-summary .wals-summary-close {
+  position: absolute;
+  right: 0.35rem;
+  top: 0.25rem;
+  border: 0;
+  background: transparent;
+  font-size: 1.3rem;
+  min-width: 2rem;
+  min-height: 2rem;
+}
+.wals-map-summary summary {
+  cursor: pointer;
+}
+.wals-map-list {
+  max-height: 13rem;
+  overflow-y: auto;
+  padding-left: 1rem;
+}
+.wals-map-list li {
+  margin: 0.2rem 0;
+}
+.wals-map-list button {
+  border: 0;
+  background: transparent;
+  text-decoration: underline;
+  padding: 0.35rem;
+}
+.map-isolation-control {
+  position: absolute;
+  top: 4.4rem;
+  left: 1rem;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.6rem;
+  background: #fffdf4f5;
+  border: 1px solid #ccd5ca;
+  font-size: 0.8rem;
+  max-width: calc(100% - 5rem);
+}
+.map-isolation-control button {
+  border: 0;
+  border-radius: 0.4rem;
+  background: #315e50;
+  color: white;
+  padding: 0.5rem;
+  cursor: pointer;
+}
+.language-inspector__entry .language-inspector__context {
+  margin: 0.15rem 0;
+  font-size: 0.78rem;
+}

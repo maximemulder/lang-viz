@@ -13,6 +13,10 @@ export const createWalsLoader = (request: () => Promise<Response>) => {
       .then(async ({ response, start }) => {
         if (!response.ok) throw new Error(`Could not load WALS (HTTP ${response.status}).`)
         const body = await response.text()
+        if (body.trimStart().startsWith('<'))
+          throw new Error(
+            'WALS data is not installed in this workspace. Restore or build its separate data bundle.',
+          )
         const received = performance.now()
         const data: unknown = JSON.parse(body)
         const parsed = performance.now()

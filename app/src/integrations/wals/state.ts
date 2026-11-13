@@ -6,6 +6,7 @@ import { walsActionAtom, walsRepositoryAtom, walsSessionAtom } from '../../featu
 import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
 import { languageMapNavigationAtom, openLanguageDetailsAtom } from '../../state/languageControls.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
+import { isolatedLanguageIdAtom } from '../../state/mapInteraction.ts'
 import { associateWals } from './languageMatching.ts'
 
 /** The integration publishes the COMPLETE ready atlas catalog, independent of map filters. */
@@ -121,6 +122,7 @@ export const showWalsExamplesAtom = atom(
   (get, set, selection: { readonly sourceId: string; readonly featureId: string }) => {
     if (!get(walsRepositoryAtom)?.index.bySource.get(selection.sourceId)?.has(selection.featureId))
       return false
+    set(isolatedLanguageIdAtom, null)
     set(walsActionAtom, { type: 'show-examples', ...selection })
     return set(focusWalsExamplesAtom)
   },

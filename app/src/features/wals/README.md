@@ -2,7 +2,7 @@
 
 WALS-02 supplies data and navigation contracts; WALS-03 supplies the published,
 independently pinned release and deployment gate. WALS-04 mounts the profile
-cards, loading data only after the first **Load WALS features** action. Retry and
+cards, loading data automatically when a language profile is opened. Retry and
 errors stay inside this section. Source/schema instructions remain
 in [the pipeline documentation](../../../../pipeline/wals/README.md).
 
@@ -73,20 +73,16 @@ summary. There is no feature inheritance.
 `LanguageDetails` places `LanguageFeatures` after the existing profile actions and
 word-entry navigation, within the existing scrollable profile body. Selected
 varieties and inspected features live in session atoms, never component state.
-The variety selector, recorded source name/ID, source macroarea and any broader
-catalog association remain outside disclosures. A saved unavailable source ID is
-shown explicitly and is never silently replaced.
+The recorded source name stays visible; variety choice is inside a disclosure.
+A saved unavailable source ID remains explicit. Defaults prefer a variety with
+recorded sentence order, then the most recorded shortlisted features.
 
-`cards.ts` owns the single editorial summary policy. Word order (81A) always has
-a slot. The other required slot is the best-covered shortlisted feature in the
-source macroarea, counting each WALS variety once, including unmatched records.
-Equal coverage follows 13A, 12A, 30A, 87A, 37A, 92A. Even a zero-coverage region
-retains the first available comparison feature. Neither required slot is removed
-when its observation is absent. An optional third card is the first observed
-extra in priority order 13A, 30A, 12A, 37A, 92A, 87A. An inspected observation
-outside these slots is appended, without duplication. Coverage is cached per
-validated repository identity. This is an editorial shortlist, not a uniqueness
-ranking or a representative sample; the UI explains the policy.
+`cards.ts` selects at most three **observed** features. It prioritizes sentence
+order (81A), followed by the best-covered regional comparison feature if recorded,
+then other recorded shortlisted features. Missing observations do not take a slot.
+An explicitly inspected feature replaces the last card instead of creating a fourth.
+The regional comparison is an editorial summary, not a claim that all languages
+in a region share a value. Coverage is cached per validated repository identity.
 
 Each card provides a plain-language definition, chapter citation and links, plus
 the exact observation's references, pages, comments and supplied examples.
@@ -99,11 +95,10 @@ Unknown and non-dominant values receive no invented illustration. Orok 87A keeps
 its published value alongside the source-erratum warning. Version, original source
 commit, citation, license, adapter notice and full supplied errata remain accessible.
 
-The observation selector uses the validated inspection action to preserve exact
-source/feature IDs. Each recorded card offers **Show recorded examples on map**;
-unrecorded values have no show action. Keyboard controls use native buttons,
-selects, disclosures and links. Narrow profiles retain the existing internal
-scrolling and keep cards and selects within their container.
+Each card offers **Find languages like this**. Definitions, exact labels,
+references and supplied examples are inside **What this means & sources**.
+Sources and data remains a separate disclosure. Native buttons, disclosures and
+selects support keyboard use; profiles retain their internal scrolling.
 
 ## Session and navigation actions
 
@@ -135,18 +130,23 @@ inspection or reopen a closed profile. Closing standalone inspection clears only
 that inspection, preserving profile choices and the overlay. Inspection and variety selection stay in the current
 workspace; show/focus explicitly opens Geography.
 
-The overlay stores only source/feature IDs, visibility and a maximum of 12 examples.
-WALS-05 derives exact-category examples and static point geometry through
-`walsExampleSelectionAtom` and `walsExampleGeometryAtom`. Selection uses the source
-ID, feature ID and limit, independently of atlas associations and UI visibility.
-`integrations/GeographyExplorations.tsx` composes lazy WALS and word-trail layers
-and summaries through Geography's slots. `WalsLayer` renders static DOM markers;
-`WalsMapSummary` supplies counts, controls and an accessible list. Single markers
-inspect exact source/feature evidence; shared positions open a chooser with every
-displayed record. WALS markers sit above lexical markers; marker and popup mouse
-events stop before the underlying polygon inspector. See the
-[exploration design](EXPLORATION_DESIGN.md) for the points-versus-arcs decision,
-deterministic spacing, count definitions and colocation policy.
+The overlay stores the selected source/feature IDs and visibility. The current
+map uses `areaMatching.ts` and `areaState.ts` to match the exact recorded category
+against explicit language/dialect associations and the already-built atlas variants
+for the active geographic source and period. Broader family associations are never
+expanded into descendants. Conflicting varieties are excluded from whole-area
+claims; missing areas, unresolved links and conflicts are counted in the disclosure.
+
+`WalsLayer` references the existing language-area vector source and original
+variant IDs, preserving language colours. There are no WALS markers, flight lines,
+country fills or generated replacement boundaries. The sidebar starts with a brief
+summary; its keyboard-accessible language list renders only when expanded.
+
+Map hover outlines an existing area and previews name, family and countries without
+replacing the open profile. Click opens information. Double-click isolates the
+language's existing areas; **Show all again** or Escape restores the view. Isolation
+changes paint only and preserves pinned selections. Overlapping languages offer a
+chooser. An isolation button is also available inside a profile's **More details**.
 
 `integrations/map/overlayCamera.ts` is shared by both overlays. The WALS consumer
 re-reads `walsCameraRequestAtom` and compares the original request identity after
@@ -204,33 +204,19 @@ exported observation. Ordinary tests remain fixture-only.
 
 ## Map controls and coexistence
 
-**Show recorded examples on map** establishes the overlay and explicitly focuses
-Geography. Subsequent inspection changes only source evidence/profile choices,
-never the overlay origin or camera. **Focus WALS examples** issues fresh intent.
-Hide/show preserves the selection and never replays focus; **Clear WALS overlay**
-leaves word-history state, profile choices and pinned comparisons intact. The
-keyboard list includes the origin (also when unlocated) and every selected source
-observation. Missing origin locations and zero candidates are explicit.
+**Find languages like this** highlights all eligible existing language areas with
+the selected recorded category and explicitly focuses Geography. Inspection retains
+the overlay origin and does not move the map. Clearing highlights retains language
+choices, word-history state and pinned entries. No new workspace is added.
 
-The neutral composition keeps the mounted map and caps the combined summary
-container at 45% of the sidebar; it scrolls independently of the language finder.
-Word histories has its own hide/show control. Its hidden sequence lives in
-`integrations/etymology/visibility.ts`; hiding cancels only owned focus, and a fresh
-explicit show/focus restores visibility. Neither overlay changes the other's
-visibility, source specification or pinned map entries.
+The initial projection is Mercator; users can still change projection. Reduced
+motion uses zero-duration focus. Overlay loading, style changes and geographic
+filter changes do not replay a consumed camera request.
 
-Globe and Mercator are retained as selected. Focus uses shortest-arc longitude
-bounds on globe. The map's existing single-world Mercator cannot fit an unwrapped
-dateline arc, so those selections use world-width bounds, with a note in the
-summary. No projection or world-copy setting is temporarily changed/restored.
-WALS uses system-font DOM markers; it adds no map glyph/font-server dependency.
-Reduced-motion focus has zero animation duration.
-
-`npm run test:wals-map-browser` builds and exercises the deployed-base application
-with the actual published data and explicitly labelled coordinate fixtures served
-by a local proxy. Installed data is unchanged. Reports and screenshots are under
-`test-results/wals-06/`. The shared word-trail regression runner accepts
-`--base /lang-viz/` for use against this same production build.
+The historical WALS-04/05/06 browser and measurement scripts below document the
+previous manual-loading and point-marker UI. Their UI expectations require updating
+before use as acceptance gates for this revision. Current checks include the unit
+suite, full snapshot integration test, build, and manual browser interaction checks.
 
 ## Measurements and handoff
 

@@ -1,10 +1,22 @@
-import { useAtomValue, useSetAtom } from 'jotai'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import type { FilterSpecification, MapLayerMouseEvent } from 'maplibre-gl'
 import { addProtocol, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { Protocol } from 'pmtiles'
-import { memo, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
+import { walsAreaMatchesAtom } from '../../integrations/wals/areaState'
+import { isolatedLanguageIdAtom } from '../../state/mapInteraction'
+import { GeometryPreview } from './geometry/GeometryPreview'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
 import { selectGeometryArchives } from '../../data/geometryArchives'
@@ -19,19 +31,24 @@ import {
 import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
+  languageColorsAtom,
   mapEntriesAtom,
   overlapModeAtom,
   selectedMapAreasAtom,
   temporalViewAtom,
   viewportLanguageIdsAtom,
 } from '../../state/atlasState'
-import { languageMapNavigationAtom, languagePointerPreviewAtom } from '../../state/languageControls'
+import {
+  languageMapNavigationAtom,
+  languagePointerPreviewAtom,
+  openLanguageDetailsAtom,
+} from '../../state/languageControls'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { InspectionHighlight } from './InspectionHighlight'
-import { visibleVariantIds } from './inspection'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
 import { LanguageMapCamera, LanguageMapPreview } from './LanguageMapFocus'
+import { pickLanguageVariants } from './languagePicking'
 import { MapBackground } from './MapBackground'
 import { MapSettings, type ProjectionMode } from './MapSettings'
 import { diagnosticsEnabled } from './overlap/diagnostics'
@@ -83,6 +100,8 @@ const hasSameVariants = (left: MapInspection | null, right: MapInspection | null
 
 const LanguageLayers = memo(() => {
   const data = useAtomValue(atlasDataAtom)
+  const isolatedId = useAtomValue(isolatedLanguageIdAtom)
+  const colors = useAtomValue(languageColorsAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const overlapMode = useAtomValue(overlapModeAtom)
@@ -103,6 +122,14 @@ const LanguageLayers = memo(() => {
       ? ['has', 'dataset_id']
       : ['in', ['get', 'dataset_id'], ['literal', datasetSelection]]
   const availableGeometryFilter: FilterSpecification = ['all', temporalFilter, datasetFilter]
+  const isolatedVariants =
+    areas.find((area) => area.languageId === isolatedId)?.variants ??
+    data.variants.filter(
+      (v) =>
+        v.languageId === isolatedId &&
+        (datasetSelection === 'all' || datasetSelection.includes(v.datasetId)) &&
+        (temporalSelection === 'all' || v.temporalCoverage.viewId === temporalSelection),
+    )
   const archiveUrl = languageArchiveUrl(
     selectGeometryArchives(
       data.manifest,
@@ -132,6 +159,16 @@ const LanguageLayers = memo(() => {
           filter={availableGeometryFilter}
           paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
         />
+        {isolatedId && (
+          <Layer
+            id="isolated-language-area"
+            source={LANGUAGE_SOURCE_ID}
+            source-layer={data.manifest.vectorLayer}
+            type="fill"
+            filter={['in', ['get', 'variant_id'], ['literal', isolatedVariants.map((v) => v.id)]]}
+            paint={{ 'fill-color': colors.get(isolatedId) ?? '#71ac85', 'fill-opacity': 0.85 }}
+          />
+        )}
       </Source>
       <OverlapHatching
         variants={areas}
@@ -149,6 +186,9 @@ const LanguageLayers = memo(() => {
 const MapHint = () => {
   const entries = useAtomValue(mapEntriesAtom)
   const visibleInPeriodCount = useAtomValue(selectedMapAreasAtom).length
+  const matches = useAtomValue(walsAreaMatchesAtom)
+  const isolated = useAtomValue(isolatedLanguageIdAtom)
+  if (matches || isolated) return null
 
   return (
     <div className={`map-hint${visibleInPeriodCount ? ' map-hint--active' : ''}`} role="status">
@@ -161,12 +201,18 @@ const MapHint = () => {
 }
 
 export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
+  const data = useAtomValue(atlasDataAtom)
+  const [isolatedId, setIsolatedId] = useAtom(isolatedLanguageIdAtom)
+  const matches = useAtomValue(walsAreaMatchesAtom)
+  const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const [hoverInspection, setHoverInspection] = useState<MapInspection | null>(null)
+  const hoverRef = useRef<MapInspection | null>(null)
   const sidebarPointer = useAtomValue(languagePointerPreviewAtom)
   const navigation = useAtomValue(languageMapNavigationAtom)
   const setCameraIntent = useSetAtom(mapCameraIntentAtom)
   const lastNavigation = useRef(navigation)
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('terrain')
-  const [projectionMode, setProjectionMode] = useState<ProjectionMode>('globe')
+  const [projectionMode, setProjectionMode] = useState<ProjectionMode>('mercator')
   const [inspection, setInspection] = useState<MapInspection | null>(null)
   const areas = useAtomValue(selectedMapAreasAtom)
   const inspectionSelectionKey = useMemo(() => mapAreaSelectionKey(areas), [areas])
@@ -183,10 +229,10 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
   const viewportDirtyRef = useRef(true)
   const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
 
-  const updateInspection = (nextInspection: MapInspection | null) => {
+  const updateInspection = useCallback((nextInspection: MapInspection | null) => {
     inspectionRef.current = nextInspection
     setInspection(nextInspection)
-  }
+  }, [])
 
   useEffect(() => {
     if (lastNavigation.current !== navigation) {
@@ -201,6 +247,8 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
       inspectionFilterRef.current = { inspectionSelectionKey }
       cancelPendingHoverQuery()
       updateInspection(null)
+      hoverRef.current = null
+      setHoverInspection(null)
     }
   })
 
@@ -222,9 +270,37 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
     [],
   )
 
+  const languageForHit = (id: string) =>
+    areas.find((area) => area.id === id)?.languageId ?? data.variantById.get(id)?.languageId
+  const hitVariants = (event: MapLayerMouseEvent) =>
+    pickLanguageVariants(event.target, event.point, {
+      data,
+      areas,
+      refinements,
+      memberships,
+      matching: Boolean(matches),
+      isolatedId,
+    })
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsolatedId(null)
+        updateInspection(null)
+      }
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [setIsolatedId, updateInspection])
+  const interactionKey = `${isolatedId ?? ''}:${matches?.categoryId ?? ''}`
+  const previousInteractionKey = useRef(interactionKey)
+  useEffect(() => {
+    if (previousInteractionKey.current === interactionKey) return
+    previousInteractionKey.current = interactionKey
+    hoverRef.current = null
+    setHoverInspection(null)
+    updateInspection(null)
+  }, [interactionKey, updateInspection])
   const queryHover = (event: MapLayerMouseEvent) => {
-    if (inspectionRef.current?.pinned) return
-
     pendingHoverEventRef.current = event
     if (hoverQueryFrameRef.current !== null) return
 
@@ -232,19 +308,20 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
       hoverQueryFrameRef.current = null
       const latestEvent = pendingHoverEventRef.current
       pendingHoverEventRef.current = null
-      if (!latestEvent || inspectionRef.current?.pinned) return
+      if (!latestEvent) return
 
       const location = latestEvent.target.unproject(latestEvent.point)
       const nextInspection = inspectionFromVariants(
-        visibleVariantIds(latestEvent.target, latestEvent.point, refinements, memberships),
+        hitVariants(latestEvent),
         location.lng,
         location.lat,
         false,
       )
       latestEvent.target.getCanvas().style.cursor = nextInspection ? 'pointer' : ''
 
-      if (!hasSameVariants(inspectionRef.current, nextInspection)) {
-        updateInspection(nextInspection)
+      if (!hasSameVariants(hoverRef.current, nextInspection)) {
+        hoverRef.current = nextInspection
+        setHoverInspection(nextInspection)
       }
     })
   }
@@ -260,6 +337,7 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
       maxZoom={12}
       renderWorldCopies={false}
       fadeDuration={0}
+      doubleClickZoom={false}
       reuseMaps
       onMouseMove={(event) => {
         lastHoverEventRef.current = event
@@ -269,18 +347,29 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
         lastHoverEventRef.current = null
         cancelPendingHoverQuery()
         event.target.getCanvas().style.cursor = ''
-        if (!inspectionRef.current?.pinned) updateInspection(null)
+        hoverRef.current = null
+        setHoverInspection(null)
       }}
       onClick={(event) => {
         cancelPendingHoverQuery()
-        updateInspection(
-          inspectionFromVariants(
-            visibleVariantIds(event.target, event.point, refinements, memberships),
-            event.lngLat.lng,
-            event.lngLat.lat,
-            true,
-          ),
-        )
+        const ids = hitVariants(event)
+        const primary = ids.length === 1 && ids[0] ? languageForHit(ids[0]) : null
+        if (primary) openDetails({ languageId: primary, moveMap: false })
+        updateInspection(inspectionFromVariants(ids, event.lngLat.lng, event.lngLat.lat, true))
+      }}
+      onDblClick={(event) => {
+        event.preventDefault()
+        cancelPendingHoverQuery()
+        const ids = hitVariants(event)
+        const unique = [
+          ...new Set(ids.map(languageForHit).filter((id): id is string => Boolean(id))),
+        ]
+        if (unique.length === 1 && unique[0]) {
+          setIsolatedId(unique[0])
+          openDetails({ languageId: unique[0], moveMap: false })
+          updateInspection(null)
+        } else
+          updateInspection(inspectionFromVariants(ids, event.lngLat.lng, event.lngLat.lat, true))
       }}
       onMoveStart={(event) => {
         if (event.originalEvent) setCameraIntent(null)
@@ -320,9 +409,22 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
           paint={{ 'background-opacity': 0 }}
         />
         <InspectionHighlight
-          variantIds={sidebarPointer ? NO_VARIANT_IDS : (inspection?.variantIds ?? NO_VARIANT_IDS)}
+          variantIds={
+            sidebarPointer
+              ? NO_VARIANT_IDS
+              : (hoverInspection?.variantIds ?? inspection?.variantIds ?? NO_VARIANT_IDS)
+          }
         />
-        <LanguageMapPreview mapInspectionActive={Boolean(inspection)} />
+        <LanguageMapPreview mapInspectionActive={Boolean(hoverInspection || inspection)} />
+        {hoverInspection &&
+          !sidebarPointer &&
+          hoverInspection.variantIds.every((id) => !areas.some((area) => area.id === id)) && (
+            <GeometryPreview
+              key={JSON.stringify(hoverInspection.variantIds)}
+              ids={hoverInspection.variantIds}
+              fillOpacity={0}
+            />
+          )}
         <LanguageMapCamera />
       </Suspense>
       {children}
@@ -338,6 +440,23 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
 
       <Suspense fallback={null}>
         <MapHint />
+        {isolatedId && (
+          <div className="map-isolation-control" role="status">
+            <span>Only {data.languageById.get(isolatedId)?.name}</span>
+            <button type="button" onClick={() => setIsolatedId(null)}>
+              Show all again
+            </button>
+          </div>
+        )}
+        {hoverInspection && !inspection && (
+          <LanguageInspector
+            inspection={hoverInspection}
+            onClose={() => {
+              hoverRef.current = null
+              setHoverInspection(null)
+            }}
+          />
+        )}
         {inspection && (
           <LanguageInspector inspection={inspection} onClose={() => updateInspection(null)} />
         )}

@@ -11,7 +11,15 @@ export const resolveWalsProfile = (
 ) => {
   const sourceIds = associations.byAtlas.get(profileId) ?? []
   const saved = session.profiles.get(profileId)
-  const sourceId = saved?.sourceId ?? sourceIds[0] ?? null
+  const ranked = [...sourceIds].sort(
+    (a, b) =>
+      Number(repository.index.bySource.get(b)?.has('81A') ?? false) -
+        Number(repository.index.bySource.get(a)?.has('81A') ?? false) ||
+      (repository.index.bySource.get(b)?.size ?? 0) -
+        (repository.index.bySource.get(a)?.size ?? 0) ||
+      a.localeCompare(b),
+  )
+  const sourceId = saved?.sourceId ?? ranked[0] ?? null
   const available = sourceId !== null && sourceIds.includes(sourceId)
   return {
     sourceIds,

@@ -1,9 +1,11 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { Popup } from 'react-map-gl/maplibre'
-import { temporalQualityLabel } from '../../domain/temporal'
+import { walsAreaMatchesAtom } from '../../integrations/wals/areaState'
 import { atlasDataAtom, languageColorsAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { openLanguageDetailsAtom } from '../../state/languageControls'
-import { LanguageWordsButton } from '../languages/LanguageWordsButton.tsx'
+import { isolatedLanguageIdAtom } from '../../state/mapInteraction'
+import { readableWalsValue, WALS_TITLES } from '../wals/cards'
+import { walsRepositoryAtom } from '../wals/state'
 
 export interface MapInspection {
   readonly longitude: number
@@ -11,32 +13,39 @@ export interface MapInspection {
   readonly variantIds: readonly string[]
   readonly pinned: boolean
 }
-
-interface LanguageInspectorProps {
+export const LanguageInspector = ({
+  inspection,
+  onClose,
+}: {
   readonly inspection: MapInspection
   readonly onClose: () => void
-}
-
-export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProps) => {
-  const data = useAtomValue(atlasDataAtom)
-  const areas = useAtomValue(selectedMapAreasAtom)
-  const colors = useAtomValue(languageColorsAtom)
-  const openDetails = useSetAtom(openLanguageDetailsAtom)
-  const datasetsById = new Map(data.datasets.map((dataset) => [dataset.id, dataset]))
-  const entries = inspection.variantIds.flatMap((variantId) => {
-    const area = areas.find(({ id }) => id === variantId)
-    const variant = data.variantById.get(variantId) ?? area?.variants[0]
-    const language = variant
-      ? data.languageById.get(area?.languageId ?? variant.languageId)
-      : undefined
-    if (!variant || !language) return []
-
-    return [{ language, variant, area, dataset: datasetsById.get(variant.datasetId) }]
+}) => {
+  const data = useAtomValue(atlasDataAtom),
+    areas = useAtomValue(selectedMapAreasAtom),
+    colors = useAtomValue(languageColorsAtom)
+  const matches = useAtomValue(walsAreaMatchesAtom),
+    repository = useAtomValue(walsRepositoryAtom)
+  const openDetails = useSetAtom(openLanguageDetailsAtom),
+    isolate = useSetAtom(isolatedLanguageIdAtom)
+  const countryNames = new Intl.DisplayNames(['en'], { type: 'region' })
+  const seen = new Set<string>()
+  const entries = inspection.variantIds.flatMap((id) => {
+    const area = areas.find((area) => area.id === id),
+      variant = data.variantById.get(id) ?? area?.variants[0]
+    const language = data.languageById.get(area?.languageId ?? variant?.languageId ?? '')
+    if (!language || !variant || seen.has(language.id)) return []
+    seen.add(language.id)
+    const countries = language.countries.map((code) => {
+      try {
+        return countryNames.of(code) ?? code
+      } catch {
+        return code
+      }
+    })
+    return [{ language, variant, area, countries }]
   })
-
-  if (entries.length === 0) return null
-
-  // Popup reads closeButton at construction, so pinning needs a new instance.
+  if (!entries.length) return null
+  const category = repository?.data.categories[matches?.categoryId ?? '']
   return (
     <Popup
       key={inspection.pinned ? 'pinned' : 'hover'}
@@ -50,74 +59,43 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
       className={`language-inspector${inspection.pinned ? ' language-inspector--pinned' : ''}`}
       onClose={onClose}
     >
-      <section aria-label="Languages at this location">
-        <header className="language-inspector__header">
-          <strong>
-            {entries.length === 1 ? entries[0]?.language.name : `${entries.length} entries here`}
-          </strong>
-          {!inspection.pinned && <small>Click to keep open</small>}
-        </header>
-
+      <section
+        aria-label="Languages at this location"
+        onMouseMove={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        {entries.length > 1 && (
+          <header className="language-inspector__header">
+            <strong>{entries.length} languages here</strong>
+          </header>
+        )}
         <div className="language-inspector__entries">
-          {entries.map(({ language, variant, area, dataset }) => (
-            <article className="language-inspector__entry" key={area?.id ?? variant.id}>
+          {entries.map(({ language, variant, area, countries }) => (
+            <article className="language-inspector__entry" key={language.id}>
               <span
                 className="language-inspector__swatch"
                 style={{ backgroundColor: area?.color ?? colors.get(language.id) }}
                 aria-hidden="true"
               />
               <div>
-                {entries.length > 1 && <strong>{language.name}</strong>}
-                <p>
-                  {language.level}
-                  {language.familyName ? ` · ${language.familyName}` : ''}
+                <strong>{language.name}</strong>
+                <p className="language-inspector__context">
+                  {language.familyName ? `${language.familyName} family` : 'Family not recorded'}
                 </p>
-                <small>
-                  {language.iso6393 ? `${language.iso6393} · ` : ''}
-                  {language.id}
-                </small>
-                {language.classification.kind === 'source' && (
-                  <small>Source-defined entry · no matched Glottocode</small>
+                <p className="language-inspector__context" title={countries.join(', ')}>
+                  {countries.length
+                    ? `Countries: ${(inspection.pinned ? countries : countries.slice(0, 3)).join(', ')}${!inspection.pinned && countries.length > 3 ? ` + ${countries.length - 3} more` : ''}`
+                    : 'Country information unavailable'}
+                </p>
+                {matches?.mappedIds.has(language.id) && category && (
+                  <p className="language-inspector__context">
+                    {WALS_TITLES[matches.featureId]}:{' '}
+                    {readableWalsValue(matches.featureId, category.name)}
+                  </p>
                 )}
-                {area?.mode === 'descendants' ? (
+                {inspection.pinned ? (
                   <>
-                    <small>Descendant areas · {area.variants.length} contributing entries</small>
-                    <small>
-                      {[
-                        ...new Set(
-                          area.variants.map(
-                            (item) => datasetsById.get(item.datasetId)?.shortName ?? item.datasetId,
-                          ),
-                        ),
-                      ].join(', ')}{' '}
-                      ·{' '}
-                      {[...new Set(area.variants.map((item) => item.temporalCoverage.label))].join(
-                        ', ',
-                      )}
-                    </small>
-                    <small>Combined available branches; coverage may be incomplete.</small>
-                  </>
-                ) : (
-                  <>
-                    <small>
-                      {dataset?.shortName ?? variant.datasetId} · {variant.temporalCoverage.label} ·{' '}
-                      {temporalQualityLabel(variant.temporalCoverage.quality)}
-                    </small>
-                    <small>
-                      {variant.geometryKind === 'source'
-                        ? 'Original source areas'
-                        : 'Area supplied by the dataset'}
-                    </small>
-                  </>
-                )}
-                {area?.branchRootId && (
-                  <small>
-                    Branch view · area not resolved to a more specific selected descendant.
-                  </small>
-                )}
-                {inspection.pinned && (
-                  <>
-                    <LanguageWordsButton language={language} onNavigate={onClose} />
                     <button
                       type="button"
                       className="language-inspector__details"
@@ -131,9 +109,29 @@ export const LanguageInspector = ({ inspection, onClose }: LanguageInspectorProp
                         onClose()
                       }}
                     >
-                      View details
+                      More details
                     </button>
+                    <button
+                      type="button"
+                      className="language-inspector__details"
+                      aria-label={`Isolate ${language.name}`}
+                      onClick={() => {
+                        isolate(language.id)
+                        onClose()
+                      }}
+                    >
+                      Isolate
+                    </button>
+                    <details>
+                      <summary>Map source</summary>
+                      <small>
+                        {data.datasets.find((d) => d.id === variant.datasetId)?.name} ·{' '}
+                        {variant.temporalCoverage.label}. Approximate language area.
+                      </small>
+                    </details>
                   </>
+                ) : (
+                  <small>Click for information · double-click to isolate</small>
                 )}
               </div>
             </article>

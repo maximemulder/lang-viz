@@ -12,6 +12,7 @@ import {
   overlapStatusAtom,
   stripeThicknessAtom,
 } from '../../../state/atlasState'
+import { mapContextOpacityAtom } from '../../../state/mapInteraction'
 import { geometryDisplay } from '../geometry/display'
 import { GeometryCoverageClient } from '../geometry/geometryService'
 import { CoverageLayers } from './CoverageLayers'
@@ -49,7 +50,7 @@ export const OverlapHatching = ({
   ).replace(/^pmtiles:\/\//, '')
   const languageColors = useAtomValue(languageColorsAtom)
   const mode = useAtomValue(overlapModeAtom)
-  const opacity = useAtomValue(languageOpacityAtom)
+  const opacity = useAtomValue(languageOpacityAtom) * useAtomValue(mapContextOpacityAtom)
   const stripeThickness = useAtomValue(stripeThicknessAtom)
   const thicknessRef = useRef(stripeThickness)
   const setOverlapStatus = useSetAtom(overlapStatusAtom)

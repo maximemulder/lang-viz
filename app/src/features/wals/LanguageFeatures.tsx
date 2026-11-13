@@ -1,17 +1,19 @@
 import { useAtomValue, useSetAtom } from 'jotai'
+import { useEffect } from 'react'
 import type { WalsReference, WalsRepository } from '../../domain/wals.ts'
 import type { WalsAssociation } from '../../integrations/wals/languageMatching.ts'
 import { resolveWalsProfile } from '../../integrations/wals/profile.ts'
 import {
-  inspectWalsObservationAtom,
+  clearWalsOverlayAtom,
   selectWalsVarietyAtom,
   showWalsExamplesAtom,
   walsAssociationsAtom,
   walsInspectionAtom,
 } from '../../integrations/wals/state.ts'
 import {
+  readableWalsValue,
   WALS_DEFINITIONS,
-  WALS_SHORTLIST,
+  WALS_TITLES,
   walsCardFeatures,
   walsWordOrderIllustration,
 } from './cards.ts'
@@ -69,6 +71,10 @@ export const WalsFeatureCard = ({
   readonly inspected?: boolean
 }) => {
   const showExamples = useSetAtom(showWalsExamplesAtom)
+  const clearOverlay = useSetAtom(clearWalsOverlayAtom)
+  const overlay = useAtomValue(walsSessionAtom).overlay
+  const active =
+    overlay?.visible && overlay.sourceId === sourceId && overlay.featureId === featureId
   const { data, index } = repository
   const feature = data.features[featureId]
   if (!feature) return null
@@ -80,32 +86,40 @@ export const WalsFeatureCard = ({
   const orokErratum = data.records[sourceId]?.name === 'Orok' && featureId === '87A'
   return (
     <article className="wals-card" data-feature-id={featureId} data-observed={!!observation}>
-      <h5>
-        {feature.name} <small>({featureId})</small>
-      </h5>
-      {inspected && <p className="wals-context">Inspected observation</p>}
-      <strong>{category?.name ?? 'Not recorded in this WALS snapshot'}</strong>
-      {observation && (
-        <p>
-          <button type="button" onClick={() => showExamples({ sourceId, featureId })}>
-            Show recorded examples on map
-          </button>
-        </p>
-      )}
+      <h5>{WALS_TITLES[featureId] ?? feature.name}</h5>
+      <strong>{category ? readableWalsValue(featureId, category.name) : 'Not recorded'}</strong>
       {illustration && (
         <p className="wals-illustration">
-          “{illustration}” — reordered English words; Sam = subject, eats = verb, rice = object.
-          This is an illustration, not a translation or a sentence in the recorded variety.
+          “{illustration}” ·{' '}
+          {category?.name
+            .split('')
+            .map((role) => ({ S: 'who', V: 'action', O: 'what' })[role])
+            .join(' → ')}
         </p>
       )}
       {orokErratum && (
-        <p className="wals-caveat">
-          Source erratum: Orok’s adjective order is disputed in the supplied errata, which report
-          adjective–noun order. This card retains the published snapshot value. See source notes.
-        </p>
+        <p className="wals-caveat">This recorded value is disputed. See the source notes below.</p>
+      )}
+      {observation && (
+        <button
+          type="button"
+          className="wals-highlight-action"
+          aria-pressed={Boolean(active)}
+          aria-label={`${active ? 'Clear' : 'Highlight'} matching languages for ${WALS_TITLES[featureId] ?? feature.name}`}
+          onClick={() => (active ? clearOverlay() : showExamples({ sourceId, featureId }))}
+        >
+          {active ? 'Clear highlights' : 'Find languages like this'}
+        </button>
       )}
       <details>
-        <summary>Definition and evidence: {featureId}</summary>
+        <summary>What this means &amp; sources</summary>
+        <p>
+          Recorded WALS value: {category?.name ?? 'Unknown'}.{' '}
+          {inspected ? 'Selected observation.' : ''}
+        </p>
+        {illustration && (
+          <p>The example rearranges English words to explain the order; it is not a translation.</p>
+        )}
         <p>{WALS_DEFINITIONS[featureId] ?? feature.description}</p>
         {category?.description && <p>{category.description}</p>}
         <p>
@@ -174,7 +188,7 @@ const SourceNotes = ({
   const record = data.records[sourceId]
   return (
     <details className="wals-source-notes">
-      <summary>WALS version, variety bibliography and source notes</summary>
+      <summary>Sources and data</summary>
       <p>{data.provenance.citation}</p>
       <p>
         Snapshot: {data.provenance.snapshot ?? 'Unspecified'} · Source commit:{' '}
@@ -226,30 +240,17 @@ const RecordedFeatures = ({
   readonly association: WalsAssociation | null
 }) => {
   const record = repository.data.records[sourceId]
-  const inspect = useSetAtom(inspectWalsObservationAtom)
   if (!record) return <p>The recorded WALS variety is unavailable.</p>
   const cards = walsCardFeatures(repository, sourceId, featureId)
   const observed = repository.index.bySource.get(sourceId)
   return (
     <div className="wals-record" data-source-id={sourceId}>
-      <p className="wals-identity">
-        Recorded variety:{' '}
-        <a href={record.url} target="_blank" rel="noreferrer">
-          {record.name}
-        </a>{' '}
-        ({sourceId}){' · '}Source region: {record.macroarea || 'Unspecified'}
-      </p>
-      {association?.status === 'associated' && (
-        <p className={association.scope === 'broader' ? 'wals-caveat' : 'wals-context'}>
-          {association.scope === 'broader' && (
-            <strong>Broader catalog association ({association.level}). </strong>
-          )}
-          {association.explanation}
+      <p className="wals-identity">Recorded for {record.name} · WALS</p>
+      {association?.status === 'associated' && association.scope === 'broader' && (
+        <p className="wals-caveat">
+          These values describe the recorded variety, not the whole language group.
         </p>
       )}
-      <p className="wals-context">
-        An editorial summary of this variety’s recorded structures, not a uniqueness ranking.
-      </p>
       {!observed?.size && (
         <p>WALS includes this variety, but none of these selected features is recorded.</p>
       )}
@@ -264,39 +265,6 @@ const RecordedFeatures = ({
           />
         ))}
       </div>
-      <details>
-        <summary>How are these cards selected?</summary>
-        <p>
-          Word order (81A) and the best-covered other shortlisted feature in this source region keep
-          their slots, including unknown values. Coverage counts every WALS source variety once,
-          including varieties without an atlas match. Ties follow 13A, 12A, 30A, 87A, 37A, 92A. A
-          third card uses the first observed extra in priority order 13A, 30A, 12A, 37A, 92A, 87A.
-          An inspected feature is also revealed. No uniqueness or representativeness is implied by
-          these editorial choices.
-        </p>
-      </details>
-      {!!observed?.size && (
-        <label className="wals-select">
-          Inspect a recorded feature
-          <select
-            aria-label="Inspect a recorded WALS feature"
-            value={featureId ?? ''}
-            onChange={(event) => {
-              if (event.currentTarget.value)
-                inspect({ sourceId, featureId: event.currentTarget.value })
-            }}
-          >
-            <option value="" disabled>
-              Choose an observation
-            </option>
-            {WALS_SHORTLIST.filter((id) => observed.has(id)).map((id) => (
-              <option key={id} value={id}>
-                {repository.data.features[id]?.name} ({id})
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       <SourceNotes repository={repository} sourceId={sourceId} />
     </div>
   )
@@ -309,6 +277,9 @@ export const LanguageFeatures = ({ profileId }: { readonly profileId: string }) 
   const session = useAtomValue(walsSessionAtom)
   const load = useSetAtom(loadWalsAtom)
   const selectVariety = useSetAtom(selectWalsVarietyAtom)
+  useEffect(() => {
+    if (!repository && loading.status === 'idle') void load()
+  }, [repository, loading.status, load])
   const profile =
     repository && associations
       ? resolveWalsProfile(repository, associations, session, profileId)
@@ -322,9 +293,6 @@ export const LanguageFeatures = ({ profileId }: { readonly profileId: string }) 
       <h4>How this language works</h4>
       {!repository ? (
         <>
-          <p>
-            Explore recorded language structures from WALS. Coverage varies by variety and feature.
-          </p>
           {loading.status === 'loading' ? (
             <p role="status">Loading language features…</p>
           ) : (
@@ -344,35 +312,39 @@ export const LanguageFeatures = ({ profileId }: { readonly profileId: string }) 
         <>
           {profile.message && (
             <p role="status">
-              {profile.message} Missing records do not mean the entry lacks these features. No
-              values are inherited from relatives.
+              {profile.sourceIds.length
+                ? 'The saved variety is unavailable. Choose another recorded variety below.'
+                : 'No WALS record is linked to this entry. This means information is unavailable, not that the language lacks these features.'}
             </p>
           )}
           {!profile.record && profile.sourceId && (
             <p>Saved WALS variety: {profile.sourceId} (unavailable for this profile).</p>
           )}
           {profile.sourceIds.length > 1 || (profile.sourceIds.length && !profile.record) ? (
-            <label className="wals-select">
-              Recorded WALS variety
-              <select
-                aria-label="Recorded WALS variety"
-                value={profile.record ? (profile.sourceId ?? '') : ''}
-                onChange={(event) =>
-                  selectVariety({ profileId, sourceId: event.currentTarget.value })
-                }
-              >
-                {!profile.record && (
-                  <option value="" disabled>
-                    Choose a variety
-                  </option>
-                )}
-                {profile.sourceIds.map((id) => (
-                  <option key={id} value={id}>
-                    {repository.data.records[id]?.name} ({id})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <details className="wals-varieties">
+              <summary>Recorded variety</summary>
+              <label className="wals-select">
+                WALS variety
+                <select
+                  aria-label="Recorded WALS variety"
+                  value={profile.record ? (profile.sourceId ?? '') : ''}
+                  onChange={(event) =>
+                    selectVariety({ profileId, sourceId: event.currentTarget.value })
+                  }
+                >
+                  {!profile.record && (
+                    <option value="" disabled>
+                      Choose a variety
+                    </option>
+                  )}
+                  {profile.sourceIds.map((id) => (
+                    <option key={id} value={id}>
+                      {repository.data.records[id]?.name} ({id})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </details>
           ) : null}
           {profile.record && profile.sourceId && (
             <RecordedFeatures
