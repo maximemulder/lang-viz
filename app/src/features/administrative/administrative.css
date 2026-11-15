@@ -1,0 +1,239 @@
+.administrative-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid rgb(29 43 39 / 12%);
+  background: var(--paper);
+}
+
+.administrative-panel__header {
+  padding: 1rem 1rem 0.7rem;
+  border-bottom: 1px solid rgb(29 43 39 / 12%);
+}
+
+.administrative-panel__header h2 {
+  margin: 0.15rem 0 0.45rem;
+}
+.administrative-panel__header p:last-child,
+.administrative-muted,
+.administrative-source p {
+  margin: 0;
+  color: var(--muted-ink);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.administrative-panel__status {
+  padding: 1rem;
+}
+.administrative-panel__status p {
+  line-height: 1.5;
+}
+
+.administrative-search-kind {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.65rem 0.8rem 0;
+  border: 0;
+}
+.administrative-search-kind legend,
+.administrative-search-field {
+  color: var(--muted-ink);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.administrative-search-kind button {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #bec8c0;
+  border-radius: 0.35rem;
+  background: #fffdf5;
+  color: var(--ink);
+  font-size: 0.73rem;
+}
+.administrative-search-kind button[aria-pressed="true"] {
+  background: #315c4b;
+  color: white;
+}
+.administrative-search-field {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.65rem 0.8rem;
+}
+.administrative-search-field input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #bec8c0;
+  border-radius: 0.35rem;
+  background: #fffdf7;
+  color: var(--ink);
+}
+.administrative-panel button:focus-visible,
+.administrative-panel input:focus-visible,
+.administrative-panel a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.administrative-results {
+  flex: 0 1 11rem;
+  min-height: 5rem;
+  overflow: auto;
+  border-top: 1px solid rgb(29 43 39 / 12%);
+  border-bottom: 1px solid rgb(29 43 39 / 12%);
+}
+.administrative-results > p {
+  margin: 0;
+  padding: 0.35rem 0.8rem;
+  color: var(--muted-ink);
+  font-size: 0.7rem;
+}
+.administrative-results ul,
+.administrative-observations ol,
+.administrative-family-languages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.administrative-results li button,
+.administrative-family-languages li button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.36rem 0.8rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.77rem;
+  text-align: left;
+}
+.administrative-results li button:hover,
+.administrative-family-languages li button:hover {
+  background: #e9eee8;
+}
+.administrative-results li button[aria-current="true"] {
+  background: #dce9de;
+  font-weight: 600;
+}
+.administrative-code {
+  flex: none;
+  color: var(--muted-ink);
+  font-size: 0.7rem;
+}
+.administrative-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.administrative-detail {
+  padding: 0.85rem;
+}
+.administrative-detail__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.administrative-detail h3,
+.administrative-source h3 {
+  margin: 0;
+  font-family: "Newsreader", serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+.administrative-detail h4 {
+  margin: 0.85rem 0 0.4rem;
+  font-size: 0.81rem;
+}
+.administrative-detail > p {
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+.administrative-facts {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.85rem 0;
+}
+.administrative-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.administrative-facts dt {
+  color: var(--muted-ink);
+}
+.administrative-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+.administrative-note {
+  padding: 0.55rem 0.65rem;
+  border-left: 3px solid var(--accent);
+  background: #f4eee3;
+}
+.administrative-observations li {
+  padding: 0.42rem 0;
+  border-bottom: 1px solid rgb(29 43 39 / 9%);
+}
+.administrative-observation__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+}
+.administrative-panel .administrative-observation__top button,
+.administrative-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #245c53;
+  text-align: left;
+  text-decoration: underline;
+}
+.administrative-observations__definition {
+  margin: 0 0 0.35rem;
+  color: var(--muted-ink);
+  font-size: 0.69rem;
+  line-height: 1.4;
+}
+.administrative-observation__bar {
+  height: 0.35rem;
+  margin-top: 0.25rem;
+  border-radius: 0.2rem;
+  background: linear-gradient(to right, #6a9c86 var(--bar-width), #e6ebe5 var(--bar-width));
+}
+.administrative-observations li p {
+  margin: 0.2rem 0 0;
+  color: var(--muted-ink);
+  font-size: 0.66rem;
+}
+.administrative-family-languages {
+  max-height: 18rem;
+  overflow: auto;
+}
+.administrative-empty {
+  margin: 0;
+  padding: 1rem;
+  color: var(--muted-ink);
+  font-size: 0.8rem;
+}
+.administrative-source {
+  padding: 0.85rem;
+  border-top: 1px solid rgb(29 43 39 / 12%);
+}
+.administrative-panel .administrative-source p {
+  margin-top: 0.55rem;
+}
+.administrative-source a {
+  color: #245c53;
+}
+
+@media (max-width: 800px) {
+  .administrative-panel {
+    border-top: 1px solid rgb(29 43 39 / 12%);
+    border-left: 0;
+  }
+}

@@ -37,7 +37,11 @@ const configuredSession = () => {
 test('workspace round trips preserve all exploration settings and evidence', () => {
   const before = configuredSession()
   const geography = reduceExplorerSession(before, { type: 'workspace', workspace: 'geography' })
-  const after = reduceExplorerSession(geography, { type: 'workspace', workspace: 'etymology' })
+  const administrative = reduceExplorerSession(geography, {
+    type: 'workspace',
+    workspace: 'administrative',
+  })
+  const after = reduceExplorerSession(administrative, { type: 'workspace', workspace: 'etymology' })
   assert.deepEqual(after, before)
   assert.equal(after.trail, before.trail)
   assert.equal(after.comparison, before.comparison)

@@ -31,7 +31,12 @@ export const parseExplorerRoute = (
   }
   const workspace = single('workspace')
   const view = single('view')
-  if (workspace !== null && workspace !== 'geography' && workspace !== 'etymology')
+  if (
+    workspace !== null &&
+    workspace !== 'geography' &&
+    workspace !== 'administrative' &&
+    workspace !== 'etymology'
+  )
     issues.push('Unknown workspace')
   if (view !== null && view !== 'history' && view !== 'family') issues.push('Unknown word view')
   const word = id('word'),
@@ -40,11 +45,13 @@ export const parseExplorerRoute = (
   return {
     route: {
       workspace:
-        workspace === 'etymology' ||
-        (!params.has('workspace') &&
-          (word !== null || concept !== null || collection !== null || view === 'family'))
-          ? 'etymology'
-          : 'geography',
+        workspace === 'administrative'
+          ? 'administrative'
+          : workspace === 'etymology' ||
+              (!params.has('workspace') &&
+                (word !== null || concept !== null || collection !== null || view === 'family'))
+            ? 'etymology'
+            : 'geography',
       word,
       view: view === 'family' ? 'family' : 'history',
       concept,

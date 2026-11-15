@@ -32,6 +32,7 @@
     "measure:wals": "node scripts/measure-wals.ts",
     "measure:wals-browser": "GITHUB_PAGES=true npm run build && uv run python -m tests.browser.wals_performance",
     "test:explorer-navigation-browser": "uv run python -m tests.browser.explorer_navigation",
+    "test:administrative-browser": "uv run python -m tests.browser.administrative",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",

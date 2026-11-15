@@ -96,10 +96,11 @@ test('empty, legacy, concept-only, and explicit Geography links parse without da
     parseExplorerRoute('#workspace=geography&word=69562&view=family').route.workspace,
     'geography',
   )
+  assert.equal(parseExplorerRoute('#workspace=administrative').route.workspace, 'administrative')
 })
 
 test('canonical route round trips preserve workspace, root, view, concept, and collection', () => {
-  for (const workspace of ['geography', 'etymology'] as const) {
+  for (const workspace of ['geography', 'administrative', 'etymology'] as const) {
     for (const view of ['history', 'family'] as const) {
       for (const word of [null, '69562']) {
         const route: ExplorerRoute = { workspace, word, view, concept: '1001', collection: '1' }

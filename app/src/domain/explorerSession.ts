@@ -1,6 +1,6 @@
 import type { LanguageClassification } from './atlas.ts'
 
-export type Workspace = 'geography' | 'etymology'
+export type Workspace = 'geography' | 'administrative' | 'etymology'
 export type WordView = 'history' | 'family'
 export interface TrailSpecification {
   readonly root: string | null

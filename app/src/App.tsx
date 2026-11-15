@@ -21,9 +21,11 @@ export const App = () => {
     return disconnect
   }, [store])
   useEffect(() => {
-    if (connected && session.workspace === 'geography') setGeographyVisited(true)
+    if (connected && session.workspace !== 'etymology') setGeographyVisited(true)
   }, [connected, session.workspace])
   const geography = session.workspace === 'geography'
+  const administrative = session.workspace === 'administrative'
+  const mapWorkspace = geography || administrative
   return (
     <MapProvider>
       <div className="app-shell">
@@ -42,7 +44,14 @@ export const App = () => {
             </button>
             <button
               type="button"
-              aria-pressed={!geography}
+              aria-pressed={administrative}
+              onClick={() => dispatch({ type: 'workspace', workspace: 'administrative' })}
+            >
+              Administrative
+            </button>
+            <button
+              type="button"
+              aria-pressed={session.workspace === 'etymology'}
               onClick={() => dispatch({ type: 'workspace', workspace: 'etymology' })}
             >
               Word histories
@@ -53,8 +62,8 @@ export const App = () => {
         <main className="workspace-host">
           {connected ? (
             <>
-              {(geographyVisited || geography) && (
-                <div className="workspace-panel atlas-workspace" hidden={!geography}>
+              {(geographyVisited || mapWorkspace) && (
+                <div className="workspace-panel atlas-workspace" hidden={!mapWorkspace}>
                   <WorkspaceBoundary name="the geography workspace">
                     <Suspense
                       fallback={
@@ -63,12 +72,12 @@ export const App = () => {
                         </p>
                       }
                     >
-                      <GeographyWorkspace visible={geography} />
+                      <GeographyWorkspace visible={mapWorkspace} administrative={administrative} />
                     </Suspense>
                   </WorkspaceBoundary>
                 </div>
               )}
-              {!geography && (
+              {session.workspace === 'etymology' && (
                 <div className="workspace-panel lexical-panel">
                   <WorkspaceBoundary
                     name="word histories"

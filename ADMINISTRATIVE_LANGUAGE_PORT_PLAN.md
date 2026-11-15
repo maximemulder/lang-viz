@@ -1,6 +1,6 @@
 # Administrative language visualization port plan
 
-Last updated: 2026-11-15. ADM-00 through ADM-03 implementation recorded below.
+Last updated: 2026-11-15. ADM-00 through ADM-04 implementation recorded below.
 
 Integrate the useful CLDR language and territory statistics from
 `origin/aastha/speaker-stats` into the current geography workspace. Keep the
@@ -99,7 +99,7 @@ delivery, and large `CldrMapView` component before integrating them.
 | ADM-01 | Reproducible CLDR supplement and provenance | ADM-00 | Implemented; source release remains unknown |
 | ADM-02 | Boundary package and explicit territory crosswalk | ADM-00 | Implemented; UI integration remains ADM-05 |
 | ADM-03 | Independent repository, domain model, and state | ADM-01 | Implemented; panel integration remains ADM-04 |
-| ADM-04 | Administrative header view and sidebar details | ADM-03 | Planned |
+| ADM-04 | Administrative header view and sidebar details | ADM-03 | Implemented; map controls remain ADM-05 |
 | ADM-05 | Optional map layers and top-left controls | ADM-02, ADM-03, ADM-04 | Planned |
 | ADM-06 | Delivery, regression, and documentation | ADM-01–ADM-05 | Planned |
 
@@ -218,6 +218,21 @@ will connect the panel and its eventual camera consumer.
 
 Acceptance: header navigation, search, selection, and detail flows are keyboard
 usable and do not disturb existing language controls.
+
+ADM-04 result: the header now routes Geography / Administrative / Word histories
+through the existing URL session. Geography and Administrative reuse one mounted
+`WorldMap`. The language sidebar remains mounted but hidden while a separately
+lazy-loaded administrative panel shows territory, source-language, and Glottolog
+family search and details. That panel requests only the observation supplement;
+its load error and retry are local. The atlas map and language catalog have
+their own error boundaries, so their data failures do not replace the
+administrative panel. Source territory codes remain visible alongside
+browser-localized area labels. Detail lists show ranked estimates and source
+status, with explicit overlap, sum, coverage, and unknown-CLDR-release caveats.
+No administrative selection opens an atlas language detail or requests a camera
+move. The representative map layer, border switch, and hover ownership are
+still ADM-05. Firefox checks covered search and keyboard selection, sidebar
+state, URL switching, and persistence of the map canvas.
 
 ### ADM-05 — Integrate map layers and controls
 

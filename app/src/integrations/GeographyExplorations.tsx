@@ -12,21 +12,28 @@ const WalsLayer = lazy(() => import('./wals/WalsLayer.tsx'))
 const WalsMapSummary = lazy(() => import('./wals/WalsMapSummary.tsx'))
 
 /** Optional explorations compose here; the map core knows neither feature. */
-export default function GeographyExplorations({ visible }: { readonly visible: boolean }) {
+export default function GeographyExplorations({
+  visible,
+  administrative,
+}: {
+  readonly visible: boolean
+  readonly administrative: boolean
+}) {
   const lexical = useAtomValue(explorerSessionAtom).overlay.enabled
   const wordVisible = useAtomValue(wordTrailVisibleAtom)
   const wals = useAtomValue(walsSessionAtom).overlay
   return (
     <GeographyWorkspace
       visible={visible}
+      administrative={administrative}
       mapLayers={
         <>
-          {lexical && wordVisible && (
+          {lexical && wordVisible && !administrative && (
             <Suspense fallback={null}>
               <WordTrailLayer />
             </Suspense>
           )}
-          {wals?.visible && visible && (
+          {wals?.visible && visible && !administrative && (
             <Suspense fallback={null}>
               <WalsLayer key={`${wals.sourceId}:${wals.featureId}`} />
             </Suspense>
@@ -34,6 +41,7 @@ export default function GeographyExplorations({ visible }: { readonly visible: b
         </>
       }
       sidebarHeader={
+        !administrative &&
         (lexical || wals) && (
           <section className="geography-explorations" aria-label="Map explorations">
             {lexical && (

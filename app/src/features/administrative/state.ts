@@ -11,7 +11,7 @@ export const administrativeLoadStateAtom = atom<{
 }>({ status: 'idle', message: '' })
 const pendingAtom = atom<Promise<void> | null>(null)
 
-/** The supplement is requested only by the future Administrative panel. */
+/** The supplement is requested only when the Administrative panel mounts. */
 export const loadAdministrativeAtom = atom(
   null,
   (get, set, load: () => Promise<AdministrativeRepository> = loadAdministrative): Promise<void> => {

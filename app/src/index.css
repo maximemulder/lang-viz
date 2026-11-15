@@ -118,6 +118,23 @@ h1 {
   flex: 1;
 }
 
+.geography-sidebar__language,
+.geography-sidebar__administrative {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.geography-sidebar__language[hidden],
+.geography-sidebar__administrative[hidden] {
+  display: none;
+}
+
+.geography-sidebar__language > .language-finder {
+  flex: 1;
+}
+
 .language-finder__inspection {
   min-height: 0;
   overflow: hidden;

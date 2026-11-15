@@ -1,4 +1,4 @@
-# Administrative browser model (ADM-03)
+# Administrative feature (ADM-03 and ADM-04)
 
 This feature reads `administrative/observations.json` only when its loader is
 called. It has no import from the atlas repository, geometry selectors, or
@@ -23,5 +23,21 @@ maps a territory to a polygon or a language to an atlas geometry.
 selection IDs, and metric choice. A selection or load completion never changes
 the map camera. An explicit territory focus creates a request in the shared
 `mapCameraIntentAtom`; ADM-05 will add a consumer that resolves the selected
-boundary view and representative point. Header view changes also leave camera
-intent alone.
+boundary view and representative point. Header view changes keep the current
+map camera position.
+
+`AdministrativePanel.tsx` is loaded only when the Administrative header view is
+first opened. It then stays mounted across header switches, preserving search,
+selection, and scroll state. Its search covers source territory codes and
+browser-localized area names, source language names/codes, and Glottolog family
+names/IDs. Details use ranked per-row estimates rather than exclusive shares;
+the UI explains overlap, source lineage, and the unknown CLDR release. The
+panel never calls atlas language-detail actions. It has a local data failure
+and retry state. The map and language catalog have independent error boundaries
+so their failures do not hide this panel.
+
+The app header and URL route own Geography / Administrative / Word histories.
+The map workspace stays mounted between Geography and Administrative. The
+existing language sidebar is hidden, not unmounted, while the administrative
+panel is visible. Administrative map interaction and opt-in borders remain
+ADM-05 work.

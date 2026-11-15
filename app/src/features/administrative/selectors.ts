@@ -146,7 +146,9 @@ export function searchFamilies(repository: AdministrativeRepository, query: stri
   const needle = query.trim().toLocaleLowerCase()
   return [...repository.familyById.values()].filter(
     (family) =>
-      !needle || family.id.includes(needle) || family.name.toLocaleLowerCase().includes(needle),
+      !needle ||
+      family.id.toLocaleLowerCase().includes(needle) ||
+      family.name.toLocaleLowerCase().includes(needle),
   )
 }
 
