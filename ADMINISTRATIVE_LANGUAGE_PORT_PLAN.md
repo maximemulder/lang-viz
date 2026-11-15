@@ -1,6 +1,6 @@
 # Administrative language visualization port plan
 
-Last updated: 2026-11-15. ADM-00 through ADM-02 implementation recorded below.
+Last updated: 2026-11-15. ADM-00 through ADM-03 implementation recorded below.
 
 Integrate the useful CLDR language and territory statistics from
 `origin/aastha/speaker-stats` into the current geography workspace. Keep the
@@ -98,7 +98,7 @@ delivery, and large `CldrMapView` component before integrating them.
 | ADM-00 | Refresh baseline and audit the branch data | — | Audited; lineage and geometry gaps documented |
 | ADM-01 | Reproducible CLDR supplement and provenance | ADM-00 | Implemented; source release remains unknown |
 | ADM-02 | Boundary package and explicit territory crosswalk | ADM-00 | Implemented; UI integration remains ADM-05 |
-| ADM-03 | Independent repository, domain model, and state | ADM-01 | Planned |
+| ADM-03 | Independent repository, domain model, and state | ADM-01 | Implemented; panel integration remains ADM-04 |
 | ADM-04 | Administrative header view and sidebar details | ADM-03 | Planned |
 | ADM-05 | Optional map layers and top-left controls | ADM-02, ADM-03, ADM-04 | Planned |
 | ADM-06 | Delivery, regression, and documentation | ADM-01–ADM-05 | Planned |
@@ -188,6 +188,16 @@ from this package alone.
 
 Acceptance: selectors work without a map, and the atlas can load and operate
 without the administrative asset.
+
+ADM-03 result: [the administrative browser model](app/src/features/administrative/README.md)
+validates and indexes the supplement lazily, keeps queries, selection IDs and
+metric choices in feature-local state, and exposes pure territory, language,
+family and metric selectors. A failed fetch is retryable and remains local to
+the administrative feature. The supplement now includes 57 family names from
+the already pinned Glottolog catalog (schema version 2), so family search does
+not depend on the atlas catalog. Loading and selection never request a camera
+move; only an explicit focus action issues a shared camera intent. ADM-04/05
+will connect the panel and its eventual camera consumer.
 
 ### ADM-04 — Add the administrative header view
 

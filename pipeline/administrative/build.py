@@ -227,11 +227,19 @@ def compile_data(source: Path, catalog: Path, pin: dict) -> dict:
         territory_glottocode_counts[
             (row["territoryCode"], associations[row["sourceLanguageCode"]]["glottocode"])
         ] += 1
+    family_ids = sorted({item["familyId"] for item in associations.values() if item["familyId"]})
+    families = []
+    for family_id in family_ids:
+        catalog_family = catalog_by_id.get(family_id)
+        if not catalog_family or catalog_family["Level"] != "family" or not catalog_family["Name"]:
+            raise ValueError(f"Missing or invalid Glottolog family: {family_id}")
+        families.append({"id": family_id, "name": catalog_family["Name"]})
     diagnostics = {
         "observationCount": len(observations),
         "territoryCount": len(territories),
         "sourceLanguageCount": len(associations),
         "glottocodeCount": len(by_glottocode),
+        "familyCount": len(families),
         "glottologLevels": dict(sorted(levels.items())),
         "territoriesWithOverlappingPercentages": sum(
             total > 100 for total in territory_percent_sums.values()
@@ -242,7 +250,7 @@ def compile_data(source: Path, catalog: Path, pin: dict) -> dict:
         "unmatchedGlottocodes": 0,
     }
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "manifest": {
             "sourceBranchCommit": pin["sourceBranchCommit"],
             "cldrRelease": pin["cldrRelease"],
@@ -271,6 +279,7 @@ def compile_data(source: Path, catalog: Path, pin: dict) -> dict:
         "territories": [territories[key] for key in sorted(territories)],
         "observations": observations,
         "languageAssociations": [associations[key] for key in sorted(associations)],
+        "families": families,
         "atlasAssociations": [
             {
                 "glottocode": key,

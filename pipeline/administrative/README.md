@@ -113,12 +113,16 @@ builds the supplement, and verifies it before the frontend build. A missing or
 changed source, catalog, producer file, or output fails this separate gate.
 Builds are deterministic and replace the file atomically only when bytes differ.
 
-The JSON contains a manifest with schema version, source branch revision,
+The JSON contains a manifest with schema version 2, source branch revision,
 CLDR release (`null`, because unknown), joined CSV and Glottolog hashes,
 Glottolog commit, adapter source hash, attribution, and coverage counts. Source
 numeric strings and identifiers are retained exactly. `languageAssociations`
 hold the verified source-code-to-Glottocode join; `atlasAssociations` explicitly
-remain unresolved for ADM-03. No boundary IDs or shapes appear in this asset.
+remain unresolved until a reviewed atlas crosswalk is available. No boundary IDs
+or shapes appear in this asset.
+The schema version 2 export also includes family IDs and names from the same
+pinned Glottolog catalog. The browser validates them against language family
+references before publishing its local repository.
 
 ADM-02 now has its own [boundary package and crosswalk](boundaries/README.md).
 It produces separate opt-in browser assets without changing this observation

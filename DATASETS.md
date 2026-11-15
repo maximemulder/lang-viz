@@ -663,10 +663,15 @@ codes and 761 original CLDR language or script codes. The original CLDR release
 and the script that produced the joined CSV were not included in the branch, so
 the supplement records that provenance gap rather than assigning a guessed
 release. The Glottolog side is checked against the pinned CLDF catalog.
+Schema version 2 also exports names for the 57 referenced families from that
+same catalog; family search does not need the atlas catalog.
 
 See [the audit, provenance, limitations, and build instructions](pipeline/administrative/README.md).
 The ignored browser output is built and verified separately before deployment.
 It contains no political boundary geometry.
+The [administrative browser model](app/src/features/administrative/README.md)
+loads this supplement on demand and keeps its selectors and state independent
+of the main atlas.
 
 ### 7.1 Optional boundary view
 

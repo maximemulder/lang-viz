@@ -84,6 +84,20 @@ def fixture(tmp_path: Path) -> tuple[Path, Path, dict]:
         writer = csv.DictWriter(handle, fieldnames=catalog_row)
         writer.writeheader()
         writer.writerow(catalog_row)
+        writer.writerow(
+            {
+                **catalog_row,
+                "ID": "indo1319",
+                "Glottocode": "indo1319",
+                "Name": "Indo-European",
+                "Level": "family",
+                "ISO639P3code": "",
+                "Family_ID": "",
+                "Latitude": "",
+                "Longitude": "",
+                "Countries": "",
+            }
+        )
 
     def spec(path: Path) -> dict:
         return {
@@ -107,6 +121,7 @@ def test_retains_script_rows_and_keeps_join_separate(tmp_path: Path) -> None:
     assert len(result["observations"]) == 2
     assert [row["sourceLanguageCode"] for row in result["observations"]] == ["en", "en_Latn"]
     assert {row["glottocode"] for row in result["languageAssociations"]} == {"stan1293"}
+    assert result["families"] == [{"id": "indo1319", "name": "Indo-European"}]
     assert result["atlasAssociations"] == [
         {
             "glottocode": "stan1293",
