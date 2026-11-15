@@ -27,7 +27,9 @@ territory polygons or treating Glottolog language coordinates as speaker locatio
   cannot establish its release.
 - The Glottolog catalog is pinned to `glottolog-cldf` commit
   `072ca0d0410039fb8b779be8fc165bac575d2cda` and a SHA-256 of its
-  `cldf/languages.csv`. The joined CSV agrees with this catalog on ID, name,
+  `cldf/languages.csv` Git blob (LF line endings). A checkout may convert the
+  file to CRLF, so use the pinned blob bytes when verifying it. The joined CSV
+  agrees with this catalog on ID, name,
   ISO 639-3, family, macroareas and countries. Three coordinate strings differ
   only at floating-point display precision (at most `1e-10`); numeric values
   are validated with that tolerance. No manual mapping is added by this adapter.
@@ -96,15 +98,17 @@ uv run python -m pipeline.administrative.build verify
 ```
 
 For an offline checkout that still has the source branch commit and the pinned
-atlas Glottolog catalog locally:
+Glottolog Git commit locally, restore the catalog from its blob before running
+the adapter:
 
 ```sh
-uv run python -m pipeline.administrative.sources restore --from-git . \
-  --catalog datasets/glottolog-cldf/cldf/languages.csv
-uv run python -m pipeline.administrative.build build \
-  --catalog datasets/glottolog-cldf/cldf/languages.csv
-uv run python -m pipeline.administrative.build verify \
-  --catalog datasets/glottolog-cldf/cldf/languages.csv
+mkdir -p data/administrative/glottolog
+git -C datasets/glottolog-cldf show \
+  072ca0d0410039fb8b779be8fc165bac575d2cda:cldf/languages.csv \
+  > data/administrative/glottolog/languages.csv
+uv run python -m pipeline.administrative.sources restore --from-git .
+uv run python -m pipeline.administrative.build build
+uv run python -m pipeline.administrative.build verify
 ```
 
 Build and verify never use the network. The output is ignored

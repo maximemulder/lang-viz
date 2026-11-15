@@ -3,8 +3,15 @@
 import argparse
 import json
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from .run import APP, browser_session, wait_for
+
+
+class BrowserReport(TypedDict):
+    passed: bool
+    checks: list[str]
+    error: NotRequired[str]
 
 
 def main():
@@ -18,7 +25,7 @@ def main():
     feature_index = json.loads((boundary_assets / "feature-index.json").read_text())
     nl_feature = next(item for item in crosswalk["territories"] if item["code"] == "NL")["featureIds"][0]
     nl_point = next(item for item in feature_index["features"] if item["featureId"] == nl_feature)["point"]
-    report = {"passed": False, "checks": []}
+    report: BrowserReport = {"passed": False, "checks": []}
     with browser_session(args.output, dev=not args.production) as (browser, origin):
         path = "/lang-viz/" if args.production else "/"
         browser.call("POST", "/url", {"url": origin + path + "?overlap-test"})
