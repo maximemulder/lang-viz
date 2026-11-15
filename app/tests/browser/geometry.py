@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Assert that inspected boundaries use the rendered fill source through LOD swaps."""
 
 

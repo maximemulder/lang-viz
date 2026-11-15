@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Supplement Glottolog with explicitly identified, dataset-defined catalog entries."""
 
 from __future__ import annotations

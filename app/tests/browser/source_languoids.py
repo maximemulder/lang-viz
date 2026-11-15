@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check source-defined entries against the production catalog and vector archive."""
 
 import json

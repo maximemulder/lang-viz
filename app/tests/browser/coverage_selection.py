@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Coverage continuity observes the selected revision across period replacements."""
 
 import argparse

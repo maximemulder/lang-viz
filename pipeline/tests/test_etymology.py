@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Small lexical fixtures; no restored datasets or network required."""
 
 import copy

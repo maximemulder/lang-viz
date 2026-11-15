@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check bulk-branch navigation coverage over German (Asher) and Yue (DLAC)."""
 
 import json

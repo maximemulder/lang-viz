@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Restore the reviewed lexical snapshot without merging its Git history.
 
 Uses immutable commit URLs by default; --from-git reads an existing local clone.

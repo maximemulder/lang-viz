@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check that independent measurements detect deliberately misleading palettes."""
 
 import copy

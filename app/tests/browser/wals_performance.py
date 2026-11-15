@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Measure the production WALS loader and painted UI with actual gzip responses."""
 
 import argparse

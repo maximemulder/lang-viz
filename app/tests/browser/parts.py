@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Compare live overlay and reusable parts through production workers and rendering."""
 
 

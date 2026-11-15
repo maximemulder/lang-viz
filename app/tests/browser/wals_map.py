@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Production WALS overlay acceptance: published evidence plus explicit edge-case fixtures."""
 
 import json

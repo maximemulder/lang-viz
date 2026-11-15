@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Production word-trail/map integration with real catalogs and explicit coordinate fixtures."""
 
 import argparse

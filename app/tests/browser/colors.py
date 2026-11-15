@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Exercise explicit view palettes through production controls and rendered geography."""
 
 import json

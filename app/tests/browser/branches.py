@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Exercise branch refinement and complete-dataset acceleration in the production browser."""
 
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validated WALS rows and browser output records."""
 
 from __future__ import annotations

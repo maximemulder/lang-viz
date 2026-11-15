@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check hierarchy browsing, ranked search, keyboard navigation and map selection."""
 
 import json

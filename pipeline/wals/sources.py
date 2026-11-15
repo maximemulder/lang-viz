@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Explicit, atomic restoration of pinned WALS and historical comparison inputs."""
 
 from __future__ import annotations

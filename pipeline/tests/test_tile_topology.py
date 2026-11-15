@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Shared borders, junctions, islands and holes survive native LOD export."""
 
 import gzip

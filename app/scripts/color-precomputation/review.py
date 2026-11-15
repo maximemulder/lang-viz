@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Write a review of color precomputation results."""
 
 

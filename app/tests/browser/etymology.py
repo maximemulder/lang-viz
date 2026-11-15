@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Exercise the shipped explorer with real lexical/atlas data and controlled HTTP failures."""
 
 import argparse

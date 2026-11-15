@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Explicit full-snapshot gate and complete historical-table reconciliation.
 
 Never invoked by ordinary fixture tests. Requires explicitly restored upstream

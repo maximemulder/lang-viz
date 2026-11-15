@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check experiment measurements without relying on the optimizer's graph."""
 
 import copy

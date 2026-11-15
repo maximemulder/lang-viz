@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Source dropdowns must remain clickable over the following sidebar section."""
 
 from .run import APP, browser_session, open_atlas, wait_for

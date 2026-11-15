@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Pack, publish and restore independent WALS browser and recoverable source releases."""
 
 from __future__ import annotations

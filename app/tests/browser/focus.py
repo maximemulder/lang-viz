@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Sidebar previews and deliberate profile navigation against real source tiles."""
 
 

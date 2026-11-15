@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Synthetic WALS inputs only: no network, historical checkout or generated browser data."""
 
 import copy

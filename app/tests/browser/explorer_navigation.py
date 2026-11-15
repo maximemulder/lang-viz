@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Exercise the real session/URL adapter in Firefox with synthetic lexical data."""
 
 import argparse

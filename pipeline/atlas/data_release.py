@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Audit, package, publish, and restore prebuilt browser data (standard library only)."""
 
 from __future__ import annotations

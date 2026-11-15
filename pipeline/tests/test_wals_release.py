@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Synthetic delivery checks; no upstream data, repository history or network required."""
 
 import io

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Build an offline comparison page from completed renders and evaluations."""
 import json
 import sys

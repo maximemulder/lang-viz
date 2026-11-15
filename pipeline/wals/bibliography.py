@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Read the normalized literal BibTeX emitted by this pinned CLDF dataset.
 
 This is deliberately not a general BibTeX interpreter. Nested/escaped braces,

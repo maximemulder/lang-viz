@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validate the complete published CLDF input and compile an atlas-independent subset."""
 
 from __future__ import annotations

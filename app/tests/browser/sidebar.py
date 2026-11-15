@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Shared sidebar actions; scenario assertions belong in the browser suites."""
 
 from typing import Any

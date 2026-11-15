@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check stripe density, zoom adaptation and geometry preservation."""
 
 import json

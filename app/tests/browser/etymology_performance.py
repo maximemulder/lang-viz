@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Measure the production lexical workspace, including actual gzip transfer and UI latency."""
 
 import argparse

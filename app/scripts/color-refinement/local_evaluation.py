@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run the shared local color evaluator."""
 
 

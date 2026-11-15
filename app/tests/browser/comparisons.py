@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Independent source/period groups and colors through the actual sidebar controls."""
 from .run import check_state, wait_for
 from .sidebar import (

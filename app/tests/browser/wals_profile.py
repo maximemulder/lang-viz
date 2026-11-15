@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Exercise actual WALS cards with controlled fixtures, then the deployed-data app."""
 
 import json

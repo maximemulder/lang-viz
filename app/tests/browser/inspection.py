@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check outline lifecycle and measure hover latency with complete Asher coverage."""
 
 import argparse

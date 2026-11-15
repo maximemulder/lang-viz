@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Independent, exhaustive local language comparisons on captured grid evidence.
 
 Unlike the optimizer's sampled graph and averaged footprint contact, this uses

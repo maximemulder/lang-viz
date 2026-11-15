@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check branch preservation using the independent topology-based evaluator."""
 import json
 import sys

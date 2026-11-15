@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Materialize shared-coverage LODs as ordinary MVT/PMTiles browser assets.
 
 Run independently with --output to evaluate new geometry without publishing it

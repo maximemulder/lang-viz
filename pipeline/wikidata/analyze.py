@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Summarise the Wikidata language extract using only the standard library."""
 
 from __future__ import annotations

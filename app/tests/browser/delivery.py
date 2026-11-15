@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify lazy geometry routing, fine prepared detail and on-demand source records."""
 
 import json

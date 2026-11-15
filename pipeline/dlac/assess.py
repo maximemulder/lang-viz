@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Audit DLAC against the locally generated atlas; never modify production artifacts.
 
 Run: bash pipeline/dlac/fetch.sh && uv run python -m pipeline.dlac.assess

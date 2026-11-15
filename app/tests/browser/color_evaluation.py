@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Independent palette measurements, usable with browser captures or saved JSON.
 
 No optimizer graph, objective, subdivision positions, or color library is used.

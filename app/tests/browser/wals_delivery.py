@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify published WALS assets and the actual lazy loader on the production base path."""
 
 import argparse

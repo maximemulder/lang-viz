@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Working selection and pinned group interaction checks."""
 
 

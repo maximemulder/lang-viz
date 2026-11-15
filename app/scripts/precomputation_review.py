@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Create a self-contained index of the app screenshots and measured tradeoffs."""
 import json
 import sys

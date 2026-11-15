@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validate and compile DiACL lexical JSON. No network or third-party packages.
 
 Every build reads and validates input contents. Identical output is left untouched;

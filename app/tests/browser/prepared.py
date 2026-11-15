@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Require prepared coverage across datasets and Asher's dense intermediate zooms."""
 
 import json

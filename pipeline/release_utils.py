@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Small archive primitives shared by independently validated data releases."""
 
 from __future__ import annotations

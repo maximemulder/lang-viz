@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validated shapes shared by the independent data-release adapters."""
 
 from __future__ import annotations

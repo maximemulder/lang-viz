@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Build selection-independent coverage before simplifying any display geometry.
 
 GEOS owns the shared boundary network through its polygonal coverage operations.

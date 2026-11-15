@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Exercise prepared defaults, provenance selection, overrides and fallback in the app."""
 import json
 from contextlib import contextmanager

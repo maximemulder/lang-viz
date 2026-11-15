@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Convert the pinned DLAC shapefile into original, classification-linked polygons.
 
 Reviewed Glottolog correspondences and registered source-defined entries are

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Package a downloaded RESOLVE Ecoregions 2017 GeoJSON as a local biome basemap."""
 
 import argparse

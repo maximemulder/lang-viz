@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Exercise stage reuse through real source/parts export and archive packaging."""
 
 import json

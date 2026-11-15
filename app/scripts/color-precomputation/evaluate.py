@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Independent metrics for training views and held-out Europe/Africa captures."""
 
 

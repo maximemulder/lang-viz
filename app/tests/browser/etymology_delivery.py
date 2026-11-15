@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify lexical data and its worker on a production project-site base path."""
 
 import argparse

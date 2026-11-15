@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Small release fixtures exercise packaging, install isolation, and failed delivery."""
 
 import io

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Production-browser overlap checks using installed Firefox and W3C WebDriver.
 
 No Python packages, browser downloads, React internals, or fixed startup sleeps.

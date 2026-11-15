@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Stage identities and lazy geometry shared by generation and restoration."""
 
 from __future__ import annotations

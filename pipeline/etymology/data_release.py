@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Package and restore independently pinned lexical browser data and raw sources."""
 
 from __future__ import annotations
