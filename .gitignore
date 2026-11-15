@@ -6,7 +6,9 @@ __pycache__/
 data/processed/
 data/etymology/
 data/wals/
+data/administrative/
 app/public/data/
 app/public/etymology/
 app/public/wals/
+app/public/administrative/
 .data-releases/

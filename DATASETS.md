@@ -654,7 +654,23 @@ are versioned in `pipeline/wikidata/queries/`.
 
 ---
 
-## 7. Candidates (not downloaded; figures to verify)
+## 7. Administrative CLDR territory-language supplement
+
+The joined CSV from `aastha/speaker-stats` is fetched from its pinned Git blob
+into ignored local data and compiled independently of atlas geography. It is not
+added to main's Git tree. It contains 1,488 language/territory rows for 251 territory
+codes and 761 original CLDR language or script codes. The original CLDR release
+and the script that produced the joined CSV were not included in the branch, so
+the supplement records that provenance gap rather than assigning a guessed
+release. The Glottolog side is checked against the pinned CLDF catalog.
+
+See [the audit, provenance, limitations, and build instructions](pipeline/administrative/README.md).
+The ignored browser output is built and verified separately before deployment.
+It contains no political boundary geometry.
+
+---
+
+## 8. Candidates (not downloaded; figures to verify)
 
 All use the Glottocode as language identifier and are available in CLDF.
 
@@ -668,7 +684,7 @@ All use the Glottocode as language identifier and are available in CLDF.
 
 ---
 
-## 8. Licences
+## 9. Licences
 
 - Most planned datasets are CC-BY-4.0. Wikidata structured data is CC0;
   **wurm1981pacific** is CC-BY-NC-4.0, which is acceptable for a course project.

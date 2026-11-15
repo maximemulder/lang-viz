@@ -47,6 +47,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: uv run python -m pipeline.wals.data_release restore
 
+      - name: Restore and validate administrative language supplement
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run python -m pipeline.administrative.sources restore
+          uv run python -m pipeline.administrative.sources verify
+          uv run python -m pipeline.administrative.build build
+          uv run python -m pipeline.administrative.build verify
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

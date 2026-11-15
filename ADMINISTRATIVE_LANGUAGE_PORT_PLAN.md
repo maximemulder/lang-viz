@@ -1,6 +1,6 @@
 # Administrative language visualization port plan
 
-Last updated: 2026-11-15.
+Last updated: 2026-11-15. ADM-00/01 audit and supplement implementation recorded below.
 
 Integrate the useful CLDR language and territory statistics from
 `origin/aastha/speaker-stats` into the current geography workspace. Keep the
@@ -16,12 +16,12 @@ each item with its decisions and validation results as work proceeds.
 
 Reviewed local revisions:
 
-- Current checkout: `5f4a083407b1f839760d453f762dfca821e7a47b`.
+- Current checkout at ADM-00 audit: `345fb82f69dc2ff75910f1d7910e39f2f2ac93d5`.
 - Source branch: `origin/aastha/speaker-stats`,
   `4cb95badf12d64d9a0ff7be5535c43fbaebb1aa9`.
 - Common ancestor: `f043e87d5a3e1a5c887ca3139e7683533f2fe0d4`.
 
-These are local references; refresh them before implementation if either branch
+These are local references; refresh them before later stages if either branch
 has advanced. Port selected data and behavior onto current main rather than
 merging the branch's separate map and app shell. The current app has a persistent
 `WorldMap`, optional layers composed by `GeographyExplorations`, a top-level
@@ -95,8 +95,8 @@ delivery, and large `CldrMapView` component before integrating them.
 
 | Item | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| ADM-00 | Refresh baseline and audit the branch data | — | Planned |
-| ADM-01 | Reproducible CLDR supplement and provenance | ADM-00 | Planned |
+| ADM-00 | Refresh baseline and audit the branch data | — | Audited; lineage and geometry gaps documented |
+| ADM-01 | Reproducible CLDR supplement and provenance | ADM-00 | Implemented; source release remains unknown |
 | ADM-02 | Boundary package and explicit territory crosswalk | ADM-00 | Planned |
 | ADM-03 | Independent repository, domain model, and state | ADM-01 | Planned |
 | ADM-04 | Administrative header view and sidebar details | ADM-03 | Planned |
@@ -136,6 +136,17 @@ the first boundary view and its limitations have an explicit policy.
 
 Acceptance: a clean checkout can obtain the same validated browser asset; a
 missing or stale supplement fails its own gate rather than disabling Geography.
+
+ADM-00/01 result: [the administrative data audit and build guide](pipeline/administrative/README.md)
+records snapshot counts, problematic joins, source-lineage gaps, the provisional
+boundary-view policy, and reproduction commands. The joined CSV is restored to
+ignored local data from the pinned source branch commit and hash; it is not added
+to main's Git tree. Its original CLDR release and preprocessing recipe are
+unknown and are represented as `null` in the manifest. The build verifies
+every supplied Glottocode against the pinned Glottolog catalog, keeps original
+CLDR code/script rows, and exports associations separately. Deployment restores
+both sources, builds the supplement, and verifies the ignored browser asset before
+building the app. ADM-02 still owns the complete boundary crosswalk audit.
 
 ### ADM-02 — Package boundary geometry independently
 

@@ -1,0 +1,21 @@
+{
+  "sourceBranchCommit": "4cb95badf12d64d9a0ff7be5535c43fbaebb1aa9",
+  "joinedCsv": {
+    "repository": "maximemulder/lang-viz",
+    "path": "pipeline/atlas/data/cldr_glottolog_joined.csv",
+    "blobSha": "5ffab1a3b7efa0b5dde6185e789674eba0fb8a36",
+    "bytes": 233164,
+    "sha256": "0737dc7fda7f31756275f162ff5a9e3319c4dc5b4176c1ca24a0b321e533c691"
+  },
+  "cldrRelease": null,
+  "cldrSourceFile": null,
+  "glottolog": {
+    "repository": "https://github.com/glottolog/glottolog-cldf",
+    "release": "Glottolog 5.3",
+    "license": "CC-BY-4.0",
+    "commit": "072ca0d0410039fb8b779be8fc165bac575d2cda",
+    "path": "cldf/languages.csv",
+    "bytes": 2504195,
+    "sha256": "0a386d9dd97018eb08a227caa4b6a9a7a1bea4b6cc9a0c0c5745174b1db5e12f"
+  }
+}
