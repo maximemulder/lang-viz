@@ -57,7 +57,7 @@ word-history overlays can coexist with separate visibility and clear controls;
 pinned comparisons and the chosen projection are preserved.
 
 Restore the independent browser release from the repository root with
-`python3 -m pipeline.wals.data_release restore`. Run `npm run test:wals-snapshot`
+`uv run python -m pipeline.wals.data_release restore`. Run `npm run test:wals-snapshot`
 for the full release/catalog checks and `npm run test:wals-profile-browser` for
 Firefox acceptance with fixtures and published data, including exact 320/390px
 layouts. The browser command builds its own production artifacts and requires all
@@ -97,7 +97,7 @@ first visit and keeps the existing map and camera across workspace switches.
 Restore the independently pinned lexical browser bundle from the repository root:
 
 ```sh
-python3 -m pipeline.etymology.data_release restore
+uv run python -m pipeline.etymology.data_release restore
 ```
 
 See the [release instructions](../pipeline/etymology/README.md#independent-release-delivery)
@@ -105,8 +105,8 @@ for checksum verification, offline installation, and source recovery. To compile
 from the pinned sources instead:
 
 ```sh
-python3 -m pipeline.etymology.sources restore --from-git .
-python3 -m pipeline.etymology.build
+uv run python -m pipeline.etymology.sources restore --from-git .
+uv run python -m pipeline.etymology.build
 ```
 
 Alternatively, omit `--from-git .` to restore the checksum-pinned sources from their

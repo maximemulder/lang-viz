@@ -42,8 +42,10 @@ const associated = performance.now()
 
 test('WALS release verifies independently and contains the reviewed seven-feature snapshot', () => {
   const result = spawnSync(
-    'python3',
+    'uv',
     [
+      'run',
+      'python',
       '-m',
       'pipeline.wals.data_release',
       'verify',

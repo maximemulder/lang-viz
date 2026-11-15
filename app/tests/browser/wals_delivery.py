@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -74,7 +75,7 @@ def main():
     artifact = (args.output / "dist").resolve()
     subprocess.run(
         [
-            "python3",
+            sys.executable,
             "-m",
             "pipeline.wals.data_release",
             "verify",

@@ -25,9 +25,9 @@ No source CSVs, bibliography, archives, or generated browser data belong in Git.
 From the repository root, Python 3.12+ (standard library only):
 
 ```sh
-python3 -m pipeline.wals.sources restore
-python3 -m pipeline.wals.sources verify
-python3 -m pipeline.wals.build
+uv run python -m pipeline.wals.sources restore
+uv run python -m pipeline.wals.sources verify
+uv run python -m pipeline.wals.build
 ```
 
 Sources go to ignored `data/wals/wals-v2020.6/`; output goes to ignored
@@ -40,7 +40,7 @@ and preserved; use `--output` to choose a fresh source directory.
 Offline restoration from a previously saved copy of the pinned archive:
 
 ```sh
-python3 -m pipeline.wals.sources restore --archive /path/to/upstream.tar.gz
+uv run python -m pipeline.wals.sources restore --archive /path/to/upstream.tar.gz
 ```
 
 Use `sources restore --output /path/to/sources` and
@@ -119,8 +119,8 @@ The explicit snapshot gate requires restored real inputs and the historical
 comparison. It never downloads data or requires a generated browser file:
 
 ```sh
-python3 -m pipeline.wals.sources restore-comparison --from-git .
-python3 -m pipeline.wals.snapshot
+uv run python -m pipeline.wals.sources restore-comparison --from-git .
+uv run python -m pipeline.wals.snapshot
 ```
 
 If the old commit is unavailable locally, omit `--from-git .` to retrieve its
@@ -162,9 +162,9 @@ Restore prebuilt data without compiling or downloading raw inputs (Python 3.12+
 and authenticated GitHub CLI):
 
 ```sh
-python3 -m pipeline.wals.data_release restore
-python3 -m pipeline.wals.data_release verify
-python3 -m pipeline.wals.data_release restore --kind sources --output /tmp/wals-release-sources
+uv run python -m pipeline.wals.data_release restore
+uv run python -m pipeline.wals.data_release verify
+uv run python -m pipeline.wals.data_release restore --kind sources --output /tmp/wals-release-sources
 ```
 
 The default source destination is `data/wals/wals-v2020.6/`. Use an unused output
@@ -178,9 +178,9 @@ restore into an absent destination; do not overlay individual release files.
 Install an already downloaded asset offline:
 
 ```sh
-python3 -m pipeline.wals.data_release install /path/to/wals-browser.tar.gz \
+uv run python -m pipeline.wals.data_release install /path/to/wals-browser.tar.gz \
   --pin /path/to/wals-release.json --output /tmp/wals-browser
-python3 -m pipeline.wals.data_release verify \
+uv run python -m pipeline.wals.data_release verify \
   --pin /path/to/wals-release.json --output /tmp/wals-browser
 ```
 
@@ -194,7 +194,7 @@ releases. The browser and CI additionally validate runtime fields and joins.
 The source asset can independently reproduce the browser data:
 
 ```sh
-python3 -m pipeline.wals.build --source-dir /tmp/wals-release-sources \
+uv run python -m pipeline.wals.build --source-dir /tmp/wals-release-sources \
   --output /tmp/reproduced-features.json
 ```
 
@@ -205,7 +205,7 @@ To create a future release, commit and make the adapter producer available on
 GitHub, explicitly restore/build the pinned sources, and choose a new tag/output:
 
 ```sh
-python3 -m pipeline.wals.data_release pack \
+uv run python -m pipeline.wals.data_release pack \
   --tag wals-SNAPSHOT-vN --pipeline-commit FULL_ADAPTER_PRODUCER_COMMIT \
   --output .data-releases/wals-SNAPSHOT-vN
 ```
@@ -216,7 +216,7 @@ update the selected pin. Review the complete candidate and checks before the
 explicit publication command:
 
 ```sh
-python3 -m pipeline.wals.data_release publish \
+uv run python -m pipeline.wals.data_release publish \
   .data-releases/wals-SNAPSHOT-vN/wals-release.json
 ```
 
@@ -243,9 +243,9 @@ For a fresh checkout, prepare the same deployable data/app combination without
 source datasets or geographic preprocessing:
 
 ```sh
-python3 -m pipeline.atlas.data_release restore
-python3 -m pipeline.etymology.data_release restore
-python3 -m pipeline.wals.data_release restore
+uv run python -m pipeline.atlas.data_release restore
+uv run python -m pipeline.etymology.data_release restore
+uv run python -m pipeline.wals.data_release restore
 cd app
 npm ci
 npm test
@@ -280,7 +280,7 @@ repository loader and exercises the actual Vite production base path:
 
 ```sh
 cd app
-python3 -m tests.browser.wals_delivery
+uv run python -m tests.browser.wals_delivery
 ```
 
 It checks lazy/concurrent/cached loading, all served release notices, missing data,

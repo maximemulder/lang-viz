@@ -2,7 +2,7 @@
 
 Extracted 2026-10-13 from the official Wikidata Query Service. Reproduce the
 download with `pipeline/wikidata/download.sh` and the figures with
-`python3 pipeline/wikidata/analyze.py`.
+`uv run python -m pipeline.wikidata.analyze`.
 
 ## What was downloaded
 

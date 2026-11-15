@@ -9,8 +9,8 @@ Port reference: `58a6c1a2a8a2ef02f433576bf15cd7b0e09c57fe`.
 From the repository root, with Python 3.12+ (standard library only):
 
 ```sh
-python3 -m pipeline.etymology.sources restore
-python3 -m pipeline.etymology.build
+uv run python -m pipeline.etymology.sources restore
+uv run python -m pipeline.etymology.build
 ```
 
 Restoration reads immutable GitHub commit URLs, verifies sizes and SHA-256, and
@@ -19,8 +19,8 @@ DiACL export URLs are provenance, not download targets: those may change over ti
 If the feature commit already exists in a local clone, restoration can run offline:
 
 ```sh
-python3 -m pipeline.etymology.sources restore --from-git .
-python3 -m pipeline.etymology.sources verify
+uv run python -m pipeline.etymology.sources restore --from-git .
+uv run python -m pipeline.etymology.sources verify
 ```
 
 The default input directory is `data/etymology/diacl-2026-10-24/`, outside Git.
@@ -104,7 +104,7 @@ membership intact. Antimeridian links split into bounded segments.
 Lightweight checks use synthetic inputs and require no lexical downloads:
 
 ```sh
-.venv/bin/python -m pytest pipeline/tests/test_etymology.py
+uv run pytest pipeline/tests/test_etymology.py
 cd app
 node --test --test-isolation=none tests/etymology.test.ts
 npm test
@@ -139,9 +139,9 @@ Restore without compiling sources (Python 3.12+, authenticated GitHub CLI for th
 repository):
 
 ```sh
-python3 -m pipeline.etymology.data_release restore
-python3 -m pipeline.etymology.data_release verify
-python3 -m pipeline.etymology.data_release restore --kind sources --output /tmp/word-trails-sources
+uv run python -m pipeline.etymology.data_release restore
+uv run python -m pipeline.etymology.data_release verify
+uv run python -m pipeline.etymology.data_release restore --kind sources --output /tmp/word-trails-sources
 ```
 
 Browser destination: `app/public/etymology/`; source destination when omitted:
@@ -155,10 +155,10 @@ and installing it into a fresh directory. Keep referenced releases available.
 For an already downloaded archive, install offline from the repository root:
 
 ```sh
-python3 -m pipeline.etymology.data_release install \
+uv run python -m pipeline.etymology.data_release install \
   .data-releases/word-trails-diacl-2026-10-24-v1/word-trails.tar.gz \
   --output /tmp/word-trails-browser-review
-python3 -m pipeline.etymology.data_release verify --output /tmp/word-trails-browser-review
+uv run python -m pipeline.etymology.data_release verify --output /tmp/word-trails-browser-review
 ```
 
 For a new release, first commit adapter changes, restore the pinned sources, and
@@ -166,7 +166,7 @@ build explicitly. Packaging reproduces the source build and rejects a stale or
 modified compiled bundle. Normal restoration never calls the source adapter.
 
 ```sh
-python3 -m pipeline.etymology.data_release pack \
+uv run python -m pipeline.etymology.data_release pack \
   --tag word-trails-SNAPSHOT-vN --pipeline-commit FULL_BUILD_COMMIT \
   --output .data-releases/word-trails-SNAPSHOT-vN
 ```
@@ -182,7 +182,7 @@ After reviewing the archives and approving publication, first push the producer
 commit to the repository (the port branch includes it), then:
 
 ```sh
-python3 -m pipeline.etymology.data_release publish \
+uv run python -m pipeline.etymology.data_release publish \
   .data-releases/word-trails-diacl-2026-10-24-v1/etymology-release.json
 ```
 

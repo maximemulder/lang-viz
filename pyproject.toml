@@ -9,11 +9,11 @@ dependencies = [
   "numpy==2.5.4",
   "shapely==2.2.0",
   "mapbox-vector-tile==2.2.0",
+  "pyproj==3.8.0",
 ]
 
 [dependency-groups]
 dev = [
-  "pyproj==3.8.0",
   "pyrefly==1.4.1",
   "pytest>=8.4.0",
   "ruff>=0.14.0",

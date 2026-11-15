@@ -178,8 +178,8 @@ upstream default-branch revision checked on 2026-11-12. Recover and validate it
 without relying on an existing `datasets/wals` checkout:
 
 ```sh
-python3 -m pipeline.wals.sources restore
-python3 -m pipeline.wals.build
+uv run python -m pipeline.wals.sources restore
+uv run python -m pipeline.wals.build
 ```
 
 The [adapter contract](pipeline/wals/README.md) describes immutable source hashes,
@@ -192,8 +192,8 @@ restores only the browser asset. Profile cards and optional geographic examples
 use this release. Restore without compiling source data:
 
 ```sh
-python3 -m pipeline.wals.data_release restore
-python3 -m pipeline.wals.data_release verify
+uv run python -m pipeline.wals.data_release restore
+uv run python -m pipeline.wals.data_release verify
 ```
 
 ### Application interpretation
@@ -634,7 +634,7 @@ integration recommendations. Wikidata structured data is CC0.
 
 ```sh
 ./pipeline/wikidata/download.sh
-python3 pipeline/wikidata/analyze.py
+uv run python -m pipeline.wikidata.analyze
 ```
 
 The four CSV files are written to `datasets/wikidata/`. The exact SPARQL queries

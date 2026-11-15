@@ -32,7 +32,7 @@ const manifest: AtlasManifest = JSON.parse(
 )
 if (manifest.geometryBuild?.kind !== 'shared-coverage')
   throw new Error(
-    'Rebuild atlas data with python -m pipeline.atlas.build before preparing branches',
+    'From the repository root, rebuild atlas data with uv run python -m pipeline.atlas.build before preparing branches',
   )
 const data = {
   languages,

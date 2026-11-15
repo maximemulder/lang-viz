@@ -233,7 +233,7 @@ first cards, cached atlas-profile and variety switches, and initial/subsequent
 overlay paints. Input and matching render commits are timed inside the browser;
 two animation frames include paint without WebDriver polling latency. Overlay
 paint excludes completion of the optional camera transition. The runner can reuse
-the final build directly with `python3 -m tests.browser.wals_performance`; use
+the final build directly with `uv run python -m tests.browser.wals_performance`; use
 `--runs` and `--output` to select repetition and ignored evidence destinations.
 
 The production loader records `wals:receive` (request/body/decode), `wals:parse`,

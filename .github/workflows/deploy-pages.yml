@@ -26,20 +26,26 @@ jobs:
       - name: Check out application
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Set up Python project
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.6"
+          python-version: "3.12"
+
       - name: Download and verify prebuilt atlas data
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -m pipeline.atlas.data_release restore
+        run: uv run python -m pipeline.atlas.data_release restore
 
       - name: Download and verify independently pinned lexical data
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -m pipeline.etymology.data_release restore
+        run: uv run python -m pipeline.etymology.data_release restore
 
       - name: Download and verify independently pinned WALS data
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -m pipeline.wals.data_release restore
+        run: uv run python -m pipeline.wals.data_release restore
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

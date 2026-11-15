@@ -1,7 +1,6 @@
 /** Restore prepared coverage from the shared canonical/LOD caches. */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -28,13 +27,15 @@ const directory = values['data-dir']
 const manifestUrl = new URL('manifest.json', directory)
 const manifest: AtlasManifest = JSON.parse(await readFile(manifestUrl, 'utf8'))
 if (manifest.geometryBuild?.kind !== 'shared-coverage')
-  throw new Error('Rebuild atlas data with python -m pipeline.atlas.build before restoring parts')
+  throw new Error(
+    'From the repository root, rebuild atlas data with uv run python -m pipeline.atlas.build before restoring parts',
+  )
 const root = new URL('../../', import.meta.url)
-const localPython = new URL('.venv/bin/python', root)
-const python = existsSync(localPython) ? fileURLToPath(localPython) : 'python3'
 const result = spawnSync(
-  python,
+  'uv',
   [
+    'run',
+    'python',
     '-m',
     'pipeline.atlas.topology_build',
     '--restore-parts',

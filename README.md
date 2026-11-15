@@ -7,13 +7,13 @@ optional focal-point overlay alongside pinned atlas areas.
 
 ## Run with published data
 
-Use Python 3.12+, the authenticated GitHub CLI, and Node.js 24+. From the repository
+Use uv, Python 3.12+, the authenticated GitHub CLI, and Node.js 24+. From the repository
 root, restore the three independently pinned browser bundles:
 
 ```sh
-python3 -m pipeline.atlas.data_release restore
-python3 -m pipeline.etymology.data_release restore
-python3 -m pipeline.wals.data_release restore
+uv run python -m pipeline.atlas.data_release restore
+uv run python -m pipeline.etymology.data_release restore
+uv run python -m pipeline.wals.data_release restore
 cd app
 npm ci
 npm run dev
@@ -351,6 +351,10 @@ uv run ruff check pipeline app/tests/browser app/scripts
 uv run pytest
 ```
 
+Run Python modules with `uv run python -m <module>` from the repository root for
+`pipeline.*`, or from `app/` for `tests.browser.*` and `scripts.*`. uv finds the
+root project from either directory and keeps the current working directory.
+
 CI builds the pinned `tile-join` binary before the pipeline tests so the native
 atlas integration cases run rather than skip.
 
@@ -424,12 +428,12 @@ machine. Record the full Git commit used for that build; commit changes to data-
 generating release data. Then, from the repository root:
 
 ```sh
-python3 -m pipeline.atlas.data_release audit
-python3 -m pipeline.atlas.data_release pack \
+uv run python -m pipeline.atlas.data_release audit
+uv run python -m pipeline.atlas.data_release pack \
   --tag atlas-data-YYYY-MM-DD \
   --pipeline-commit FULL_BUILD_COMMIT \
   --output .data-releases/atlas-data-YYYY-MM-DD
-python3 -m pipeline.atlas.data_release publish \
+uv run python -m pipeline.atlas.data_release publish \
   .data-releases/atlas-data-YYYY-MM-DD/data-release.json
 ```
 
@@ -460,13 +464,13 @@ packaging checkout separately, without attributing the build to that checkout.
 To test a bundle locally, restore it into an empty directory:
 
 ```sh
-python3 -m pipeline.atlas.data_release install \
+uv run python -m pipeline.atlas.data_release install \
   .data-releases/atlas-data-YYYY-MM-DD/atlas-data.tar.gz \
   --pin .data-releases/atlas-data-YYYY-MM-DD/data-release.json \
   --output /tmp/atlas-release-preview
 ```
 
-`python3 -m pipeline.atlas.data_release restore` downloads the pinned release into
+`uv run python -m pipeline.atlas.data_release restore` downloads the pinned release into
 an empty `app/public/data/`; `--output` selects another directory. Installation
 checks the checksum and complete referenced file set before exposing the result.
 It refuses to overwrite existing data. Roll back by restoring an earlier

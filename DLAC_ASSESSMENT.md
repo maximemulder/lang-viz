@@ -231,12 +231,12 @@ With the existing datasets and generated schema-v4 atlas in place:
 
 ```sh
 bash pipeline/dlac/fetch.sh
-uv run --script pipeline/dlac/assess.py
+uv run python -m pipeline.dlac.assess
 ```
 
-The script declares isolated, pinned analysis dependencies; it does not change
-the production pipeline dependencies. Results are written under the ignored
-`data/processed/dlac-assessment/` directory:
+The assessment uses the project dependencies declared in `pyproject.toml`.
+Results are written under the ignored `data/processed/dlac-assessment/`
+directory:
 
 - `summary.json`: source checksums, geometry checks, label counts, unresolved
   components, catalog fingerprints, and candidate coverage.

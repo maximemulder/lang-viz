@@ -37,13 +37,13 @@ dependencies = [
     { name = "mapbox-vector-tile" },
     { name = "numpy" },
     { name = "polars" },
+    { name = "pyproj" },
     { name = "pyshp" },
     { name = "shapely" },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "pyproj" },
     { name = "pyrefly" },
     { name = "pytest" },
     { name = "ruff" },
@@ -55,13 +55,13 @@ requires-dist = [
     { name = "mapbox-vector-tile", specifier = "==2.2.0" },
     { name = "numpy", specifier = "==2.5.4" },
     { name = "polars", specifier = ">=1.35.0" },
+    { name = "pyproj", specifier = "==3.8.0" },
     { name = "pyshp", specifier = "==3.1.6" },
     { name = "shapely", specifier = "==2.2.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pyproj", specifier = "==3.8.0" },
     { name = "pyrefly", specifier = "==1.4.1" },
     { name = "pytest", specifier = ">=8.4.0" },
     { name = "ruff", specifier = ">=0.14.0" },

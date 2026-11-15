@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["pyshp==3.1.6", "shapely==2.2.0", "pyproj==3.8.0"]
-# ///
 """Audit DLAC against the locally generated atlas; never modify production artifacts.
 
-Run: bash pipeline/dlac/fetch.sh && uv run --script pipeline/dlac/assess.py
+Run: bash pipeline/dlac/fetch.sh && uv run python -m pipeline.dlac.assess
 Candidate correspondences are hypotheses, not an approved import crosswalk.
 """
 
