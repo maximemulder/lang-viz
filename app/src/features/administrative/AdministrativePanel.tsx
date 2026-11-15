@@ -15,8 +15,11 @@ import {
   administrativeLoadStateAtom,
   administrativeRepositoryAtom,
   administrativeSessionAtom,
+  boundaryIndexAtom,
+  focusAdministrativeTerritoryAtom,
   loadAdministrativeAtom,
   selectAdministrativeAtom,
+  setAdministrativeMetricAtom,
   setAdministrativeQueryAtom,
   setAdministrativeSearchKindAtom,
 } from './state.ts'
@@ -261,10 +264,13 @@ export default function AdministrativePanel() {
   const repository = useAtomValue(administrativeRepositoryAtom)
   const loadState = useAtomValue(administrativeLoadStateAtom)
   const session = useAtomValue(administrativeSessionAtom)
+  const boundaryIndex = useAtomValue(boundaryIndexAtom)
   const load = useSetAtom(loadAdministrativeAtom)
   const setQuery = useSetAtom(setAdministrativeQueryAtom)
   const setKind = useSetAtom(setAdministrativeSearchKindAtom)
   const select = useSetAtom(selectAdministrativeAtom)
+  const setMetric = useSetAtom(setAdministrativeMetricAtom)
+  const focus = useSetAtom(focusAdministrativeTerritoryAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
   useEffect(() => {
     void load()
@@ -336,6 +342,76 @@ export default function AdministrativePanel() {
               </button>
             ))}
           </fieldset>
+          <fieldset className="administrative-metrics">
+            <legend>Map color</legend>
+            <label>
+              <input
+                type="radio"
+                name="administrative-metric"
+                checked={!session.metric}
+                onChange={() => setMetric(null)}
+              />
+              None
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="administrative-metric"
+                checked={session.metric?.kind === 'territory-population'}
+                onChange={() => setMetric({ kind: 'territory-population' })}
+              />
+              Reported population
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="administrative-metric"
+                checked={session.metric?.kind === 'territory-literacy'}
+                onChange={() => setMetric({ kind: 'territory-literacy' })}
+              />
+              Territory literacy
+            </label>
+            {session.selection?.kind === 'language' && (
+              <label>
+                <input
+                  type="radio"
+                  name="administrative-metric"
+                  checked={
+                    session.metric?.kind === 'language-estimate' &&
+                    session.metric.sourceLanguageCode === session.selection.id
+                  }
+                  onChange={() => {
+                    if (session.selection?.kind === 'language')
+                      setMetric({
+                        kind: 'language-estimate',
+                        sourceLanguageCode: session.selection.id,
+                      })
+                  }}
+                />
+                Selected language estimate
+              </label>
+            )}
+            {session.selection?.kind === 'family' && (
+              <label>
+                <input
+                  type="radio"
+                  name="administrative-metric"
+                  checked={
+                    session.metric?.kind === 'family-estimate' &&
+                    session.metric.familyId === session.selection.id
+                  }
+                  onChange={() => {
+                    if (session.selection?.kind === 'family')
+                      setMetric({ kind: 'family-estimate', familyId: session.selection.id })
+                  }}
+                />
+                Selected family estimate sum
+              </label>
+            )}
+            <p>
+              Color appears only for matched polygons when Borders is on. No value means no fill.
+            </p>
+          </fieldset>
           <label className="administrative-search-field">
             Find {session.searchKind === 'territory' ? 'an area' : `a ${session.searchKind}`}
             <input
@@ -373,6 +449,29 @@ export default function AdministrativePanel() {
             </ul>
           </section>
           <div className="administrative-detail-scroll">
+            {session.selection?.kind === 'territory' && (
+              <>
+                <button
+                  className="administrative-focus"
+                  type="button"
+                  disabled={
+                    boundaryIndex?.associations.get(session.selection.id)?.status !== 'matched'
+                  }
+                  onClick={() => {
+                    if (session.selection?.kind === 'territory') focus(session.selection.id)
+                  }}
+                >
+                  Focus mapped area
+                </button>
+                {boundaryIndex &&
+                  boundaryIndex.associations.get(session.selection.id)?.status !== 'matched' && (
+                    <p className="administrative-note">
+                      No matched polygon or representative point in this boundary view. The CLDR
+                      observations remain available above.
+                    </p>
+                  )}
+              </>
+            )}
             {session.selection ? (
               <Details
                 repository={repository}

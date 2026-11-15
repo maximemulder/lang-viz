@@ -1,5 +1,10 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import type { FilterSpecification, MapLayerMouseEvent } from 'maplibre-gl'
+import type {
+  FilterSpecification,
+  MapLayerMouseEvent,
+  Map as MapLibreMap,
+  PointLike,
+} from 'maplibre-gl'
 import { addProtocol, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { Protocol } from 'pmtiles'
@@ -82,6 +87,25 @@ const PROJECTIONS = {
 const LANGUAGE_SOURCE_ID = 'language-areas'
 const LANGUAGE_HIT_LAYER_ID = 'language-area-hit-targets'
 const NO_VARIANT_IDS: readonly string[] = []
+
+export interface AreaInteraction {
+  readonly enabled: boolean
+  readonly borders: boolean
+  readonly hitLayers: readonly string[]
+  readonly onBordersChange: (enabled: boolean) => void
+  readonly onHoverModeChange: (mode: 'language' | 'area') => void
+  readonly onHover: (code: string | null, longitude: number, latitude: number) => void
+  readonly onSelect: (code: string | null) => void
+}
+
+const pickArea = (map: MapLibreMap, point: PointLike, layers: readonly string[]): string | null => {
+  const available = layers.filter((id) => map.getLayer(id))
+  if (!available.length) return null
+  const hit = map
+    .queryRenderedFeatures(point, { layers: available })
+    .find((feature) => typeof feature.properties?.territoryCode === 'string')
+  return hit?.properties?.territoryCode ?? null
+}
 
 const inspectionFromVariants = (
   variantIds: readonly string[],
@@ -200,7 +224,15 @@ const MapHint = () => {
   )
 }
 
-export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
+export const WorldMap = ({
+  children,
+  administrative,
+  areaInteraction,
+}: {
+  readonly children?: ReactNode
+  readonly administrative: boolean
+  readonly areaInteraction: AreaInteraction
+}) => {
   const data = useAtomValue(atlasDataAtom)
   const [isolatedId, setIsolatedId] = useAtom(isolatedLanguageIdAtom)
   const matches = useAtomValue(walsAreaMatchesAtom)
@@ -228,6 +260,20 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
   const hoverQueryFrameRef = useRef<number | null>(null)
   const viewportDirtyRef = useRef(true)
   const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
+
+  const areaMode = areaInteraction.enabled
+  useEffect(() => {
+    if (!areaMode) return
+    pendingHoverEventRef.current = null
+    if (hoverQueryFrameRef.current !== null) {
+      window.cancelAnimationFrame(hoverQueryFrameRef.current)
+      hoverQueryFrameRef.current = null
+    }
+    hoverRef.current = null
+    setHoverInspection(null)
+    inspectionRef.current = null
+    setInspection(null)
+  }, [areaMode])
 
   const updateInspection = useCallback((nextInspection: MapInspection | null) => {
     inspectionRef.current = nextInspection
@@ -340,6 +386,12 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
       doubleClickZoom={false}
       reuseMaps
       onMouseMove={(event) => {
+        if (areaInteraction?.enabled) {
+          const code = pickArea(event.target, event.point, areaInteraction.hitLayers)
+          event.target.getCanvas().style.cursor = code ? 'pointer' : ''
+          areaInteraction.onHover(code, event.lngLat.lng, event.lngLat.lat)
+          return
+        }
         lastHoverEventRef.current = event
         queryHover(event)
       }}
@@ -349,9 +401,14 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
         event.target.getCanvas().style.cursor = ''
         hoverRef.current = null
         setHoverInspection(null)
+        areaInteraction?.onHover(null, 0, 0)
       }}
       onClick={(event) => {
         cancelPendingHoverQuery()
+        if (areaInteraction?.enabled) {
+          areaInteraction.onSelect(pickArea(event.target, event.point, areaInteraction.hitLayers))
+          return
+        }
         const ids = hitVariants(event)
         const primary = ids.length === 1 && ids[0] ? languageForHit(ids[0]) : null
         if (primary) openDetails({ languageId: primary, moveMap: false })
@@ -360,6 +417,10 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
       onDblClick={(event) => {
         event.preventDefault()
         cancelPendingHoverQuery()
+        if (areaInteraction?.enabled) {
+          areaInteraction.onSelect(pickArea(event.target, event.point, areaInteraction.hitLayers))
+          return
+        }
         const ids = hitVariants(event)
         const unique = [
           ...new Set(ids.map(languageForHit).filter((id): id is string => Boolean(id))),
@@ -384,7 +445,8 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
       onIdle={(event) => {
         if (inspectionDirtyRef.current) {
           inspectionDirtyRef.current = false
-          if (lastHoverEventRef.current) queryHover(lastHoverEventRef.current)
+          if (lastHoverEventRef.current && !areaInteraction?.enabled)
+            queryHover(lastHoverEventRef.current)
         }
 
         // Hover repaints also become idle; viewport discovery only needs new
@@ -436,10 +498,11 @@ export const WorldMap = ({ children }: { readonly children?: ReactNode }) => {
         onProjectionChange={setProjectionMode}
         backgroundMode={backgroundMode}
         onBackgroundChange={setBackgroundMode}
+        areaInteraction={areaInteraction}
       />
 
       <Suspense fallback={null}>
-        <MapHint />
+        {!administrative && <MapHint />}
         {isolatedId && (
           <div className="map-isolation-control" role="status">
             <span>Only {data.languageById.get(isolatedId)?.name}</span>

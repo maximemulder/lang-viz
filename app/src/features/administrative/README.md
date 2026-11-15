@@ -1,9 +1,9 @@
-# Administrative feature (ADM-03 and ADM-04)
+# Administrative feature (ADM-03 through ADM-05)
 
-This feature reads `administrative/observations.json` only when its loader is
-called. It has no import from the atlas repository, geometry selectors, or
-boundary package. A missing or invalid supplement affects only its own load
-state; the atlas can load normally.
+The observation repository reads `administrative/observations.json` only when
+its loader is called. It has no import from the atlas repository or boundary
+package. A missing or invalid supplement affects only its own load state; the
+atlas can load normally.
 
 `repository.ts` validates schema version 2, provenance fields, coverage counts,
 all foreign keys, and unique source territory/language pairs before indexing.
@@ -22,9 +22,9 @@ maps a territory to a polygon or a language to an atlas geometry.
 `state.ts` stores repository load state separately from a small session of query,
 selection IDs, and metric choice. A selection or load completion never changes
 the map camera. An explicit territory focus creates a request in the shared
-`mapCameraIntentAtom`; ADM-05 will add a consumer that resolves the selected
-boundary view and representative point. Header view changes keep the current
-map camera position.
+`mapCameraIntentAtom`; `BoundaryLayer` resolves a reviewed representative
+point for that request. Header view changes keep the current map camera
+position.
 
 `AdministrativePanel.tsx` is loaded only when the Administrative header view is
 first opened. It then stays mounted across header switches, preserving search,
@@ -39,5 +39,21 @@ so their failures do not hide this panel.
 The app header and URL route own Geography / Administrative / Word histories.
 The map workspace stays mounted between Geography and Administrative. The
 existing language sidebar is hidden, not unmounted, while the administrative
-panel is visible. Administrative map interaction and opt-in borders remain
-ADM-05 work.
+panel is visible.
+
+`boundaryRepository.ts` loads the reviewed crosswalk and representative points
+from the separate ADM-02 package on first Administrative view or area hover.
+It fetches and decodes the pinned TopoJSON only when Borders is enabled. The
+boundary package never alters CLDR observations. `BoundaryLayer.tsx` renders
+markers, opt-in outlines and eligible metric fills, plus source and dispute
+notes. Geometry selection and a focus request require an explicit matched
+crosswalk entry; ambiguous or unmatched CLDR areas remain searchable without
+a shape. Fetch failures stay within this optional layer and can be retried.
+
+`GeographyExplorations` owns the optional layer and supplies a small generic
+interaction adapter to `WorldMap`. The map host chooses exactly one pointer
+picker at a time. Borders off removes the polygon source and its hit layer;
+area mode can then pick only visible markers. The border icon and Language / Area
+segmented button sit beside map settings, with borders off and Language selected
+by default. The two top-left controls do not
+modify atlas language selections, filters, CLDR values, or the camera.

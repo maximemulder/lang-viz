@@ -275,6 +275,14 @@ export const installOverlapTestApi = (
         ],
       }
     },
+    queryLayers: (center: [number, number], layerIds: readonly string[]) => {
+      const layers = layerIds.filter((id) => map.getLayer(id))
+      if (!layers.length) return []
+      return map.queryRenderedFeatures(map.project(center), { layers }).map((feature) => ({
+        layerId: feature.layer.id,
+        properties: feature.properties,
+      }))
+    },
     reloadStyle: () => {
       styleReloading = true
       map.setStyle(map.getStyle(), { diff: false })

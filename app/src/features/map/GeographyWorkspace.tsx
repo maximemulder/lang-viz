@@ -4,7 +4,7 @@ import { useMap } from 'react-map-gl/maplibre'
 import { WorkspaceBoundary } from '../../components/WorkspaceBoundary.tsx'
 import { atlasDataAtom } from '../../state/atlasState.ts'
 import { LanguageFinder, LanguageFinderFallback } from '../languages/LanguageFinder.tsx'
-import { WorldMap } from './WorldMap.tsx'
+import { type AreaInteraction, WorldMap } from './WorldMap.tsx'
 
 const AdministrativePanel = lazy(() => import('../administrative/AdministrativePanel.tsx'))
 
@@ -13,11 +13,13 @@ export default function GeographyWorkspace({
   visible,
   administrative,
   mapLayers,
+  areaInteraction,
   sidebarHeader,
 }: {
   readonly visible: boolean
   readonly administrative: boolean
   readonly mapLayers?: ReactNode
+  readonly areaInteraction: AreaInteraction
   readonly sidebarHeader?: ReactNode
 }) {
   const maps = useMap()
@@ -35,7 +37,9 @@ export default function GeographyWorkspace({
     <>
       <WorkspaceBoundary name="atlas data" onRetry={retry}>
         <section className="map-shell" aria-label="Language map">
-          <WorldMap>{mapLayers}</WorldMap>
+          <WorldMap administrative={administrative} areaInteraction={areaInteraction}>
+            {mapLayers}
+          </WorldMap>
         </section>
       </WorkspaceBoundary>
       <div className="geography-sidebar">

@@ -5,6 +5,7 @@ import { languageOpacityAtom, overlapModeAtom, stripeThicknessAtom } from '../..
 import { BIOMES } from './biomes'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
 import { globeLandPath, mercatorLandPath } from './projectionIcons'
+import type { AreaInteraction } from './WorldMap.tsx'
 
 export type ProjectionMode = 'globe' | 'mercator'
 
@@ -61,11 +62,13 @@ export const MapSettings = ({
   onProjectionChange,
   backgroundMode,
   onBackgroundChange,
+  areaInteraction,
 }: {
   readonly backgroundMode: BackgroundMode
   readonly onBackgroundChange: (mode: BackgroundMode) => void
   readonly projectionMode: ProjectionMode
   readonly onProjectionChange: (mode: ProjectionMode) => void
+  readonly areaInteraction: AreaInteraction
 }) => {
   const tooltipId = useId()
   const [open, setOpen] = useState(false)
@@ -100,25 +103,77 @@ export const MapSettings = ({
 
   return (
     <div className="map-settings" ref={containerRef}>
-      <button
-        className="map-settings__toggle"
-        type="button"
-        ref={toggleRef}
-        aria-label="Map settings"
-        title="Map settings"
-        aria-expanded={open}
-        aria-controls="map-settings-panel"
-        onClick={() => setOpen(!open)}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M4 7h9m4 0h3M4 17h3m4 0h9M13 4v6M7 14v6"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
+      <div className="map-settings__toolbar">
+        <button
+          className="map-settings__toggle"
+          type="button"
+          ref={toggleRef}
+          aria-label="Map settings"
+          title="Map settings"
+          aria-expanded={open}
+          aria-controls="map-settings-panel"
+          onClick={() => setOpen(!open)}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M4 7h9m4 0h3M4 17h3m4 0h9M13 4v6M7 14v6"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+        {areaInteraction && (
+          <div className="map-area-controls">
+            <button
+              className="map-settings__toggle map-area-controls__borders"
+              type="button"
+              aria-label="Administrative borders"
+              title={areaInteraction.borders ? 'Hide borders' : 'Show borders'}
+              aria-pressed={areaInteraction.borders}
+              onClick={() => areaInteraction.onBordersChange(!areaInteraction.borders)}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M3 5.5 9 3l6 2 6-2v15.5L15 21l-6-2-6 2V5.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="m9 3 1.5 5-2 4 2 3L9 19m6-14-1 4 2 3-1 3v6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <fieldset className="map-area-controls__inspect">
+              <legend className="visually-hidden">Inspect on map</legend>
+              <button
+                className="map-area-controls__inspect-button"
+                type="button"
+                title="Inspect languages on map"
+                aria-label="Inspect languages on map"
+                aria-pressed={!areaInteraction.enabled}
+                onClick={() => areaInteraction.onHoverModeChange('language')}
+              >
+                Language
+              </button>
+              <button
+                className="map-area-controls__inspect-button"
+                type="button"
+                title="Inspect administrative areas on map"
+                aria-label="Inspect administrative areas on map"
+                aria-pressed={areaInteraction.enabled}
+                onClick={() => areaInteraction.onHoverModeChange('area')}
+              >
+                Area
+              </button>
+            </fieldset>
+          </div>
+        )}
+      </div>
       <section
         id="map-settings-panel"
         className="map-settings__panel"

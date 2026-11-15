@@ -35,6 +35,13 @@ export interface OverlapTestApi {
   recompute(): void
   failNextPublication(service: TileService): void
   inspect(center: [number, number]): { variantIds: string[]; point: [number, number] }
+  queryLayers(
+    center: [number, number],
+    layerIds: readonly string[],
+  ): readonly {
+    layerId: string
+    properties: Record<string, unknown>
+  }[]
   probeInspection(center: [number, number]): Promise<InspectionProbe>
   inspectionHighlight(): {
     variantIds: readonly string[]

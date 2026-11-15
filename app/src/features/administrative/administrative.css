@@ -31,6 +31,43 @@
   line-height: 1.5;
 }
 
+.administrative-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  border: 0;
+  border-bottom: 1px solid rgb(29 43 39 / 12%);
+  color: var(--ink);
+  font-size: 0.7rem;
+}
+.administrative-metrics legend {
+  color: var(--muted-ink);
+  font-weight: 600;
+}
+.administrative-metrics label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.administrative-metrics input {
+  accent-color: #315c4b;
+}
+.administrative-metrics p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted-ink);
+}
+.administrative-focus {
+  margin: 0.6rem 0.8rem 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #bec8c0;
+  border-radius: 0.35rem;
+  background: #fffdf5;
+  color: var(--ink);
+}
+
 .administrative-search-kind {
   display: flex;
   gap: 0.25rem;

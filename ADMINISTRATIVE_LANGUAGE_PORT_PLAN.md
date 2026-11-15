@@ -1,6 +1,6 @@
 # Administrative language visualization port plan
 
-Last updated: 2026-11-15. ADM-00 through ADM-04 implementation recorded below.
+Last updated: 2026-11-15. ADM-00 through ADM-05 implementation recorded below.
 
 Integrate the useful CLDR language and territory statistics from
 `origin/aastha/speaker-stats` into the current geography workspace. Keep the
@@ -53,16 +53,16 @@ delivery, and large `CldrMapView` component before integrating them.
    geometry under an explicit boundary view. Changing that view must leave CLDR
    values unchanged. Do not silently assign disputed or unmatched shapes to a
    statistical record. Show the source and viewpoint in the map legend/details.
-4. **Borders are opt-in.** Put a visible Show borders switch at the top left of
-   the map, initially off. Off means no administrative outlines, fills, labels,
-   or invisible polygon hit targets from this feature. Administrative statistics
-   remain available in the administrative view and, where a defensible
-   representative point is available, through clearly labeled territory
+4. **Borders are opt-in.** Put a visible Show borders icon button beside map
+   settings at the top left of the map, initially off. Off means no administrative
+   outlines, fills, labels, or invisible polygon hit targets from this feature.
+   Administrative statistics remain available in the administrative view and,
+   where a defensible representative point is available, through clearly labeled territory
    markers. On enables the selected boundary layer and optional metric shading.
    Avoid a political basemap style that can show different borders or labels
    beneath this layer.
-5. **Hover has one owner at a time.** Put a Language / Administrative area switch
-   beside the border switch, initially Language. Language mode uses the existing
+5. **Hover has one owner at a time.** Put a segmented Language / Area button
+   beside the border button, initially Language. Language mode uses the existing
    language picker and inspector. Administrative area mode inspects territory
    markers with borders off and visible territory polygons with borders on. The
    same mode determines click precedence and cursor/tooltip behavior. Switching
@@ -240,9 +240,9 @@ state, URL switching, and persistence of the map canvas.
   `GeographyExplorations`. Reuse the map camera, projection, and existing
   physical basemap. Do not port the branch's separate CARTO map or its
   zoom-dependent click rules unchanged.
-- Add top-left Borders and Hover controls near existing map settings. Defaults:
-  borders off, hover Language. Keep them visible and understandable when the
-  Geography header view is selected.
+- Add a top-left border icon button and Language / Area segmented button beside
+  existing map settings. Defaults: borders off, hover Language. Keep them visible
+  and understandable when the Geography header view is selected.
 - Route pointer events through one active picker. With borders off, area mode
   targets visible markers only; with borders on, it may target visible polygons.
   Do not leave a transparent, politically meaningful hit layer active when
@@ -257,6 +257,31 @@ state, URL switching, and persistence of the map canvas.
 
 Acceptance: toggles change only presentation/interaction; neither modifies
 CLDR values, pinned language entries, atlas filters, or camera state.
+
+ADM-05 result: `GeographyExplorations` now composes a lazy boundary layer into
+the persistent map. The top-left controls default to Borders off and Hover
+Language. Administrative opens with representative markers from the separate
+boundary index; Geography loads no boundary assets until the user enables
+borders or area hover. The pinned Natural Earth 4.1.0 / world-atlas 2.0.2
+topology is fetched only with Borders on. Matched polygons receive outlines,
+selected territory highlights, and optional fills for reported population,
+territory literacy, a selected language estimate, or a selected family estimate
+sum. Unassigned source shapes have distinct gray outlines; reviewed sensitive
+matches have orange outlines and source notes. Ambiguous/unmatched CLDR codes
+stay available in the sidebar without a fill or marker. The legend and map
+attribution name the boundary source and its viewpoint. Area hover/click uses
+visible markers with borders off, and matched polygons with borders on; the
+polygon hit layer unmounts when borders turn off. The language picker is
+inactive in area mode, while atlas selections and the map camera remain
+untouched by presentation changes. The explicit Focus mapped area button uses
+a reviewed representative point and is disabled for unmatched codes.
+
+The chosen first view and policy are the ADM-02 reviewed crosswalk. Markers
+appear automatically in Administrative; no diversity formula or inferred
+user-location viewpoint is included. Focused boundary decoding and crosswalk
+tests plus Firefox pointer checks cover marker-only and polygon selection,
+opt-in topology fetching, metric fill, and persistent controls. ADM-06 retains
+the broader data/deployment and basemap/error/mobile verification work.
 
 ### ADM-06 — Verify and hand off
 

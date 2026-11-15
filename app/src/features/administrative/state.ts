@@ -1,5 +1,6 @@
 import { atom } from 'jotai'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
+import type { BoundaryIndex } from './boundaryRepository.ts'
 import type { AdministrativeRepository } from './model.ts'
 import { loadAdministrative } from './repository.ts'
 import type { AdministrativeMetric } from './selectors.ts'
@@ -55,6 +56,21 @@ export const administrativeSessionAtom = atom<AdministrativeSession>({
   selection: null,
   metric: null,
 })
+
+/** Presentation preferences never enter the CLDR repository or atlas session. */
+export const boundaryPresentationAtom = atom<{
+  readonly borders: boolean
+  readonly hover: 'language' | 'area'
+}>({
+  borders: false,
+  hover: 'language',
+})
+export const hoveredAdministrativeAreaAtom = atom<{
+  readonly code: string
+  readonly longitude: number
+  readonly latitude: number
+} | null>(null)
+export const boundaryIndexAtom = atom<BoundaryIndex | null>(null)
 
 export const setAdministrativeQueryAtom = atom(null, (get, set, query: string) =>
   set(administrativeSessionAtom, { ...get(administrativeSessionAtom), query }),

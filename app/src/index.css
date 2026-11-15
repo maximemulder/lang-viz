@@ -766,8 +766,16 @@ h2 {
   pointer-events: none;
 }
 
+.map-settings__toolbar,
+.map-area-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .map-settings__toggle,
-.map-settings__panel {
+.map-settings__panel,
+.map-area-controls__inspect {
   border: 1px solid rgb(29 43 39 / 12%);
   border-radius: 0.65rem;
   background: rgb(248 246 238 / 96%);
@@ -788,8 +796,57 @@ h2 {
 }
 
 .map-settings__toggle:hover,
-.map-settings__toggle[aria-expanded="true"] {
+.map-settings__toggle[aria-expanded="true"],
+.map-area-controls__inspect-button:hover {
   background: var(--paper);
+}
+
+.map-area-controls__borders[aria-pressed="true"],
+.map-area-controls__inspect-button[aria-pressed="true"] {
+  background: #dce9df;
+  color: #214e3a;
+}
+
+.map-area-controls__inspect {
+  display: flex;
+  height: 2.5rem;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.map-area-controls__inspect-button {
+  min-width: 3.35rem;
+  padding: 0 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.map-area-controls__inspect-button + .map-area-controls__inspect-button {
+  border-left: 1px solid rgb(29 43 39 / 12%);
+}
+
+.administrative-map-legend {
+  position: absolute;
+  z-index: 3;
+  right: 0.7rem;
+  bottom: 1.9rem;
+  display: grid;
+  gap: 0.15rem;
+  max-width: min(22rem, calc(100% - 1.4rem));
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgb(29 43 39 / 12%);
+  border-radius: 0.5rem;
+  background: rgb(248 246 238 / 94%);
+  color: var(--ink);
+  font-size: 0.67rem;
+  line-height: 1.35;
+  pointer-events: auto;
 }
 
 .map-settings__panel {
