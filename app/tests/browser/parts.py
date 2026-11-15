@@ -2,6 +2,7 @@
 """Compare live overlay and reusable parts through production workers and rendering."""
 import argparse
 import json
+from typing import Any
 
 from run import APP, browser_session, check_state, wait_for
 from sidebar import add_selected, clear_selection, open_details, search, select_branches, select_result, view
@@ -34,7 +35,7 @@ def main():
         native = state["status"] == "idle"
         if not native:
             check_state(state)
-        report = {"outcome": "native", "workerMs": 0, "firstRenderMs": 0} if native else state["reports"][-1]
+        report: dict[str, Any] = {"outcome": "native", "workerMs": 0, "firstRenderMs": 0} if native else state["reports"][-1]
         results["cases"].append({"name": name, "engine": engine, "run": run, "report": report})
         if report["outcome"] == "error":
             assert engine == "live", report

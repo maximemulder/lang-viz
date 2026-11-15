@@ -343,7 +343,8 @@ npm run typecheck
 npm run build
 ```
 
-Pipeline regressions can be checked with `uv run pytest`.
+The Python pipeline, browser tests, and app scripts are type checked with
+`uv run pyrefly check`. Pipeline regressions can be checked with `uv run pytest`.
 
 ## Overlap rendering
 

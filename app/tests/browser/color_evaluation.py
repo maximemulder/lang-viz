@@ -10,6 +10,7 @@ import math
 from collections import defaultdict
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 
 @cache
@@ -32,7 +33,7 @@ def distance(a, b):
     return lab_distance(lab(a), lab(b))
 
 
-def evaluate_colors(capture, palette):
+def evaluate_colors(capture, palette) -> dict[str, Any]:
     """Measure actual shades at contacts, multiscale clade contrast, and coherence.
     Exact colors participate in readability, but not coherence.
     Missing palette colors fail explicitly instead of silently dropping entries.

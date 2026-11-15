@@ -2,6 +2,7 @@
 """Require prepared coverage across datasets and Asher's dense intermediate zooms."""
 
 import json
+from typing import Any
 
 from delivery import archives
 from run import APP, browser_session, check_state, open_atlas, wait_for
@@ -114,7 +115,7 @@ def lod_continuity(browser, output):
 def main():
     output = APP / "test-results/prepared"
     output.mkdir(parents=True, exist_ok=True)
-    result = {"asher": {}, "otherProfiles": {}}
+    result: dict[str, Any] = {"asher": {}, "otherProfiles": {}}
     with browser_session(output) as (browser, origin):
         open_atlas(browser, origin)
         try:

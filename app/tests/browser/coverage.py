@@ -2,13 +2,14 @@
 """Check bulk-branch navigation coverage over German (Asher) and Yue (DLAC)."""
 
 import json
+from typing import Any
 
 from run import APP, browser_session, check_state, open_atlas, wait_for
 from sidebar import select_branches
 
 
 def check_navigation(browser, output, source, projection, center, points, language):
-    moves = []
+    moves: list[dict[str, Any]] = []
     for i, zoom in enumerate([4.5, 5.5, 6.5, 4, 3, 5, 6, 4.5]):
         target = [center[0] + (i % 2) * 0.8, center[1]]
         browser.js("""

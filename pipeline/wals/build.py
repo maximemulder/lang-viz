@@ -13,6 +13,7 @@ import tempfile
 from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from pipeline.release_utils import digest, local_path
@@ -65,7 +66,7 @@ def plain(value: str) -> str:
 def read_csv(path: Path) -> tuple[list[str], dict[str, dict]]:
     with path.open(encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream)
-        fields = reader.fieldnames or []
+        fields = list(reader.fieldnames or [])
         require(
             bool(fields) and len(fields) == len(set(fields)),
             path.name,
@@ -96,6 +97,7 @@ def references(value: str, bibliography: dict, location: str, separator: str = "
     for item in split(value, separator):
         match = re.fullmatch(r"([^\s\[\]]+)(?:\[([^\[\]]*)\])?", item)
         require(match is not None, location, f"invalid reference {item!r}")
+        assert match is not None
         key, pages = match.groups()
         require(key in bibliography, location, f"unresolved bibliography reference {key}")
         result.append({"sourceId": key, "pages": pages or ""})
@@ -179,7 +181,7 @@ def coordinates(row: dict) -> tuple[list[float] | None, str | None]:
         )
         values.append(number)
     if all(v is not None for v in values):
-        return values, None
+        return [v for v in values if v is not None], None
     return None, "missing" if all(v is None for v in values) else "incomplete"
 
 
@@ -193,7 +195,8 @@ def compile_data(directory: Path, *, pinned: bool = True) -> dict:
     chapters, examples = tables["chapters.csv"], tables["examples.csv"]
     require(set(FEATURES) <= features.keys(), "parameters.csv", "shortlisted feature missing")
     groups = {k for k in languages if k.startswith(("family-", "subfamily-", "genus-"))}
-    records, missing = {}, []
+    records: dict[str, dict[str, Any]] = {}
+    missing = []
     for key, row in languages.items():
         point, reason = coordinates(row)
         if key in groups:
@@ -231,7 +234,8 @@ def compile_data(directory: Path, *, pinned: bool = True) -> dict:
         pair = row["Parameter_ID"], row["Number"]
         require(pair not in numbers, key, "duplicate category number within feature")
         numbers.add(pair)
-    pairs, observed, observations = set(), set(), {}
+    pairs, observed = set(), set()
+    observations: dict[str, dict[str, Any]] = {}
     for key, row in tables["values.csv"].items():
         at = f"values.csv:{key}"
         language, feature = row["Language_ID"], row["Parameter_ID"]
@@ -253,7 +257,7 @@ def compile_data(directory: Path, *, pinned: bool = True) -> dict:
                 "exampleIds": split(row["Example_ID"], " "),
                 "url": f"https://wals.info/valuesets/{quote(key, safe='')}",
             }
-    feature_output = {}
+    feature_output: dict[str, dict[str, Any]] = {}
     for key in FEATURES:
         row = features[key]
         chapter = chapters[row["Chapter_ID"]]
@@ -298,7 +302,7 @@ def compile_data(directory: Path, *, pinned: bool = True) -> dict:
         for row in collection.values()
         for ref in row["references"]
     }
-    refs = {
+    refs: dict[str, dict[str, Any]] = {
         key: {**bibliography[key], "url": f"https://wals.info/refdb/record/{quote(key, safe='')}"}
         for key in sorted(used_refs)
     }

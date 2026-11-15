@@ -90,7 +90,10 @@ def restore(
                     if not member.isfile() or member.size != entry["bytes"]:
                         raise ValueError(f"Invalid source archive member: {member.name}")
                     destination.parent.mkdir(parents=True, exist_ok=True)
-                    with bundle.extractfile(member) as src, destination.open("wb") as dst:
+                    src = bundle.extractfile(member)
+                    if src is None:
+                        raise ValueError(f"Cannot extract source archive member: {member.name}")
+                    with src, destination.open("wb") as dst:
                         shutil.copyfileobj(src, dst)
         else:
             for entry in pin["files"]:

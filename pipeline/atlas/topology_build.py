@@ -28,6 +28,7 @@ from typing import Any
 import mapbox_vector_tile
 import numpy as np
 import shapely as geos
+from shapely.geometry.base import BaseGeometry
 from mapbox_vector_tile.encoder import on_invalid_geometry_raise
 
 from pipeline.atlas.topology import (
@@ -89,7 +90,7 @@ def source_profiles(source: Path, cache: Path) -> dict[tuple[str, str], ProfileS
     }
 
 
-def tile_geometry(geometry: geos.Geometry, zoom: int, x: int, y: int) -> geos.Geometry:
+def tile_geometry(geometry: BaseGeometry, zoom: int, x: int, y: int) -> BaseGeometry:
     def transform(coordinates):
         return coordinates * (EXTENT * 2**zoom) - np.array([x, y]) * EXTENT
 
@@ -113,7 +114,7 @@ def clipped_features(
     geometries: np.ndarray,
     attributes: list[dict[str, Any]],
     indices: Iterable[int],
-    bounds: geos.Geometry,
+    bounds: BaseGeometry,
     zoom: int,
     x: int,
     y: int,
@@ -175,7 +176,7 @@ def source_features(
     Faces already contain native tile-cut vertices. Clipping buffered neighbors
     before assembly keeps buffer rounding outside the native tile interior.
     """
-    groups: dict[str, list[geos.Geometry]] = defaultdict(list)
+    groups: dict[str, list[BaseGeometry]] = defaultdict(list)
     for part in parts:
         for member in feature_members(part):
             groups[member].append(part["geometry"])
@@ -546,6 +547,7 @@ def build_profile(
                 level = levels[str(zoom)] = {**stats, **low.stats}
                 atomic_json(store.levels_file, levels)
                 export_seconds = time.monotonic() - export_started
+            assert level is not None
             for name in level["tiles"]:
                 target = parts / f"{zoom}-{name}.pbf"
                 if need_parts or not target.is_file():

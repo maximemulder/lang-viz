@@ -10,6 +10,7 @@ from collections import Counter
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 from run import APP, SCENARIOS, browser_session, wait_for
 
@@ -17,7 +18,7 @@ from run import APP, SCENARIOS, browser_session, wait_for
 @contextmanager
 def controlled_server(upstream):
     """Proxy only for test-owned failures/delays; never modify installed data or app code."""
-    control = {
+    control: dict[str, Any] = {
         "lexical": "ready",
         "atlas": "ready",
         "release": threading.Event(),
@@ -27,7 +28,7 @@ def controlled_server(upstream):
     hits = Counter()
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
         def do_GET(self):
@@ -79,6 +80,7 @@ def controlled_server(upstream):
                 response = error
             try:
                 with response:
+                    assert response.status is not None
                     self.send_response(response.status)
                     for key, value in response.headers.items():
                         if key.lower() not in {"connection", "transfer-encoding", "cache-control"}:
@@ -106,7 +108,7 @@ def main():
     parser.add_argument("--output", type=Path, default=APP / "test-results/etymology-03/browser")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    report = {
+    report: dict[str, Any] = {
         "passed": False,
         "serving": "production",
         "data": "real pinned snapshots",

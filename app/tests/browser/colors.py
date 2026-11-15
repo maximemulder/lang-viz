@@ -4,6 +4,7 @@
 import json
 import math
 import time
+from typing import Any
 
 from color_evaluation import distance, evaluate_colors, lab
 from run import APP, browser_session, check_state, open_atlas, wait_for
@@ -89,8 +90,9 @@ def optimize(browser, ids, output=None, name=None):
     assert before["coverageUrls"] == after["coverageUrls"], "Recoloring replaced coverage"
     assert len(before["reports"]) == len(after["reports"]), "Recoloring requested geometry"
     colors = color_state(browser, ids)["colors"]
-    report = {"metrics": result, "seconds": elapsed, "colors": colors}
+    report: dict[str, Any] = {"metrics": result, "seconds": elapsed, "colors": colors}
     if output is not None:
+        assert name is not None
         capture = captured_input(browser)
         palette = {"colors": colors, "anchors": {root: region["anchor"]
                    for root, region in result["regions"].items()}}
@@ -106,7 +108,7 @@ def optimize(browser, ids, output=None, name=None):
 def main():
     output = APP / "test-results/colors"
     output.mkdir(parents=True, exist_ok=True)
-    results = {}
+    results: dict[str, Any] = {}
     with browser_session(output) as (browser, origin):
         try:
             open_atlas(browser, origin)

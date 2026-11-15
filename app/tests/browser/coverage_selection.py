@@ -4,6 +4,7 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from run import APP, SCENARIOS, browser_session, check_state, open_atlas
 
@@ -14,7 +15,7 @@ def main():
         "--output", type=Path, default=APP / "test-results/etymology-04/coverage-selection"
     )
     args = parser.parse_args()
-    report = {"passed": False, "periods": []}
+    report: dict[str, Any] = {"passed": False, "periods": []}
     with browser_session(args.output) as (browser, origin):
         open_atlas(browser, origin)
         try:

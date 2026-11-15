@@ -7,6 +7,7 @@ import os
 import time
 from itertools import pairwise
 from pathlib import Path
+from typing import Any
 
 from etymology import controlled_server
 from inspection import move, render_frames
@@ -22,7 +23,7 @@ def main():
     if args.base.strip("/") == "lang-viz":
         os.environ["GITHUB_PAGES"] = "true"
     args.output.mkdir(parents=True, exist_ok=True)
-    report = {
+    report: dict[str, Any] = {
         "passed": False,
         "data": "real lexical/atlas snapshots, plus labeled coordinate fixtures",
         "checks": [],

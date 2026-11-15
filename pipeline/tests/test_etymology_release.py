@@ -106,7 +106,11 @@ def test_invalid_archive_members_and_contents_fail_before_install(package, tmp_p
     pin = release.read_pin(reference)
     archive = reference.parent / pin["assets"]["browser"]["name"]
     with tarfile.open(archive) as bundle:
-        members = [(member, bundle.extractfile(member).read()) for member in bundle.getmembers()]
+        members = []
+        for member in bundle.getmembers():
+            extracted = bundle.extractfile(member)
+            assert extracted is not None
+            members.append((member, extracted.read()))
     with tarfile.open(archive, "w:gz") as bundle:
         for member, body in members:
             if fault == "missing" and member.name == "NOTICE.md":

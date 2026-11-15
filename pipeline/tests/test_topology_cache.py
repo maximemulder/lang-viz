@@ -17,6 +17,7 @@ def atlas(tmp_path):
     binary = find_tile_join()
     if not binary:
         pytest.skip("Build tile-join to exercise cache reuse")
+    assert binary is not None
     source = tmp_path / "areas.geojsonl"
     output, cache = tmp_path / "public", tmp_path / "cache"
     records = []

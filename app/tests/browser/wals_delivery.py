@@ -13,6 +13,7 @@ from collections import Counter
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 from run import APP, browser_session, wait_for
 
@@ -22,7 +23,7 @@ def controlled_server(upstream):
     control, hits = {"mode": "ready"}, Counter()
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
         def do_GET(self):
@@ -100,7 +101,7 @@ def main():
     )
     shutil.copyfile(artifact / "wals-delivery.html", artifact / "index.html")
     shutil.copytree(args.data, artifact / "wals", dirs_exist_ok=True)
-    report = {"passed": False, "base": "/lang-viz/", "checks": []}
+    report: dict[str, Any] = {"passed": False, "base": "/lang-viz/", "checks": []}
     with (
         browser_session(args.output, out_dir=artifact) as (browser, upstream),
         controlled_server(upstream) as (origin, control, hits),

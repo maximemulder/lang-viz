@@ -17,8 +17,8 @@ from typing import Any
 
 import numpy as np
 import shapely as geos
-from shapely import Geometry
 from shapely.errors import GEOSException
+from shapely.geometry.base import BaseGeometry
 
 # About four centimetres at the equator. This is GEOS's numerical precision,
 # independent of the display LOD's vector-tile precision.
@@ -45,17 +45,17 @@ def project(coordinates: np.ndarray) -> np.ndarray:
     return result
 
 
-def polygons(geometry: Geometry) -> list[Geometry]:
+def polygons(geometry: BaseGeometry) -> list[geos.Polygon]:
     if geometry.is_empty:
         return []
-    if geometry.geom_type == "Polygon":
+    if isinstance(geometry, geos.Polygon):
         return [geometry]
-    if geometry.geom_type in ("MultiPolygon", "GeometryCollection"):
+    if isinstance(geometry, (geos.MultiPolygon, geos.GeometryCollection)):
         return [p for child in geometry.geoms for p in polygons(child)]
     return []
 
 
-def wrap_world(geometry: Geometry) -> list[Geometry]:
+def wrap_world(geometry: BaseGeometry) -> list[geos.Polygon]:
     """Normalize source longitudes that extend slightly past the antimeridian."""
     minx, _, maxx, _ = geometry.bounds
     if minx >= 0 and maxx <= 1:
@@ -87,7 +87,7 @@ def merge_memberships(
     for index, (face, members) in enumerate(zip(faces, memberships, strict=True)):
         cell = tuple(cells[index]) if cells is not None else ()
         groups[(cell, members)].append(face)
-    result: list[Geometry] = []
+    result: list[BaseGeometry] = []
     labels: list[tuple[str, ...]] = []
     for (_, members), pieces in sorted(groups.items()):
         joined = geos.disjoint_subset_union_all(pieces) if len(pieces) > 1 else pieces[0]
@@ -116,7 +116,7 @@ def split_point_contacts(
     invalid = geos.coverage_invalid_edges(faces)
     affected = np.flatnonzero(~geos.is_empty(invalid))
     neighbors = set(geos.STRtree(faces).query(faces[affected], predicate="intersects")[1])
-    result: list[Geometry] = []
+    result: list[BaseGeometry] = []
     labels: list[tuple[str, ...]] = []
     split_count = 0
     for i, (face, members) in enumerate(zip(faces, memberships, strict=True)):
@@ -147,7 +147,7 @@ def partition_sources(
     filled merely because no language contributes to them. No hierarchy policy
     is applied here, so removing a child can still expose its ancestor.
     """
-    groups: dict[str, list[Geometry]] = defaultdict(list)
+    groups: dict[str, list[BaseGeometry]] = defaultdict(list)
     properties: dict[str, dict[str, Any]] = {}
     repairs: list[dict[str, Any]] = []
     for feature in features:
@@ -223,9 +223,9 @@ def simplify_partition(
     )
 
 
-def language_geometries(partition: Partition) -> dict[str, Geometry]:
+def language_geometries(partition: Partition) -> dict[str, BaseGeometry]:
     """Reconstruct variants without another language-to-language overlay."""
-    groups: dict[str, list[Geometry]] = defaultdict(list)
+    groups: dict[str, list[BaseGeometry]] = defaultdict(list)
     for face, members in zip(partition.faces, partition.memberships, strict=True):
         if not face.is_empty:
             for member in members:
@@ -245,7 +245,7 @@ class SourceAreaIndex:
         active = [i for i, members in enumerate(partition.memberships) if members]
         self.faces = partition.faces[active]
         self.memberships = [partition.memberships[i] for i in active]
-        self.areas = geos.area(self.faces)
+        self.areas = np.atleast_1d(geos.area(self.faces))
         self.index = geos.STRtree(self.faces)
         self.count = 2**AREA_INDEX_ZOOM
         self.regions: dict[tuple[int, int], tuple[np.ndarray, list[tuple[str, ...]], Any]] = {}
@@ -270,9 +270,9 @@ class SourceAreaIndex:
             self.regions[key] = pieces, members, geos.STRtree(pieces)
         return self.regions[key]
 
-    def majority(self, face: Geometry) -> tuple[str, ...]:
+    def majority(self, face: BaseGeometry) -> tuple[str, ...]:
         candidates = self.index.query(face)
-        if sum(self.areas[candidates]) * 2 < face.area:
+        if np.sum(self.areas[candidates]) * 2 < face.area:
             return ()
         areas: dict[tuple[str, ...], float] = defaultdict(float)
         minx, miny, maxx, maxy = face.bounds
@@ -298,11 +298,13 @@ class SourceAreaIndex:
                     chunk = geos.MultiPolygon(polygons(chunk))
                 pieces, members, index = self.region(x, y)
                 local = index.query(chunk)
-                values = geos.area(geos.intersection(chunk, pieces[local], grid_size=SOURCE_GRID))
+                values = np.atleast_1d(
+                    geos.area(geos.intersection(chunk, pieces[local], grid_size=SOURCE_GRID))
+                )
                 for source, area in zip(local, values, strict=True):
                     areas[members[source]] += area
         areas[()] += max(0, face.area - sum(areas.values()))
-        return max(sorted(areas), key=areas.get)
+        return max(sorted(areas), key=lambda members: areas[members])
 
 
 def precision_candidates(

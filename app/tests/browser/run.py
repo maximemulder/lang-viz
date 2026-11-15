@@ -20,6 +20,7 @@ import urllib.error
 import urllib.request
 from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
+from typing import Any
 
 APP = pathlib.Path(__file__).resolve().parents[2]
 SCENARIOS = json.loads((pathlib.Path(__file__).parent / "scenarios.json").read_text())
@@ -36,7 +37,7 @@ SUPPORTED_LIMITS = {
 }
 
 
-def request(base, method, path, payload=None):
+def request(base, method, path, payload=None) -> Any:
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(
         base + path,
@@ -589,7 +590,7 @@ def main():
         subprocess.run(["npm", "run", "build"], cwd=APP, check=True)
 
     archive = APP / "public/data/language-areas.pmtiles"
-    result = {
+    result: dict[str, Any] = {
         "schemaVersion": 1,
         "environment": {
             "serving": "development" if args.dev else "production",
@@ -624,7 +625,7 @@ def main():
             for scenario in SCENARIOS:
                 if args.scenario and scenario["name"] not in args.scenario:
                     continue
-                case = {"name": scenario["name"], "run": run + 1, "scenario": scenario}
+                case: dict[str, Any] = {"name": scenario["name"], "run": run + 1, "scenario": scenario}
                 result["cases"].append(case)
                 try:
                     open_atlas(browser, origin, terrain=args.terrain, timeout=args.timeout)

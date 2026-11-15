@@ -10,6 +10,7 @@ import shapely as geos
 from shapely import Polygon, box
 from shapely.errors import GEOSException
 from shapely.geometry import shape
+from shapely.geometry.base import BaseGeometry
 
 from pipeline.atlas.topology import (
     Partition,
@@ -87,10 +88,10 @@ def test_shared_junctions_and_small_faces_survive_simplification():
     partition = partition_sources(inputs)
     detailed = simplify_partition(partition, 8)
     coarse = simplify_partition(partition, 0)
-    assert sum(geos.get_num_coordinates(coarse.faces)) < sum(
+    assert np.sum(geos.get_num_coordinates(coarse.faces)) < np.sum(
         geos.get_num_coordinates(detailed.faces)
     )
-    assert not any(geos.is_empty(coarse.faces))
+    assert not np.any(geos.is_empty(coarse.faces))
     assert coarse.memberships == partition.memberships
     validate_coverage(coarse.faces, "test")
     covered = geos.coverage_union_all(
@@ -277,7 +278,7 @@ def test_failed_candidate_cannot_be_masked_by_a_rounded_neighbor(monkeypatch):
         if grid == 1 / 8192:
             if any(g.equals(right) for g in np.atleast_1d(geometry)):
                 raise GEOSException("Forced complex-hole precision failure")
-            if isinstance(geometry, geos.Geometry) and geometry.equals(left):
+            if isinstance(geometry, BaseGeometry) and geometry.equals(left):
                 return box(0.25, 0.25, 0.5, 0.5)
         return native(geometry, grid, **options)
 
@@ -300,7 +301,9 @@ def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
         feature("b", box(0.495, 0.48, 0.52, 0.52)),
     ]
     for record in records:
-        record["properties"].update(dataset_id="test", temporal_view="contemporary")
+        properties = record["properties"]
+        assert isinstance(properties, dict)
+        properties.update(dataset_id="test", temporal_view="contemporary")
     source.write_text("\n".join(json.dumps(f) for f in records) + "\n")
     output, cache = tmp_path / "public", tmp_path / "cache"
     manifest = build(source, output, cache, binary, max_zoom=1)

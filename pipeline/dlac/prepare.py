@@ -13,6 +13,7 @@ import io
 import json
 import re
 from collections import Counter
+from contextlib import closing
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -76,7 +77,7 @@ def read_crosswalk(path: Path, known_languoids: set[str]) -> dict:
     return lookup
 
 
-def convert_record(record: dict, geometry: dict, lookup: dict) -> dict:
+def convert_record(record: dict, geometry: object, lookup: dict) -> dict:
     assignments = []
     inconsistent = bool(record["CHINESE_GR"] and "Han Chinese" not in record["LANGUAGE_F"])
     for key in components(record):
@@ -89,10 +90,10 @@ def convert_record(record: dict, geometry: dict, lookup: dict) -> dict:
                 "included": row["status"] in {"candidate", "source-defined"} and not inconsistent,
             }
         )
-    ids = list(dict.fromkeys(row["languageId"] for row in assignments if row["included"]))
+    ids = list(dict.fromkeys(str(row["languageId"]) for row in assignments if row["included"]))
     codes = list(
         dict.fromkeys(
-            row["glottocode"] for row in assignments if row["included"] and row["glottocode"]
+            str(row["glottocode"]) for row in assignments if row["included"] and row["glottocode"]
         )
     )
     status = (
@@ -138,10 +139,15 @@ def prepare(
         crs = archive.read(f"{stem}.prj").decode()
         if 'GEOGCS["GCS_WGS_1984"' not in crs or "PROJCS[" in crs:
             raise ValueError("DLAC CRS is no longer geographic WGS84")
-        with shapefile.Reader(
-            **{ext: io.BytesIO(archive.read(f"{stem}.{ext}")) for ext in ["shp", "shx", "dbf"]}
+        with closing(
+            shapefile.Reader(
+                shp=io.BytesIO(archive.read(f"{stem}.shp")),
+                shx=io.BytesIO(archive.read(f"{stem}.shx")),
+                dbf=io.BytesIO(archive.read(f"{stem}.dbf")),
+            )
         ) as reader:
             for entry in reader.iterShapeRecords():
+                assert entry.record is not None and entry.shape is not None
                 record = entry.record.as_dict()
                 source_id = record["CH_LANGS_"]
                 if source_id in ids:

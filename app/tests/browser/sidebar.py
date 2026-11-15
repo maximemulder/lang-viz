@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Shared sidebar actions; scenario assertions belong in the browser suites."""
 
+from typing import Any
+
 from run import wait_for
 
 
@@ -60,7 +62,7 @@ def search(browser, query, glottocode):
     )
 
 
-def select_branches(browser, source, center, zoom=4.5, *, settle=True, period="contemporary"):
+def select_branches(browser, source, center, zoom=4.5, *, settle=True, period="contemporary") -> Any:
     view(browser, "explore")
     browser.js(
         "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:arguments[1]})",

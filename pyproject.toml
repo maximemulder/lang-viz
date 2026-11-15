@@ -13,13 +13,26 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "pyproj==3.8.0",
+  "pyrefly==1.4.1",
   "pytest>=8.4.0",
   "ruff>=0.14.0",
+  "types-shapely==2.1.0.20261030",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.pyrefly]
+python-version = "3.12"
+project-includes = ["pipeline/**/*.py", "app/tests/browser/**/*.py", "app/scripts/**/*.py"]
+search-path = [
+  "app/tests/browser",
+  "app/scripts/color-branches",
+  "app/scripts/color-precomputation",
+  "app/scripts/color-refinement",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["pipeline/tests"]

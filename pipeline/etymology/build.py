@@ -93,7 +93,7 @@ def references(value, sources: dict, location: str) -> list[dict]:
         at = f"{location}[{index}]"
         reference = obj(reference, at)
         source = joined(reference.get("FkSourceId"), sources, f"{at}.FkSourceId")
-        record = {"FkSourceId": int(source)}
+        record: dict[str, int | str] = {"FkSourceId": int(source)}
         for field in ("LocationWithinSource", "Note"):
             if field in reference:
                 record[field] = text(reference[field], f"{at}.{field}", optional=True)

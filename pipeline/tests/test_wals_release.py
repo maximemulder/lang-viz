@@ -111,7 +111,11 @@ def test_unsafe_or_incomplete_archives_fail_before_install(package, tmp_path, fa
     pin = release.read_pin(reference)
     archive = reference.parent / release.ASSETS["browser"]
     with tarfile.open(archive) as bundle:
-        members = [(m, bundle.extractfile(m).read()) for m in bundle.getmembers()]
+        members = []
+        for member in bundle.getmembers():
+            extracted = bundle.extractfile(member)
+            assert extracted is not None
+            members.append((member, extracted.read()))
     with tarfile.open(archive, "w:gz") as bundle:
         for member, body in members:
             if fault == "missing" and member.name == "NOTICE.md":

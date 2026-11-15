@@ -2,11 +2,12 @@
 
 import copy
 import unittest
+from typing import Any
 
 from color_evaluation import evaluate_colors
 
 
-def fixture(branches=2):
+def fixture(branches=2) -> tuple[dict[str, Any], dict[str, Any]]:
     ids = [f"b{i}" for i in range(branches)]
     order = ["root"] + [node for b in ids for node in (b, b+"a", b+"b")]
     children = {"root": ids, **{b: [b+"a", b+"b"] for b in ids}}

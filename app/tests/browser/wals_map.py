@@ -11,6 +11,7 @@ import urllib.request
 from collections import Counter
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 from inspection import render_frames
 from run import APP, SCENARIOS, browser_session, wait_for
@@ -24,7 +25,7 @@ def controlled_server(upstream):
     hits = Counter()
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
         def do_GET(self):
@@ -65,6 +66,7 @@ def controlled_server(upstream):
                 response = error
             try:
                 with response:
+                    assert response.status is not None
                     self.send_response(response.status)
                     for key, value in response.headers.items():
                         if key.lower() not in {"connection", "transfer-encoding", "cache-control"}:
@@ -648,7 +650,7 @@ def main():
     )
     if not os.environ.get("WALS_SKIP_BUILD"):
         subprocess.run(["npm", "run", "build"], cwd=APP, check=True)
-    report = {"passed": False, "base": "/lang-viz/"}
+    report: dict[str, Any] = {"passed": False, "base": "/lang-viz/"}
     case = os.environ.get("WALS_CASE")
     if case not in (None, "fixture", "published"):
         raise ValueError("WALS_CASE must be fixture or published when set")

@@ -17,6 +17,7 @@ import io
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Any, cast
 from zipfile import ZipFile
 
 import shapefile
@@ -70,7 +71,9 @@ def assess():
     with ZipFile(ARCHIVE) as archive:
         stem = "ACSN_MajorLanguages_pgn_wgs84"
         reader = shapefile.Reader(
-            **{ext: io.BytesIO(archive.read(f"{stem}.{ext}")) for ext in ["shp", "shx", "dbf"]}
+            shp=io.BytesIO(archive.read(f"{stem}.shp")),
+            shx=io.BytesIO(archive.read(f"{stem}.shx")),
+            dbf=io.BytesIO(archive.read(f"{stem}.dbf")),
         )
         crs = archive.read(f"{stem}.prj").decode()
         records = list(reader.iterShapeRecords())
@@ -85,11 +88,12 @@ def assess():
     unmapped = []
     shared = inconsistent = 0
     for entry in records:
-        record = entry.record.as_dict()
+        assert entry.record is not None and entry.shape is not None
+        record: dict[str, Any] = entry.record.as_dict()
         source_id = str(record["CH_LANGS_"])
         source_ids[source_id] += 1
         legacy_ids[str(record["CH_LANGS_I"])] += 1
-        geometry = shape(entry.shape.__geo_interface__)
+        geometry = shape(cast(dict[str, Any], entry.shape.__geo_interface__))
         if not geometry.is_valid:
             invalid.append({"source_id": source_id, "reason": explain_validity(geometry)})
         # Repair only the analysis copy; retain the original ZIP unchanged.
@@ -196,7 +200,7 @@ def assess():
     }
     project = Transformer.from_crs("EPSG:4326", "EPSG:6933", always_xy=True).transform
     projected = {
-        node: transform(unary_union(by_candidate[node]), project, interleaved=False)
+        node: transform(unary_union(by_candidate[node]), cast(Any, project), interleaved=False)
         for node in compare_ids
     }
     geographic = []
@@ -219,7 +223,9 @@ def assess():
         if not geometries:
             raise ValueError(f"Missing geometry for {variant['id']}")
         existing = transform(
-            unary_union([make_valid(g) for g in geometries]), project, interleaved=False
+            unary_union([make_valid(g) for g in geometries]),
+            cast(Any, project),
+            interleaved=False,
         )
         incoming = projected[node]
         intersection = incoming.intersection(existing).area
@@ -243,7 +249,7 @@ def assess():
         "bbox": bbox,
         "crs": crs,
         "invalid_geometries": invalid,
-        "coordinate_count": sum(len(r.shape.points) for r in records),
+        "coordinate_count": sum(len(r.shape.points) for r in records if r.shape is not None),
         "unique_source_ids": len(source_ids),
         "duplicate_legacy_ids": {k: v for k, v in legacy_ids.items() if v > 1},
         "raw_label_counts": raw_counts,

@@ -13,6 +13,7 @@ from collections import Counter
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 from run import APP, browser_session, wait_for
 
@@ -43,7 +44,7 @@ def measured_server(upstream, slow):
     compressed = gzip.compress((APP / "dist/etymology/word-trails.json").read_bytes(), mtime=0)
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
         def do_GET(self):
@@ -101,7 +102,7 @@ def main():
     parser.add_argument("--base", default="/")
     parser.add_argument("--runs", type=int, default=3)
     args = parser.parse_args()
-    report = {
+    report: dict[str, Any] = {
         "passed": False,
         "browser": None,
         "device": platform.platform(),

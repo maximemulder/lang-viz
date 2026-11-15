@@ -200,7 +200,11 @@ def test_invalid_bundles_are_rejected_before_publication(data, tmp_path, kind):
     reference = package(data, tmp_path / "bundle")
     archive = reference.parent / release.ASSET
     with tarfile.open(archive, "r:gz") as source:
-        members = [(member, source.extractfile(member).read()) for member in source.getmembers()]
+        members = []
+        for member in source.getmembers():
+            extracted = source.extractfile(member)
+            assert extracted is not None
+            members.append((member, extracted.read()))
     with tarfile.open(archive, "w:gz") as bundle:
         for member, contents in members:
             bundle.addfile(member, io.BytesIO(contents))

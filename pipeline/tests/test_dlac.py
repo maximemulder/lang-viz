@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+from contextlib import closing
 from dataclasses import replace
 from zipfile import ZipFile
 
@@ -29,13 +30,13 @@ def dlac_archive(tmp_path, monkeypatch):
         (20, "Han Chinese Languages", "Shaozhou Tuhua"),
         (21, "Han Chinese Languages", "Danzhou Dialect (Unclassified)"),
     ]
-    with shapefile.Writer(str(stem), shapeType=shapefile.POLYGON) as writer:
+    with closing(shapefile.Writer(str(stem), shapeType=shapefile.POLYGON)) as writer:
         writer.field("CH_LANGS_", "N")
         writer.field("CH_LANGS_I", "N")
         writer.field("LANGUAGE_F", "C", size=80)
         writer.field("CHINESE_GR", "C", size=80)
         for source_id, family, group in rows:
-            writer.poly([[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]])
+            writer.poly([[(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (0.0, 0.0)]])
             # The legacy ID intentionally repeats; the unique ID must be used.
             writer.record(source_id, 19, family, group)
     stem.with_suffix(".prj").write_text('GEOGCS["GCS_WGS_1984"]')

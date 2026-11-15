@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise branch refinement and complete-dataset acceleration in the production browser."""
 import json
+from typing import Any
 
 from run import APP, browser_session, check_state, open_atlas, wait_for
 from sidebar import add_selected, open_details, search, select_branches, select_result, view
@@ -9,7 +10,7 @@ from sidebar import add_selected, open_details, search, select_branches, select_
 def main():
     output = APP / "test-results/branches"
     output.mkdir(parents=True, exist_ok=True)
-    results = {}
+    results: dict[str, Any] = {}
     with browser_session(output) as (browser, origin):
         open_atlas(browser, origin)
         try:

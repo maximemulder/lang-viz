@@ -36,7 +36,7 @@ def measured_server(upstream, slow):
     compressed = gzip.compress(raw, mtime=0)
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
         def do_GET(self):
@@ -74,6 +74,7 @@ def measured_server(upstream, slow):
                     }
                 if "text/html" in content_type:
                     body = body.replace(b"<head>", b"<head>" + BOOTSTRAP, 1)
+            assert status is not None
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))

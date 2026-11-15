@@ -2,6 +2,7 @@
 """Check source-defined entries against the production catalog and vector archive."""
 
 import json
+from typing import Any
 
 from run import APP, browser_session, open_atlas, wait_for
 from sidebar import add_selected, clear_selection, open_details, search, view
@@ -10,7 +11,7 @@ from sidebar import add_selected, clear_selection, open_details, search, view
 def main():
     output = APP / "test-results/source-languoids"
     output.mkdir(parents=True, exist_ok=True)
-    results = {}
+    results: dict[str, Any] = {}
     cases = [
         ("tibeto-burman", "Tibeto-Burman Languages", [91, 32], 4.5),
         ("shaozhou-tuhua", "Shaozhou Tuhua", [112.3, 25.8], 6),

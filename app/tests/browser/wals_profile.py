@@ -11,6 +11,7 @@ import urllib.request
 from collections import Counter
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 from run import APP, browser_session, wait_for
 from sidebar import add_selected, open_details, search
@@ -22,7 +23,7 @@ def controlled_server(upstream):
     hits = Counter()
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
         def do_GET(self):
@@ -50,6 +51,7 @@ def controlled_server(upstream):
             except urllib.error.HTTPError as error:
                 response = error
             with response:
+                assert response.status is not None
                 self.send_response(response.status)
                 for key, value in response.headers.items():
                     if key.lower() in {
@@ -164,7 +166,7 @@ def fixture_checks(output):
         cwd=APP,
     )
     (artifact / "wals/features.json").write_bytes(fixture)
-    report = {"checks": []}
+    report: dict[str, Any] = {"checks": []}
     with (
         browser_session(output / "fixture", out_dir=artifact) as (browser, upstream),
         controlled_server(upstream) as (origin, control, hits),
@@ -304,7 +306,7 @@ def fixture_checks(output):
 def production_checks(output):
     if not os.environ.get("WALS_SKIP_BUILD"):
         subprocess.run(["npm", "run", "build"], cwd=APP, check=True)
-    report = {"checks": []}
+    report: dict[str, Any] = {"checks": []}
     with (
         browser_session(output / "production") as (browser, upstream),
         controlled_server(upstream) as (origin, _control, hits),
@@ -511,7 +513,7 @@ def main():
     os.environ["GITHUB_PAGES"] = "true"
     output = APP / "test-results/wals-04"
     output.mkdir(parents=True, exist_ok=True)
-    report = {"passed": False, "base": "/lang-viz/"}
+    report: dict[str, Any] = {"passed": False, "base": "/lang-viz/"}
     try:
         report["fixture"] = fixture_checks(output)
         report["production"] = production_checks(output)
