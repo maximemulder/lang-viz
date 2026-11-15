@@ -126,6 +126,30 @@ documented in the [frontend guide](app/README.md#wals-profile-features).
 Workers or sharding require evidence from slower devices; the local acceptance
 measurements and their limits are in [the handoff](WALS_PORT_PLAN.md).
 
+Administrative language statistics use a separate CLDR supplement rather than
+the atlas catalog schema. `pipeline/administrative/` restores a pinned joined
+CSV and Glottolog CLDF snapshot, verifies their hashes, and builds a versioned
+`observations.json` with source territory and language IDs. The original CLDR
+release and joined CSV producer are unknown and are disclosed in the asset.
+`pipeline/administrative/boundaries/` independently restores a pinned Natural
+Earth 4.1.0 / world-atlas 2.0.2 topology and builds a reviewed territory
+crosswalk plus feature index. Boundary IDs, representative points, and
+political viewpoint do not enter the observations asset. The ordinary Pages
+workflow validates both packages before the frontend build; generated browser
+assets are ignored by Git and excluded from Biome formatting.
+
+In the browser, `features/administrative/` owns the lazy data repository,
+selectors, session, panel, and optional boundary layer. `GeographyExplorations`
+mounts the independent layer in the persistent `WorldMap` and supplies a small
+area-picker adapter. The header selects Geography or Administrative without
+remounting the map. Borders default off and polygon hit targets are unmounted
+with them; Language / Area picks one interaction owner. The map settings offer
+only physical backgrounds without political labels. This release has one
+boundary viewpoint and no client-country signal; a future alternate view needs
+its own reviewed geometry/crosswalk and a passive host-supplied country code.
+See [the administrative feature contract](app/src/features/administrative/README.md)
+and [the port handoff](ADMINISTRATIVE_LANGUAGE_PORT_PLAN.md).
+
 Word histories use an independent lexical schema and release pin
 (`etymology-release.json`). The geographic catalog IDs and lexical numeric IDs
 remain separate. `pipeline.etymology.data_release` restores a prebuilt browser

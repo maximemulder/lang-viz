@@ -36,6 +36,7 @@ npm run test:catalog-browser
 npm run test:selection-browser
 npm run test:focus-browser
 npm run test:explorer-navigation-browser
+npm run test:administrative-browser
 npm run test:etymology-browser
 npm run test:word-trail-browser
 npm run test:coverage-selection-browser
@@ -52,6 +53,14 @@ npm run test:inspection-browser -- --dev
 npm run build && uv run python -m tests.browser.dropdowns
 npm run build && uv run python -m tests.browser.stripes
 ```
+
+`test:administrative-browser` runs the administrative interaction checks in the
+development app. To check the deployed asset paths, first run
+`GITHUB_PAGES=true npm run build`, then
+`GITHUB_PAGES=true uv run python -m tests.browser.administrative --production`.
+This checks the same boundary and CLDR assets in the Pages-base build, including
+load/retry failures, map controls, both projections, four basemaps, and a narrow
+Firefox layout.
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, and existing npm
 dependencies. Atlas checks also require generated data under `public/data/`. The runner uses

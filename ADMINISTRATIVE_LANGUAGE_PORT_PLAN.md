@@ -1,6 +1,6 @@
 # Administrative language visualization port plan
 
-Last updated: 2026-11-15. ADM-00 through ADM-05 implementation recorded below.
+Last updated: 2026-11-15. ADM-00 through ADM-06 implementation recorded below.
 
 Integrate the useful CLDR language and territory statistics from
 `origin/aastha/speaker-stats` into the current geography workspace. Keep the
@@ -9,8 +9,7 @@ codes identify statistical records, while a separately versioned boundary source
 determines how, or whether, those records appear as geographic areas. Borders are
 off by default. The existing language visualization remains the default view.
 
-This is an implementation plan, not a record of completed integration. Update
-each item with its decisions and validation results as work proceeds.
+This plan also records the completed integration and its validation results.
 
 ## Baseline and scope
 
@@ -97,15 +96,14 @@ delivery, and large `CldrMapView` component before integrating them.
 | --- | --- | --- | --- |
 | ADM-00 | Refresh baseline and audit the branch data | — | Audited; lineage and geometry gaps documented |
 | ADM-01 | Reproducible CLDR supplement and provenance | ADM-00 | Implemented; source release remains unknown |
-| ADM-02 | Boundary package and explicit territory crosswalk | ADM-00 | Implemented; UI integration remains ADM-05 |
-| ADM-03 | Independent repository, domain model, and state | ADM-01 | Implemented; panel integration remains ADM-04 |
-| ADM-04 | Administrative header view and sidebar details | ADM-03 | Implemented; map controls remain ADM-05 |
-| ADM-05 | Optional map layers and top-left controls | ADM-02, ADM-03, ADM-04 | Planned |
-| ADM-06 | Delivery, regression, and documentation | ADM-01–ADM-05 | Planned |
+| ADM-02 | Boundary package and explicit territory crosswalk | ADM-00 | Implemented |
+| ADM-03 | Independent repository, domain model, and state | ADM-01 | Implemented |
+| ADM-04 | Administrative header view and sidebar details | ADM-03 | Implemented |
+| ADM-05 | Optional map layers and top-left controls | ADM-02, ADM-03, ADM-04 | Implemented |
+| ADM-06 | Delivery, regression, and documentation | ADM-01–ADM-05 | Implemented |
 
-Each item should be independently reviewable and leave main buildable. Keep
-ADM-04 behind an unavailable/loading state until its data is delivered; do not
-expose controls that depend on missing assets.
+Each item is independently reviewable and leaves main buildable. Administrative
+data errors stay local to the panel or boundary layer.
 
 ### ADM-00 — Refresh the baseline and audit data
 
@@ -306,7 +304,27 @@ administrative header view remains useful with borders off; switching boundary
 views does not change statistical values; deployment serves the same validated
 assets used by the checks.
 
-## Decisions to settle before the map stage
+ADM-06 result (2026-11-15): the ordinary Pages workflow restores pinned input
+snapshots, builds and verifies `observations.json`, then restores, builds and
+verifies the three independent boundary assets before the frontend build. A
+Pages-base production build contains the same four validated administrative
+files; their bytes match the files in `app/public/administrative/`. Biome excludes
+these generated JSON/TopoJSON files, as it already does other generated assets.
+The 15 administrative pipeline tests and all 317 frontend unit tests pass;
+frontend typecheck, Biome check, and Pages build pass. Firefox checks pass against
+the built Pages app: initial borders off and language inspection, lazy geometry,
+exclusive area picking, source-specific no-match behavior, CLDR and boundary
+fetch failure/retry, metric fill, header persistence, both projections, keyboard
+border control, narrow layout, and border-off behavior across all four physical
+basemaps. The browser check uses a 500 px Firefox viewport; a physical phone was
+not tested.
+
+Only one boundary view ships, so statistical invariance when changing views is
+supported by the separate data contract and crosswalk tests, not an end-to-end
+view-switch check. The source CLDR release and joined CSV transformation remain
+unverified; 20 area codes have no geometry and one is ambiguous in this view.
+
+## Map-stage decisions and future choices
 
 - Which boundary source and disputed-area policy should be the first shipped
   view? The code should permit alternatives without changing CLDR data.

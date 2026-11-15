@@ -681,7 +681,15 @@ separate, ignored browser assets restored during deployment. The
 record 230 matched, one ambiguous, and 20 unmatched CLDR territories. This
 opt-in view reflects Natural Earth's political choices; its geometry IDs and
 representative points never enter the CLDR observations. The browser gets a
-source topology, reviewed crosswalk, and feature index for the later map UI.
+source topology, reviewed crosswalk, and feature index for the map UI. Both the
+CLDR supplement and boundary view are restored and validated in the ordinary
+Pages deployment before building the browser app. The 20 unmatched and one
+ambiguous codes remain searchable without a polygon or metric fill. There is
+one source viewpoint and no alternative country-specific border package or
+host-supplied client location signal. The map defaults to borders off, and all
+source outlines use the same style when enabled. The 500 px Firefox production
+check covers both projections and all four basemap modes; a physical phone was
+not tested.
 
 ---
 

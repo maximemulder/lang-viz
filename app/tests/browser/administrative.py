@@ -10,6 +10,7 @@ from .run import APP, browser_session, wait_for
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=APP / "test-results/administrative")
+    parser.add_argument("--production", action="store_true", help="Use the built Pages app")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     boundary_assets = APP / "public/administrative/boundaries"
@@ -18,8 +19,9 @@ def main():
     nl_feature = next(item for item in crosswalk["territories"] if item["code"] == "NL")["featureIds"][0]
     nl_point = next(item for item in feature_index["features"] if item["featureId"] == nl_feature)["point"]
     report = {"passed": False, "checks": []}
-    with browser_session(args.output, dev=True) as (browser, origin):
-        browser.call("POST", "/url", {"url": origin + "/?overlap-test"})
+    with browser_session(args.output, dev=not args.production) as (browser, origin):
+        path = "/lang-viz/" if args.production else "/"
+        browser.call("POST", "/url", {"url": origin + path + "?overlap-test"})
 
         def js(script, *args):
             return browser.js(script, *args)
@@ -66,7 +68,18 @@ def main():
             report["checks"].append("default borders off and language hover")
             button("On map", ".language-tabs")
             js("window.savedAdministrativeMap = document.querySelector('.maplibregl-canvas')")
+            js("""window.administrativeFetch = window.fetch;
+window.fetch = (...args) => {
+  if (String(args[0]).endsWith('/administrative/observations.json')) {
+    window.fetch = window.administrativeFetch;
+    return Promise.resolve(new Response('', {status: 503}));
+  }
+  return window.administrativeFetch(...args);
+}""")
             button("Administrative", ".workspace-nav")
+            wait_for(lambda: js("return !!document.querySelector('.administrative-panel__status[role=alert]')"), 30, "failed CLDR load")
+            assert js("return window.savedAdministrativeMap === document.querySelector('.maplibregl-canvas')")
+            button("Retry data load", ".administrative-panel__status")
             wait_for(
                 lambda: js("return !!document.querySelector('.administrative-results button')"),
                 30,
@@ -85,7 +98,18 @@ def main():
             click_geo([6.2, 53.1])
             assert not js("return !!document.querySelector('.administrative-detail')")
             report["checks"].append("border-off area picker ignores polygon interiors")
+            js("""window.administrativeFetch = window.fetch;
+window.fetch = (...args) => {
+  if (String(args[0]).endsWith('/geometry.topojson')) {
+    window.fetch = window.administrativeFetch;
+    return Promise.resolve(new Response('', {status: 503}));
+  }
+  return window.administrativeFetch(...args);
+}""")
             js("document.querySelector('.map-area-controls__borders').click()")
+            wait_for(lambda: js("return !!document.querySelector('.administrative-map-legend [role=alert]')"), 30, "failed boundary load")
+            assert not js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-polygon-hits']).length")
+            button("Retry", ".administrative-map-legend")
             wait_for(lambda: js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.topojson'))"), 30, "boundary topology")
             wait_for(lambda: js("return !document.querySelector('.administrative-map-legend')?.textContent.includes('Loading boundary geometry')"), 30, "boundary rendering")
             assert "Natural Earth 4.1.0" in js("return document.querySelector('.administrative-map-legend').textContent")
@@ -98,6 +122,14 @@ def main():
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='NL'&&h.properties.metricValue>0)"), 15, "matched metric fill")
             report["checks"].append("opt-in boundaries and metric control")
+
+            type_query("XK")
+            wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='XK')"), 10, "unmatched area search")
+            select_code("XK")
+            assert js("return document.querySelector('.administrative-focus').disabled")
+            assert "no matched polygon" in js("return document.querySelector('.administrative-map-legend').textContent")
+            report["checks"].append("ambiguous territory remains searchable without a polygon")
+            button("Areas", ".administrative-search-kind")
 
             type_query("NL")
             wait_for(
@@ -175,6 +207,26 @@ def main():
                 "Russia polygon on globe",
             )
             report["checks"].append("date-line boundary renders in Mercator and globe")
+            browser.call("POST", "/window/rect", {"width": 500, "height": 850})
+            wait_for(lambda: js("return window.innerWidth <= 600"), 10, "narrow viewport")
+            assert js("return [...document.querySelectorAll('.map-settings__toolbar button')].every(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth})")
+            assert js("return !!document.querySelector('.administrative-results button')")
+            border = browser.call("POST", "/element", {"using": "css selector", "value": ".map-area-controls__borders"})["element-6066-11e4-a52e-4f735466cecf"]
+            browser.call("POST", f"/element/{border}/value", {"text": "\ue007"})
+            assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "false"
+            assert not js("return window.overlapTest.queryLayers([100,60],['administrative-polygon-hits']).length")
+            language = browser.call("POST", "/element", {"using": "css selector", "value": ".map-area-controls__inspect button:first-of-type"})["element-6066-11e4-a52e-4f735466cecf"]
+            browser.call("POST", f"/element/{language}/value", {"text": "\ue007"})
+            assert js("return document.querySelector('.map-area-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
+            area = browser.call("POST", "/element", {"using": "css selector", "value": ".map-area-controls__inspect button:last-child"})["element-6066-11e4-a52e-4f735466cecf"]
+            browser.call("POST", f"/element/{area}/value", {"text": "\ue007"})
+            assert js("return document.querySelector('.map-area-controls__inspect button:last-child').getAttribute('aria-pressed')") == "true"
+            report["checks"].append("narrow layout and keyboard map controls")
+            for background in ("minimal", "biomes", "terrain", "satellite"):
+                js("document.querySelector('input[name=map-background][value='+arguments[0]+']').click()", background)
+                assert js("return document.querySelector('input[name=map-background][value='+arguments[0]+']').checked", background)
+                assert not js("return window.overlapTest.queryLayers([100,60],['administrative-polygon-hits']).length")
+            report["checks"].append("all backgrounds keep borders off without polygon hit targets")
             report["passed"] = True
         except Exception as error:
             report["error"] = str(error)
