@@ -668,6 +668,16 @@ See [the audit, provenance, limitations, and build instructions](pipeline/admini
 The ignored browser output is built and verified separately before deployment.
 It contains no political boundary geometry.
 
+### 7.1 Optional boundary view
+
+ADM-02 packages `world-atlas` 2.0.2 / Natural Earth 4.1.0 Admin-0 1:50m as
+separate, ignored browser assets restored during deployment. The
+[pinned source, explicit 251-code crosswalk, audit, and reproduction guide](pipeline/administrative/boundaries/README.md)
+record 230 matched, one ambiguous, and 20 unmatched CLDR territories. This
+opt-in view reflects Natural Earth's political choices; its geometry IDs and
+representative points never enter the CLDR observations. The browser gets a
+source topology, reviewed crosswalk, and feature index for the later map UI.
+
 ---
 
 ## 8. Candidates (not downloaded; figures to verify)

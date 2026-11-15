@@ -1,0 +1,24 @@
+{
+  "viewId": "natural-earth-4.1.0-world-atlas-2.0.2-50m",
+  "worldview": "Natural Earth 4.1.0 Admin-0 countries, as distributed by world-atlas 2.0.2. This source makes its own de facto political boundary choices; the view is opt-in and is not a neutral definition of CLDR territories.",
+  "worldAtlas": {
+    "version": "2.0.2",
+    "archiveUrl": "https://registry.npmjs.org/world-atlas/-/world-atlas-2.0.2.tgz",
+    "archiveIntegritySha512": "IXfV0qwlKXpckz1FhwXVwKRjiIhOnWttOskm5CtxMsjgE/MXAYRHWJqgXOpM8IkcPBoXnyTU5lFHcYa5ChG0LQ==",
+    "path": "package/countries-50m.json",
+    "featureCount": 241,
+    "bytes": 756420,
+    "sha256": "04342cdc1e3016bcd7db1630de95684d67b79fe3c8c460321e87aef469502394",
+    "license": "ISC",
+    "naturalEarthVersion": "4.1.0",
+    "naturalEarthLicense": "public domain"
+  },
+  "iso3166": {
+    "version": "2.1.1",
+    "archiveUrl": "https://registry.npmjs.org/iso-3166-1/-/iso-3166-1-2.1.1.tgz",
+    "archiveIntegritySha512": "RZxXf8cw5Y8LyHZIwIRvKw8sWTIHh2/txBT+ehO0QroesVfnz3JNFFX4i/OC/Yuv2bDIVYrHna5PMvjtpefq5w==",
+    "bytes": 7035,
+    "sha256": "cb932292e5f0acf38a82e3a3f05f03b6858828c835f494b653e14c6a0e1f737c",
+    "license": "MIT"
+  }
+}

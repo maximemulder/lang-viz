@@ -56,6 +56,14 @@ jobs:
           uv run python -m pipeline.administrative.build build
           uv run python -m pipeline.administrative.build verify
 
+      - name: Restore and validate optional administrative boundary view
+        run: |
+          uv run python -m pipeline.administrative.boundaries.sources restore
+          uv run python -m pipeline.administrative.boundaries.sources verify
+          uv run python -m pipeline.administrative.boundaries.build build
+          uv run python -m pipeline.administrative.boundaries.build verify
+          uv run pytest -q pipeline/tests/test_administrative_boundaries.py
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

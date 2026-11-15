@@ -120,6 +120,10 @@ numeric strings and identifiers are retained exactly. `languageAssociations`
 hold the verified source-code-to-Glottocode join; `atlasAssociations` explicitly
 remain unresolved for ADM-03. No boundary IDs or shapes appear in this asset.
 
+ADM-02 now has its own [boundary package and crosswalk](boundaries/README.md).
+It produces separate opt-in browser assets without changing this observation
+export.
+
 Attribution: Unicode CLDR data are offered under the
 [Unicode License v3](https://github.com/unicode-org/cldr/blob/main/LICENSE);
 Glottolog CLDF is [CC BY 4.0](https://github.com/glottolog/glottolog-cldf).

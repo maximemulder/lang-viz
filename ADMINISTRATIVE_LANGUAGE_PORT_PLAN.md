@@ -1,6 +1,6 @@
 # Administrative language visualization port plan
 
-Last updated: 2026-11-15. ADM-00/01 audit and supplement implementation recorded below.
+Last updated: 2026-11-15. ADM-00 through ADM-02 implementation recorded below.
 
 Integrate the useful CLDR language and territory statistics from
 `origin/aastha/speaker-stats` into the current geography workspace. Keep the
@@ -97,7 +97,7 @@ delivery, and large `CldrMapView` component before integrating them.
 | --- | --- | --- | --- |
 | ADM-00 | Refresh baseline and audit the branch data | — | Audited; lineage and geometry gaps documented |
 | ADM-01 | Reproducible CLDR supplement and provenance | ADM-00 | Implemented; source release remains unknown |
-| ADM-02 | Boundary package and explicit territory crosswalk | ADM-00 | Planned |
+| ADM-02 | Boundary package and explicit territory crosswalk | ADM-00 | Implemented; UI integration remains ADM-05 |
 | ADM-03 | Independent repository, domain model, and state | ADM-01 | Planned |
 | ADM-04 | Administrative header view and sidebar details | ADM-03 | Planned |
 | ADM-05 | Optional map layers and top-left controls | ADM-02, ADM-03, ADM-04 | Planned |
@@ -165,6 +165,16 @@ building the app. ADM-02 still owns the complete boundary crosswalk audit.
 
 Acceptance: swapping the boundary asset or view changes geometry and map
 attribution, not CLDR observation values or IDs.
+
+ADM-02 result: [the boundary-view audit and build guide](pipeline/administrative/boundaries/README.md)
+records the pinned `world-atlas` 2.0.2 / Natural Earth 4.1.0 topology,
+the independent 251-territory crosswalk, 241 geometry features and their
+representative points, explicit unmatched/ambiguous cases, and basemap audit.
+The geometry, crosswalk, and index are separate ignored browser assets restored
+in deployment. No CLDR values or IDs change when the boundary view is built.
+The source does not include disputed-segment metadata; ADM-05 can flag
+viewpoint-sensitive areas but cannot draw a distinct line for every dispute
+from this package alone.
 
 ### ADM-03 — Add the administrative feature model
 
