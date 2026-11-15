@@ -8,7 +8,6 @@ import io
 import json
 import tarfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -246,7 +245,7 @@ def test_partial_coordinate_diagnosed_invalid_half_not_hidden(tmp_path, rows):
         build.compile_data(fixture_directory(tmp_path, rows), pinned=False)
 
 
-def test_determinism_atomic_failure_and_content_validation(tmp_path, rows):
+def test_determinism_atomic_failure_and_content_validation(tmp_path, rows, monkeypatch):
     directory = fixture_directory(tmp_path / "inputs", rows)
     output = tmp_path / "bundle.json"
     build.build(directory, output, pinned=False)
@@ -262,11 +261,14 @@ def test_determinism_atomic_failure_and_content_validation(tmp_path, rows):
     assert old.pop("provenance") != new.pop("provenance")
     assert old == new
     before = output.read_bytes()
-    with (
-        patch.object(build.os, "replace", side_effect=OSError("replacement failure")),
-        pytest.raises(OSError, match="replacement failure"),
-    ):
-        build.write_json(output, {"changed": True})
+
+    def fail_replace(*_args):
+        raise OSError("replacement failure")
+
+    with monkeypatch.context() as patcher:
+        patcher.setattr(build.os, "replace", fail_replace)
+        with pytest.raises(OSError, match="replacement failure"):
+            build.write_json(output, {"changed": True})
     assert output.read_bytes() == before
     assert not list(tmp_path.glob(".bundle.json-*"))
     (directory / "cldf/sources.bib").write_text("malformed")
@@ -360,12 +362,12 @@ def test_restore_failure_is_atomic(tmp_path, failure):
     assert not list(tmp_path.glob(".restored-*"))
 
 
-def test_missing_pin_and_no_implicit_download(tmp_path, rows):
+def test_missing_pin_and_no_implicit_download(tmp_path, rows, monkeypatch):
     directory = fixture_directory(tmp_path, rows)
-    with (
-        patch.object(sources.urllib.request, "urlopen", side_effect=AssertionError("network")),
-        pytest.raises(ValueError, match="mismatch"),
-    ):
+    monkeypatch.setattr(
+        sources.urllib.request, "urlopen", lambda *_a, **_k: pytest.fail("must not download")
+    )
+    with pytest.raises(ValueError, match="mismatch"):
         build.compile_data(directory)
 
 

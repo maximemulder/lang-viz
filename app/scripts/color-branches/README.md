@@ -105,7 +105,7 @@ saved alongside the palettes. Generated artifacts are ignored by git.
 
 ```sh
 node --test --test-isolation=none tests/color-branches.test.ts tests/color-refinement-experiment.test.ts
-python3 -m unittest tests.browser.test_color_evaluation tests.browser.test_local_color_evaluation
+uv run --project .. --locked pytest -q tests/browser/test_color_evaluation.py tests/browser/test_local_color_evaluation.py
 ```
 
 The independent evaluator uses exhaustive nearby comparisons on the captured

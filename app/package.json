@@ -16,7 +16,7 @@
     "test:selection-browser": "npm run build && python3 -m tests.browser.selection",
     "test:focus-browser": "npm run build && python3 -m tests.browser.focus",
     "test:prepared-colors-browser": "npm run build && python3 -m tests.browser.prepared_colors",
-    "test:colors-browser": "python3 -m unittest tests.browser.test_color_evaluation && npm run build && python3 -m tests.browser.colors",
+    "test:colors-browser": "uv run --project .. --locked pytest -q tests/browser/test_color_evaluation.py && npm run build && python3 -m tests.browser.colors",
     "evaluate:colors": "python3 -m tests.browser.color_evaluation",
     "test:source-browser": "npm run build && python3 -m tests.browser.source_languoids",
     "test:geometry-browser": "npm run build && python3 -m tests.browser.geometry",

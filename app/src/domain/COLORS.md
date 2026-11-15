@@ -377,7 +377,7 @@ npm run evaluate:colors -- --input test-results/colors/asher-world-input.json \
 
 Omit `--palette` to evaluate the stable reference on the same footprints. Run the
 measurement unit tests alone with
-`python3 -m unittest tests.browser.test_color_evaluation`.
+`uv run --project .. --locked pytest -q tests/browser/test_color_evaluation.py`.
 
 The grid approximates area and contact: same-cell occupancy does not prove polygon
 overlap, thin shapes can occupy a disproportionately large fraction of a cell, and
@@ -475,7 +475,7 @@ Reproduce from `app/`, after obtaining the three saved browser captures:
 ```sh
 node scripts/color-refinement/run.mjs
 python3 -m scripts.color-refinement.local_evaluation test-results/color-refinement
-python3 -m unittest tests.browser.test_color_evaluation tests.browser.test_local_color_evaluation
+uv run --project .. --locked pytest -q tests/browser/test_color_evaluation.py tests/browser/test_local_color_evaluation.py
 ```
 
 Optionally run `python3 -m scripts.color-refinement.render` with a production build,
