@@ -157,8 +157,9 @@ building the app. ADM-02 still owns the complete boundary crosswalk audit.
 - Maintain a versioned CLDR-code-to-boundary-feature crosswalk with explicit
   match, ambiguous, and unmatched outcomes. Keep crosswalk decisions separate
   from statistics and geometry files.
-- Make disputed segments or areas visually distinct when supported. Do not
-  silently color ambiguous polygons with one territory's metric.
+- Use one visual style for all boundary outlines; disclose the source viewpoint
+  and relevant disputed-area notes in the legend or details. Do not silently
+  color ambiguous polygons with one territory's metric.
 - Verify the current plain, biomes, terrain, and satellite backgrounds do not
   inject political lines or labels while borders are off. Replace or constrain
   a background if that guarantee does not hold.
@@ -247,10 +248,11 @@ state, URL switching, and persistence of the map canvas.
   targets visible markers only; with borders on, it may target visible polygons.
   Do not leave a transparent, politically meaningful hit layer active when
   borders are off.
-- Draw boundary lines and, only when a metric is selected, eligible fills from
-  the chosen boundary package. Keep dispute/no-data styling and attribution
-  visible. A territory selection may highlight its shape only while borders
-  are on; otherwise identify it via its marker and administrative sidebar.
+- Draw boundary lines with one outline style and, only when a metric is selected,
+  eligible fills from the chosen boundary package. Keep source viewpoint and
+  no-data explanations visible. A territory selection may highlight its shape
+  only while borders are on; otherwise identify it via its marker and
+  administrative sidebar.
 - Keep the main language overlays and their data state independent. If both
   visualizations are visible, use explicit layer order and opacity so neither
   appears to be the other's geographic evidence.
@@ -266,8 +268,8 @@ borders or area hover. The pinned Natural Earth 4.1.0 / world-atlas 2.0.2
 topology is fetched only with Borders on. Matched polygons receive outlines,
 selected territory highlights, and optional fills for reported population,
 territory literacy, a selected language estimate, or a selected family estimate
-sum. Unassigned source shapes have distinct gray outlines; reviewed sensitive
-matches have orange outlines and source notes. Ambiguous/unmatched CLDR codes
+sum. All source shapes have the same outline color and width; reviewed sensitive
+matches retain source notes. Ambiguous/unmatched CLDR codes
 stay available in the sidebar without a fill or marker. The legend and map
 attribution name the boundary source and its viewpoint. Area hover/click uses
 visible markers with borders off, and matched polygons with borders on; the
@@ -278,8 +280,13 @@ a reviewed representative point and is disabled for unmatched codes.
 
 The chosen first view and policy are the ADM-02 reviewed crosswalk. Markers
 appear automatically in Administrative; no diversity formula or inferred
-user-location viewpoint is included. Focused boundary decoding and crosswalk
-tests plus Firefox pointer checks cover marker-only and polygon selection,
+user-location viewpoint is included. The current static deployment has neither
+alternative boundary packages nor a passive client-country signal, so it uses
+the pinned source view for every client. A future host-supplied country code
+could select a separately reviewed alternative view when both are available;
+it must not trigger a geolocation prompt or use browser language as location.
+Focused boundary decoding and crosswalk tests plus Firefox pointer checks cover
+marker-only and polygon selection,
 opt-in topology fetching, metric fill, and persistent controls. ADM-06 retains
 the broader data/deployment and basemap/error/mobile verification work.
 
@@ -309,6 +316,7 @@ assets used by the checks.
 - Should area markers appear automatically when the Administrative header view
   opens, or only after a territory/metric is selected? Either behavior must keep the
   default language map unchanged on initial load.
-- Should a future viewpoint suggestion use the user's chosen setting or an
-  explicitly opted-in location signal? Do not silently infer a political view
-  from IP address or browser language.
+- If a future deployment supplies a passive client-country signal, define the
+  supported country-to-view mapping against separately reviewed boundary
+  packages. Fall back to the documented source view when either is missing;
+  never request browser geolocation or infer location from browser language.

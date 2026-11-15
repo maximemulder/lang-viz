@@ -16,9 +16,13 @@ areas](https://www.naturalearthdata.com/downloads/50m-cultural-vectors/50m-admin
 `world-atlas` preserves country names and ISO numeric IDs where available, but
 it does not carry a separate disputed-segment layer. This view must be labeled
 as **Natural Earth 4.1.0 / world-atlas 2.0.2**, with borders off by default.
-The crosswalk flags viewpoint-sensitive territory associations; ADM-05 must
-make those visible in the legend or inspection UI. It must not claim that all
-disputes can be shown as distinct lines with this source.
+The crosswalk flags viewpoint-sensitive territory associations. The map uses
+one outline style for all features, identifies the source viewpoint in its
+legend, and shows relevant crosswalk notes when a territory is selected. It
+must not claim that all disputes can be shown as distinct lines with this
+source. This package contains no alternative country-specific border view.
+The static GitHub Pages deployment supplies no client-country signal, so the
+map cannot make a location-aware view choice at present.
 
 ## Explicit association policy
 

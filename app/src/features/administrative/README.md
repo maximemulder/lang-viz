@@ -45,10 +45,20 @@ panel is visible.
 from the separate ADM-02 package on first Administrative view or area hover.
 It fetches and decodes the pinned TopoJSON only when Borders is enabled. The
 boundary package never alters CLDR observations. `BoundaryLayer.tsx` renders
-markers, opt-in outlines and eligible metric fills, plus source and dispute
-notes. Geometry selection and a focus request require an explicit matched
-crosswalk entry; ambiguous or unmatched CLDR areas remain searchable without
-a shape. Fetch failures stay within this optional layer and can be retried.
+markers, opt-in outlines and eligible metric fills, plus source and viewpoint
+notes. Every outline uses the same paint, regardless of whether its association
+is viewpoint-sensitive or has no matched CLDR area. Geometry selection and a
+focus request require an explicit matched crosswalk entry; ambiguous or
+unmatched CLDR areas remain searchable without a shape. Fetch failures stay
+within this optional layer and can be retried.
+
+The current boundary package contains only one Natural Earth view. The static
+GitHub Pages deployment has no client-country signal, so it always renders that
+view. A future location-aware choice requires separately reviewed alternative
+geometry and crosswalk packages plus a country signal supplied to the app by
+its host. The app must not request browser geolocation or treat browser language
+as a reliable country location. A missing or unsupported signal uses the
+documented source view; it must never silently reassign CLDR observations.
 
 `GeographyExplorations` owns the optional layer and supplies a small generic
 interaction adapter to `WorldMap`. The map host chooses exactly one pointer

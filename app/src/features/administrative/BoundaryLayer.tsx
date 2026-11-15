@@ -179,16 +179,8 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             id="administrative-boundary-lines"
             type="line"
             paint={{
-              'line-color': [
-                'match',
-                ['get', 'status'],
-                'sensitive',
-                '#a76a39',
-                'unassigned',
-                '#999793',
-                '#566b66',
-              ],
-              'line-width': ['match', ['get', 'status'], 'sensitive', 1.5, 0.8],
+              'line-color': '#566b66',
+              'line-width': 0.8,
               'line-opacity': 0.78,
             }}
           />
@@ -246,7 +238,9 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             <>
               {!filledGeometry && !error && <span>Loading boundary geometry…</span>}
               <span>Natural Earth 4.1.0 / world-atlas 2.0.2 boundaries · source viewpoint</span>
-              <span>Orange lines: viewpoint-sensitive matches. Gray: no matched CLDR area.</span>
+              <span>
+                Boundaries reflect this source's viewpoint. Some shapes have no matched CLDR area.
+              </span>
               {metricLabel && (
                 <span>
                   Teal fill: {metricLabel}, relative to the largest matched value (
