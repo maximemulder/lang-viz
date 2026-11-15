@@ -13,10 +13,10 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from inspection import render_frames
-from run import APP, SCENARIOS, browser_session, wait_for
-from sidebar import open_details, search
-from wals_profile import click_text, key, record, select
+from .inspection import render_frames
+from .run import APP, SCENARIOS, browser_session, wait_for
+from .sidebar import open_details, search
+from .wals_profile import click_text, key, record, select
 
 
 @contextmanager

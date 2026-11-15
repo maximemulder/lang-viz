@@ -1,5 +1,8 @@
 # Browser overlap checks and measurements
 
+Browser checks and their shared helpers are Python modules under `tests.browser`.
+Run checks from `app/` with `python3 -m tests.browser.<module>` or the npm scripts.
+
 The WALS final acceptance/handoff is recorded in the
 [port roadmap](../../../WALS_PORT_PLAN.md). After restoring all three pinned
 browser datasets, `npm run measure:wals-browser` builds the production
@@ -13,7 +16,7 @@ completion is outside overlay-paint timing. Timer gaps include unrelated map/GC
 work and are not Long Tasks API results.
 
 To reuse an existing production build, run
-`python3 tests/browser/wals_performance.py --runs 3`; `--output` selects the
+`python3 -m tests.browser.wals_performance --runs 3`; `--output` selects the
 evidence directory (default `test-results/wals-07/performance/`). The report
 contains environment/capabilities, payload hash and compressed/decoded sizes,
 resource timings, loader preparation phases, no-eager-load/cache assertions,
@@ -46,8 +49,8 @@ npm run test:coverage-browser
 npm run test:branch-browser
 npm run test:parts-browser
 npm run test:inspection-browser -- --dev
-npm run build && python3 tests/browser/dropdowns.py
-npm run build && python3 tests/browser/stripes.py
+npm run build && python3 -m tests.browser.dropdowns
+npm run build && python3 -m tests.browser.stripes
 ```
 
 Requires Python **3.11+**, Firefox, and geckodriver on `PATH`, and existing npm
@@ -74,7 +77,7 @@ map/camera/selection retention, native keyboard navigation, Back/Forward, refres
 malformed/unknown links, retry, and narrow layouts. Same-origin frames exercise
 320/390px viewports because headless Firefox clamps the outer window to 500px.
 Reports/screenshots are saved to `test-results/etymology-03/browser/`.
-To reuse an existing build, run `python3 tests/browser/etymology.py`; use `--output`
+To reuse an existing build, run `python3 -m tests.browser.etymology`; use `--output`
 to change the artifact directory. This is the explorer UI suite; map integration has its own gate below.
 
 `test:word-trail-browser` builds and checks independent lexical layers, canonical
@@ -86,7 +89,7 @@ both projections, style replacement, and a narrow sidebar. Real lexical/atlas
 snapshots are used; an explicitly modified in-memory response tests missing points
 and antimeridian links because the pinned lexical snapshot has no missing points.
 Installed assets are never modified. Reports/screenshots go to
-`test-results/etymology-04/browser/`; use `python3 tests/browser/word_trail.py` to
+`test-results/etymology-04/browser/`; use `python3 -m tests.browser.word_trail` to
 reuse a build, and `--output` to change the destination. Browser errors fail checks.
 The earlier geographic warm-republication failure was separately repaired by
 retaining the active coverage during forced recomputation; the ordinary overlap
@@ -102,7 +105,7 @@ been displayed for an unchanged selection is still an error. Reports are saved
 to `test-results/etymology-04/coverage-selection/`.
 
 `measure:etymology-browser` builds and measures the shipped lexical explorer.
-`python3 tests/browser/etymology_performance.py --runs 3 --output test-results/lexical-performance`
+`python3 -m tests.browser.etymology_performance --runs 3 --output test-results/lexical-performance`
 reuses a production build. Three fresh origins for each network condition yield
 12 samples: cold load and HTTP-cache reload, over loopback and with only the
 lexical response throttled to 10 Mbit/s plus 150ms TTFB. A test proxy injects a
@@ -129,7 +132,7 @@ To check a production project-site build and its lexical worker/data paths:
 
 ```sh
 GITHUB_PAGES=true npm run build
-GITHUB_PAGES=true python3 tests/browser/etymology_delivery.py
+GITHUB_PAGES=true python3 -m tests.browser.etymology_delivery
 ```
 
 `--out-dir` selects another production output. It checks `/lang-viz/` lexical and
@@ -513,7 +516,8 @@ After restoring the independently pinned WALS browser release, run from the
 repository root:
 
 ```sh
-python3 app/tests/browser/wals_delivery.py
+cd app
+python3 -m tests.browser.wals_delivery
 ```
 
 This builds a separate test-only consumer of the production repository loader;
@@ -571,4 +575,4 @@ records, missing origin locations, no candidates, dateline focus, independent
 word/WALS overlays, pin preservation, style/projection changes, reduced motion,
 manual interruption, late responses and workspace return. Reports/screenshots are
 ignored under `app/test-results/wals-06/`. Run the existing word-trail regression
-against the same build with `python3 tests/browser/word_trail.py --base /lang-viz/`.
+against the same build with `python3 -m tests.browser.word_trail --base /lang-viz/`.

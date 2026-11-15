@@ -1,11 +1,15 @@
+#!/usr/bin/env python3
+
+
 import json
 import sys
 from pathlib import Path
-from review import write_review
+
+from scripts.branch_review import write_review
+
 APP = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(APP / 'tests/browser'))
-from run import browser_session, open_atlas
-from sidebar import select_branches
+from tests.browser.run import browser_session, open_atlas
+from tests.browser.sidebar import select_branches
 
 out = Path(sys.argv[1]) if len(sys.argv) > 1 else APP / 'test-results/color-branches'
 variants = json.loads((out / 'benchmark.json').read_text())['variants']

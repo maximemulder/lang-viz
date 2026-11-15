@@ -1,11 +1,9 @@
+#!/usr/bin/env python3
 """Check experiment measurements without relying on the optimizer's graph."""
 import copy
-import sys
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/color-refinement'))
-from local_evaluation import evaluate, prepare
+from .local_evaluation import evaluate, prepare
 
 
 def fixture(cells=([11], [12]), columns=10, rows=10):

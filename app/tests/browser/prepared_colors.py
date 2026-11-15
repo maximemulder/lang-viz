@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
 """Exercise prepared defaults, provenance selection, overrides and fallback in the app."""
 import json
 from contextlib import contextmanager
-from tempfile import TemporaryDirectory
 from pathlib import Path
-from run import APP, browser_session, open_atlas, wait_for
-from sidebar import select_branches, add_selected
-from colors import color_state, color_controls, button, optimize
+from tempfile import TemporaryDirectory
+
+from .colors import button, color_controls, color_state, optimize
+from .run import APP, browser_session, open_atlas, wait_for
+from .sidebar import add_selected, select_branches
 
 out=APP/'test-results/prepared-colors'
 manifest=json.loads((APP/'public/data/manifest.json').read_text())

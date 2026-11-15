@@ -16,9 +16,9 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from run import APP, browser_session, wait_for
-from sidebar import open_details, search
-from wals_map import open_profile, settled
+from .run import APP, browser_session, wait_for
+from .sidebar import open_details, search
+from .wals_map import open_profile, settled
 
 BOOTSTRAP = b"""<script>
 window.walsProbe={gaps:[],errors:[]};

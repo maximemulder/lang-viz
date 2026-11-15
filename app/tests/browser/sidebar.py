@@ -3,7 +3,7 @@
 
 from typing import Any
 
-from run import wait_for
+from .run import wait_for
 
 
 def view(browser, name):

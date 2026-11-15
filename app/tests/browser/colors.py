@@ -6,9 +6,9 @@ import math
 import time
 from typing import Any
 
-from color_evaluation import distance, evaluate_colors, lab
-from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import open_details, search, select_branches, view, map_section
+from .color_evaluation import distance, evaluate_colors, lab
+from .run import APP, browser_session, check_state, open_atlas, wait_for
+from .sidebar import map_section, open_details, search, select_branches, view
 
 
 def color_controls(browser):

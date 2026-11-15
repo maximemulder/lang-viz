@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 """Compare live overlay and reusable parts through production workers and rendering."""
+
+
 import argparse
 import json
 from typing import Any
 
-from run import APP, browser_session, check_state, wait_for
-from sidebar import add_selected, clear_selection, open_details, search, select_branches, select_result, view
+from .run import APP, browser_session, check_state, wait_for
+from .sidebar import (
+    add_selected,
+    clear_selection,
+    open_details,
+    search,
+    select_branches,
+    select_result,
+    view,
+)
 
 
 def main():
@@ -75,7 +85,7 @@ def main():
                     clear_selection(browser)
                     select_result(browser, "halh1238")
                     add_selected(browser)
-                    state = record(browser, "Halh-branch", engine, run, [[112, 45.5], [98, 43]])
+                    record(browser, "Halh-branch", engine, run, [[112, 45.5], [98, 43]])
                     assert browser.js("return window.overlapTest.inspect([112,45.5]).variantIds") == ["asher2007world:contemporary:dari1250"]
                     search(browser, "dari1250", "dari1250")
                     open_details(browser)

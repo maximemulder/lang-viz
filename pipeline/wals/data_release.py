@@ -11,7 +11,9 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
+from typing import cast
 
+from pipeline.release_types import FileDigest, WalsReleasePin
 from pipeline.release_utils import digest, extract_archive, local_path, write_archive
 from pipeline.wals import build, sources
 
@@ -43,16 +45,16 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
 
 
-def write_json(path: Path, value: dict) -> None:
+def write_json(path: Path, value: object) -> None:
     path.write_text(
         json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8"
     )
 
 
-def inventory(root: Path) -> dict:
+def inventory(root: Path) -> dict[str, FileDigest]:
     if root.is_symlink() or not root.is_dir():
         raise ValueError(f"Missing or linked WALS directory: {root}")
-    result = {}
+    result: dict[str, FileDigest] = {}
     for path in sorted(root.rglob("*")):
         if path.is_symlink() or not (path.is_dir() or path.is_file()):
             raise ValueError(f"Invalid WALS installation member: {path}")
@@ -64,8 +66,10 @@ def inventory(root: Path) -> dict:
     return result
 
 
-def read_pin(reference: Path) -> dict:
+def read_pin(reference: Path) -> WalsReleasePin:
     pin = read_json(reference)
+    if not isinstance(pin, dict) or not isinstance(pin.get("assets"), dict):
+        raise TypeError("Invalid WALS release assets")
     if any(
         type(pin.get(field)) is not int or pin[field] != 1
         for field in ("schemaVersion", "walsSchemaVersion", "adapterVersion")
@@ -85,11 +89,18 @@ def read_pin(reference: Path) -> dict:
         raise ValueError("WALS release requires browser and source assets")
     for kind, name in ASSETS.items():
         asset = pin["assets"][kind]
-        if asset["name"] != name or not re.fullmatch(r"[a-f0-9]{64}", asset["sha256"]):
+        if not isinstance(asset, dict):
+            raise TypeError("Invalid WALS release asset")
+        checksum = asset.get("sha256")
+        if (
+            asset.get("name") != name
+            or not isinstance(checksum, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", checksum)
+        ):
             raise ValueError("Invalid WALS release asset")
-        if type(asset["bytes"]) is not int or asset["bytes"] <= 0:
+        if type(asset.get("bytes")) is not int or asset["bytes"] <= 0:
             raise ValueError("Invalid WALS archive size")
-        files = asset["files"]
+        files = asset.get("files")
         if not isinstance(files, dict) or not files:
             raise ValueError("Missing WALS file inventory")
         if kind == "browser" and set(files) != BROWSER_FILES:
@@ -107,12 +118,14 @@ def read_pin(reference: Path) -> dict:
             if local_path(validation_root, name).relative_to(validation_root).as_posix() != name:
                 raise ValueError(f"Noncanonical WALS path: {name}")
             if (
-                type(entry["bytes"]) is not int
+                not isinstance(entry, dict)
+                or type(entry.get("bytes")) is not int
                 or entry["bytes"] < 0
+                or not isinstance(entry.get("sha256"), str)
                 or not re.fullmatch(r"[a-f0-9]{64}", entry["sha256"])
             ):
                 raise ValueError("Invalid WALS file inventory")
-    return pin
+    return cast(WalsReleasePin, pin)
 
 
 def counts(data: dict) -> dict:
@@ -122,7 +135,7 @@ def counts(data: dict) -> dict:
     }
 
 
-def verify(root: Path, pin: dict, kind: str = "browser") -> None:
+def verify(root: Path, pin: WalsReleasePin, kind: str = "browser") -> None:
     files = inventory(root)
     if files != pin["assets"][kind]["files"]:
         raise ValueError(f"WALS {kind} file checksum/size/set mismatch: {root}")
@@ -223,7 +236,7 @@ def pack(
                 "files": inventory(browser),
             },
         )
-        pin = {
+        pin: WalsReleasePin = {
             "schemaVersion": 1,
             "walsSchemaVersion": build.SCHEMA_VERSION,
             "adapterVersion": build.ADAPTER_VERSION,

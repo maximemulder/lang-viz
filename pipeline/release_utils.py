@@ -8,6 +8,8 @@ import hashlib
 import tarfile
 from pathlib import Path, PurePosixPath
 
+from pipeline.release_types import FileDigest
+
 
 def digest(path: Path) -> str:
     with path.open("rb") as stream:
@@ -39,7 +41,7 @@ def write_archive(root: Path, names: list[str], output: Path) -> None:
                 bundle.addfile(info, source)
 
 
-def extract_archive(archive: Path, staging: Path, expected: dict[str, dict]) -> None:
+def extract_archive(archive: Path, staging: Path, expected: dict[str, FileDigest]) -> None:
     """Check names/types/sizes before extraction; callers validate contents before install."""
     with tarfile.open(archive, "r:gz") as bundle:
         members = bundle.getmembers()

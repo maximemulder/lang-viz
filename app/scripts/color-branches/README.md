@@ -82,10 +82,10 @@ Run from `app/`, using the existing saved captures in `test-results/colors/`:
 
 ```sh
 node scripts/color-refinement/run.mjs --branches --rounds 3
-python3 scripts/color-refinement/local_evaluation.py test-results/color-branches
-python3 scripts/color-branches/audit.py test-results/color-branches
+python3 -m scripts.color-refinement.local_evaluation test-results/color-branches
+python3 -m scripts.color-branches.audit test-results/color-branches
 npm run build
-python3 scripts/color-branches/render.py
+python3 -m scripts.color-branches.render
 ```
 
 Firefox and geckodriver must be installed for rendering. The render uses the
@@ -105,7 +105,7 @@ saved alongside the palettes. Generated artifacts are ignored by git.
 
 ```sh
 node --test --test-isolation=none tests/color-branches.test.ts tests/color-refinement-experiment.test.ts
-python3 -m unittest discover -s tests/browser -p 'test_*color_evaluation.py'
+python3 -m unittest tests.browser.test_color_evaluation tests.browser.test_local_color_evaluation
 ```
 
 The independent evaluator uses exhaustive nearby comparisons on the captured
@@ -233,13 +233,13 @@ Reproduce from `app/` (use three rounds for stronger timing evidence):
 
 ```sh
 node scripts/color-refinement/run.mjs --chroma --rounds 1
-python3 scripts/color-refinement/local_evaluation.py test-results/color-chroma
-python3 scripts/color-branches/audit.py test-results/color-chroma
-python3 scripts/color-branches/render.py test-results/color-chroma
+python3 -m scripts.color-refinement.local_evaluation test-results/color-chroma
+python3 -m scripts.color-branches.audit test-results/color-chroma
+python3 -m scripts.color-branches.render test-results/color-chroma
 node scripts/color-refinement/run.mjs --chroma-anchors --rounds 1
-python3 scripts/color-refinement/local_evaluation.py test-results/color-chroma-anchors
-python3 scripts/color-branches/audit.py test-results/color-chroma-anchors
-python3 scripts/color-branches/render.py test-results/color-chroma-anchors
+python3 -m scripts.color-refinement.local_evaluation test-results/color-chroma-anchors
+python3 -m scripts.color-branches.audit test-results/color-chroma-anchors
+python3 -m scripts.color-branches.render test-results/color-chroma-anchors
 ```
 
 The anchor experiment saves `anchor-source.ts` with the injected implementation.

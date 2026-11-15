@@ -19,8 +19,8 @@ From `app/`, using the saved color captures and prepared branch-coverage tiles:
 
 ```sh
 node scripts/color-precomputation/run.mjs --output test-results/color-precomputation-multiview
-python3 scripts/color-precomputation/render.py test-results/color-precomputation-multiview
-python3 scripts/color-precomputation/evaluate.py test-results/color-precomputation-multiview
+python3 -m scripts.color-precomputation.render test-results/color-precomputation-multiview
+python3 -m scripts.color-precomputation.evaluate test-results/color-precomputation-multiview
 ```
 
 Open `test-results/color-precomputation-multiview/review.html` for matched app

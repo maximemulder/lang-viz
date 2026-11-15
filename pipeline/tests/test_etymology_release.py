@@ -6,6 +6,7 @@ import json
 import subprocess
 import tarfile
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -136,7 +137,7 @@ def test_invalid_archive_members_and_contents_fail_before_install(package, tmp_p
 @pytest.mark.parametrize("field", ["schemaVersion", "lexicalSchemaVersion", "adapterVersion"])
 def test_incompatible_pins_fail_clearly(package, tmp_path, field):
     reference, _, _ = package
-    pin = release.read_pin(reference)
+    pin = cast(dict[str, Any], release.read_pin(reference))
     pin[field] = 999
     release.write_json(reference, pin)
     with pytest.raises(ValueError, match="Unsupported"):
@@ -144,6 +145,15 @@ def test_incompatible_pins_fail_clearly(package, tmp_path, field):
             reference.parent / release.ASSETS["browser"], reference, tmp_path / "installed"
         )
     assert not (tmp_path / "installed").exists()
+
+
+def test_malformed_release_inventory_is_rejected(package):
+    reference, _, _ = package
+    pin = cast(dict[str, Any], release.read_pin(reference))
+    pin["assets"]["browser"]["files"]["NOTICE.md"] = None
+    release.write_json(reference, pin)
+    with pytest.raises(ValueError, match="Invalid file inventory"):
+        release.read_pin(reference)
 
 
 def test_modified_existing_install_is_preserved_and_not_downloaded(package, tmp_path, monkeypatch):

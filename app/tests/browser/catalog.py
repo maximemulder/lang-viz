@@ -3,10 +3,10 @@
 
 import json
 
-from comparisons import check_comparisons
-from selection import check_selection
-from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import open_details, search, view, map_section
+from .comparisons import check_comparisons
+from .run import APP, browser_session, open_atlas, wait_for
+from .selection import check_selection
+from .sidebar import map_section, open_details, search, view
 
 
 def main():

@@ -343,8 +343,16 @@ npm run typecheck
 npm run build
 ```
 
-The Python pipeline, browser tests, and app scripts are type checked with
-`uv run pyrefly check`. Pipeline regressions can be checked with `uv run pytest`.
+Check the Python pipeline, browser tests, and app scripts from the repository root:
+
+```sh
+uv run pyrefly check
+uv run ruff check pipeline app/tests/browser app/scripts
+uv run pytest
+```
+
+CI builds the pinned `tile-join` binary before the pipeline tests so the native
+atlas integration cases run rather than skip.
 
 ## Overlap rendering
 

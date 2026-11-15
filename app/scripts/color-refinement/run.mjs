@@ -293,7 +293,7 @@ ${refinement}
     await save('benchmark.json', report)
   }
   console.log(
-    `Evaluate saved palettes: python3 scripts/color-refinement/local_evaluation.py ${output}`,
+    `Evaluate saved palettes: python3 -m scripts.color-refinement.local_evaluation ${output}`,
   )
 } finally {
   await rm(temporary, { recursive: true, force: true })

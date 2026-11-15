@@ -1,12 +1,16 @@
+#!/usr/bin/env python3
 """Independent metrics for training views and held-out Europe/Africa captures."""
+
+
 import json
 import sys
 from pathlib import Path
-from review import write_review
+
+from scripts.precomputation_review import write_review
+
 APP = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(APP / 'scripts/color-refinement'))
-from local_evaluation import prepare, evaluate
-from color_evaluation import evaluate_colors
+from tests.browser.color_evaluation import evaluate_colors
+from tests.browser.local_evaluation import evaluate, prepare
 
 out = Path(sys.argv[1]) if len(sys.argv)>1 else APP / 'test-results/color-precomputation'
 variants = json.loads((out / 'benchmark.json').read_text())['variants']

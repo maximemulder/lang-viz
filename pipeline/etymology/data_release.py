@@ -11,8 +11,10 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
+from typing import cast
 
 from pipeline.etymology import build, sources
+from pipeline.release_types import EtymologyReleasePin, FileDigest
 from pipeline.release_utils import digest, extract_archive, local_path, write_archive
 
 ROOT = sources.ROOT
@@ -27,13 +29,13 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=build.unique_object)
 
 
-def write_json(path: Path, value: dict) -> None:
+def write_json(path: Path, value: object) -> None:
     path.write_text(
         json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
 
-def inventory(root: Path) -> dict:
+def inventory(root: Path) -> dict[str, FileDigest]:
     return {
         p.relative_to(root).as_posix(): {"bytes": p.stat().st_size, "sha256": digest(p)}
         for p in sorted(root.rglob("*"))
@@ -41,19 +43,25 @@ def inventory(root: Path) -> dict:
     }
 
 
-def read_pin(reference: Path) -> dict:
+def read_pin(reference: Path) -> EtymologyReleasePin:
     pin = read_json(reference)
+    if not isinstance(pin, dict) or not isinstance(pin.get("assets"), dict):
+        raise TypeError("Invalid lexical release assets")
     if (
         pin.get("schemaVersion") != 1
         or pin.get("lexicalSchemaVersion") != 1
         or pin.get("adapterVersion") != 1
     ):
         raise ValueError("Unsupported lexical release/schema/adapter version")
-    if not re.fullmatch(r"[\w.-]+/[\w.-]+", pin.get("repository", "")):
+    if not isinstance(pin.get("repository"), str) or not re.fullmatch(
+        r"[\w.-]+/[\w.-]+", pin["repository"]
+    ):
         raise ValueError("Invalid release repository")
-    if not re.fullmatch(r"[\w.-]+", pin.get("tag", "")):
+    if not isinstance(pin.get("tag"), str) or not re.fullmatch(r"[\w.-]+", pin["tag"]):
         raise ValueError("Invalid release tag")
-    if not re.fullmatch(r"[a-f0-9]{40}", pin.get("pipelineCommit", "")):
+    if not isinstance(pin.get("pipelineCommit"), str) or not re.fullmatch(
+        r"[a-f0-9]{40}", pin["pipelineCommit"]
+    ):
         raise ValueError("A full producer commit is required")
     if not isinstance(pin.get("snapshot"), str):
         raise TypeError("A pinned lexical snapshot is required")
@@ -61,22 +69,34 @@ def read_pin(reference: Path) -> dict:
         raise ValueError("Lexical release must contain browser and source archives")
     for kind, name in ASSETS.items():
         asset = pin["assets"][kind]
-        if asset["name"] != name or not re.fullmatch(r"[a-f0-9]{64}", asset["sha256"]):
+        if not isinstance(asset, dict):
+            raise TypeError("Invalid lexical release asset")
+        checksum = asset.get("sha256")
+        if (
+            asset.get("name") != name
+            or not isinstance(checksum, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", checksum)
+        ):
             raise ValueError("Invalid lexical release asset")
-        if type(asset["bytes"]) is not int or asset["bytes"] <= 0:
+        if type(asset.get("bytes")) is not int or asset["bytes"] <= 0:
             raise ValueError("Invalid archive size")
-        for path, entry in asset["files"].items():
+        files = asset.get("files")
+        if not isinstance(files, dict) or not files:
+            raise ValueError("Invalid file inventory")
+        for path, entry in files.items():
             local_path(Path("/tmp/lexical-release-validation"), path)
             if (
-                type(entry["bytes"]) is not int
+                not isinstance(entry, dict)
+                or type(entry.get("bytes")) is not int
                 or entry["bytes"] < 0
+                or not isinstance(entry.get("sha256"), str)
                 or not re.fullmatch(r"[a-f0-9]{64}", entry["sha256"])
             ):
                 raise ValueError("Invalid file inventory")
-    return pin
+    return cast(EtymologyReleasePin, pin)
 
 
-def verify(root: Path, pin: dict, kind: str = "browser") -> None:
+def verify(root: Path, pin: EtymologyReleasePin, kind: str = "browser") -> None:
     if inventory(root) != pin["assets"][kind]["files"]:
         raise ValueError(f"Lexical {kind} file checksum/size/set mismatch: {root}")
     source_pin = read_json(root / "sources.json")
@@ -162,7 +182,7 @@ def pack(
             "files": inventory(browser),
         }
         write_json(browser / "manifest.json", manifest)
-        pin = {
+        pin: EtymologyReleasePin = {
             "schemaVersion": 1,
             "lexicalSchemaVersion": build.SCHEMA_VERSION,
             "adapterVersion": build.ADAPTER_VERSION,

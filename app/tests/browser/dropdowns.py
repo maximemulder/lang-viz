@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Source dropdowns must remain clickable over the following sidebar section."""
 
-from run import APP, browser_session, open_atlas, wait_for
+from .run import APP, browser_session, open_atlas, wait_for
 
 
 def click(browser, x, y):
@@ -47,7 +47,14 @@ def main():
             if height == 1000:
                 assert point["overlapsNext"], "Regression must test beyond the source section"
             click(browser, point["x"], point["y"])
-            wait_for(lambda: browser.js("return document.querySelectorAll('.source-filter__option input')[arguments[0]].checked!==arguments[1]", point["index"], point["checked"]), 10, "pointer selection beyond section")
+            wait_for(
+                lambda point=point: browser.js(
+                    "return document.querySelectorAll('.source-filter__option input')[arguments[0]].checked!==arguments[1]",
+                    point["index"], point["checked"],
+                ),
+                10,
+                "pointer selection beyond section",
+            )
             browser.screenshot(output / f"sources-{width}-{height}.png")
             browser.call("POST", "/actions", {"actions": [{
                 "type": "key", "id": "dropdown-keyboard", "actions": [

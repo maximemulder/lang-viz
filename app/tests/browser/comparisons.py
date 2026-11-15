@@ -1,6 +1,16 @@
+#!/usr/bin/env python3
 """Independent source/period groups and colors through the actual sidebar controls."""
-from run import check_state, wait_for
-from sidebar import add_selected, clear_selection, open_details, search, select_control, select_result, sources, view
+from .run import check_state, wait_for
+from .sidebar import (
+    add_selected,
+    clear_selection,
+    open_details,
+    search,
+    select_control,
+    select_result,
+    sources,
+    view,
+)
 
 
 def check_comparisons(browser, output):

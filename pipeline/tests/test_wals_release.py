@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tarfile
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -152,10 +153,19 @@ def test_unsafe_or_incomplete_archives_fail_before_install(package, tmp_path, fa
 )
 def test_incompatible_or_invalid_pins_fail_clearly(package, field):
     reference, _, _ = package
-    pin = release.read_pin(reference)
+    pin = cast(dict[str, Any], release.read_pin(reference))
     pin[field] = 999 if field.endswith("Version") else "bad/value/!"
     release.write_json(reference, pin)
     with pytest.raises(ValueError, match="Unsupported|Invalid"):
+        release.read_pin(reference)
+
+
+def test_malformed_release_inventory_is_rejected(package):
+    reference, _, _ = package
+    pin = cast(dict[str, Any], release.read_pin(reference))
+    pin["assets"]["browser"]["files"]["NOTICE.md"] = None
+    release.write_json(reference, pin)
+    with pytest.raises(ValueError, match="Invalid WALS file inventory"):
         release.read_pin(reference)
 
 

@@ -13,8 +13,8 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from run import APP, browser_session, wait_for
-from sidebar import add_selected, open_details, search
+from .run import APP, browser_session, wait_for
+from .sidebar import add_selected, open_details, search
 
 
 @contextmanager

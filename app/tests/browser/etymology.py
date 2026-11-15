@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from run import APP, SCENARIOS, browser_session, wait_for
+from .run import APP, SCENARIOS, browser_session, wait_for
 
 
 @contextmanager

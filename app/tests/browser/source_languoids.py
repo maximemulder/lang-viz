@@ -4,8 +4,8 @@
 import json
 from typing import Any
 
-from run import APP, browser_session, open_atlas, wait_for
-from sidebar import add_selected, clear_selection, open_details, search, view
+from .run import APP, browser_session, open_atlas, wait_for
+from .sidebar import add_selected, clear_selection, open_details, search, view
 
 
 def main():

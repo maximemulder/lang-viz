@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from run import APP, SCENARIOS, browser_session, check_state, open_atlas
+from .run import APP, SCENARIOS, browser_session, check_state, open_atlas
 
 
 def main():

@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
 """Working selection and pinned group interaction checks."""
+
+
 import json
 
-from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import add_selected, clear_selection, open_details, search, select_control, select_result, sources, view
+from .run import APP, browser_session, check_state, open_atlas, wait_for
+from .sidebar import (
+    add_selected,
+    clear_selection,
+    open_details,
+    search,
+    select_control,
+    select_result,
+    sources,
+    view,
+)
 
 
 def check_selection(browser, output):

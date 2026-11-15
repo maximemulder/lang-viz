@@ -28,12 +28,9 @@ target-version = "py312"
 python-version = "3.12"
 project-includes = ["pipeline/**/*.py", "app/tests/browser/**/*.py", "app/scripts/**/*.py"]
 search-path = [
-  "app/tests/browser",
-  "app/scripts/color-branches",
-  "app/scripts/color-precomputation",
-  "app/scripts/color-refinement",
+  "app",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["pipeline/tests"]
+testpaths = ["pipeline/tests", "app/tests/browser"]
 pythonpath = ["."]

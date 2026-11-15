@@ -9,10 +9,12 @@ Field contents (including LaTeX) are retained as text, never rendered as HTML.
 
 import re
 
+from .types import BibliographyEntry
 
-def parse_bibtex(source: str) -> dict:
+
+def parse_bibtex(source: str) -> dict[str, BibliographyEntry]:
     pos = 0
-    result = {}
+    result: dict[str, BibliographyEntry] = {}
     keys = set()
 
     def fail(message):

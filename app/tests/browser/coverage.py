@@ -4,8 +4,8 @@
 import json
 from typing import Any
 
-from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import select_branches
+from .run import APP, browser_session, check_state, open_atlas, wait_for
+from .sidebar import select_branches
 
 
 def check_navigation(browser, output, source, projection, center, points, language):

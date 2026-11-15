@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Sidebar previews and deliberate profile navigation against real source tiles."""
+
+
 import json
 
-from run import APP, browser_session, open_atlas, wait_for
-from sidebar import add_selected, open_details, search, select_result, view
+from .run import APP, browser_session, open_atlas, wait_for
+from .sidebar import add_selected, open_details, search, select_result, view
 
 
 def check_focus(browser, output):
@@ -158,7 +160,7 @@ def check_focus(browser, output):
     view(browser, 'map')
     move('.on-map-group__identity')
     outlined(expected)
-    before_group = ready()['camera']
+    ready()
     browser.js('window.overlapTest.camera([80,20],3)')
     ready()
     browser.js("document.querySelector('.on-map-group__identity').click()")

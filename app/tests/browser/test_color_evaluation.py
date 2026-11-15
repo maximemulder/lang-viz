@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 """Check that independent measurements detect deliberately misleading palettes."""
 
 import copy
 import unittest
 from typing import Any
 
-from color_evaluation import evaluate_colors
+from .color_evaluation import evaluate_colors
 
 
 def fixture(branches=2) -> tuple[dict[str, Any], dict[str, Any]]:

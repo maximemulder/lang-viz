@@ -437,11 +437,11 @@ with the runners' normal headless settings and basemap disabled. Profile-focus
 and selection checks passed using their existing `check_focus`/`check_selection`
 functions with `browser_session` and `open_atlas`, redirecting evidence to this
 stage's directory. Canonical rerun commands from `app/` are
-`python3 tests/browser/focus.py` and `python3 tests/browser/selection.py` (these
+`python3 -m tests.browser.focus` and `python3 -m tests.browser.selection` (these
 write to their standard report directories).
 
 Word-trail acceptance passed all 18 checkpoints with
-`python3 tests/browser/word_trail.py --output test-results/wals-00/word-trail`.
+`python3 -m tests.browser.word_trail --output test-results/wals-00/word-trail`.
 This includes stale profile-bounds cancellation, explicit camera focus, preservation
 of pinned comparisons, missing-coordinate/antimeridian fixtures, both projections,
 style restoration, and narrow-layout workspace round trips. No application test

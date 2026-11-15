@@ -28,8 +28,8 @@ from typing import Any
 import mapbox_vector_tile
 import numpy as np
 import shapely as geos
-from shapely.geometry.base import BaseGeometry
 from mapbox_vector_tile.encoder import on_invalid_geometry_raise
+from shapely.geometry.base import BaseGeometry
 
 from pipeline.atlas.topology import (
     EXTENT,

@@ -9,10 +9,10 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
-from etymology import controlled_server
-from inspection import move, render_frames
-from run import APP, SCENARIOS, browser_session, wait_for
-from sidebar import search, select_control
+from .etymology import controlled_server
+from .inspection import move, render_frames
+from .run import APP, SCENARIOS, browser_session, wait_for
+from .sidebar import search, select_control
 
 
 def main():

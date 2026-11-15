@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Exercise branch refinement and complete-dataset acceleration in the production browser."""
+
+
 import json
 from typing import Any
 
-from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import add_selected, open_details, search, select_branches, select_result, view
+from .run import APP, browser_session, check_state, open_atlas, wait_for
+from .sidebar import add_selected, open_details, search, select_branches, select_result, view
 
 
 def main():

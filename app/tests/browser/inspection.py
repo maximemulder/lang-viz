@@ -6,9 +6,8 @@ import json
 import pathlib
 import subprocess
 
-from prepared import select_all
-from run import APP, SCENARIOS, browser_session, check_state, open_atlas, wait_for
-from sidebar import open_details, search, view
+from .prepared import select_all
+from .run import APP, SCENARIOS, browser_session, check_state, open_atlas, wait_for
 
 
 def highlighted(browser):

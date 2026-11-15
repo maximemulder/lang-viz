@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Assert that inspected boundaries use the rendered fill source through LOD swaps."""
+
+
 import json
-from run import APP, browser_session, open_atlas, wait_for, SCENARIOS
-from inspection import move
+
+from .inspection import move
+from .run import APP, SCENARIOS, browser_session, open_atlas, wait_for
 
 
 def main():

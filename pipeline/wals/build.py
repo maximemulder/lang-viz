@@ -13,13 +13,21 @@ import tempfile
 from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 from pipeline.release_utils import digest, local_path
 
 from .bibliography import parse_bibtex
 from .sources import ROOT, read_pin, source_directory, verify
+from .types import (
+    BibliographyEntry,
+    CsvRow,
+    WalsFeature,
+    WalsObservation,
+    WalsRecord,
+    WalsReference,
+)
 
 SCHEMA_VERSION = 1
 ADAPTER_VERSION = 1
@@ -63,7 +71,7 @@ def plain(value: str) -> str:
     return " ".join("".join(parser.parts).split())
 
 
-def read_csv(path: Path) -> tuple[list[str], dict[str, dict]]:
+def read_csv(path: Path) -> tuple[list[str], dict[str, CsvRow]]:
     with path.open(encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream)
         fields = list(reader.fieldnames or [])
@@ -72,19 +80,20 @@ def read_csv(path: Path) -> tuple[list[str], dict[str, dict]]:
             path.name,
             "missing/duplicate CSV headers",
         )
-        result = {}
+        result: dict[str, CsvRow] = {}
         for row in reader:
             require(
                 None not in row and None not in row.values(),
                 f"{path.name}:{reader.line_num}",
                 "wrong CSV field count",
             )
-            key = row.get("ID", "")
+            clean = cast(CsvRow, row)
+            key = clean.get("ID", "")
             require(
                 bool(re.fullmatch(r"[A-Za-z0-9_.:-]+", key)), path.name, f"invalid/empty ID {key!r}"
             )
             require(key not in result, path.name, f"duplicate ID {key}")
-            result[key] = row
+            result[key] = clean
     return fields, result
 
 
@@ -92,8 +101,10 @@ def split(value: str, separator: str | None) -> list[str]:
     return [v.strip() for v in value.split(separator) if v.strip()] if value else []
 
 
-def references(value: str, bibliography: dict, location: str, separator: str = ";") -> list[dict]:
-    result = []
+def references(
+    value: str, bibliography: dict[str, BibliographyEntry], location: str, separator: str = ";"
+) -> list[WalsReference]:
+    result: list[WalsReference] = []
     for item in split(value, separator):
         match = re.fullmatch(r"([^\s\[\]]+)(?:\[([^\[\]]*)\])?", item)
         require(match is not None, location, f"invalid reference {item!r}")
@@ -104,12 +115,15 @@ def references(value: str, bibliography: dict, location: str, separator: str = "
     return result
 
 
-def load_tables(directory: Path) -> tuple[dict, dict, dict]:
+def load_tables(
+    directory: Path,
+) -> tuple[dict[str, Any], dict[str, dict[str, CsvRow]], dict[str, BibliographyEntry]]:
     """Validate IDs and all declared foreign keys, not just the exported observations."""
     cldf = directory / "cldf"
     metadata = json.loads((cldf / "StructureDataset-metadata.json").read_text())
     bibliography = parse_bibtex((cldf / "sources.bib").read_text())
-    tables, schemas = {}, {}
+    tables: dict[str, dict[str, CsvRow]] = {}
+    schemas: dict[str, Any] = {}
     for table in metadata["tables"]:
         name, schema = table["url"], table["tableSchema"]
         require(name not in tables, "metadata", f"duplicate table {name}")
@@ -195,7 +209,7 @@ def compile_data(directory: Path, *, pinned: bool = True) -> dict:
     chapters, examples = tables["chapters.csv"], tables["examples.csv"]
     require(set(FEATURES) <= features.keys(), "parameters.csv", "shortlisted feature missing")
     groups = {k for k in languages if k.startswith(("family-", "subfamily-", "genus-"))}
-    records: dict[str, dict[str, Any]] = {}
+    records: dict[str, WalsRecord] = {}
     missing = []
     for key, row in languages.items():
         point, reason = coordinates(row)
@@ -235,7 +249,7 @@ def compile_data(directory: Path, *, pinned: bool = True) -> dict:
         require(pair not in numbers, key, "duplicate category number within feature")
         numbers.add(pair)
     pairs, observed = set(), set()
-    observations: dict[str, dict[str, Any]] = {}
+    observations: dict[str, WalsObservation] = {}
     for key, row in tables["values.csv"].items():
         at = f"values.csv:{key}"
         language, feature = row["Language_ID"], row["Parameter_ID"]
@@ -257,7 +271,7 @@ def compile_data(directory: Path, *, pinned: bool = True) -> dict:
                 "exampleIds": split(row["Example_ID"], " "),
                 "url": f"https://wals.info/valuesets/{quote(key, safe='')}",
             }
-    feature_output: dict[str, dict[str, Any]] = {}
+    feature_output: dict[str, WalsFeature] = {}
     for key in FEATURES:
         row = features[key]
         chapter = chapters[row["Chapter_ID"]]

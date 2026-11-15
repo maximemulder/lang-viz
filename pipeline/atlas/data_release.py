@@ -12,7 +12,9 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
+from typing import cast
 
+from pipeline.release_types import AtlasReleasePin
 from pipeline.release_utils import digest, local_path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +25,33 @@ ASSET = "atlas-data.tar.gz"
 
 def read_json(path: Path):
     return json.loads(path.read_text())
+
+
+def read_pin(reference: Path) -> AtlasReleasePin:
+    value = read_json(reference)
+    if (
+        not isinstance(value, dict)
+        or "pipelineCommit" not in value
+        or any(
+            not isinstance(value.get(field), str) or not value[field]
+            for field in ("repository", "tag", "asset", "sha256")
+        )
+    ):
+        raise ValueError("Invalid atlas data release pin")
+    if value["asset"] != ASSET:
+        raise ValueError("Invalid atlas data release asset")
+    if not re.fullmatch(r"[a-f0-9]{64}", value["sha256"]):
+        raise ValueError("Invalid atlas data release checksum")
+    commit = value.get("pipelineCommit")
+    if commit is not None and (
+        not isinstance(commit, str) or not re.fullmatch(r"[a-f0-9]{40}", commit)
+    ):
+        raise ValueError("Invalid atlas data release commit")
+    if commit is None:
+        packaged = value.get("packagedFromCommit")
+        if not isinstance(packaged, str) or not re.fullmatch(r"[a-f0-9]{40}", packaged):
+            raise ValueError("Invalid atlas data release packaging commit")
+    return cast(AtlasReleasePin, value)
 
 
 def release_files(root: Path) -> list[Path]:
@@ -142,7 +171,7 @@ def pack(root: Path, output: Path, repository: str, tag: str, commit: str) -> Pa
         raise ValueError("Bundle exceeds GitHub's 2 GiB release asset limit")
     temporary.replace(archive)
     reference = output / PIN.name
-    pin = {
+    pin: AtlasReleasePin = {
         "repository": repository,
         "tag": tag,
         "asset": ASSET,
@@ -158,7 +187,7 @@ def pack(root: Path, output: Path, repository: str, tag: str, commit: str) -> Pa
 
 
 def install(archive: Path, reference: Path, destination: Path) -> None:
-    pin = read_json(reference)
+    pin = read_pin(reference)
     if digest(archive) != pin["sha256"]:
         raise ValueError("Data bundle checksum does not match data-release.json")
     if destination.exists() and any(destination.iterdir()):
@@ -188,7 +217,7 @@ def install(archive: Path, reference: Path, destination: Path) -> None:
 
 
 def restore(reference: Path, destination: Path) -> None:
-    pin = read_json(reference)
+    pin = read_pin(reference)
     with tempfile.TemporaryDirectory() as temporary:
         subprocess.run(
             [
@@ -209,7 +238,7 @@ def restore(reference: Path, destination: Path) -> None:
 
 
 def publish(reference: Path, destination: Path) -> None:
-    pin = read_json(reference)
+    pin = read_pin(reference)
     archive = local_path(reference.parent, pin["asset"])
     if digest(archive) != pin["sha256"]:
         raise ValueError("Data bundle checksum does not match data-release.json")

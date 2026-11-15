@@ -195,6 +195,16 @@ def test_failed_checksum_never_installs_data(data, tmp_path):
     assert not (tmp_path / "restored").exists()
 
 
+@pytest.mark.parametrize("field,value", [("asset", "other.tar.gz"), ("pipelineCommit", 42)])
+def test_invalid_release_pin_is_rejected(data, tmp_path, field, value):
+    reference = package(data, tmp_path / "bundle")
+    pin = release.read_json(reference)
+    pin[field] = value
+    reference.write_text(json.dumps(pin))
+    with pytest.raises(ValueError, match="Invalid atlas data release"):
+        release.read_pin(reference)
+
+
 @pytest.mark.parametrize("kind", ["traversal", "symlink", "extra"])
 def test_invalid_bundles_are_rejected_before_publication(data, tmp_path, kind):
     reference = package(data, tmp_path / "bundle")

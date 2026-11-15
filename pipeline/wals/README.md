@@ -279,7 +279,8 @@ The separate Firefox delivery check builds only a test consumer of the productio
 repository loader and exercises the actual Vite production base path:
 
 ```sh
-python3 app/tests/browser/wals_delivery.py
+cd app
+python3 -m tests.browser.wals_delivery
 ```
 
 It checks lazy/concurrent/cached loading, all served release notices, missing data,

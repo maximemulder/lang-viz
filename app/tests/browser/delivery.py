@@ -4,8 +4,8 @@
 import json
 from urllib.parse import parse_qs, urlsplit
 
-from run import APP, browser_session, check_state, open_atlas, wait_for
-from sidebar import open_details, search, select_branches
+from .run import APP, browser_session, check_state, open_atlas, wait_for
+from .sidebar import open_details, search, select_branches
 
 
 def archives(tile_url):

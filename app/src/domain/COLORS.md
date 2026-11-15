@@ -377,7 +377,7 @@ npm run evaluate:colors -- --input test-results/colors/asher-world-input.json \
 
 Omit `--palette` to evaluate the stable reference on the same footprints. Run the
 measurement unit tests alone with
-`python3 -m unittest discover -s tests/browser -p test_color_evaluation.py`.
+`python3 -m unittest tests.browser.test_color_evaluation`.
 
 The grid approximates area and contact: same-cell occupancy does not prove polygon
 overlap, thin shapes can occupy a disproportionately large fraction of a cell, and
@@ -474,11 +474,11 @@ Reproduce from `app/`, after obtaining the three saved browser captures:
 
 ```sh
 node scripts/color-refinement/run.mjs
-python3 scripts/color-refinement/local_evaluation.py test-results/color-refinement
-python3 -m unittest discover -s tests/browser -p 'test_*color_evaluation.py'
+python3 -m scripts.color-refinement.local_evaluation test-results/color-refinement
+python3 -m unittest tests.browser.test_color_evaluation tests.browser.test_local_color_evaluation
 ```
 
-Optionally run `python3 scripts/color-refinement/render.py` with a production build,
+Optionally run `python3 -m scripts.color-refinement.render` with a production build,
 Firefox, and geckodriver installed. It renders matched views plus Europe/Africa
 details and creates `test-results/color-refinement/index.html` for switching between
 screenshots. Inputs, palettes, timing runs, independent measurements, and screenshots

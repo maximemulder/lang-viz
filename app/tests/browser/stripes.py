@@ -3,7 +3,7 @@
 
 import json
 
-from run import APP, browser_session, check_state, open_atlas, wait_for
+from .run import APP, browser_session, check_state, open_atlas, wait_for
 
 
 def thickness(browser, value):

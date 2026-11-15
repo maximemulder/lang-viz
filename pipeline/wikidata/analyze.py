@@ -10,7 +10,6 @@ from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "datasets" / "wikidata"
 GLOTTOLOG = ROOT / "datasets" / "glottolog-cldf" / "cldf" / "languages.csv"
@@ -89,7 +88,7 @@ def main() -> None:
         speaker_scope.update(name or "(unspecified)" for name in names)
 
     estimates = []
-    for statement_id, group in active_statement_rows.items():
+    for group in active_statement_rows.values():
         try:
             value = float(group[0]["speaker_count"])
         except (TypeError, ValueError):
@@ -108,7 +107,7 @@ def main() -> None:
         if any(row["stated_in_id"] or row["reference_url"] for row in group)
     }
     estimate_years = []
-    for statement_id, group in active_statement_rows.items():
+    for group in active_statement_rows.values():
         value = next((row["point_in_time"] for row in group if row["point_in_time"]), "")
         if value[:4].isdigit():
             estimate_years.append(int(value[:4]))
@@ -135,7 +134,7 @@ def main() -> None:
         row["writing_system_name"] or row["writing_system_id"] for row in scripts
     )
     per_language_estimates: dict[str, list[float]] = defaultdict(list)
-    for statement_id, group in active_statement_rows.items():
+    for group in active_statement_rows.values():
         try:
             per_language_estimates[group[0]["glottocode"]].append(
                 float(group[0]["speaker_count"])
@@ -188,7 +187,7 @@ def main() -> None:
     print("Writing systems")
     print(f"  languages: {len({code for code, _ in script_pairs}):,}")
     print(f"  distinct language-system pairs: {len(script_pairs):,}")
-    print(f"  Glottolog language-level coverage: {len(({code for code, _ in script_pairs} & glottolog_languages)) / len(glottolog_languages):.1%}")
+    print(f"  Glottolog language-level coverage: {len({code for code, _ in script_pairs} & glottolog_languages) / len(glottolog_languages):.1%}")
     print_macroarea_coverage(
         "coverage", {code for code, _ in script_pairs}, glottolog_by_code
     )

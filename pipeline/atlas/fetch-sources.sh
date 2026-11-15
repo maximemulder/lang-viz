@@ -3,9 +3,22 @@ set -euo pipefail
 
 project_root="${ATLAS_FETCH_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 lock_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sources.lock.tsv"
+only_target=""
+case "${1:-}" in
+  "") ;;
+  --tippecanoe-only) only_target=".tools/tippecanoe-src" ;;
+  *) echo "Usage: $0 [--tippecanoe-only]" >&2; exit 2 ;;
+esac
+if [[ $# -gt 1 ]]; then
+  echo "Usage: $0 [--tippecanoe-only]" >&2
+  exit 2
+fi
 
 while IFS=$'\t' read -r target revision repository sparse_paths; do
   if [[ -z "$target" || "$target" == \#* ]]; then
+    continue
+  fi
+  if [[ -n "$only_target" && "$target" != "$only_target" ]]; then
     continue
   fi
 
@@ -59,4 +72,6 @@ while IFS=$'\t' read -r target revision repository sparse_paths; do
   fi
 done < "$lock_file"
 
-ATLAS_FETCH_ROOT="$project_root" bash "$(dirname "${BASH_SOURCE[0]}")/../dlac/fetch.sh"
+if [[ -z "$only_target" ]]; then
+  ATLAS_FETCH_ROOT="$project_root" bash "$(dirname "${BASH_SOURCE[0]}")/../dlac/fetch.sh"
+fi

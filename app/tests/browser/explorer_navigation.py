@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from run import APP, browser_session, wait_for
+from .run import APP, browser_session, wait_for
 
 
 def main():

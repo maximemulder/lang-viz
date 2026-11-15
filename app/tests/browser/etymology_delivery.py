@@ -5,8 +5,8 @@ import argparse
 import json
 from pathlib import Path
 
-from etymology import controlled_server
-from run import APP, browser_session, wait_for
+from .etymology import controlled_server
+from .run import APP, browser_session, wait_for
 
 
 def main():
