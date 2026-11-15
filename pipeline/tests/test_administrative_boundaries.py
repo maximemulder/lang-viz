@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Policy and provenance checks for the opt-in boundary view."""
 
 from __future__ import annotations

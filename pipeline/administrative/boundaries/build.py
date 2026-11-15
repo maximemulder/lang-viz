@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validate the boundary view and build its separate browser assets."""
 
 from __future__ import annotations

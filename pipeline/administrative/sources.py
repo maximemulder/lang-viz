@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Restore and verify pinned administrative source files outside Git."""
 
 from __future__ import annotations

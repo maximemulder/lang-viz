@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validate and compile the pinned, prejoined CLDR territory supplement.
 
 The CSV is a fixed branch snapshot. Its upstream CLDR release and preprocessing
