@@ -126,12 +126,12 @@ def main():
                 return clone.textContent.trim();
             """, selector)
             wait_for(
-                lambda: browser.js("""
+                lambda title=title: browser.js("""
                     const header = document.querySelector('.administrative-inspector-header');
                     return header?.querySelector('.details-header__title').textContent.trim() === arguments[0] &&
                         !header.querySelector('.details-header__eyebrow') &&
                         !header.querySelector('button[aria-expanded]');
-                """, title, label),
+                """, title),
                 10,
                 f"{label} identity in shared header",
             )
