@@ -8,8 +8,8 @@
   font-size: 0.75rem;
   line-height: 1.5;
 }
-.word-map-summary h2 {
-  font-size: 1.4rem;
+.word-map-summary > .details-header {
+  margin: -0.75rem -0.75rem 0.75rem;
 }
 .word-map-summary p {
   margin: 0.4rem 0;

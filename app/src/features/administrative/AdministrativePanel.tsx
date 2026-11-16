@@ -1,5 +1,7 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { type CSSProperties, useEffect, useMemo } from 'react'
+import { DetailsHeader } from '../../components/DetailsHeader.tsx'
+import { DetailsMapAction } from '../../components/DetailsMapAction.tsx'
 import type { AdministrativeRepository, Observation } from './model.ts'
 import {
   type ReportedObservation,
@@ -118,10 +120,6 @@ const Details = ({
     if (!detail) return null
     return (
       <section className="administrative-detail" aria-label="Territory details">
-        <div className="administrative-detail__heading">
-          <h3>{regionLabel(detail.territory.code, names)}</h3>
-          <span className="administrative-code">{detail.territory.code}</span>
-        </div>
         <p className="administrative-muted">
           CLDR statistical area. This code is independent of any displayed polygon.
         </p>
@@ -161,10 +159,6 @@ const Details = ({
     const { language } = detail
     return (
       <section className="administrative-detail" aria-label="Language details">
-        <div className="administrative-detail__heading">
-          <h3>{language.name}</h3>
-          <span className="administrative-code">{language.sourceLanguageCode}</span>
-        </div>
         <p className="administrative-muted">
           Source language code {language.sourceLanguageCode}; Glottolog {language.glottocode}. This
           association does not identify an atlas speaker polygon.
@@ -217,10 +211,6 @@ const Details = ({
   if (!detail) return null
   return (
     <section className="administrative-detail" aria-label="Family details">
-      <div className="administrative-detail__heading">
-        <h3>{detail.familyName}</h3>
-        <span className="administrative-code">{detail.familyId}</span>
-      </div>
       <p className="administrative-muted">
         Glottolog family assigned to source language associations.
       </p>
@@ -260,17 +250,73 @@ const Details = ({
   )
 }
 
+export const AdministrativeDetails = () => {
+  const repository = useAtomValue(administrativeRepositoryAtom)
+  const session = useAtomValue(administrativeSessionAtom)
+  const boundaryIndex = useAtomValue(boundaryIndexAtom)
+  const select = useSetAtom(selectAdministrativeAtom)
+  const focus = useSetAtom(focusAdministrativeTerritoryAtom)
+  const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
+  if (!repository || !session.selection) return null
+  const selection = session.selection
+  const title =
+    selection.kind === 'territory'
+      ? regionLabel(selection.id, names)
+      : selection.kind === 'language'
+        ? repository.languageByCode.get(selection.id)?.name
+        : repository.familyById.get(selection.id)?.name
+  if (!title) return null
+  const canFocusMap = boundaryIndex?.associations.get(selection.id)?.status === 'matched'
+  return (
+    <div className="administrative-detail-scroll">
+      <DetailsHeader
+        className="administrative-inspector-header"
+        title={title}
+        subtitle={
+          <>
+            <span className="administrative-code">{selection.id}</span> ·{' '}
+            {selection.kind === 'family' ? 'Glottolog' : 'CLDR'}
+          </>
+        }
+        closeLabel={`Close ${title} details`}
+        onClose={() => {
+          const origin = document.querySelector<HTMLElement>(
+            '.administrative-results button[aria-current="true"]',
+          )
+          const restoreFocus =
+            origin ?? document.querySelector<HTMLElement>('.administrative-search-field input')
+          select(null)
+          restoreFocus?.focus({ preventScroll: true })
+        }}
+      />
+      {selection.kind === 'territory' && (
+        <DetailsMapAction disabled={!canFocusMap} onFocus={() => focus(selection.id)} />
+      )}
+      {selection.kind === 'territory' && boundaryIndex && !canFocusMap && (
+        <p className="administrative-note">
+          No matched polygon or representative point in this boundary view. The CLDR observations
+          remain available below.
+        </p>
+      )}
+      <Details
+        repository={repository}
+        selection={session.selection}
+        onSelect={select}
+        names={names}
+      />
+    </div>
+  )
+}
+
 export default function AdministrativePanel() {
   const repository = useAtomValue(administrativeRepositoryAtom)
   const loadState = useAtomValue(administrativeLoadStateAtom)
   const session = useAtomValue(administrativeSessionAtom)
-  const boundaryIndex = useAtomValue(boundaryIndexAtom)
   const load = useSetAtom(loadAdministrativeAtom)
   const setQuery = useSetAtom(setAdministrativeQueryAtom)
   const setKind = useSetAtom(setAdministrativeSearchKindAtom)
   const select = useSetAtom(selectAdministrativeAtom)
   const setMetric = useSetAtom(setAdministrativeMetricAtom)
-  const focus = useSetAtom(focusAdministrativeTerritoryAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
   useEffect(() => {
     void load()
@@ -448,72 +494,35 @@ export default function AdministrativePanel() {
               ))}
             </ul>
           </section>
-          <div className="administrative-detail-scroll">
-            {session.selection?.kind === 'territory' && (
-              <>
-                <button
-                  className="administrative-focus"
-                  type="button"
-                  disabled={
-                    boundaryIndex?.associations.get(session.selection.id)?.status !== 'matched'
-                  }
-                  onClick={() => {
-                    if (session.selection?.kind === 'territory') focus(session.selection.id)
-                  }}
-                >
-                  Focus mapped area
-                </button>
-                {boundaryIndex &&
-                  boundaryIndex.associations.get(session.selection.id)?.status !== 'matched' && (
-                    <p className="administrative-note">
-                      No matched polygon or representative point in this boundary view. The CLDR
-                      observations remain available above.
-                    </p>
-                  )}
-              </>
-            )}
-            {session.selection ? (
-              <Details
-                repository={repository}
-                selection={session.selection}
-                onSelect={select}
-                names={names}
-              />
-            ) : (
-              <p className="administrative-empty">
-                Choose an area, language, or family to see its observations.
-              </p>
-            )}
-            <section className="administrative-source" aria-label="Data notes">
-              <h3>About these estimates</h3>
-              <p>
-                Approximate functional speaker estimates may include first and later-language
-                speakers. The source count is derived from territory population and reported
-                percentage. Coverage is incomplete.
-              </p>
-              <p>
-                The joined file’s original CLDR release and preprocessing are unverified. Its source
-                codes are independent of map borders; browser-localized area names are display
-                labels only.
-              </p>
-              <p>
-                Snapshot: {number(repository.data.manifest.coverage.territoryCount)} areas,{' '}
-                {number(repository.data.manifest.coverage.observationCount)} observations. CLDR
-                release: {repository.data.manifest.cldrRelease ?? 'unknown'}.
-              </p>
-              <p>
-                Sources:{' '}
-                <a href="https://cldr.unicode.org/" target="_blank" rel="noreferrer">
-                  Unicode CLDR
-                </a>{' '}
-                and{' '}
-                <a href="https://glottolog.org/" target="_blank" rel="noreferrer">
-                  Glottolog
-                </a>
-                .
-              </p>
-            </section>
-          </div>
+          <details className="administrative-source">
+            <summary>About these estimates</summary>
+            <p>
+              Approximate functional speaker estimates may include first and later-language
+              speakers. The source count is derived from territory population and reported
+              percentage. Coverage is incomplete.
+            </p>
+            <p>
+              The joined file’s original CLDR release and preprocessing are unverified. Its source
+              codes are independent of map borders; browser-localized area names are display labels
+              only.
+            </p>
+            <p>
+              Snapshot: {number(repository.data.manifest.coverage.territoryCount)} areas,{' '}
+              {number(repository.data.manifest.coverage.observationCount)} observations. CLDR
+              release: {repository.data.manifest.cldrRelease ?? 'unknown'}.
+            </p>
+            <p>
+              Sources:{' '}
+              <a href="https://cldr.unicode.org/" target="_blank" rel="noreferrer">
+                Unicode CLDR
+              </a>{' '}
+              and{' '}
+              <a href="https://glottolog.org/" target="_blank" rel="noreferrer">
+                Glottolog
+              </a>
+              .
+            </p>
+          </details>
         </>
       )}
     </aside>

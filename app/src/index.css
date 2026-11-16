@@ -90,6 +90,23 @@ h1 {
   min-height: 0;
 }
 
+.atlas-workspace:has(> .geography-inspector) {
+  grid-template-columns: minmax(0, 1fr) minmax(21rem, 23rem) minmax(19rem, 21rem);
+}
+
+.geography-inspector {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid rgb(29 43 39 / 12%);
+  background: var(--paper);
+}
+
+.geography-inspector .wals-standalone {
+  padding: 0.8rem;
+}
+
 .geography-sidebar {
   display: flex;
   flex-direction: column;
@@ -109,7 +126,7 @@ h1 {
 
 .language-finder {
   display: grid;
-  grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   border-left: 1px solid rgb(29 43 39 / 12%);
   background: var(--paper);
 }
@@ -585,35 +602,6 @@ h2 {
   border-bottom: 1px solid rgb(29 43 39 / 16%);
   background: transparent;
 }
-.finder-detail__header {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.45rem 0.75rem;
-}
-.finder-detail__heading {
-  flex: 1;
-  min-width: 0;
-}
-.finder-detail__toggle,
-.finder-detail__close {
-  flex-shrink: 0;
-  width: 1.8rem;
-  height: 1.8rem;
-  padding: 0;
-  border: 0;
-  border-radius: 0.3rem;
-  color: var(--muted-ink);
-  background: transparent;
-  font-size: 1.1rem;
-  cursor: pointer;
-}
-.finder-detail__toggle:hover,
-.finder-detail__close:hover {
-  color: var(--accent);
-  background: rgb(203 93 62 / 10%);
-}
 .finder-detail__body {
   min-height: 0;
   padding: 0 0.75rem 0.5rem;
@@ -647,35 +635,6 @@ h2 {
   color: var(--muted-ink);
   font-size: 0.65rem;
   line-height: 1.5;
-}
-.finder-detail__heading h3,
-.finder-detail__heading small {
-  display: block;
-}
-.finder-detail__heading h3 {
-  margin: 0;
-  font-family: "Newsreader", serif;
-  font-size: 1.35rem;
-  font-weight: 500;
-}
-.finder-detail__name {
-  padding: 0;
-  border: 0;
-  color: inherit;
-  background: none;
-  font: inherit;
-  text-align: left;
-}
-.finder-detail__name:hover:not(:disabled) {
-  text-decoration: underline;
-}
-.finder-detail__name:disabled {
-  cursor: default;
-}
-.finder-detail__heading small {
-  margin-top: 0.15rem;
-  color: var(--muted-ink);
-  font-size: 0.6rem;
 }
 .finder-detail__path {
   display: flex;
@@ -1277,6 +1236,11 @@ h2 {
     grid-template-rows: minmax(16rem, 38dvh) minmax(36rem, 62dvh);
   }
 
+  .atlas-workspace:has(> .geography-inspector) {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(16rem, 38dvh) minmax(12rem, 30dvh) minmax(36rem, 62dvh);
+  }
+
   .language-finder {
     border-top: 1px solid rgb(29 43 39 / 12%);
     border-left: 0;
@@ -1825,19 +1789,6 @@ h2 {
   padding: 0.25rem 0 0.65rem 1.1rem;
 }
 
-.sidebar-pane__identity {
-  flex: 1;
-  min-width: 0;
-}
-
-.sidebar-pane__toggle {
-  flex-shrink: 0;
-  padding: 0;
-  border: 0;
-  color: var(--muted-ink);
-  background: transparent;
-}
-
 .sidebar-pane__header:focus-visible,
 .language-finder :is(button, select, input, textarea, summary):focus-visible {
   outline: 2px solid var(--accent);
@@ -2078,4 +2029,13 @@ h2 {
 .language-word-entries:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.geography-inspector .finder-detail {
+  max-height: none;
+  border-bottom: 0;
+}
+
+.geography-inspector .finder-detail__body {
+  overflow: visible;
 }

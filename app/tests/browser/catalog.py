@@ -226,17 +226,21 @@ def main():
             assert browser.js("return document.activeElement.dataset.languageId") == child_id
             assert browser.snapshot()["selectedCount"] == 0
             assert browser.js("""
-                return document.querySelector('.language-tabs').getBoundingClientRect().bottom <=
-                    document.querySelector('.finder-detail').getBoundingClientRect().top + 1;
-            """), 'Opening the inspector keeps primary navigation anchored above it'
-            browser.js("document.querySelector('.finder-detail__toggle').click()")
-            assert browser.js("return document.querySelector('#focused-language-body').hidden")
+                const map = document.querySelector('.map-shell').getBoundingClientRect();
+                const details = document.querySelector('.geography-inspector').getBoundingClientRect();
+                const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+                const finder = document.querySelector('.language-finder').getBoundingClientRect();
+                return map.right <= details.left + 1 && details.right <= controls.left + 1 &&
+                    finder.left >= controls.left && finder.right <= controls.right + 1 &&
+                    document.querySelector('.language-list').clientHeight >= 88;
+            """), 'Inspection opens beside the map and leaves browsing controls usable'
+            assert browser.js("return !document.querySelector('.finder-detail__toggle')")
             view(browser, 'map')
             assert browser.js("""
                 return !!document.querySelector('.finder-detail') &&
-                    document.querySelector('#focused-language-body').hidden &&
+                    !document.querySelector('#focused-language-body').hidden &&
                     document.querySelector('.finder-options').getClientRects().length === 0;
-            """), "Collapsed inspection persists across views; filters belong to Explore"
+            """), "Inspection stays expanded across views; filters belong to Explore"
             view(browser, 'explore')
             browser.js("document.querySelector('.finder-detail__close').click()")
             assert browser.js("return !document.querySelector('.finder-detail')")
@@ -330,7 +334,7 @@ def main():
             results["selectionGroups"] = check_selection(browser, output)
             results["comparisons"] = check_comparisons(browser, output)
 
-            # Expanded details stays bounded and leaves room to browse on narrow screens.
+            # The extra pane can scroll independently when the browser is narrow.
 
             browser.call("POST", "/window/rect", {"width": 390, "height": 844})
             search(browser, "abkh1242", "abkh1242")
@@ -340,10 +344,13 @@ def main():
                 const panel = document.querySelector('.finder-detail');
                 return {height: panel.clientHeight, width: innerWidth,
                     documentWidth: document.documentElement.scrollWidth,
+                    inspectorHeight: document.querySelector('.geography-inspector').clientHeight,
+                    inspectorScrollHeight: document.querySelector('.geography-inspector').scrollHeight,
                     listHeight: document.querySelector('.language-list').clientHeight,
                     visiblePanels: [...document.querySelectorAll('.language-panel')].filter(panel => !panel.hidden).length};
                 """)
-            assert 120 <= narrow["height"] <= 224 and narrow["visiblePanels"] == 1, narrow
+            assert narrow["height"] >= 120 and narrow["visiblePanels"] == 1, narrow
+            assert narrow["inspectorScrollHeight"] >= narrow["inspectorHeight"], narrow
             assert narrow["listHeight"] >= 88, narrow
             assert narrow["documentWidth"] <= narrow["width"], narrow
             results["narrowLayout"] = narrow

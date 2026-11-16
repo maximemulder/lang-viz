@@ -1,5 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useEffect } from 'react'
+import { DetailsHeader } from '../../components/DetailsHeader.tsx'
 import type { WalsReference, WalsRepository } from '../../domain/wals.ts'
 import type { WalsAssociation } from '../../integrations/wals/languageMatching.ts'
 import { resolveWalsProfile } from '../../integrations/wals/profile.ts'
@@ -369,10 +370,11 @@ export const WalsStandaloneInspection = () => {
   if (inspection.profileId) return null
   return (
     <section className="wals-panel wals-standalone" aria-label="Standalone WALS source inspection">
-      <h4>WALS source inspection</h4>
-      <button type="button" onClick={() => dispatch({ type: 'clear-inspection' })}>
-        Close source inspection
-      </button>
+      <DetailsHeader
+        title={inspection.record?.name ?? 'WALS source inspection'}
+        closeLabel="Close source inspection"
+        onClose={() => dispatch({ type: 'clear-inspection' })}
+      />
       <p>{inspection.message}</p>
       <RecordedFeatures
         repository={repository}

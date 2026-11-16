@@ -44,13 +44,11 @@ export const languagePanelAtom = atom<{
   readonly detailId: string | null
   readonly detailGroupId: string | null
   readonly detailEntryId: string | null
-  readonly detailCollapsed: boolean
 }>({
   view: 'explore',
   detailId: null,
   detailGroupId: null,
   detailEntryId: null,
-  detailCollapsed: false,
 })
 
 export const openLanguageDetailsAtom = atom(
@@ -62,7 +60,6 @@ export const openLanguageDetailsAtom = atom(
       detailId: typeof target === 'string' ? target : target.languageId,
       detailGroupId: typeof target === 'string' ? null : (target.groupId ?? null),
       detailEntryId: typeof target === 'string' ? null : (target.entryId ?? null),
-      detailCollapsed: false,
     })
     if (typeof target === 'string' || target.moveMap !== false) {
       set(focusLanguageOnMapAtom, typeof target === 'string' ? { languageId: target } : target)
@@ -78,7 +75,6 @@ export const closeLanguageDetailsAtom = atom(null, (get, set) => {
     detailId: null,
     detailGroupId: null,
     detailEntryId: null,
-    detailCollapsed: false,
   })
 })
 

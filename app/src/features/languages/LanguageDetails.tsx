@@ -1,6 +1,8 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useMemo } from 'react'
-import { SidebarPane, SidebarPaneHeader } from '../../components/SidebarPane'
+import { DetailsHeader } from '../../components/DetailsHeader'
+import { DetailsMapAction } from '../../components/DetailsMapAction'
+import { SidebarPane } from '../../components/SidebarPane'
 import { mappedBranchForLanguage } from '../../domain/aggregation'
 import { languageAncestors } from '../../domain/hierarchy'
 import { targetGeometry } from '../../domain/languageFocus'
@@ -127,57 +129,33 @@ export const LanguageDetails = () => {
       aria-label="Entry details"
       aria-labelledby="focused-language-name"
     >
-      <SidebarPaneHeader
+      <DetailsHeader
         className="finder-detail__header"
-        toggleClassName="finder-detail__toggle"
-        title={
-          <div className="finder-detail__heading" aria-live="polite">
-            <h3 id="focused-language-name">
-              <button
-                type="button"
-                className="finder-detail__name"
-                disabled={!canFocusMap}
-                title={`Center map on ${detail.name}`}
-                onClick={() => focusOnMap(profileTarget)}
-              >
-                {detail.name}
-              </button>
-            </h3>
-            <small>
-              {detail.level} · {detail.id}
-              {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
-            </small>
-          </div>
+        identityClassName="finder-detail__heading"
+        closeClassName="finder-detail__close"
+        titleId="focused-language-name"
+        title={detail.name}
+        subtitle={
+          <>
+            {detail.id}
+            {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
+          </>
         }
-        expanded={!panel.detailCollapsed}
-        controls="focused-language-body"
-        toggleLabel={
-          panel.detailCollapsed ? 'Expand language details' : 'Collapse language details'
-        }
-        onToggle={() => setPanel({ ...panel, detailCollapsed: !panel.detailCollapsed })}
-        actions={
-          <button
-            type="button"
-            className="finder-detail__close"
-            aria-label="Close language details"
-            onClick={() => {
-              const origin = document.querySelector<HTMLElement>(
-                `#language-panel-${panel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
-              )
-              const restoreFocus = origin ?? document.getElementById(`language-tab-${panel.view}`)
-              closeDetails()
-              restoreFocus?.focus({ preventScroll: true })
-            }}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        }
+        closeLabel="Close language details"
+        onClose={() => {
+          const origin = document.querySelector<HTMLElement>(
+            `#language-panel-${panel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
+          )
+          const restoreFocus = origin ?? document.getElementById(`language-tab-${panel.view}`)
+          closeDetails()
+          restoreFocus?.focus({ preventScroll: true })
+        }}
       />
+      <DetailsMapAction disabled={!canFocusMap} onFocus={() => focusOnMap(profileTarget)} />
       <div
         id="focused-language-body"
         className="finder-detail__body"
         key={`${detail.id}/${panel.detailGroupId ?? ''}/${panel.detailEntryId ?? ''}`}
-        hidden={panel.detailCollapsed}
       >
         <nav className="finder-detail__path" aria-label="Classification ancestors">
           {languageAncestors(hierarchy, detail).map((ancestor) => (

@@ -263,7 +263,7 @@ def fixture_checks(output):
         assert "Unmatched (orphan)" in browser.js(
             "return document.querySelector('.wals-standalone').textContent"
         )
-        click_text(browser, "Close source inspection")
+        browser.js("document.querySelector('button[aria-label=\"Close source inspection\"]').click()")
         click_text(browser, "Catalog pending")
         click_text(browser, "Inspect Donegal")
         record(browser, "ird")
@@ -276,7 +276,7 @@ def fixture_checks(output):
             "unobserved and absent records, standalone unmatched evidence, late association preserves evidence without profile navigation"
         )
 
-        click_text(browser, "Close source inspection")
+        browser.js("document.querySelector('button[aria-label=\"Close source inspection\"]').click()")
         click_text(browser, "atlas:irish")
         browser.js("document.querySelector('select[aria-label=\"Recorded WALS variety\"]').focus()")
         key(browser, "\ue010")  # End selects the last variety using the native select.
@@ -397,7 +397,7 @@ def production_checks(output):
         browser.js("document.querySelector('.wals-card[data-feature-id=\"87A\"]').scrollIntoView()")
         assert browser.js("return document.documentElement.scrollWidth <= innerWidth")
         assert browser.js(
-            "return document.querySelector('.finder-detail__body').scrollHeight > document.querySelector('.finder-detail__body').clientHeight"
+            "return document.querySelector('.geography-inspector').scrollHeight > document.querySelector('.geography-inspector').clientHeight"
         )
         browser.screenshot(output / "production/narrow-orok.png")
         assert not browser.js("return !!document.querySelector('.wals-panel button[aria-pressed]')")

@@ -8,9 +8,7 @@ import {
   selectedMapAreasAtom,
 } from '../../state/atlasState'
 import { type LanguagePanelView, languagePanelAtom } from '../../state/languageControls'
-import { WalsStandaloneInspection } from '../wals/LanguageFeatures.tsx'
 import { ExploreLanguages } from './ExploreLanguages'
-import { LanguageDetails } from './LanguageDetails'
 import { OnMapView } from './OnMapView'
 
 const VIEWS = ['explore', 'map'] as const
@@ -71,10 +69,6 @@ export const LanguageFinder = () => {
             {view === 'map' && <span>{groups.length.toLocaleString()}</span>}
           </button>
         ))}
-      </div>
-      <div className="language-finder__inspection">
-        {panel.detailId && <LanguageDetails />}
-        <WalsStandaloneInspection />
       </div>
       {/* Keep list views mounted so their searches, expansion and scroll positions survive inspection. */}
       <section

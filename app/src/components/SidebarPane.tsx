@@ -31,49 +31,6 @@ export const SidebarPane = ({
   </details>
 )
 
-/** The inspector also needs an independently clickable name and a close action. */
-export const SidebarPaneHeader = ({
-  title,
-  summary,
-  expanded,
-  onToggle,
-  controls,
-  toggleLabel,
-  actions,
-  className = '',
-  toggleClassName = '',
-}: PaneHeadingProps & {
-  readonly expanded: boolean
-  readonly onToggle: () => void
-  readonly controls: string
-  readonly toggleLabel: string
-  readonly actions?: ReactNode
-  readonly className?: string
-  readonly toggleClassName?: string
-}) => {
-  return (
-    <header className={`sidebar-pane__header ${className}`}>
-      <button
-        type="button"
-        className={`sidebar-pane__toggle ${toggleClassName}`}
-        aria-label={toggleLabel}
-        aria-expanded={expanded}
-        aria-controls={controls}
-        onClick={onToggle}
-      >
-        <span className="sidebar-pane__chevron" data-expanded={expanded} aria-hidden="true">
-          ▸
-        </span>
-      </button>
-      <div className="sidebar-pane__identity">
-        {title}
-        {summary && <span className="sidebar-pane__summary">{summary}</span>}
-      </div>
-      {actions}
-    </header>
-  )
-}
-
 /** A section with an explicit content box lets long lists fill the available space. */
 export const SidebarSection = ({
   title,

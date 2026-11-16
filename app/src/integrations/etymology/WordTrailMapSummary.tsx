@@ -1,4 +1,5 @@
 import { useAtomValue, useSetAtom } from 'jotai'
+import { DetailsHeader } from '../../components/DetailsHeader.tsx'
 import { hasLanguagePoint } from '../../domain/etymology.ts'
 import { atlasWordTrailAtom, etymologyRepositoryAtom } from '../../features/etymology/state.ts'
 import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
@@ -25,10 +26,12 @@ export default function WordTrailMapSummary() {
   }).length
   return (
     <aside className="word-map-summary" aria-label="Current word trail on atlas">
-      <p className="eyebrow">Current word trail</p>
-      <h2>
-        {data.lexemes[session.trail.root ?? '']?.f} · {trail.ids.length} forms
-      </h2>
+      <DetailsHeader
+        title={data.lexemes[session.trail.root ?? '']?.f ?? 'Word trail'}
+        subtitle={`${trail.ids.length} forms`}
+        closeLabel="Clear word overlay"
+        onClose={() => dispatch({ type: 'clear-overlay' })}
+      />
       <p>
         {located} of {groups.length} language records have focal points. Lines connect
         representative locations, not historical routes. Relationship direction and evidence are in
@@ -50,9 +53,6 @@ export default function WordTrailMapSummary() {
         </button>
         <button type="button" disabled={operation?.busy} onClick={() => void addAreas()}>
           Add matched language areas
-        </button>
-        <button type="button" onClick={() => dispatch({ type: 'clear-overlay' })}>
-          Clear word overlay
         </button>
       </div>
       {operation?.message && <p role="status">{operation.message}</p>}

@@ -1,5 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useState } from 'react'
+import { DetailsHeader } from '../../components/DetailsHeader'
 import { LanguagePreviewItem } from '../../features/languages/LanguagePreview'
 import { readableWalsValue, WALS_TITLES } from '../../features/wals/cards'
 import { walsRepositoryAtom, walsSessionAtom } from '../../features/wals/state'
@@ -27,19 +28,13 @@ export default function WalsMapSummary() {
       aria-label="Matching language areas"
       data-wals-feature={overlay.featureId}
     >
-      <button
-        type="button"
-        className="wals-summary-close"
-        aria-label="Clear matching language areas"
-        onClick={() => clear()}
-      >
-        ×
-      </button>
-      <p className="eyebrow">Shared language feature</p>
-      <h2>
-        {WALS_TITLES[overlay.featureId] ?? 'Language feature'} ·{' '}
-        {category ? readableWalsValue(overlay.featureId, category.name) : 'Unknown'}
-      </h2>
+      <DetailsHeader
+        title={WALS_TITLES[overlay.featureId] ?? 'Language feature'}
+        subtitle={category ? readableWalsValue(overlay.featureId, category.name) : 'Unknown'}
+        closeClassName="wals-summary-close"
+        closeLabel="Clear matching language areas"
+        onClose={() => clear()}
+      />
       <p>
         {languages.length} language areas highlighted. Hover to preview, click for information,
         double-click to isolate.

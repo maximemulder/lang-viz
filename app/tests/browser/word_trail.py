@@ -242,7 +242,7 @@ def main():
             select_control(browser, ".finder-filters__period select", "contemporary")
             browser.settled(60, fail_on_error=True)
             before_clear = browser.snapshot()
-            button("Clear word overlay")
+            browser.js("document.querySelector('button[aria-label=\"Clear word overlay\"]').click()")
             wait_for(
                 lambda: not browser.js("return !!document.querySelector('.word-map-summary')"),
                 10,

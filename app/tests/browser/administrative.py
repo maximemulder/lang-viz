@@ -123,7 +123,14 @@ window.fetch = (...args) => {
             hits = wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-polygon-hits'])") or None, 20, "rendered polygon hit")
             assert any(hit["properties"].get("territoryCode") == "NL" for hit in hits), hits
             click_geo([6.2, 53.1])
-            wait_for(lambda: js("return document.querySelector('.administrative-detail .administrative-code')?.textContent==='NL'"), 15, "polygon area selection")
+            wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'"), 15, "polygon area selection")
+            assert js("""
+                const details = document.querySelector('.geography-inspector');
+                const controls = document.querySelector('.administrative-panel');
+                return details?.contains(document.querySelector('.administrative-detail')) &&
+                    !controls.contains(document.querySelector('.administrative-detail')) &&
+                    document.querySelector('.administrative-results').clientHeight >= 80;
+            """)
             report["checks"].append("border-on polygon picker selects the CLDR area")
             js("[...document.querySelectorAll('input[name=administrative-metric]')][1].click()")
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
@@ -133,7 +140,7 @@ window.fetch = (...args) => {
             type_query("XK")
             wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='XK')"), 10, "unmatched area search")
             select_code("XK")
-            assert js("return document.querySelector('.administrative-focus').disabled")
+            assert js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
             assert "no matched polygon" in js("return document.querySelector('.administrative-map-legend').textContent")
             report["checks"].append("ambiguous territory remains searchable without a polygon")
             button("Areas", ".administrative-search-kind")
@@ -152,7 +159,7 @@ window.fetch = (...args) => {
             assert "independent of any displayed polygon" in js(
                 "return document.querySelector('.administrative-detail').textContent"
             )
-            assert not js("return document.querySelector('.administrative-focus').disabled")
+            assert not js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
             report["checks"].append("territory search, selection, and overlap caveat")
 
             button("Languages", ".administrative-search-kind")
@@ -183,7 +190,7 @@ window.fetch = (...args) => {
             assert "Borders are off" in js("return document.querySelector('.administrative-map-legend').textContent")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-polygon-hits']).length===0"), 10, "polygon layer removal")
             click_geo(nl_point)
-            wait_for(lambda: js("return document.querySelector('.administrative-detail .administrative-code')?.textContent==='NL'"), 10, "visible marker selection")
+            wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'"), 10, "visible marker selection")
             report["checks"].append("border-off marker remains selectable without a polygon hit layer")
             js("document.querySelector('.map-area-controls__inspect button:first-of-type').click()")
             assert js("return document.querySelector('.map-area-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"

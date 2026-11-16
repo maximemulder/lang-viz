@@ -1,5 +1,5 @@
 .wals-map-summary {
-  padding: 0.75rem;
+  padding: 0;
   border-bottom: 1px solid #bec8c0;
   background: var(--paper);
   color: var(--ink);
@@ -8,12 +8,9 @@
   line-height: 1.5;
 }
 
-.wals-map-summary h2 {
-  font-size: 1rem;
-  margin: 0.4rem 0;
-}
-.wals-map-summary p {
-  margin: 0.4rem 0;
+.wals-map-summary > p,
+.wals-map-summary > details {
+  margin: 0.75rem;
 }
 .wals-map-actions {
   display: flex;
@@ -83,33 +80,6 @@
 .wals-map-popup button {
   display: block;
   margin: 0.3rem 0;
-}
-.wals-map-summary {
-  position: relative;
-  border-radius: 0.6rem;
-  margin: 0.5rem;
-  background: #edf3e8;
-  border: 1px solid #cbd6c7;
-  padding: 0.8rem;
-  font-size: 0.78rem;
-}
-.wals-map-summary h2 {
-  padding-right: 1.3rem;
-  font-size: 0.98rem;
-  line-height: 1.4;
-}
-.wals-map-summary .eyebrow {
-  font-size: 0.65rem;
-}
-.wals-map-summary .wals-summary-close {
-  position: absolute;
-  right: 0.35rem;
-  top: 0.25rem;
-  border: 0;
-  background: transparent;
-  font-size: 1.3rem;
-  min-width: 2rem;
-  min-height: 2rem;
 }
 .wals-map-summary summary {
   cursor: pointer;

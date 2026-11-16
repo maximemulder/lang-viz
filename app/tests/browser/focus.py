@@ -79,17 +79,17 @@ def check_focus(browser, output):
     ready()
     outlined([dutch])
 
-    # The existing profile name can refocus; no extra Locate button is needed.
+    # The explicit map action refocuses the selected language.
     browser.js('window.overlapTest.camera([80,20],3)')
     far = ready()['camera']
-    browser.js("document.querySelector('.finder-detail__name').click()")
-    wait_for(lambda: browser.snapshot()['camera'] != far, 15, 'profile name refocus')
+    browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
+    wait_for(lambda: browser.snapshot()['camera'] != far, 15, 'language map action refocus')
     ready()
     outlined([dutch])
     # A second profile click interrupts an in-flight move to the previous profile.
     browser.js('window.overlapTest.camera([80,20],3)')
     ready()
-    browser.js("document.querySelector('.finder-detail__name').click()")
+    browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
     search(browser, 'stan1295', 'stan1295')
     browser.js("document.querySelector('.language-row__identity').click()")
     wait_for(lambda: browser.snapshot()['camera']['center'][0] < 20 and not browser.snapshot()['moving'], 20, 'latest profile wins')
@@ -98,7 +98,7 @@ def check_focus(browser, output):
     search(browser, 'shan1293', 'shan1293')
     old_camera = browser.snapshot()['camera']
     open_details(browser, expand=False)
-    assert browser.js("return document.querySelector('.finder-detail__name').disabled")
+    assert browser.js("return document.querySelector('.finder-detail .details-map-action__button').disabled")
     assert 'No mapped area' in browser.js("return document.querySelector('.finder-detail').textContent")
     outlined([])
     assert ready()['camera'] == old_camera
@@ -133,7 +133,7 @@ def check_focus(browser, output):
     before_remove = ready()['camera']
     browser.js("document.querySelector('.focused-map-entry button').click()")
     wait_for(lambda: browser.snapshot()['selectedCount'] == 0, 10, 'remove focused entry')
-    assert browser.js("return document.querySelector('.finder-detail__name').disabled")
+    assert browser.js("return document.querySelector('.finder-detail .details-map-action__button').disabled")
     outlined([])
     assert ready()['camera'] == before_remove
 

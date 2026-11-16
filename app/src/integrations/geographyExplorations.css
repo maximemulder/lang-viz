@@ -1,8 +1,5 @@
 .geography-explorations {
-  flex: 0 1 auto;
   min-height: 0;
-  max-height: 45%;
-  overflow: auto;
 }
 
 .geography-explorations > .word-map-summary {

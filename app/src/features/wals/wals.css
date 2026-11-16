@@ -147,3 +147,7 @@
 .wals-panel details p {
   font-size: 0.78rem;
 }
+
+.wals-standalone > .details-header {
+  margin: -0.8rem -0.8rem 0.75rem;
+}
