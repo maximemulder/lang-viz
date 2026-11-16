@@ -1284,39 +1284,6 @@ h2 {
   border-radius: 0.15rem;
 }
 
-.language-tabs {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0 0.75rem;
-  border-bottom: 1px solid rgb(29 43 39 / 12%);
-}
-
-.language-tabs button {
-  flex: 1;
-  padding: 0.75rem 0.35rem 0.6rem;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--muted-ink);
-  background: transparent;
-  font-size: 0.78rem;
-}
-
-.language-tabs button[aria-selected="true"] {
-  border-bottom-color: var(--ink);
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.language-tabs button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.language-tabs button span {
-  margin-left: 0.35rem;
-  font-size: 0.65rem;
-}
-
 .language-panel {
   min-width: 0;
   min-height: 0;
@@ -1625,7 +1592,6 @@ h2 {
   background: rgb(203 93 62 / 10%);
 }
 
-.language-tabs button:focus-visible,
 .language-row__identity:focus-visible,
 .on-map-row button:focus-visible,
 .finder-detail button:focus-visible,

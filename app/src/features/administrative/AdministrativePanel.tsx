@@ -2,6 +2,7 @@ import { useAtomValue, useSetAtom } from 'jotai'
 import { type CSSProperties, useEffect, useMemo } from 'react'
 import { DetailsHeader } from '../../components/DetailsHeader.tsx'
 import { DetailsMapAction } from '../../components/DetailsMapAction.tsx'
+import { SidebarTabs } from '../../components/SidebarTabs.tsx'
 import type { AdministrativeRepository, Observation } from './model.ts'
 import {
   type ReportedObservation,
@@ -352,11 +353,6 @@ export default function AdministrativePanel() {
 
   return (
     <aside className="administrative-panel" aria-label="Administrative language statistics">
-      <header className="administrative-panel__header">
-        <p className="eyebrow">Administrative</p>
-        <h2>Languages by area</h2>
-        <p>Explore reported language estimates for CLDR territory codes.</p>
-      </header>
       {!repository ? (
         <div
           className="administrative-panel__status"
@@ -375,154 +371,160 @@ export default function AdministrativePanel() {
         </div>
       ) : (
         <>
-          <fieldset className="administrative-search-kind">
-            <legend>Search</legend>
-            {(['territory', 'language', 'family'] as const).map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                aria-pressed={session.searchKind === kind}
-                onClick={() => setKind(kind)}
-              >
-                {kind === 'territory' ? 'Areas' : kind === 'language' ? 'Languages' : 'Families'}
-              </button>
-            ))}
-          </fieldset>
-          <fieldset className="administrative-metrics">
-            <legend>Map color</legend>
-            <label>
-              <input
-                type="radio"
-                name="administrative-metric"
-                checked={!session.metric}
-                onChange={() => setMetric(null)}
-              />
-              None
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="administrative-metric"
-                checked={session.metric?.kind === 'territory-population'}
-                onChange={() => setMetric({ kind: 'territory-population' })}
-              />
-              Reported population
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="administrative-metric"
-                checked={session.metric?.kind === 'territory-literacy'}
-                onChange={() => setMetric({ kind: 'territory-literacy' })}
-              />
-              Territory literacy
-            </label>
-            {session.selection?.kind === 'language' && (
+          <SidebarTabs
+            className="administrative-search-kind"
+            idPrefix="administrative"
+            label="Search by"
+            selected={session.searchKind}
+            onSelect={setKind}
+            tabs={[
+              { value: 'territory', label: 'Areas' },
+              { value: 'language', label: 'Languages' },
+              { value: 'family', label: 'Families' },
+            ]}
+          />
+          <section
+            className="administrative-search-panel"
+            id={`administrative-panel-${session.searchKind}`}
+            role="tabpanel"
+            aria-labelledby={`administrative-tab-${session.searchKind}`}
+          >
+            <fieldset className="administrative-metrics">
+              <legend>Map color</legend>
               <label>
                 <input
                   type="radio"
                   name="administrative-metric"
-                  checked={
-                    session.metric?.kind === 'language-estimate' &&
-                    session.metric.sourceLanguageCode === session.selection.id
-                  }
-                  onChange={() => {
-                    if (session.selection?.kind === 'language')
-                      setMetric({
-                        kind: 'language-estimate',
-                        sourceLanguageCode: session.selection.id,
-                      })
-                  }}
+                  checked={!session.metric}
+                  onChange={() => setMetric(null)}
                 />
-                Selected language estimate
+                None
               </label>
-            )}
-            {session.selection?.kind === 'family' && (
               <label>
                 <input
                   type="radio"
                   name="administrative-metric"
-                  checked={
-                    session.metric?.kind === 'family-estimate' &&
-                    session.metric.familyId === session.selection.id
-                  }
-                  onChange={() => {
-                    if (session.selection?.kind === 'family')
-                      setMetric({ kind: 'family-estimate', familyId: session.selection.id })
-                  }}
+                  checked={session.metric?.kind === 'territory-population'}
+                  onChange={() => setMetric({ kind: 'territory-population' })}
                 />
-                Selected family estimate sum
+                Reported population
               </label>
-            )}
-            <p>
-              Color appears only for matched polygons when Borders is on. No value means no fill.
-            </p>
-          </fieldset>
-          <label className="administrative-search-field">
-            Find {session.searchKind === 'territory' ? 'an area' : `a ${session.searchKind}`}
-            <input
-              type="search"
-              value={session.query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Name or source code"
-            />
-          </label>
-          <section className="administrative-results" aria-label="Search results">
-            <p>
-              {number(results.length)}{' '}
-              {session.searchKind === 'territory' ? 'areas' : `${session.searchKind}s`}
-              {results.length > visibleResults.length
-                ? ` · first ${visibleResults.length} shown`
-                : ''}
-            </p>
-            {results.length === 0 && <p>No matches.</p>}
-            <ul>
-              {visibleResults.map((item) => (
-                <li key={`${item.kind}:${item.id}`}>
-                  <button
-                    type="button"
-                    aria-current={
-                      session.selection?.kind === item.kind && session.selection.id === item.id
-                        ? 'true'
-                        : undefined
+              <label>
+                <input
+                  type="radio"
+                  name="administrative-metric"
+                  checked={session.metric?.kind === 'territory-literacy'}
+                  onChange={() => setMetric({ kind: 'territory-literacy' })}
+                />
+                Territory literacy
+              </label>
+              {session.selection?.kind === 'language' && (
+                <label>
+                  <input
+                    type="radio"
+                    name="administrative-metric"
+                    checked={
+                      session.metric?.kind === 'language-estimate' &&
+                      session.metric.sourceLanguageCode === session.selection.id
                     }
-                    onClick={() => select({ kind: item.kind, id: item.id })}
-                  >
-                    {item.label} <span className="administrative-code">{item.id}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    onChange={() => {
+                      if (session.selection?.kind === 'language')
+                        setMetric({
+                          kind: 'language-estimate',
+                          sourceLanguageCode: session.selection.id,
+                        })
+                    }}
+                  />
+                  Selected language estimate
+                </label>
+              )}
+              {session.selection?.kind === 'family' && (
+                <label>
+                  <input
+                    type="radio"
+                    name="administrative-metric"
+                    checked={
+                      session.metric?.kind === 'family-estimate' &&
+                      session.metric.familyId === session.selection.id
+                    }
+                    onChange={() => {
+                      if (session.selection?.kind === 'family')
+                        setMetric({ kind: 'family-estimate', familyId: session.selection.id })
+                    }}
+                  />
+                  Selected family estimate sum
+                </label>
+              )}
+              <p>
+                Color appears only for matched polygons when Borders is on. No value means no fill.
+              </p>
+            </fieldset>
+            <label className="administrative-search-field">
+              Find {session.searchKind === 'territory' ? 'an area' : `a ${session.searchKind}`}
+              <input
+                type="search"
+                value={session.query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Name or source code"
+              />
+            </label>
+            <section className="administrative-results" aria-label="Search results">
+              <p>
+                {number(results.length)}{' '}
+                {session.searchKind === 'territory' ? 'areas' : `${session.searchKind}s`}
+                {results.length > visibleResults.length
+                  ? ` · first ${visibleResults.length} shown`
+                  : ''}
+              </p>
+              {results.length === 0 && <p>No matches.</p>}
+              <ul>
+                {visibleResults.map((item) => (
+                  <li key={`${item.kind}:${item.id}`}>
+                    <button
+                      type="button"
+                      aria-current={
+                        session.selection?.kind === item.kind && session.selection.id === item.id
+                          ? 'true'
+                          : undefined
+                      }
+                      onClick={() => select({ kind: item.kind, id: item.id })}
+                    >
+                      {item.label} <span className="administrative-code">{item.id}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <details className="administrative-source">
+              <summary>About these estimates</summary>
+              <p>
+                Approximate functional speaker estimates may include first and later-language
+                speakers. The source count is derived from territory population and reported
+                percentage. Coverage is incomplete.
+              </p>
+              <p>
+                The joined file’s original CLDR release and preprocessing are unverified. Its source
+                codes are independent of map borders; browser-localized area names are display
+                labels only.
+              </p>
+              <p>
+                Snapshot: {number(repository.data.manifest.coverage.territoryCount)} areas,{' '}
+                {number(repository.data.manifest.coverage.observationCount)} observations. CLDR
+                release: {repository.data.manifest.cldrRelease ?? 'unknown'}.
+              </p>
+              <p>
+                Sources:{' '}
+                <a href="https://cldr.unicode.org/" target="_blank" rel="noreferrer">
+                  Unicode CLDR
+                </a>{' '}
+                and{' '}
+                <a href="https://glottolog.org/" target="_blank" rel="noreferrer">
+                  Glottolog
+                </a>
+                .
+              </p>
+            </details>
           </section>
-          <details className="administrative-source">
-            <summary>About these estimates</summary>
-            <p>
-              Approximate functional speaker estimates may include first and later-language
-              speakers. The source count is derived from territory population and reported
-              percentage. Coverage is incomplete.
-            </p>
-            <p>
-              The joined file’s original CLDR release and preprocessing are unverified. Its source
-              codes are independent of map borders; browser-localized area names are display labels
-              only.
-            </p>
-            <p>
-              Snapshot: {number(repository.data.manifest.coverage.territoryCount)} areas,{' '}
-              {number(repository.data.manifest.coverage.observationCount)} observations. CLDR
-              release: {repository.data.manifest.cldrRelease ?? 'unknown'}.
-            </p>
-            <p>
-              Sources:{' '}
-              <a href="https://cldr.unicode.org/" target="_blank" rel="noreferrer">
-                Unicode CLDR
-              </a>{' '}
-              and{' '}
-              <a href="https://glottolog.org/" target="_blank" rel="noreferrer">
-                Glottolog
-              </a>
-              .
-            </p>
-          </details>
         </>
       )}
     </aside>

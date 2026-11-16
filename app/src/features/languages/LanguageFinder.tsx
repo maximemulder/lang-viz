@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { type KeyboardEvent, useEffect, useRef } from 'react'
+import { useEffect } from 'react'
+import { SidebarTabs } from '../../components/SidebarTabs.tsx'
 import { walsAtlasCatalogAtom } from '../../integrations/wals/state.ts'
 import {
   atlasDataAtom,
@@ -11,9 +12,6 @@ import { type LanguagePanelView, languagePanelAtom } from '../../state/languageC
 import { ExploreLanguages } from './ExploreLanguages'
 import { OnMapView } from './OnMapView'
 
-const VIEWS = ['explore', 'map'] as const
-const LABELS = { explore: 'Explore', map: 'On map' }
-
 export const LanguageFinder = () => {
   const [panel, setPanel] = useAtom(languagePanelAtom)
   const atlas = useAtomValue(atlasDataAtom)
@@ -22,54 +20,25 @@ export const LanguageFinder = () => {
   const selected = useAtomValue(mapEntriesAtom)
   const groups = useAtomValue(mapGroupsAtom)
   const displayed = useAtomValue(selectedMapAreasAtom)
-  const tabRefs = useRef<Partial<Record<LanguagePanelView, HTMLButtonElement | null>>>({})
   const selectView = (view: LanguagePanelView) => setPanel({ ...panel, view })
-  const handleTabKey = (event: KeyboardEvent, view: LanguagePanelView) => {
-    const views = VIEWS
-    const index = views.indexOf(view)
-    const next =
-      event.key === 'ArrowRight'
-        ? views[(index + 1) % views.length]
-        : event.key === 'ArrowLeft'
-          ? views[(index + views.length - 1) % views.length]
-          : event.key === 'Home'
-            ? views[0]
-            : event.key === 'End'
-              ? views.at(-1)
-              : undefined
-    if (!next) return
-    event.preventDefault()
-    selectView(next)
-    tabRefs.current[next]?.focus()
-  }
   return (
     <aside className="language-finder" aria-label="Language controls">
-      <div className="language-tabs" role="tablist" aria-label="Language views">
-        {VIEWS.map((view) => (
-          <button
-            key={view}
-            type="button"
-            role="tab"
-            id={`language-tab-${view}`}
-            aria-controls={`language-panel-${view}`}
-            aria-selected={panel.view === view}
-            aria-label={
-              view === 'map'
-                ? `On map, ${groups.length.toLocaleString()} groups, ${selected.length.toLocaleString()} areas, ${displayed.length.toLocaleString()} displayed`
-                : undefined
-            }
-            tabIndex={panel.view === view ? 0 : -1}
-            ref={(element) => {
-              tabRefs.current[view] = element
-            }}
-            onClick={() => selectView(view)}
-            onKeyDown={(event) => handleTabKey(event, view)}
-          >
-            {LABELS[view]}
-            {view === 'map' && <span>{groups.length.toLocaleString()}</span>}
-          </button>
-        ))}
-      </div>
+      <SidebarTabs
+        className="language-tabs"
+        idPrefix="language"
+        label="Language views"
+        selected={panel.view}
+        onSelect={selectView}
+        tabs={[
+          { value: 'explore', label: 'Explore' },
+          {
+            value: 'map',
+            label: 'On map',
+            ariaLabel: `On map, ${groups.length.toLocaleString()} groups, ${selected.length.toLocaleString()} areas, ${displayed.length.toLocaleString()} displayed`,
+            badge: groups.length.toLocaleString(),
+          },
+        ]}
+      />
       {/* Keep list views mounted so their searches, expansion and scroll positions survive inspection. */}
       <section
         className="language-panel"
