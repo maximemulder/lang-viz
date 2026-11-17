@@ -3,7 +3,6 @@ import { Popup } from 'react-map-gl/maplibre'
 import { walsAreaMatchesAtom } from '../../integrations/wals/areaState'
 import { atlasDataAtom, languageColorsAtom, selectedMapAreasAtom } from '../../state/atlasState'
 import { openLanguageDetailsAtom } from '../../state/languageControls'
-import { isolatedLanguageIdAtom } from '../../state/mapInteraction'
 import { readableWalsValue, WALS_TITLES } from '../wals/cards'
 import { walsRepositoryAtom } from '../wals/state'
 
@@ -25,8 +24,7 @@ export const LanguageInspector = ({
     colors = useAtomValue(languageColorsAtom)
   const matches = useAtomValue(walsAreaMatchesAtom),
     repository = useAtomValue(walsRepositoryAtom)
-  const openDetails = useSetAtom(openLanguageDetailsAtom),
-    isolate = useSetAtom(isolatedLanguageIdAtom)
+  const openDetails = useSetAtom(openLanguageDetailsAtom)
   const countryNames = new Intl.DisplayNames(['en'], { type: 'region' })
   const seen = new Set<string>()
   const entries = inspection.variantIds.flatMap((id) => {
@@ -111,17 +109,6 @@ export const LanguageInspector = ({
                     >
                       More details
                     </button>
-                    <button
-                      type="button"
-                      className="language-inspector__details"
-                      aria-label={`Isolate ${language.name}`}
-                      onClick={() => {
-                        isolate(language.id)
-                        onClose()
-                      }}
-                    >
-                      Isolate
-                    </button>
                     <details>
                       <summary>Map source</summary>
                       <small>
@@ -131,7 +118,7 @@ export const LanguageInspector = ({
                     </details>
                   </>
                 ) : (
-                  <small>Click for information · double-click to isolate</small>
+                  <small>Click for details · double-click to focus</small>
                 )}
               </div>
             </article>

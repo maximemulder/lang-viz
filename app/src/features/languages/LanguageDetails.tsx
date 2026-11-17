@@ -30,7 +30,6 @@ import {
   openLanguageDetailsAtom,
   revealLanguageAtom,
 } from '../../state/languageControls'
-import { isolatedLanguageIdAtom } from '../../state/mapInteraction'
 import {
   searchCoverageAtom,
   searchSelectionAtom,
@@ -45,7 +44,6 @@ import { PinnedMapEntries } from './PinnedMapEntries'
 
 export const LanguageDetails = () => {
   const [panel, setPanel] = useAtom(languagePanelAtom)
-  const [isolatedId, setIsolatedId] = useAtom(isolatedLanguageIdAtom)
   const data = useAtomValue(atlasDataAtom)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
@@ -211,19 +209,6 @@ export const LanguageDetails = () => {
         <LanguageWordsButton language={detail} />
         <LanguageFeatures profileId={detail.id} />
         <SidebarPane className="finder-detail__more" title="More details">
-          {detailVariants.length > 0 && ['language', 'dialect'].includes(detail.level) && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsolatedId(isolatedId === detail.id ? null : detail.id)
-                if (isolatedId !== detail.id) focusOnMap(profileTarget)
-              }}
-            >
-              {isolatedId === detail.id
-                ? 'Show all map areas again'
-                : 'Isolate this language on map'}
-            </button>
-          )}
           {classification.kind === 'source' && (
             <div className="finder-detail__classification">
               <h4>Source-defined entry</h4>

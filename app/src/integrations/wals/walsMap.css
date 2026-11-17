@@ -98,29 +98,6 @@
   text-decoration: underline;
   padding: 0.35rem;
 }
-.map-isolation-control {
-  position: absolute;
-  top: 4.4rem;
-  left: 1rem;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 0.6rem;
-  background: #fffdf4f5;
-  border: 1px solid #ccd5ca;
-  font-size: 0.8rem;
-  max-width: calc(100% - 5rem);
-}
-.map-isolation-control button {
-  border: 0;
-  border-radius: 0.4rem;
-  background: #315e50;
-  color: white;
-  padding: 0.5rem;
-  cursor: pointer;
-}
 .language-inspector__entry .language-inspector__context {
   margin: 0.15rem 0;
   font-size: 0.78rem;

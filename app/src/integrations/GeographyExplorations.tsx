@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import { ADMINISTRATIVE_ATTRIBUTION } from '../features/administrative/attribution.ts'
 import { AREA_POINT_LAYER, AREA_POLYGON_LAYER } from '../features/administrative/boundaryLayers.ts'
 import {
+  focusAdministrativeShapeAtom,
   hoveredAdministrativeAreaAtom,
   languageBordersAtom,
   selectAdministrativeAtom,
@@ -34,6 +35,7 @@ export default function GeographyExplorations({
   const dispatch = useSetAtom(explorerActionAtom)
   const setHoveredArea = useSetAtom(hoveredAdministrativeAreaAtom)
   const selectArea = useSetAtom(selectAdministrativeAtom)
+  const focusShape = useSetAtom(focusAdministrativeShapeAtom)
   return (
     <GeographyWorkspace
       visible={visible}
@@ -54,7 +56,15 @@ export default function GeographyExplorations({
         onHover: (area, longitude, latitude) =>
           setHoveredArea(area ? { ...area, longitude, latitude } : null),
         onSelect: (area) => {
-          if (area?.territoryCode) selectArea({ kind: 'territory', id: area.territoryCode })
+          if (area)
+            selectArea(
+              area.territoryCode
+                ? { kind: 'territory', id: area.territoryCode }
+                : { kind: 'source-shape', id: area.featureId },
+            )
+        },
+        onFocus: (area) => {
+          focusShape(area.featureId)
         },
       }}
       mapLayers={

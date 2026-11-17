@@ -29,6 +29,9 @@ def test_pinned_view_and_browser_assets_agree(inputs: tuple[dict, dict]) -> None
         "unassignedFeatures": 5,
     }
     assert len(geometry["features"]) == 242
+    by_feature = {item["featureId"]: item for item in index["features"]}
+    assert by_feature["country-NLD"]["bounds"][0] > 3  # Mainland focus, not Caribbean islands.
+    assert by_feature["country-SOL"]["bounds"][2] < 50
     assert {
         item["sourceName"]
         for item in index["features"]

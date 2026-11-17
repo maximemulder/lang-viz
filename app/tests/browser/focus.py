@@ -171,6 +171,30 @@ def check_focus(browser, output):
     outlined(expected)
     assert browser.js("return !!document.querySelector('.focused-map-entry[data-group-id]')")
     assert not aggregate['errors']
+    # Pointer activation follows the same inspect/then-focus sequence as Areas mode.
+    browser.js('window.overlapTest.configure({languageIds:["stan1295"],center:[10,51],zoom:3})')
+    ready()
+    hit = browser.js('return window.overlapTest.inspect([10,51])')
+    assert german in hit['variantIds'], hit
+    def map_action(double=False):
+        x, y = browser.js('return window.overlapTest.inspect([10,51]).point')
+        actions = [{'type':'pointerMove','origin':'viewport','x':x,'y':y}]
+        actions += [{'type':'pointerDown','button':0},{'type':'pointerUp','button':0}]
+        if double:
+            actions += [{'type':'pointerDown','button':0},{'type':'pointerUp','button':0}]
+        browser.call('POST','/actions',{'actions':[{'type':'pointer','id':'map-pointer','parameters':{'pointerType':'mouse'},'actions':actions}]})
+    map_action()
+    wait_for(lambda: browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')"), 10, 'map click language details')
+    assert ready()['camera']['zoom'] == 3
+    map_action(double=True)
+    wait_for(lambda: browser.snapshot()['camera']['zoom'] > 3.5, 15, 'map double-click language focus')
+    assert browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')")
+    assert not browser.js("return !!document.querySelector('.map-isolation-control')")
+    browser.js('document.querySelector(".finder-detail button[aria-label=\\"Close language details\\"]").click()')
+    browser.js('window.overlapTest.camera([10,51],3)')
+    ready()
+    map_action(double=True)
+    wait_for(lambda: browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')") and browser.snapshot()['camera']['zoom'] > 3.5, 15, 'first double-click target retained')
     print('Sidebar pointer/keyboard previews, profile navigation, pinned context, style recovery, and aggregate framing passed', flush=True)
     return {'searchHover':'passed','keyboard':'passed','profileNavigation':'passed','pinnedContext':'passed','aggregateContributors':len(expected)}
 

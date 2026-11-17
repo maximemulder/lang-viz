@@ -143,7 +143,7 @@ country fills or generated replacement boundaries. The sidebar starts with a bri
 summary; its keyboard-accessible language list renders only when expanded.
 
 Map hover outlines an existing area and previews name, family and countries without
-replacing the open profile. Click opens information. Double-click isolates the
+replacing the open profile. Click opens information. Double-click focuses the
 language's existing areas; **Show all again** or Escape restores the view. Isolation
 changes paint only and preserves pinned selections. Overlapping languages offer a
 chooser. An isolation button is also available inside a profile's **More details**.

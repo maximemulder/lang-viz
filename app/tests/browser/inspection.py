@@ -71,21 +71,23 @@ def lifecycle(browser, output):
         move(browser, [-1.5, 52.5], click=True)
         wait_for(
             lambda: browser.js(
-                "return !!document.querySelector('.language-inspector--pinned .maplibregl-popup-close-button')"
+                "return !!document.querySelector('.finder-detail')"
             ),
             10,
-            "pinned popup close button",
+            "language sidebar details",
         )
-        move(browser, [2, 52.5])
-        expect_highlight(browser, english)
+        expected = move(browser, [2, 52.5])
+        expect_highlight(browser, expected)
         browser.js("window.overlapTest.reloadStyle()")
         browser.settled(60, fail_on_error=True)
-        expect_highlight(browser, english)
+        expect_highlight(browser, expected)
         browser.js("window.overlapTest.camera([-1.5,52.5],5.4)")
         browser.settled(60, fail_on_error=True)
-        expect_highlight(browser, english)
         browser.js(
-            "document.querySelector('.language-inspector .maplibregl-popup-close-button').click()"
+            "document.querySelector('.finder-detail button[aria-label=\"Close language details\"]').click()"
+        )
+        browser.call(
+            "POST", "/actions", {"actions": [{"type":"pointer", "id":"inspection-mouse", "parameters":{"pointerType":"mouse"}, "actions":[{"type":"pointerMove", "origin":"viewport", "x":1250, "y":300}]}]}
         )
         expect_highlight(browser, [])
         assert (
@@ -118,7 +120,7 @@ def lifecycle(browser, output):
         render_frames(browser)
         expect_highlight(browser, [])
     print(
-        "Hover, overlap, empty space, pin/close, style reload, new tiles and leave: passed",
+        "Hover, overlap, empty space, detail open/close, style reload, new tiles and leave: passed",
         flush=True,
     )
 

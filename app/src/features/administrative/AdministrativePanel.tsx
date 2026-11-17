@@ -19,6 +19,7 @@ import {
   administrativeRepositoryAtom,
   administrativeSessionAtom,
   boundaryIndexAtom,
+  focusAdministrativeShapeAtom,
   focusAdministrativeTerritoryAtom,
   loadAdministrativeAtom,
   selectAdministrativeAtom,
@@ -260,9 +261,28 @@ export const AdministrativeDetails = () => {
   const boundaryIndex = useAtomValue(boundaryIndexAtom)
   const select = useSetAtom(selectAdministrativeAtom)
   const focus = useSetAtom(focusAdministrativeTerritoryAtom)
+  const focusShape = useSetAtom(focusAdministrativeShapeAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
-  if (!repository || !session.selection) return null
+  if (!session.selection) return null
   const selection = session.selection
+  if (selection.kind === 'source-shape') {
+    const shape = boundaryIndex?.features.find((feature) => feature.featureId === selection.id)
+    if (!shape) return null
+    return (
+      <div className="administrative-detail-scroll">
+        <DetailsHeader
+          className="administrative-inspector-header"
+          title={shape.sourceName}
+          subtitle="Natural Earth administrative shape"
+          closeLabel={`Close ${shape.sourceName} details`}
+          onClose={() => select(null)}
+        />
+        <DetailsMapAction disabled={false} onFocus={() => focusShape(shape.featureId)} />
+        <p className="administrative-note">No CLDR data is linked to this area.</p>
+      </div>
+    )
+  }
+  if (!repository) return null
   const title =
     selection.kind === 'territory'
       ? regionLabel(selection.id, names)

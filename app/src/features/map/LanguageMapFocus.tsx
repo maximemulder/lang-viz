@@ -18,6 +18,7 @@ import {
 } from '../../state/languageControls'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { searchCoverageAtom } from '../../state/searchSelection'
+import { focusBounds } from './focusBounds.ts'
 import { GeometryHighlight } from './GeometryHighlight'
 import { useGeometryDisplay } from './geometry/display'
 import { GeometryPreview } from './geometry/GeometryPreview'
@@ -132,22 +133,8 @@ export const LanguageMapCamera = () => {
       if (bounds.some((bound) => !bound)) return
       const extent = combinedBounds(bounds.filter((bound) => bound !== undefined))
       if (!extent) return
-      const canvas = map.getCanvas()
-      const areaBounds: [[number, number], [number, number]] = [
-        [extent[0], extent[1]],
-        [extent[2], extent[3]],
-      ]
-      const padding = Math.min(48, canvas.clientWidth / 8, canvas.clientHeight / 8)
-      const camera = map.cameraForBounds(areaBounds, { padding })
-      if (camera?.zoom === undefined) return
       if (!current()) return
-      moved = true
-      map.fitBounds(areaBounds, {
-        padding,
-        // Leave room for the surrounding region, even for a very small footprint.
-        maxZoom: Math.max(map.getMinZoom(), Math.min(6, camera.zoom - 1)),
-        duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450,
-      })
+      moved = focusBounds(map, extent)
     }
     // A failed optional camera index must not interrupt inspecting or selecting languages.
     void navigate().catch(() => {})

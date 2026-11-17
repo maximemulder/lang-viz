@@ -16,6 +16,7 @@ from pathlib import Path
 import shapefile
 from shapely.geometry import MultiPolygon, Point, Polygon, shape
 from shapely.validation import make_valid
+from pipeline.geometry_bounds import geometry_bounds
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -56,7 +57,7 @@ def rounded_geometry(geometry: dict) -> dict:
     return {"type": geometry["type"], "coordinates": round_coordinates(geometry["coordinates"])}
 
 
-def representative_point(geometry: dict) -> list[float]:
+def focus_polygon(geometry: dict) -> Polygon:
     parsed = shape(geometry)
     if not parsed.is_valid:
         parsed = make_valid(parsed)
@@ -78,7 +79,10 @@ def representative_point(geometry: dict) -> list[float]:
     ]
     if not candidates:
         raise ValueError("No usable country polygon for representative point")
-    polygon = max(candidates, key=lambda item: item.area)
+    return max(candidates, key=lambda item: item.area)
+
+
+def representative_point(polygon: Polygon) -> list[float]:
     point = polygon.representative_point()
     longitude, latitude = round(point.x, 6), round(point.y, 6)
     if not polygon.covers(Point(longitude, latitude)):
@@ -111,6 +115,7 @@ def read_shapes(archive: Path, spec: dict) -> tuple[list[dict], list[dict]]:
                 raise ValueError("Invalid Natural Earth country identifier")
             feature_id = f"country-{key}"
             source_geometry = rounded_geometry(item.shape.__geo_interface__)
+            polygon = focus_polygon(source_geometry)
             # Natural Earth's default ISO fields intentionally use -99 for
             # some areas (including France and Norway); the EH field retains
             # their ISO identifiers without changing the polygon viewpoint.
@@ -123,7 +128,8 @@ def read_shapes(archive: Path, spec: dict) -> tuple[list[dict], list[dict]]:
                 else None,
                 "sourceNumericId": numeric if re.fullmatch(r"[0-9]{3}", numeric) else None,
                 "sourceName": name,
-                "point": representative_point(source_geometry),
+                "point": representative_point(polygon),
+                "bounds": geometry_bounds([{"geometry": polygon.__geo_interface__}]),
             }
             features.append(feature)
             geometry.append(

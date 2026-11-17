@@ -1,4 +1,5 @@
 import type { FeatureCollection, Geometry } from 'geojson'
+import type { GeographicBounds } from '../../domain/languageFocus.ts'
 
 type Coordinate = [number, number]
 
@@ -9,6 +10,8 @@ export interface BoundaryFeature {
   readonly sourceNumericId: string | null
   readonly sourceName: string
   readonly point: readonly [number, number]
+  /** Main polygon around the representative point, avoiding distant islands when focusing. */
+  readonly bounds: GeographicBounds
 }
 
 export interface BoundaryAssociation {
@@ -68,6 +71,11 @@ export function indexBoundaries(indexValue: unknown, crosswalkValue: unknown): B
       !Array.isArray(feature.point) ||
       feature.point.length !== 2 ||
       feature.point.some((value) => typeof value !== 'number' || !Number.isFinite(value)) ||
+      !Array.isArray(feature.bounds) ||
+      feature.bounds.length !== 4 ||
+      feature.bounds.some((value) => typeof value !== 'number' || !Number.isFinite(value)) ||
+      feature.bounds[2] < feature.bounds[0] ||
+      feature.bounds[3] < feature.bounds[1] ||
       featureIds.has(feature.featureId)
     )
       throw new Error('Invalid boundary feature index.')

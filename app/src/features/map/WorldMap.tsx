@@ -1,4 +1,4 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
 import type {
   FilterSpecification,
   MapLayerMouseEvent,
@@ -20,7 +20,6 @@ import {
 } from 'react'
 import MapView, { Layer, NavigationControl, ScaleControl, Source } from 'react-map-gl/maplibre'
 import { walsAreaMatchesAtom } from '../../integrations/wals/areaState'
-import { isolatedLanguageIdAtom } from '../../state/mapInteraction'
 import { GeometryPreview } from './geometry/GeometryPreview'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { languageArchiveUrl } from '../../data/atlasRepository'
@@ -37,7 +36,6 @@ import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
   initializeDefaultMapAtom,
-  languageColorsAtom,
   mapEntriesAtom,
   overlapModeAtom,
   selectedMapAreasAtom,
@@ -45,6 +43,7 @@ import {
   viewportLanguageIdsAtom,
 } from '../../state/atlasState'
 import {
+  focusLanguageOnMapAtom,
   languageMapNavigationAtom,
   languagePointerPreviewAtom,
   openLanguageDetailsAtom,
@@ -104,7 +103,18 @@ export interface AreaInteraction {
   readonly onHoverModeChange: (mode: 'language' | 'area') => void
   readonly onHover: (area: AreaHit | null, longitude: number, latitude: number) => void
   readonly onSelect: (area: AreaHit | null) => void
+  readonly onFocus: (area: AreaHit) => void
 }
+
+type MapHit =
+  | { readonly kind: 'area'; readonly area: AreaHit | null }
+  | {
+      readonly kind: 'language'
+      readonly ids: readonly string[]
+      readonly target: { readonly languageId: string; readonly entryId?: string } | null
+      readonly longitude: number
+      readonly latitude: number
+    }
 
 const pickArea = (
   map: MapLibreMap,
@@ -142,8 +152,6 @@ const hasSameVariants = (left: MapInspection | null, right: MapInspection | null
 
 const LanguageLayers = memo(() => {
   const data = useAtomValue(atlasDataAtom)
-  const isolatedId = useAtomValue(isolatedLanguageIdAtom)
-  const colors = useAtomValue(languageColorsAtom)
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
   const overlapMode = useAtomValue(overlapModeAtom)
@@ -164,14 +172,6 @@ const LanguageLayers = memo(() => {
       ? ['has', 'dataset_id']
       : ['in', ['get', 'dataset_id'], ['literal', datasetSelection]]
   const availableGeometryFilter: FilterSpecification = ['all', temporalFilter, datasetFilter]
-  const isolatedVariants =
-    areas.find((area) => area.languageId === isolatedId)?.variants ??
-    data.variants.filter(
-      (v) =>
-        v.languageId === isolatedId &&
-        (datasetSelection === 'all' || datasetSelection.includes(v.datasetId)) &&
-        (temporalSelection === 'all' || v.temporalCoverage.viewId === temporalSelection),
-    )
   const archiveUrl = languageArchiveUrl(
     selectGeometryArchives(
       data.manifest,
@@ -201,16 +201,6 @@ const LanguageLayers = memo(() => {
           filter={availableGeometryFilter}
           paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
         />
-        {isolatedId && (
-          <Layer
-            id="isolated-language-area"
-            source={LANGUAGE_SOURCE_ID}
-            source-layer={data.manifest.vectorLayer}
-            type="fill"
-            filter={['in', ['get', 'variant_id'], ['literal', isolatedVariants.map((v) => v.id)]]}
-            paint={{ 'fill-color': colors.get(isolatedId) ?? '#71ac85', 'fill-opacity': 0.85 }}
-          />
-        )}
       </Source>
       <OverlapHatching
         variants={areas}
@@ -229,8 +219,7 @@ const MapHint = () => {
   const entries = useAtomValue(mapEntriesAtom)
   const visibleInPeriodCount = useAtomValue(selectedMapAreasAtom).length
   const matches = useAtomValue(walsAreaMatchesAtom)
-  const isolated = useAtomValue(isolatedLanguageIdAtom)
-  if (matches || isolated) return null
+  if (matches) return null
 
   return (
     <div className={`map-hint${visibleInPeriodCount ? ' map-hint--active' : ''}`} role="status">
@@ -256,9 +245,9 @@ export const WorldMap = ({
   const data = useAtomValue(atlasDataAtom)
   const initializeDefaultMap = useSetAtom(initializeDefaultMapAtom)
   useEffect(() => initializeDefaultMap(), [initializeDefaultMap])
-  const [isolatedId, setIsolatedId] = useAtom(isolatedLanguageIdAtom)
   const matches = useAtomValue(walsAreaMatchesAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const focusLanguage = useSetAtom(focusLanguageOnMapAtom)
   const [hoverInspection, setHoverInspection] = useState<MapInspection | null>(null)
   const hoverRef = useRef<MapInspection | null>(null)
   const sidebarPointer = useAtomValue(languagePointerPreviewAtom)
@@ -281,10 +270,18 @@ export const WorldMap = ({
   const pendingHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
   const hoverQueryFrameRef = useRef<number | null>(null)
   const viewportDirtyRef = useRef(true)
+  const pendingClickRef = useRef<MapHit | null>(null)
+  const clickTimerRef = useRef<number | null>(null)
   const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
 
   const areaMode = areaInteraction.enabled
+  const cancelClickTimer = useCallback(() => {
+    if (clickTimerRef.current !== null) window.clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = null
+  }, [])
   useEffect(() => {
+    cancelClickTimer()
+    pendingClickRef.current = null
     if (!areaMode) return
     pendingHoverEventRef.current = null
     if (hoverQueryFrameRef.current !== null) {
@@ -295,7 +292,9 @@ export const WorldMap = ({
     setHoverInspection(null)
     inspectionRef.current = null
     setInspection(null)
-  }, [areaMode])
+  }, [areaMode, cancelClickTimer])
+
+  useEffect(() => () => cancelClickTimer(), [cancelClickTimer])
 
   const updateInspection = useCallback((nextInspection: MapInspection | null) => {
     inspectionRef.current = nextInspection
@@ -347,19 +346,15 @@ export const WorldMap = ({
       refinements,
       memberships,
       matching: Boolean(matches),
-      isolatedId,
     })
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsolatedId(null)
-        updateInspection(null)
-      }
+      if (event.key === 'Escape') updateInspection(null)
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [setIsolatedId, updateInspection])
-  const interactionKey = `${isolatedId ?? ''}:${matches?.categoryId ?? ''}`
+  }, [updateInspection])
+  const interactionKey = matches?.categoryId ?? ''
   const previousInteractionKey = useRef(interactionKey)
   useEffect(() => {
     if (previousInteractionKey.current === interactionKey) return
@@ -392,6 +387,43 @@ export const WorldMap = ({
         setHoverInspection(nextInspection)
       }
     })
+  }
+
+  const resolveMapHit = (event: MapLayerMouseEvent): MapHit => {
+    if (areaInteraction.enabled) {
+      return { kind: 'area', area: pickArea(event.target, event.point, areaInteraction.hitLayers) }
+    }
+    const ids = hitVariants(event)
+    const languages = [...new Set(ids.map(languageForHit).filter((id): id is string => !!id))]
+    const selectedArea = ids.length === 1 ? areas.find((area) => area.id === ids[0]) : null
+    return {
+      kind: 'language',
+      ids,
+      target:
+        languages.length === 1 && languages[0]
+          ? {
+              languageId: languages[0],
+              ...(selectedArea ? { entryId: selectedArea.id } : {}),
+            }
+          : null,
+      longitude: event.lngLat.lng,
+      latitude: event.lngLat.lat,
+    }
+  }
+
+  const activateMapHit = (hit: MapHit, focus: boolean) => {
+    cancelPendingHoverQuery()
+    if (hit.kind === 'area') {
+      areaInteraction.onSelect(hit.area)
+      if (focus && hit.area) areaInteraction.onFocus(hit.area)
+    } else if (hit.target) {
+      openDetails({ ...hit.target, moveMap: false })
+      updateInspection(null)
+      if (focus) focusLanguage(hit.target)
+    } else {
+      // Several languages at this point still require an explicit choice in the popup.
+      updateInspection(inspectionFromVariants(hit.ids, hit.longitude, hit.latitude, true))
+    }
   }
 
   // Pattern zoom fades blend two stripe phases and create false category colors.
@@ -427,33 +459,25 @@ export const WorldMap = ({
         areaInteraction?.onHover(null, 0, 0)
       }}
       onClick={(event) => {
-        cancelPendingHoverQuery()
-        if (areaInteraction?.enabled) {
-          areaInteraction.onSelect(pickArea(event.target, event.point, areaInteraction.hitLayers))
+        if (event.originalEvent.detail >= 2) {
+          cancelClickTimer()
           return
         }
-        const ids = hitVariants(event)
-        const primary = ids.length === 1 && ids[0] ? languageForHit(ids[0]) : null
-        if (primary) openDetails({ languageId: primary, moveMap: false })
-        updateInspection(inspectionFromVariants(ids, event.lngLat.lng, event.lngLat.lat, true))
+        cancelClickTimer()
+        const hit = resolveMapHit(event)
+        pendingClickRef.current = hit
+        // Opening details resizes the map, so let a second click use this original hit.
+        clickTimerRef.current = window.setTimeout(() => {
+          clickTimerRef.current = null
+          activateMapHit(hit, false)
+        }, 350)
       }}
       onDblClick={(event) => {
         event.preventDefault()
-        cancelPendingHoverQuery()
-        if (areaInteraction?.enabled) {
-          areaInteraction.onSelect(pickArea(event.target, event.point, areaInteraction.hitLayers))
-          return
-        }
-        const ids = hitVariants(event)
-        const unique = [
-          ...new Set(ids.map(languageForHit).filter((id): id is string => Boolean(id))),
-        ]
-        if (unique.length === 1 && unique[0]) {
-          setIsolatedId(unique[0])
-          openDetails({ languageId: unique[0], moveMap: false })
-          updateInspection(null)
-        } else
-          updateInspection(inspectionFromVariants(ids, event.lngLat.lng, event.lngLat.lat, true))
+        cancelClickTimer()
+        const hit = pendingClickRef.current ?? resolveMapHit(event)
+        pendingClickRef.current = null
+        activateMapHit(hit, true)
       }}
       onMoveStart={(event) => {
         if (event.originalEvent) setCameraIntent(null)
@@ -527,14 +551,6 @@ export const WorldMap = ({
 
       <Suspense fallback={null}>
         {!administrative && <MapHint />}
-        {isolatedId && (
-          <div className="map-isolation-control" role="status">
-            <span>Only {data.languageById.get(isolatedId)?.name}</span>
-            <button type="button" onClick={() => setIsolatedId(null)}>
-              Show all again
-            </button>
-          </div>
-        )}
         {hoverInspection && !inspection && (
           <LanguageInspector
             inspection={hoverInspection}

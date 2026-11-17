@@ -2,7 +2,9 @@ import type { FeatureCollection } from 'geojson'
 import { useAtomValue, useSetAtom, useStore } from 'jotai'
 import { useEffect, useMemo, useState } from 'react'
 import { Layer, Popup, Source, useMap } from 'react-map-gl/maplibre'
+import { combinedBounds } from '../../domain/languageFocus.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
+import { focusBounds } from '../map/focusBounds.ts'
 import {
   INSPECTION_LINE_COLOR,
   INSPECTION_LINE_OPACITY,
@@ -90,21 +92,27 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   }, [showGeometry, index, retry])
   useEffect(() => {
     if (!request || intent !== request || !index) return
-    const association = index.associations.get(request.territoryCode)
-    const point = index.features.find((feature) =>
-      association?.featureIds.includes(feature.featureId),
-    )?.point
+    const bounds = combinedBounds(
+      index.features
+        .filter((feature) => request.featureIds.includes(feature.featureId))
+        .map((feature) => feature.bounds),
+    )
     const map = current?.getMap()
-    if (!point || !map || store.get(mapCameraIntentAtom) !== request) return
-    map.easeTo({
-      center: [point[0], point[1]],
-      zoom: Math.max(map.getZoom(), 3),
-      duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450,
-    })
+    if (!bounds || !map || store.get(mapCameraIntentAtom) !== request) return
+    if (focusBounds(map, bounds)) {
+      store.set(administrativeCameraRequestAtom, null)
+      store.set(mapCameraIntentAtom, null)
+    }
   }, [request, intent, index, current, store])
 
   const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
+  const selectedShape = session.selection?.kind === 'source-shape' ? session.selection.id : null
   const hoveredFeatureId = areaMode ? hovered?.featureId : null
+  const outlinedFeatureIds = hoveredFeatureId
+    ? [hoveredFeatureId]
+    : selectedShape
+      ? [selectedShape]
+      : (index?.associations.get(selectedCode ?? '')?.featureIds ?? [])
   const values = useMemo(() => {
     const result: Record<string, number> = {}
     if (!repository || !session.metric || !index) return result
@@ -159,11 +167,15 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
-          {selectedCode && (
+          {(selectedCode || selectedShape) && (
             <Layer
               id="administrative-selected-area"
               type="fill"
-              filter={['==', ['get', 'territoryCode'], selectedCode]}
+              filter={
+                selectedShape
+                  ? ['==', ['get', 'featureId'], selectedShape]
+                  : ['==', ['get', 'territoryCode'], selectedCode]
+              }
               paint={{ 'fill-color': '#eca647', 'fill-opacity': 0.25 }}
             />
           )}
@@ -176,12 +188,12 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               'line-opacity': 0.78,
             }}
           />
-          {hoveredFeatureId && (
+          {areaMode && outlinedFeatureIds.length > 0 && (
             <Layer
               id="administrative-hover-outline"
               source="administrative-boundaries"
               type="line"
-              filter={['==', ['get', 'featureId'], hoveredFeatureId]}
+              filter={['in', ['get', 'featureId'], ['literal', outlinedFeatureIds]]}
               paint={{
                 'line-color': INSPECTION_LINE_COLOR,
                 'line-width': INSPECTION_LINE_WIDTH,

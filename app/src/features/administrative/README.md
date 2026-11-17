@@ -23,8 +23,8 @@ maps a territory to a polygon or a language to an atlas geometry.
 `state.ts` stores repository load state separately from a small session of query,
 selection IDs, and metric choice. A selection or load completion never changes
 the map camera. An explicit territory focus creates a request in the shared
-`mapCameraIntentAtom`; `BoundaryLayer` resolves a reviewed representative
-point for that request. Map mode changes keep the current map camera
+`mapCameraIntentAtom`; `BoundaryLayer` fits precomputed geometry bounds for
+that request. Map mode changes keep the current map camera
 position.
 
 `AdministrativePanel.tsx` is loaded only when Areas mode is first opened.
@@ -42,7 +42,8 @@ control switches both the sidebar and map picker, and the URL records the select
 map mode. The map stays mounted across modes. The language sidebar is hidden,
 not unmounted, while the administrative panel is visible.
 
-`boundaryRepository.ts` loads the reviewed crosswalk and representative points
+`boundaryRepository.ts` loads the reviewed crosswalk, representative points, and
+main-polygon focus bounds (so overseas islands do not pull a mainland focus away)
 from the separate ADM-02 package when Areas mode is first selected.
 It fetches and validates the pinned GeoJSON when borders are visible or Areas mode is
 enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
@@ -53,10 +54,9 @@ Loading and retry messages appear only while needed. Selection-specific viewpoin
 notes appear in the detail panel. Every full
 border uses the same paint, regardless of whether its association is
 viewpoint-sensitive or has no matched CLDR area.
-Every Natural Earth source shape is inspectable in Area mode. Selection of
-CLDR details and a focus request require an explicit matched crosswalk entry;
-ambiguous shapes show their source name and explain that no reviewed match
-exists. Unmatched CLDR areas remain searchable without a shape. Fetch failures
+Every Natural Earth source shape is inspectable in Area mode. Shapes without a
+reviewed CLDR match open a source-shape sidebar with a no-data message and can
+still be focused. Unmatched CLDR areas remain searchable without a shape. Fetch failures
 stay within this optional layer and can be retried.
 
 The current boundary package contains only one Natural Earth view. The static
@@ -70,7 +70,9 @@ documented source view; it must never silently reassign CLDR observations.
 `GeographyExplorations` owns the optional layer and supplies a small generic
 interaction adapter to `WorldMap`. The map host chooses exactly one pointer
 picker at a time. Areas mode shows borders, uses a transparent polygon hit layer,
-and outlines the area under the pointer. Languages mode inspects language polygons;
+and outlines the area under the pointer. Click opens sidebar details and double-click
+also fits the shape on the map, following the same rule as Languages mode.
+Languages mode inspects language polygons;
 its border button optionally shows the administrative boundary network. The border
 button stays selected and disabled in Areas mode. The
 Languages / Areas control sits beside map settings, with Languages selected by

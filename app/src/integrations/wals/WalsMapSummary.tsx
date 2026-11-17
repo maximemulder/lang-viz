@@ -37,7 +37,7 @@ export default function WalsMapSummary() {
       />
       <p>
         {languages.length} language areas highlighted. Hover to preview, click for information,
-        double-click to isolate.
+        double-click to focus.
       </p>
       <details onToggle={(event) => setExpanded(event.currentTarget.open)}>
         <summary>Languages and data</summary>

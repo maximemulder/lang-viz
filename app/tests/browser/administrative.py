@@ -67,6 +67,10 @@ def main():
             x, y = js("return window.overlapTest.inspect(arguments[0]).point", coordinates)
             browser.call("POST", "/actions", {"actions": [{"type": "pointer", "id": "administrative-map-pointer", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y}, {"type": "pointerDown", "button": 0}, {"type": "pointerUp", "button": 0}]}]})
 
+        def double_click_geo(coordinates):
+            x, y = js("return window.overlapTest.inspect(arguments[0]).point", coordinates)
+            browser.call("POST", "/actions", {"actions": [{"type": "pointer", "id": "administrative-map-pointer", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y}, {"type": "pointerDown", "button": 0}, {"type": "pointerUp", "button": 0}, {"type": "pointerDown", "button": 0}, {"type": "pointerUp", "button": 0}]}]})
+
         def hover_geo(coordinates):
             x, y = js("return window.overlapTest.inspect(arguments[0]).point", coordinates)
             browser.call("POST", "/actions", {"actions": [{"type": "pointer", "id": "administrative-map-pointer", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x + 20, "y": y + 20}, {"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y}]}]})
@@ -130,7 +134,7 @@ window.fetch = (...args) => {
             assert any(hit["properties"].get("territoryCode") == "NL" for hit in hits), hits
             assert js("return !!window.overlapTest.layerState('administrative-boundary-lines')")
             hover_geo([6.2, 53.1])
-            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == nl_feature and s['sourceLoaded'] else None), 20, "hovered area outline")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and nl_feature in s['filter'][-1][-1] and s['sourceLoaded'] else None), 20, "hovered area outline")
             outline = js("return window.overlapTest.layerState('administrative-hover-outline')")
             assert (outline["color"], outline["width"], outline["opacity"]) == ("#111111", 3, 0.95)
             assert not js("return window.overlapTest.layerState('administrative-hover-halo')")
@@ -147,6 +151,13 @@ window.fetch = (...args) => {
                     document.querySelector('.administrative-results').clientHeight >= 80;
             """)
             report["checks"].append("polygon picker selects the CLDR area")
+            assert not js("return window.overlapTest.snapshot().moving")
+            js("window.overlapTest.camera([5.3,52.1],4)")
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "area double-click setup")
+            double_click_geo([6.2, 53.1])
+            wait_for(lambda: js("return window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "area double-click focus")
+            assert js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'")
+            report["checks"].append("area double-click fits shape and retains details")
             assert "Natural Earth 5.1.1" in js("return document.querySelector('.administrative-attribution').textContent")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             js("[...document.querySelectorAll('input[name=administrative-metric]')][1].click()")
@@ -171,8 +182,12 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return document.querySelector('.maplibregl-popup')?.textContent.includes('Somaliland')"), 10, "Somaliland popup")
             assert "No reviewed CLDR match for this shape" in js("return document.querySelector('.maplibregl-popup').textContent")
             click_geo(somaliland_point)
-            assert js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='LY'")
-            report["checks"].append("Somaliland remains visible and inspectable without invented data")
+            wait_for(lambda: js("return document.querySelector('.administrative-inspector-header')?.textContent.includes('Somaliland')"), 10, "Somaliland sidebar")
+            assert "No CLDR data is linked to this area" in js("return document.querySelector('.administrative-detail-scroll').textContent")
+            assert not js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
+            double_click_geo(somaliland_point)
+            wait_for(lambda: js("return window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "Somaliland double-click focus")
+            report["checks"].append("Somaliland opens source-shape details without invented data")
             js("window.overlapTest.camera([5.3,52.1],5)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Netherlands camera restored")
 

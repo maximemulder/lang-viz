@@ -48,8 +48,9 @@ Natural Earth's Admin-0 countries file does not carry every disputed line as a
 separate segment.
 
 Representative points are computed inside each source polygon, never from
-language locations. The browser splits date-line rings before handing GeoJSON
-to MapLibre.
+language locations. The feature index also stores bounds for the main polygon
+around each point, so focusing a mainland shape does not zoom out to distant
+islands. The browser splits date-line rings before handing GeoJSON to MapLibre.
 
 ## Reproduction
 

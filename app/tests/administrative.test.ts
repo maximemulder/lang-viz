@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { createStore } from 'jotai/vanilla'
+import { indexBoundaries } from '../src/features/administrative/boundaryRepository.ts'
 import {
   createAdministrativeLoader,
   indexAdministrative,
@@ -19,6 +20,8 @@ import {
   administrativeLoadStateAtom,
   administrativeRepositoryAtom,
   administrativeSessionAtom,
+  boundaryIndexAtom,
+  focusAdministrativeShapeAtom,
   focusAdministrativeTerritoryAtom,
   loadAdministrativeAtom,
   selectAdministrativeAtom,
@@ -221,8 +224,46 @@ test('loader shares success, retries a failure, and isolates administrative stat
   await store.set(loadAdministrativeAtom, () => Promise.resolve(repository))
   assert.equal(store.get(administrativeLoadStateAtom).status, 'ready')
   assert.strictEqual(store.get(mapCameraIntentAtom), originalIntent)
+  store.set(
+    boundaryIndexAtom,
+    indexBoundaries(
+      {
+        schemaVersion: 2,
+        viewId: 'test',
+        features: [
+          {
+            featureId: 'matched',
+            sourceId: 'AAA',
+            sourceAlpha2Code: 'AA',
+            sourceNumericId: '001',
+            sourceName: 'Alpha',
+            point: [1, 1],
+            bounds: [0, 0, 2, 2],
+          },
+          {
+            featureId: 'unmatched',
+            sourceId: 'BBB',
+            sourceAlpha2Code: null,
+            sourceNumericId: null,
+            sourceName: 'Unmatched',
+            point: [5, 5],
+            bounds: [4, 4, 6, 6],
+          },
+        ],
+      },
+      {
+        schemaVersion: 2,
+        viewId: 'test',
+        territories: [{ code: 'AA', status: 'matched', featureIds: ['matched'] }],
+      },
+    ),
+  )
   assert.equal(store.set(selectAdministrativeAtom, { kind: 'territory', id: 'AA' }), true)
   assert.equal(store.set(selectAdministrativeAtom, { kind: 'territory', id: 'XX' }), false)
+  assert.equal(store.set(selectAdministrativeAtom, { kind: 'source-shape', id: 'unmatched' }), true)
+  assert.equal(store.get(administrativeSessionAtom).selection?.id, 'unmatched')
+  assert.equal(store.set(selectAdministrativeAtom, { kind: 'source-shape', id: 'missing' }), false)
+  store.set(selectAdministrativeAtom, { kind: 'territory', id: 'AA' })
   assert.equal(
     store.set(setAdministrativeMetricAtom, { kind: 'language-estimate', sourceLanguageCode: 'en' }),
     true,
@@ -231,6 +272,8 @@ test('loader shares success, retries a failure, and isolates administrative stat
   assert.strictEqual(store.get(mapCameraIntentAtom), originalIntent)
   assert.equal(store.set(focusAdministrativeTerritoryAtom, 'XX'), false)
   assert.equal(store.set(focusAdministrativeTerritoryAtom, 'AA'), true)
-  assert.deepEqual(store.get(mapCameraIntentAtom), { territoryCode: 'AA', requestId: 1 })
+  assert.deepEqual(store.get(mapCameraIntentAtom), { featureIds: ['matched'], requestId: 1 })
+  assert.equal(store.set(focusAdministrativeShapeAtom, 'unmatched'), true)
+  assert.deepEqual(store.get(mapCameraIntentAtom), { featureIds: ['unmatched'], requestId: 2 })
   assert.ok(store.get(administrativeRepositoryAtom))
 })
