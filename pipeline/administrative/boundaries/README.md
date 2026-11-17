@@ -32,8 +32,9 @@ observations.
 | Source shapes without a reviewed CLDR match | 5 |
 
 The five unassigned shapes are **Somaliland**, **Kosovo**, **Northern Cyprus**,
-**Indian Ocean Territories**, and **Siachen Glacier**. All source shapes retain borders and representative
-points and can be inspected in Area mode. They receive no metric fill.
+**Indian Ocean Territories**, and **Siachen Glacier**. All source shapes retain borders,
+label positions, and representative points and can be inspected in Area mode.
+They receive no metric fill.
 Somalia's `SO` observations are assigned only to the source's Somalia polygon;
 they are not copied to Somaliland. Kosovo's `XK` observations remain
 searchable, with its separate source polygon documented as ambiguous.
@@ -50,7 +51,12 @@ separate segment.
 Representative points are computed inside each source polygon, never from
 language locations. The feature index also stores bounds for the main polygon
 around each point, so focusing a mainland shape does not zoom out to distant
-islands. The browser splits date-line rings before handing GeoJSON to MapLibre.
+islands. Labels use Natural Earth's `NAME` or its shorter `NAME_LONG`,
+`LABEL_X/Y`, `MIN_LABEL`, and `LABELRANK`. Minimum label zooms are rounded up
+to six integer bands (2–7); MapLibre suppresses collisions. Labels stay
+available beyond Natural Earth's `MAX_LABEL`, since this map has no finer
+place-name layer. Representative points remain invisible hit targets for tiny
+shapes. The browser splits date-line rings before handing GeoJSON to MapLibre.
 
 ## Reproduction
 

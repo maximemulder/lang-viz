@@ -10,6 +10,10 @@ export interface BoundaryFeature {
   readonly sourceNumericId: string | null
   readonly sourceName: string
   readonly point: readonly [number, number]
+  readonly labelName: string
+  readonly labelPoint: readonly [number, number]
+  readonly minLabel: number
+  readonly labelRank: number
   /** Main polygon around the representative point, avoiding distant islands when focusing. */
   readonly bounds: GeographicBounds
 }
@@ -29,6 +33,7 @@ export interface BoundaryIndex {
   readonly associations: ReadonlyMap<string, BoundaryAssociation>
   readonly featureToCode: ReadonlyMap<string, string>
   readonly points: FeatureCollection
+  readonly labels: FeatureCollection
 }
 
 const base = () => `${import.meta.env?.BASE_URL ?? '/'}administrative/boundaries/`
@@ -68,9 +73,23 @@ export function indexBoundaries(indexValue: unknown, crosswalkValue: unknown): B
           /^[A-Z]{2}$/.test(feature.sourceAlpha2Code))
       ) ||
       typeof feature.sourceName !== 'string' ||
+      typeof feature.labelName !== 'string' ||
+      !feature.labelName ||
       !Array.isArray(feature.point) ||
       feature.point.length !== 2 ||
       feature.point.some((value) => typeof value !== 'number' || !Number.isFinite(value)) ||
+      !Array.isArray(feature.labelPoint) ||
+      feature.labelPoint.length !== 2 ||
+      feature.labelPoint.some((value) => typeof value !== 'number' || !Number.isFinite(value)) ||
+      Math.abs(feature.labelPoint[0]) > 180 ||
+      Math.abs(feature.labelPoint[1]) > 90 ||
+      typeof feature.minLabel !== 'number' ||
+      !Number.isFinite(feature.minLabel) ||
+      feature.minLabel < 0 ||
+      feature.minLabel > 24 ||
+      !Number.isInteger(feature.labelRank) ||
+      feature.labelRank < 1 ||
+      feature.labelRank > 10 ||
       !Array.isArray(feature.bounds) ||
       feature.bounds.length !== 4 ||
       feature.bounds.some((value) => typeof value !== 'number' || !Number.isFinite(value)) ||
@@ -115,7 +134,22 @@ export function indexBoundaries(indexValue: unknown, crosswalkValue: unknown): B
       }
     }),
   }
-  return { viewId: index.viewId, features, associations, featureToCode, points }
+  const labels: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: features.map((feature) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [...feature.labelPoint] },
+      properties: {
+        featureId: feature.featureId,
+        territoryCode: featureToCode.get(feature.featureId) ?? null,
+        sourceName: feature.sourceName,
+        labelName: feature.labelName,
+        minLabel: feature.minLabel,
+        labelRank: feature.labelRank,
+      },
+    })),
+  }
+  return { viewId: index.viewId, features, associations, featureToCode, points, labels }
 }
 
 let indexPromise: Promise<BoundaryIndex> | undefined

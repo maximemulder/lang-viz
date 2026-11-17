@@ -30,6 +30,11 @@ def test_pinned_view_and_browser_assets_agree(inputs: tuple[dict, dict]) -> None
     }
     assert len(geometry["features"]) == 242
     by_feature = {item["featureId"]: item for item in index["features"]}
+    assert by_feature["country-USA"]["labelName"] == "United States"
+    assert by_feature["country-USA"]["minLabel"] == 1.7
+    assert by_feature["country-LBY"]["labelName"] == "Libya"
+    assert by_feature["country-LBY"]["labelPoint"] == [18.011015, 26.638944]
+    assert by_feature["country-SOL"]["minLabel"] == 4.5
     assert by_feature["country-NLD"]["bounds"][0] > 3  # Mainland focus, not Caribbean islands.
     assert by_feature["country-SOL"]["bounds"][2] < 50
     assert {

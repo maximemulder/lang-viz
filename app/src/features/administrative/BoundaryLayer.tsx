@@ -10,7 +10,7 @@ import {
   INSPECTION_LINE_OPACITY,
   INSPECTION_LINE_WIDTH,
 } from '../map/geometry/boundaryInspection.ts'
-import { AREA_POINT_LAYER, AREA_POLYGON_LAYER } from './boundaryLayers.ts'
+import { AREA_LABEL_ZOOMS, AREA_POINT_LAYER, AREA_POLYGON_LAYER } from './boundaryLayers.ts'
 import {
   type BoundaryIndex,
   loadBoundaryGeometry,
@@ -25,6 +25,8 @@ import {
   hoveredAdministrativeAreaAtom,
   languageBordersAtom,
 } from './state.ts'
+
+const LABEL_ANCHOR = 'administrative-label-anchor'
 
 const label = (code: string) => {
   try {
@@ -49,10 +51,9 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const areaMode = administrative
-  const showPoints = areaMode
   const showGeometry = areaMode || languageBorders
   useEffect(() => {
-    if (!showPoints && !languageBorders) return
+    if (!showGeometry) return
     if (retry) setError('')
     let active = true
     void loadBoundaryIndex()
@@ -70,7 +71,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
     return () => {
       active = false
     }
-  }, [showPoints, languageBorders, retry, publishIndex])
+  }, [showGeometry, retry, publishIndex])
   useEffect(() => {
     if (!showGeometry || !index) return
     if (retry) setError('')
@@ -146,12 +147,14 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
 
   return (
     <>
+      <Layer id={LABEL_ANCHOR} type="background" paint={{ 'background-opacity': 0 }} />
       {showGeometry && filledGeometry && (
         <Source id="administrative-boundaries" type="geojson" data={filledGeometry}>
           {session.metric && (
             <Layer
               id="administrative-metric-fill"
               type="fill"
+              beforeId={LABEL_ANCHOR}
               filter={['has', 'metricValue']}
               paint={{
                 'fill-color': [
@@ -171,6 +174,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             <Layer
               id="administrative-selected-area"
               type="fill"
+              beforeId={LABEL_ANCHOR}
               filter={
                 selectedShape
                   ? ['==', ['get', 'featureId'], selectedShape]
@@ -182,6 +186,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           <Layer
             id="administrative-boundary-lines"
             type="line"
+            beforeId={LABEL_ANCHOR}
             paint={{
               'line-color': '#566b66',
               'line-width': 0.8,
@@ -193,6 +198,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               id="administrative-hover-outline"
               source="administrative-boundaries"
               type="line"
+              beforeId={LABEL_ANCHOR}
               filter={['in', ['get', 'featureId'], ['literal', outlinedFeatureIds]]}
               paint={{
                 'line-color': INSPECTION_LINE_COLOR,
@@ -206,34 +212,55 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             <Layer
               id={AREA_POLYGON_LAYER}
               type="fill"
+              beforeId={LABEL_ANCHOR}
               paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
             />
           )}
         </Source>
       )}
-      {showPoints && index && (
+      {areaMode && index && (
         <Source id="administrative-points" type="geojson" data={index.points}>
           <Layer
             id={AREA_POINT_LAYER}
             type="circle"
+            beforeId={LABEL_ANCHOR}
+            // A small invisible target keeps tiny source shapes inspectable.
             paint={{
-              'circle-radius': [
-                'case',
-                ['==', ['get', 'territoryCode'], selectedCode ?? ''],
-                6,
-                3.4,
-              ],
-              'circle-color': [
-                'case',
-                ['==', ['get', 'territoryCode'], selectedCode ?? ''],
-                '#e99a35',
-                '#196c70',
-              ],
-              'circle-stroke-color': '#fffdf6',
-              'circle-stroke-width': 1.5,
-              'circle-opacity': 0.9,
+              'circle-radius': 8,
+              'circle-opacity': 0,
             }}
           />
+        </Source>
+      )}
+      {areaMode && index && (
+        <Source id="administrative-labels" type="geojson" data={index.labels}>
+          {AREA_LABEL_ZOOMS.map((zoom) => (
+            <Layer
+              key={zoom}
+              id={`administrative-labels-${zoom}`}
+              type="symbol"
+              minzoom={zoom}
+              filter={[
+                'all',
+                ['>', ['get', 'minLabel'], zoom - 1],
+                ['<=', ['get', 'minLabel'], zoom],
+              ]}
+              layout={{
+                'text-field': ['get', 'labelName'],
+                'text-font': ['Arial', 'sans-serif'],
+                'text-size': 13,
+                'text-max-width': 10,
+                'text-padding': 3,
+                'symbol-sort-key': ['get', 'labelRank'],
+              }}
+              paint={{
+                'text-color': '#182d31',
+                'text-halo-color': '#fffdf6',
+                'text-halo-width': 2.1,
+                'text-halo-blur': 0.4,
+              }}
+            />
+          ))}
         </Source>
       )}
       {areaMode && hovered && (
@@ -255,7 +282,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           )}
         </Popup>
       )}
-      {(showPoints || showGeometry) && error ? (
+      {showGeometry && error ? (
         <div className="administrative-map-status" role="alert">
           {error}{' '}
           <button

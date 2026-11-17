@@ -11,11 +11,21 @@ const asset = (name: string) =>
     readFileSync(new URL(`../public/administrative/boundaries/${name}`, import.meta.url), 'utf8'),
   ) as unknown
 
-test('the pinned boundary crosswalk keeps markers and polygons independent of CLDR values', () => {
+test('the pinned boundary crosswalk keeps labels and polygons independent of CLDR values', () => {
   const index = indexBoundaries(asset('feature-index.json'), asset('crosswalk.json'))
   assert.equal(index.features.length, 242)
   assert.equal(index.associations.size, 258)
   assert.equal(index.points.features.length, 242)
+  assert.equal(index.labels.features.length, 242)
+  assert.equal(
+    index.features.find((feature) => feature.featureId === 'country-USA')?.labelName,
+    'United States',
+  )
+  assert.deepEqual(
+    index.labels.features.find((feature) => feature.properties?.featureId === 'country-SOL')
+      ?.geometry,
+    { type: 'Point', coordinates: [46.731595, 9.443889] },
+  )
   assert.equal(index.associations.get('XK')?.status, 'ambiguous')
   assert.equal(index.associations.get('XK')?.featureIds.length, 1)
   assert.equal(

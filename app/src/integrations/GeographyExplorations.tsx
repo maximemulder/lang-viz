@@ -1,7 +1,11 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { lazy, Suspense } from 'react'
 import { ADMINISTRATIVE_ATTRIBUTION } from '../features/administrative/attribution.ts'
-import { AREA_POINT_LAYER, AREA_POLYGON_LAYER } from '../features/administrative/boundaryLayers.ts'
+import {
+  AREA_LABEL_LAYERS,
+  AREA_POINT_LAYER,
+  AREA_POLYGON_LAYER,
+} from '../features/administrative/boundaryLayers.ts'
 import {
   focusAdministrativeShapeAtom,
   hoveredAdministrativeAreaAtom,
@@ -52,7 +56,7 @@ export default function GeographyExplorations({
           setHoveredArea(null)
           dispatch({ type: 'map-mode', mode })
         },
-        hitLayers: [AREA_POINT_LAYER, AREA_POLYGON_LAYER],
+        hitLayers: [...AREA_LABEL_LAYERS, AREA_POINT_LAYER, AREA_POLYGON_LAYER],
         onHover: (area, longitude, latitude) =>
           setHoveredArea(area ? { ...area, longitude, latitude } : null),
         onSelect: (area) => {

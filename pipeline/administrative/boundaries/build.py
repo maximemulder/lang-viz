@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import io
 import json
+import math
 import re
 import tempfile
 import xml.etree.ElementTree as ET
@@ -120,6 +121,20 @@ def read_shapes(archive: Path, spec: dict) -> tuple[list[dict], list[dict]]:
             # some areas (including France and Norway); the EH field retains
             # their ISO identifiers without changing the polygon viewpoint.
             numeric = source["ISO_N3_EH"]
+            label_name = min((source["NAME"], source["NAME_LONG"]), key=len)
+            label_point = [source["LABEL_X"], source["LABEL_Y"]]
+            min_label = source["MIN_LABEL"]
+            label_rank = source["LABELRANK"]
+            if (
+                not label_name
+                or not all(math.isfinite(value) for value in label_point + [min_label])
+                or not -180 <= label_point[0] <= 180
+                or not -90 <= label_point[1] <= 90
+                or not 0 <= min_label <= 24
+                or not isinstance(label_rank, int)
+                or not 1 <= label_rank <= 10
+            ):
+                raise ValueError(f"Invalid Natural Earth label for {key}")
             feature = {
                 "featureId": feature_id,
                 "sourceId": key,
@@ -129,6 +144,10 @@ def read_shapes(archive: Path, spec: dict) -> tuple[list[dict], list[dict]]:
                 "sourceNumericId": numeric if re.fullmatch(r"[0-9]{3}", numeric) else None,
                 "sourceName": name,
                 "point": representative_point(polygon),
+                "labelName": label_name,
+                "labelPoint": label_point,
+                "minLabel": min_label,
+                "labelRank": label_rank,
                 "bounds": geometry_bounds([{"geometry": polygon.__geo_interface__}]),
             }
             features.append(feature)

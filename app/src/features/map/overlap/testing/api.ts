@@ -45,6 +45,7 @@ export interface OverlapTestApi {
   layerState(id: string): {
     filter: unknown
     sourceLoaded: boolean
+    order: number
     color: unknown
     width: unknown
     opacity: unknown

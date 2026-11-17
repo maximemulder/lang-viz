@@ -25,6 +25,8 @@ def main():
     feature_index = json.loads((boundary_assets / "feature-index.json").read_text())
     nl_feature = next(item for item in crosswalk["territories"] if item["code"] == "NL")["featureIds"][0]
     nl_point = next(item for item in feature_index["features"] if item["featureId"] == nl_feature)["point"]
+    nl_label = next(item for item in feature_index["features"] if item["featureId"] == nl_feature)["labelPoint"]
+    us_label = next(item for item in feature_index["features"] if item["featureId"] == "country-USA")["labelPoint"]
     ly_point = next(item for item in feature_index["features"] if item["featureId"] == "country-LBY")["point"]
     somaliland_point = next(item for item in feature_index["features"] if item["featureId"] == "country-SOL")["point"]
     report: BrowserReport = {"passed": False, "checks": []}
@@ -114,7 +116,7 @@ window.fetch = (...args) => {
             assert js("return document.querySelector('.map-area-controls__inspect').getBoundingClientRect().left === window.initialAreaControlLeft")
             assert js("return window.savedAdministrativeMap === document.querySelector('.maplibregl-canvas')")
             report["checks"].append("header and persistent map")
-            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Points identify source geometries')"), 20, "administrative map information")
+            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Area names appear as you zoom in')"), 20, "administrative map information")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             assert not js("return !!document.querySelector('.administrative-map-legend')")
             assert js("return !!document.querySelector('.maplibregl-ctrl-attrib-button')")
@@ -128,8 +130,16 @@ window.fetch = (...args) => {
             assert not js("return document.querySelector('.maplibregl-ctrl-attrib').classList.contains('maplibregl-compact-show')")
             assert js("return document.querySelector('.map-area-controls__inspect button:last-child').getAttribute('aria-pressed')") == "true"
             wait_for(lambda: js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.geojson'))"), 30, "boundary geometry")
+            js("window.overlapTest.camera(arguments[0],1.35)", us_label)
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "world label zoom")
+            assert not js("return window.overlapTest.queryLayers(arguments[0],['administrative-labels-2']).some(h=>h.properties.labelName==='United States')", us_label)
+            js("window.overlapTest.camera(arguments[0],2.5)", us_label)
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "country label zoom")
+            wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-labels-2']).some(h=>h.properties.labelName==='United States')", us_label), 20, "United States label")
+            report["checks"].append("Area names appear at Natural Earth zoom thresholds")
             js("window.overlapTest.camera([5.3,52.1],5)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Netherlands camera")
+            wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-labels-2','administrative-labels-3','administrative-labels-4','administrative-labels-5']).some(h=>h.properties.labelName==='Netherlands')", nl_label), 20, "Netherlands label")
             hits = wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-polygon-hits'])") or None, 20, "rendered polygon hit")
             assert any(hit["properties"].get("territoryCode") == "NL" for hit in hits), hits
             assert js("return !!window.overlapTest.layerState('administrative-boundary-lines')")
@@ -137,6 +147,7 @@ window.fetch = (...args) => {
             wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and nl_feature in s['filter'][-1][-1] and s['sourceLoaded'] else None), 20, "hovered area outline")
             outline = js("return window.overlapTest.layerState('administrative-hover-outline')")
             assert (outline["color"], outline["width"], outline["opacity"]) == ("#111111", 3, 0.95)
+            assert js("return Math.min(...[2,3,4,5,6,7].map(z=>window.overlapTest.layerState('administrative-labels-'+z).order)) > window.overlapTest.layerState('administrative-hover-outline').order")
             assert not js("return window.overlapTest.layerState('administrative-hover-halo')")
             assert "Netherlands" in js("return document.querySelector('.maplibregl-popup')?.textContent")
             browser.screenshot(args.output / "area-hover.png")
@@ -163,6 +174,7 @@ window.fetch = (...args) => {
             js("[...document.querySelectorAll('input[name=administrative-metric]')][1].click()")
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='NL'&&h.properties.metricValue>0)"), 15, "matched metric fill")
+            assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-metric-fill').order")
             report["checks"].append("Area borders and metric control")
 
             js("window.overlapTest.camera(arguments[0],4)", ly_point)

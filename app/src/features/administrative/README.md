@@ -42,12 +42,12 @@ control switches both the sidebar and map picker, and the URL records the select
 map mode. The map stays mounted across modes. The language sidebar is hidden,
 not unmounted, while the administrative panel is visible.
 
-`boundaryRepository.ts` loads the reviewed crosswalk, representative points, and
+`boundaryRepository.ts` loads the reviewed crosswalk, label positions, representative points, and
 main-polygon focus bounds (so overseas islands do not pull a mainland focus away)
 from the separate ADM-02 package when Areas mode is first selected.
 It fetches and validates the pinned GeoJSON when borders are visible or Areas mode is
 enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
-renders markers, hover outlines, borders and eligible metric fills.
+renders zoom-dependent area names, hover outlines, borders and eligible metric fills.
 The map information control always carries boundary source credits and
 interpretation notes, including when the optional boundary sources are hidden.
 Loading and retry messages appear only while needed. Selection-specific viewpoint
