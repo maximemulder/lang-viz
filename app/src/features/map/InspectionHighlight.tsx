@@ -1,5 +1,5 @@
 import { useAtomValue } from 'jotai'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { selectedMapAreasAtom } from '../../state/atlasState'
 import { createBoundaryInspection, inspectionLayerId } from './geometry/boundaryInspection'
 import { useGeometryDisplay } from './geometry/display'
@@ -9,9 +9,14 @@ export const InspectionHighlight = ({ variantIds }: { readonly variantIds: reado
   const areas = useAtomValue(selectedMapAreasAtom)
   const { map, display, state } = useGeometryDisplay()
   const inspection = useRef<ReturnType<typeof createBoundaryInspection> | null>(null)
-  const variants = variantIds.flatMap(
-    (id) => areas.find((area) => area.id === id)?.variants.map((variant) => variant.id) ?? [id],
+  const variants = useMemo(
+    () =>
+      variantIds.flatMap(
+        (id) => areas.find((area) => area.id === id)?.variants.map((variant) => variant.id) ?? [id],
+      ),
+    [variantIds, areas],
   )
+  const groups = useMemo(() => variantIds.map((id) => [id]), [variantIds])
   useLayoutEffect(() => {
     if (!map || !state.source) return
     const controller = createBoundaryInspection(map, state.source)
@@ -22,7 +27,6 @@ export const InspectionHighlight = ({ variantIds }: { readonly variantIds: reado
     }
   }, [map, state.source])
   useLayoutEffect(() => {
-    const groups = variantIds.map((id) => [id])
     inspection.current?.set(groups)
     if (!state.source) return
     display.highlights.set('language-inspection', {
@@ -36,6 +40,6 @@ export const InspectionHighlight = ({ variantIds }: { readonly variantIds: reado
     return () => {
       display.highlights.delete('language-inspection')
     }
-  }, [display, state.source, variantIds, variants])
+  }, [display, state.source, groups, variants])
   return null
 }

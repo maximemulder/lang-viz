@@ -57,8 +57,7 @@ export default function GeographyExplorations({
           dispatch({ type: 'map-mode', mode })
         },
         hitLayers: [...AREA_LABEL_LAYERS, AREA_POINT_LAYER, AREA_POLYGON_LAYER],
-        onHover: (area, longitude, latitude) =>
-          setHoveredArea(area ? { ...area, longitude, latitude } : null),
+        onHover: (area) => setHoveredArea(area?.featureId ?? null),
         onSelect: (area) => {
           if (area)
             selectArea(

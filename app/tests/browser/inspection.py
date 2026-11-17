@@ -66,6 +66,24 @@ def lifecycle(browser, output):
             expect_highlight(browser, expected)
         english = move(browser, [-1.5, 52.5])
         expect_highlight(browser, english)
+        wait_for(
+            lambda: browser.js("return !!document.querySelector('.language-inspector:not(.language-inspector--pinned)')"),
+            10,
+            "language hover popup",
+        )
+        before = browser.js("return document.querySelector('.language-inspector').getBoundingClientRect().left")
+        x, y = browser.js("return window.overlapTest.inspect([-1.5,52.5]).point")
+        browser.call(
+            "POST",
+            "/actions",
+            {"actions": [{"type": "pointer", "id": "inspection-mouse", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x + 12, "y": y}]}]},
+        )
+        expect_highlight(browser, english)
+        wait_for(
+            lambda: browser.js("return document.querySelector('.language-inspector')?.getBoundingClientRect().left") != before,
+            10,
+            "language hover popup follows pointer",
+        )
         render_frames(browser)
         browser.screenshot(output / f"hover-{projection}.png")
         move(browser, [-1.5, 52.5], click=True)

@@ -1,7 +1,7 @@
 import type { FeatureCollection } from 'geojson'
 import { useAtomValue, useSetAtom, useStore } from 'jotai'
 import { useEffect, useMemo, useState } from 'react'
-import { Layer, Popup, Source, useMap } from 'react-map-gl/maplibre'
+import { Layer, Source, useMap } from 'react-map-gl/maplibre'
 import { combinedBounds } from '../../domain/languageFocus.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { focusBounds } from '../map/focusBounds.ts'
@@ -27,14 +27,6 @@ import {
 } from './state.ts'
 
 const LABEL_ANCHOR = 'administrative-label-anchor'
-
-const label = (code: string) => {
-  try {
-    return new Intl.DisplayNames(undefined, { type: 'region' }).of(code) ?? code
-  } catch {
-    return code
-  }
-}
 
 export default function BoundaryLayer({ administrative }: { readonly administrative: boolean }) {
   const languageBorders = useAtomValue(languageBordersAtom)
@@ -108,7 +100,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
 
   const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
   const selectedShape = session.selection?.kind === 'source-shape' ? session.selection.id : null
-  const hoveredFeatureId = areaMode ? hovered?.featureId : null
+  const hoveredFeatureId = areaMode ? hovered : null
   const outlinedFeatureIds = hoveredFeatureId
     ? [hoveredFeatureId]
     : selectedShape
@@ -262,25 +254,6 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             />
           ))}
         </Source>
-      )}
-      {areaMode && hovered && (
-        <Popup
-          longitude={hovered.longitude}
-          latitude={hovered.latitude}
-          closeButton={false}
-          closeOnClick={false}
-          anchor="bottom"
-          offset={12}
-        >
-          <strong>
-            {hovered.territoryCode ? label(hovered.territoryCode) : hovered.sourceName}
-          </strong>{' '}
-          {hovered.territoryCode ? (
-            <span>{hovered.territoryCode}</span>
-          ) : (
-            <span>No reviewed CLDR match for this shape</span>
-          )}
-        </Popup>
       )}
       {showGeometry && error ? (
         <div className="administrative-map-status" role="alert">

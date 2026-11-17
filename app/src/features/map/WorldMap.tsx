@@ -100,7 +100,7 @@ export interface AreaInteraction {
   readonly hitLayers: readonly string[]
   readonly onBordersChange: (enabled: boolean) => void
   readonly onHoverModeChange: (mode: 'language' | 'area') => void
-  readonly onHover: (area: AreaHit | null, longitude: number, latitude: number) => void
+  readonly onHover: (area: AreaHit | null) => void
   readonly onSelect: (area: AreaHit | null) => void
   readonly onFocus: (area: AreaHit) => void
 }
@@ -363,10 +363,24 @@ export const WorldMap = ({
       )
       latestEvent.target.getCanvas().style.cursor = nextInspection ? 'pointer' : ''
 
-      if (!hasSameVariants(hoverRef.current, nextInspection)) {
+      const previous = hoverRef.current
+      if (hasSameVariants(previous, nextInspection)) {
+        if (!previous || !nextInspection) return
+        if (
+          previous.longitude === nextInspection.longitude &&
+          previous.latitude === nextInspection.latitude
+        )
+          return
+        // Keep the variant IDs stable so moving the popup does not repaint the outline.
+        hoverRef.current = {
+          ...previous,
+          longitude: nextInspection.longitude,
+          latitude: nextInspection.latitude,
+        }
+      } else {
         hoverRef.current = nextInspection
-        setHoverInspection(nextInspection)
       }
+      setHoverInspection(hoverRef.current)
     })
   }
 
@@ -425,7 +439,7 @@ export const WorldMap = ({
         if (areaInteraction?.enabled) {
           const area = pickArea(event.target, event.point, areaInteraction.hitLayers)
           event.target.getCanvas().style.cursor = area ? 'pointer' : ''
-          areaInteraction.onHover(area, event.lngLat.lng, event.lngLat.lat)
+          areaInteraction.onHover(area)
           return
         }
         lastHoverEventRef.current = event
@@ -437,7 +451,7 @@ export const WorldMap = ({
         event.target.getCanvas().style.cursor = ''
         hoverRef.current = null
         setHoverInspection(null)
-        areaInteraction?.onHover(null, 0, 0)
+        areaInteraction?.onHover(null)
       }}
       onClick={(event) => {
         if (event.originalEvent.detail >= 2) {
