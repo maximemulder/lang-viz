@@ -656,15 +656,14 @@ are versioned in `pipeline/wikidata/queries/`.
 
 ## 7. Administrative CLDR territory-language supplement
 
-The joined CSV from `aastha/speaker-stats` is fetched from its pinned Git blob
-into ignored local data and compiled independently of atlas geography. It is not
-added to main's Git tree. It contains 1,488 language/territory rows for 251 territory
-codes and 761 original CLDR language or script codes. The original CLDR release
-and the script that produced the joined CSV were not included in the branch, so
-the supplement records that provenance gap rather than assigning a guessed
-release. The Glottolog side is checked against the pinned CLDF catalog.
-Schema version 2 also exports names for the 57 referenced families from that
-same catalog; family search does not need the atlas catalog.
+The statistical supplement is built from pinned Unicode CLDR 49 XML and
+English display names. It contains 1,630 language/territory rows for 258
+territories and 798 CLDR language or script codes. The older prejoined CSV is
+retained only as a reviewed CLDR-code-to-Glottolog mapping, validated against
+the pinned CLDF catalog. Its original preprocessing remains undocumented.
+The 37 CLDR codes without a reviewed match retain their 142 observations with
+null Glottocodes. Schema version 3 exports names for 57 referenced Glottolog
+families; family search does not need the atlas catalog.
 
 See [the audit, provenance, limitations, and build instructions](pipeline/administrative/README.md).
 The ignored browser output is built and verified separately before deployment.
@@ -675,16 +674,17 @@ of the main atlas.
 
 ### 7.1 Optional boundary view
 
-ADM-02 packages `world-atlas` 2.0.2 / Natural Earth 4.1.0 Admin-0 1:50m as
-separate, ignored browser assets restored during deployment. The
-[pinned source, explicit 251-code crosswalk, audit, and reproduction guide](pipeline/administrative/boundaries/README.md)
-record 230 matched, one ambiguous, and 20 unmatched CLDR territories. This
+The current view packages Natural Earth's 1:50m Admin-0 countries file 5.1.1
+from its overall 5.1.2 release as separate, ignored browser assets. The
+[pinned source, explicit 258-code crosswalk, audit, and reproduction guide](pipeline/administrative/boundaries/README.md)
+record 236 matched, one ambiguous, and 21 unmatched CLDR territories. This
 opt-in view reflects Natural Earth's political choices; its geometry IDs and
 representative points never enter the CLDR observations. The browser gets a
-source topology, reviewed crosswalk, and feature index for the map UI. Both the
+source GeoJSON, reviewed crosswalk, and feature index for the map UI. Both the
 CLDR supplement and boundary view are restored and validated in the ordinary
-Pages deployment before building the browser app. The 20 unmatched and one
-ambiguous codes remain searchable without a polygon or metric fill. There is
+Pages deployment before building the browser app. Five source shapes have no
+reviewed CLDR match; they remain inspectable without a metric fill. The 21
+unmatched and one ambiguous CLDR codes remain searchable. There is
 one source viewpoint and no alternative country-specific border package or
 host-supplied client location signal. The map defaults to borders off, and all
 source outlines use the same style when enabled. The 500 px Firefox production

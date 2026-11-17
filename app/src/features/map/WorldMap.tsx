@@ -90,23 +90,39 @@ const LANGUAGE_SOURCE_ID = 'language-areas'
 const LANGUAGE_HIT_LAYER_ID = 'language-area-hit-targets'
 const NO_VARIANT_IDS: readonly string[] = []
 
+export interface AreaHit {
+  readonly featureId: string
+  readonly sourceName: string
+  readonly territoryCode: string | null
+}
+
 export interface AreaInteraction {
   readonly enabled: boolean
   readonly borders: boolean
   readonly hitLayers: readonly string[]
   readonly onBordersChange: (enabled: boolean) => void
   readonly onHoverModeChange: (mode: 'language' | 'area') => void
-  readonly onHover: (code: string | null, longitude: number, latitude: number) => void
-  readonly onSelect: (code: string | null) => void
+  readonly onHover: (area: AreaHit | null, longitude: number, latitude: number) => void
+  readonly onSelect: (area: AreaHit | null) => void
 }
 
-const pickArea = (map: MapLibreMap, point: PointLike, layers: readonly string[]): string | null => {
+const pickArea = (
+  map: MapLibreMap,
+  point: PointLike,
+  layers: readonly string[],
+): AreaHit | null => {
   const available = layers.filter((id) => map.getLayer(id))
   if (!available.length) return null
   const hit = map
     .queryRenderedFeatures(point, { layers: available })
-    .find((feature) => typeof feature.properties?.territoryCode === 'string')
-  return hit?.properties?.territoryCode ?? null
+    .find((feature) => typeof feature.properties?.featureId === 'string')
+  if (!hit || typeof hit.properties?.sourceName !== 'string') return null
+  return {
+    featureId: hit.properties.featureId,
+    sourceName: hit.properties.sourceName,
+    territoryCode:
+      typeof hit.properties.territoryCode === 'string' ? hit.properties.territoryCode : null,
+  }
 }
 
 const inspectionFromVariants = (
@@ -394,9 +410,9 @@ export const WorldMap = ({
       reuseMaps
       onMouseMove={(event) => {
         if (areaInteraction?.enabled) {
-          const code = pickArea(event.target, event.point, areaInteraction.hitLayers)
-          event.target.getCanvas().style.cursor = code ? 'pointer' : ''
-          areaInteraction.onHover(code, event.lngLat.lng, event.lngLat.lat)
+          const area = pickArea(event.target, event.point, areaInteraction.hitLayers)
+          event.target.getCanvas().style.cursor = area ? 'pointer' : ''
+          areaInteraction.onHover(area, event.lngLat.lng, event.lngLat.lat)
           return
         }
         lastHoverEventRef.current = event

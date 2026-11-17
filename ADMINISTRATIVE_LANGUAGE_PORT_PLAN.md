@@ -2,6 +2,12 @@
 
 Last updated: 2026-11-15. ADM-00 through ADM-06 implementation recorded below.
 
+This is a historical port record. The current implementation uses CLDR 49
+observations and Natural Earth Admin-0 countries 5.1.1; see
+[administrative data](pipeline/administrative/README.md) and
+[boundary view](pipeline/administrative/boundaries/README.md) for current pins
+and coverage.
+
 Integrate the useful CLDR language and territory statistics from
 `origin/aastha/speaker-stats` into the current geography workspace. Keep the
 administrative exploration independent of the main language map: CLDR territory

@@ -7,8 +7,18 @@
     "bytes": 233164,
     "sha256": "0737dc7fda7f31756275f162ff5a9e3319c4dc5b4176c1ca24a0b321e533c691"
   },
-  "cldrRelease": null,
-  "cldrSourceFile": null,
+  "cldrRelease": "49",
+  "cldrSourceFile": "https://github.com/unicode-org/cldr/tree/release-49",
+  "cldrSupplemental": {
+    "url": "https://raw.githubusercontent.com/unicode-org/cldr/release-49/common/supplemental/supplementalData.xml",
+    "bytes": 394860,
+    "sha256": "745150ec1408d50e1a272b65654a5dd645f3e60f5cc2898b576f725b28538d1a"
+  },
+  "cldrEnglish": {
+    "url": "https://raw.githubusercontent.com/unicode-org/cldr/release-49/common/main/en.xml",
+    "bytes": 486056,
+    "sha256": "f8cbf26964d0e349fc96d9e5a56292edcbaab25c8e64177ca4f111773dfb79cf"
+  },
   "glottolog": {
     "repository": "https://github.com/glottolog/glottolog-cldf",
     "release": "Glottolog 5.3",

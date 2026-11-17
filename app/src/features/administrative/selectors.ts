@@ -135,7 +135,7 @@ export function searchLanguages(repository: AdministrativeRepository, query: str
       !needle ||
       [
         language.sourceLanguageCode,
-        language.glottocode,
+        language.glottocode ?? '',
         language.iso6393 ?? '',
         language.name,
       ].some((value) => value.toLocaleLowerCase().includes(needle)),

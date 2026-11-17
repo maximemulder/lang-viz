@@ -104,7 +104,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   }, [request, intent, index, current, store])
 
   const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
-  const hoveredCode = areaMode ? hovered?.code : null
+  const hoveredFeatureId = areaMode ? hovered?.featureId : null
   const values = useMemo(() => {
     const result: Record<string, number> = {}
     if (!repository || !session.metric || !index) return result
@@ -178,12 +178,12 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
-          {hoveredCode && (
+          {hoveredFeatureId && (
             <Layer
               id="administrative-hover-outline"
               source="administrative-boundaries"
               type="line"
-              filter={['==', ['get', 'territoryCode'], hoveredCode]}
+              filter={['==', ['get', 'featureId'], hoveredFeatureId]}
               paint={{
                 'line-color': INSPECTION_LINE_COLOR,
                 'line-width': INSPECTION_LINE_WIDTH,
@@ -196,7 +196,6 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             <Layer
               id={AREA_POLYGON_LAYER}
               type="fill"
-              filter={['has', 'territoryCode']}
               paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
             />
           )}
@@ -236,7 +235,14 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           anchor="bottom"
           offset={12}
         >
-          <strong>{label(hovered.code)}</strong> <span>{hovered.code}</span>
+          <strong>
+            {hovered.territoryCode ? label(hovered.territoryCode) : hovered.sourceName}
+          </strong>{' '}
+          {hovered.territoryCode ? (
+            <span>{hovered.territoryCode}</span>
+          ) : (
+            <span>No reviewed CLDR match for this shape</span>
+          )}
         </Popup>
       )}
       {(showPoints || showGeometry) && error ? (

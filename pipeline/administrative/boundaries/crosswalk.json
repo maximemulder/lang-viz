@@ -1,8 +1,7 @@
 {
-  "schemaVersion": 1,
-  "viewId": "natural-earth-4.1.0-world-atlas-2.0.2-50m",
-  "policy": "Only explicit matched entries may receive metric fills. Ambiguous and unmatched entries have no fill. Viewpoint-sensitive entries must be visually disclosed when the boundary view is shown. Admin-0 shapes include dependent territories and do not imply sovereignty. Unassigned source geometries have no CLDR value.",
-  "mappingSource": "ISO 3166-1 alpha-2/numeric mapping from pinned iso-3166-1 2.1.1 package; unresolved and sensitive cases reviewed explicitly.",
+  "schemaVersion": 2,
+  "viewId": "natural-earth-5.1.1-50m",
+  "policy": "Every Natural Earth country polygon remains visible and inspectable. Only reviewed numeric ISO matches receive CLDR metric fills. Unassigned source shapes retain their source names and have no CLDR value.",
   "territories": [
     {
       "code": "AC",
@@ -16,7 +15,7 @@
       "status": "matched",
       "sourceNumericCode": "020",
       "featureIds": [
-        "country-234"
+        "country-AND"
       ]
     },
     {
@@ -24,7 +23,7 @@
       "status": "matched",
       "sourceNumericCode": "784",
       "featureIds": [
-        "country-032"
+        "country-ARE"
       ]
     },
     {
@@ -32,7 +31,7 @@
       "status": "matched",
       "sourceNumericCode": "004",
       "featureIds": [
-        "country-237"
+        "country-AFG"
       ]
     },
     {
@@ -40,7 +39,7 @@
       "status": "matched",
       "sourceNumericCode": "028",
       "featureIds": [
-        "country-232"
+        "country-ATG"
       ]
     },
     {
@@ -48,7 +47,7 @@
       "status": "matched",
       "sourceNumericCode": "660",
       "featureIds": [
-        "country-021"
+        "country-AIA"
       ]
     },
     {
@@ -56,7 +55,7 @@
       "status": "matched",
       "sourceNumericCode": "008",
       "featureIds": [
-        "country-236"
+        "country-ALB"
       ]
     },
     {
@@ -64,7 +63,7 @@
       "status": "matched",
       "sourceNumericCode": "051",
       "featureIds": [
-        "country-230"
+        "country-ARM"
       ]
     },
     {
@@ -72,7 +71,15 @@
       "status": "matched",
       "sourceNumericCode": "024",
       "featureIds": [
-        "country-233"
+        "country-AGO"
+      ]
+    },
+    {
+      "code": "AQ",
+      "status": "matched",
+      "sourceNumericCode": "010",
+      "featureIds": [
+        "country-ATA"
       ]
     },
     {
@@ -80,7 +87,7 @@
       "status": "matched",
       "sourceNumericCode": "032",
       "featureIds": [
-        "country-231"
+        "country-ARG"
       ]
     },
     {
@@ -88,7 +95,7 @@
       "status": "matched",
       "sourceNumericCode": "016",
       "featureIds": [
-        "country-014"
+        "country-ASM"
       ]
     },
     {
@@ -96,7 +103,7 @@
       "status": "matched",
       "sourceNumericCode": "040",
       "featureIds": [
-        "country-224"
+        "country-AUT"
       ]
     },
     {
@@ -104,16 +111,20 @@
       "status": "matched",
       "sourceNumericCode": "036",
       "featureIds": [
-        "country-225",
-        "country-229"
-      ]
+        "country-AUS",
+        "country-ATC"
+      ],
+      "excludedFeatureIds": [
+        "country-IOA"
+      ],
+      "note": "Indian Ocean Territories share an Australian ISO identifier in this source, but have no separately reviewed CLDR observation and receive no Australian metric fill."
     },
     {
       "code": "AW",
       "status": "matched",
       "sourceNumericCode": "533",
       "featureIds": [
-        "country-097"
+        "country-ABW"
       ]
     },
     {
@@ -121,7 +132,7 @@
       "status": "matched",
       "sourceNumericCode": "248",
       "featureIds": [
-        "country-168"
+        "country-ALD"
       ]
     },
     {
@@ -129,7 +140,7 @@
       "status": "matched",
       "sourceNumericCode": "031",
       "featureIds": [
-        "country-223"
+        "country-AZE"
       ]
     },
     {
@@ -137,7 +148,7 @@
       "status": "matched",
       "sourceNumericCode": "070",
       "featureIds": [
-        "country-212"
+        "country-BIH"
       ]
     },
     {
@@ -145,7 +156,7 @@
       "status": "matched",
       "sourceNumericCode": "052",
       "featureIds": [
-        "country-219"
+        "country-BRB"
       ]
     },
     {
@@ -153,7 +164,7 @@
       "status": "matched",
       "sourceNumericCode": "050",
       "featureIds": [
-        "country-220"
+        "country-BGD"
       ]
     },
     {
@@ -161,7 +172,7 @@
       "status": "matched",
       "sourceNumericCode": "056",
       "featureIds": [
-        "country-217"
+        "country-BEL"
       ]
     },
     {
@@ -169,7 +180,7 @@
       "status": "matched",
       "sourceNumericCode": "854",
       "featureIds": [
-        "country-207"
+        "country-BFA"
       ]
     },
     {
@@ -177,7 +188,7 @@
       "status": "matched",
       "sourceNumericCode": "100",
       "featureIds": [
-        "country-208"
+        "country-BGR"
       ]
     },
     {
@@ -185,7 +196,7 @@
       "status": "matched",
       "sourceNumericCode": "048",
       "featureIds": [
-        "country-221"
+        "country-BHR"
       ]
     },
     {
@@ -193,7 +204,7 @@
       "status": "matched",
       "sourceNumericCode": "108",
       "featureIds": [
-        "country-206"
+        "country-BDI"
       ]
     },
     {
@@ -201,7 +212,7 @@
       "status": "matched",
       "sourceNumericCode": "204",
       "featureIds": [
-        "country-215"
+        "country-BEN"
       ]
     },
     {
@@ -209,7 +220,7 @@
       "status": "matched",
       "sourceNumericCode": "652",
       "featureIds": [
-        "country-164"
+        "country-BLM"
       ]
     },
     {
@@ -217,7 +228,7 @@
       "status": "matched",
       "sourceNumericCode": "060",
       "featureIds": [
-        "country-024"
+        "country-BMU"
       ]
     },
     {
@@ -225,7 +236,7 @@
       "status": "matched",
       "sourceNumericCode": "096",
       "featureIds": [
-        "country-209"
+        "country-BRN"
       ]
     },
     {
@@ -233,7 +244,7 @@
       "status": "matched",
       "sourceNumericCode": "068",
       "featureIds": [
-        "country-213"
+        "country-BOL"
       ]
     },
     {
@@ -248,7 +259,7 @@
       "status": "matched",
       "sourceNumericCode": "076",
       "featureIds": [
-        "country-210"
+        "country-BRA"
       ]
     },
     {
@@ -256,7 +267,7 @@
       "status": "matched",
       "sourceNumericCode": "044",
       "featureIds": [
-        "country-222"
+        "country-BHS"
       ]
     },
     {
@@ -264,7 +275,7 @@
       "status": "matched",
       "sourceNumericCode": "064",
       "featureIds": [
-        "country-214"
+        "country-BTN"
       ]
     },
     {
@@ -279,7 +290,7 @@
       "status": "matched",
       "sourceNumericCode": "072",
       "featureIds": [
-        "country-211"
+        "country-BWA"
       ]
     },
     {
@@ -287,7 +298,7 @@
       "status": "matched",
       "sourceNumericCode": "112",
       "featureIds": [
-        "country-218"
+        "country-BLR"
       ]
     },
     {
@@ -295,7 +306,7 @@
       "status": "matched",
       "sourceNumericCode": "084",
       "featureIds": [
-        "country-216"
+        "country-BLZ"
       ]
     },
     {
@@ -303,7 +314,7 @@
       "status": "matched",
       "sourceNumericCode": "124",
       "featureIds": [
-        "country-202"
+        "country-CAN"
       ]
     },
     {
@@ -318,7 +329,7 @@
       "status": "matched",
       "sourceNumericCode": "180",
       "featureIds": [
-        "country-191"
+        "country-COD"
       ]
     },
     {
@@ -326,7 +337,7 @@
       "status": "matched",
       "sourceNumericCode": "140",
       "featureIds": [
-        "country-200"
+        "country-CAF"
       ]
     },
     {
@@ -334,7 +345,7 @@
       "status": "matched",
       "sourceNumericCode": "178",
       "featureIds": [
-        "country-192"
+        "country-COG"
       ]
     },
     {
@@ -342,7 +353,7 @@
       "status": "matched",
       "sourceNumericCode": "756",
       "featureIds": [
-        "country-047"
+        "country-CHE"
       ]
     },
     {
@@ -350,7 +361,7 @@
       "status": "matched",
       "sourceNumericCode": "384",
       "featureIds": [
-        "country-189"
+        "country-CIV"
       ]
     },
     {
@@ -358,7 +369,7 @@
       "status": "matched",
       "sourceNumericCode": "184",
       "featureIds": [
-        "country-095"
+        "country-COK"
       ]
     },
     {
@@ -366,7 +377,7 @@
       "status": "matched",
       "sourceNumericCode": "152",
       "featureIds": [
-        "country-198"
+        "country-CHL"
       ]
     },
     {
@@ -374,7 +385,7 @@
       "status": "matched",
       "sourceNumericCode": "120",
       "featureIds": [
-        "country-203"
+        "country-CMR"
       ]
     },
     {
@@ -382,7 +393,7 @@
       "status": "matched",
       "sourceNumericCode": "156",
       "featureIds": [
-        "country-195"
+        "country-CHN"
       ]
     },
     {
@@ -390,8 +401,15 @@
       "status": "matched",
       "sourceNumericCode": "170",
       "featureIds": [
-        "country-194"
+        "country-COL"
       ]
+    },
+    {
+      "code": "CP",
+      "status": "unmatched",
+      "sourceNumericCode": null,
+      "featureIds": [],
+      "reason": "No separate Natural Earth 1:50m Admin-0 country geometry for this CLDR territory."
     },
     {
       "code": "CQ",
@@ -405,7 +423,7 @@
       "status": "matched",
       "sourceNumericCode": "188",
       "featureIds": [
-        "country-190"
+        "country-CRI"
       ]
     },
     {
@@ -413,7 +431,7 @@
       "status": "matched",
       "sourceNumericCode": "192",
       "featureIds": [
-        "country-187"
+        "country-CUB"
       ]
     },
     {
@@ -421,7 +439,7 @@
       "status": "matched",
       "sourceNumericCode": "132",
       "featureIds": [
-        "country-201"
+        "country-CPV"
       ]
     },
     {
@@ -429,7 +447,7 @@
       "status": "matched",
       "sourceNumericCode": "531",
       "featureIds": [
-        "country-098"
+        "country-CUW"
       ]
     },
     {
@@ -444,7 +462,7 @@
       "status": "matched",
       "sourceNumericCode": "196",
       "featureIds": [
-        "country-186"
+        "country-CYP"
       ],
       "viewpointSensitive": true,
       "note": "The source also has an unnumbered Northern Cyprus geometry."
@@ -454,7 +472,7 @@
       "status": "matched",
       "sourceNumericCode": "203",
       "featureIds": [
-        "country-184"
+        "country-CZE"
       ]
     },
     {
@@ -462,7 +480,7 @@
       "status": "matched",
       "sourceNumericCode": "276",
       "featureIds": [
-        "country-156"
+        "country-DEU"
       ]
     },
     {
@@ -477,7 +495,7 @@
       "status": "matched",
       "sourceNumericCode": "262",
       "featureIds": [
-        "country-180"
+        "country-DJI"
       ]
     },
     {
@@ -485,7 +503,7 @@
       "status": "matched",
       "sourceNumericCode": "208",
       "featureIds": [
-        "country-183"
+        "country-DNK"
       ]
     },
     {
@@ -493,7 +511,7 @@
       "status": "matched",
       "sourceNumericCode": "212",
       "featureIds": [
-        "country-179"
+        "country-DMA"
       ]
     },
     {
@@ -501,7 +519,7 @@
       "status": "matched",
       "sourceNumericCode": "214",
       "featureIds": [
-        "country-178"
+        "country-DOM"
       ]
     },
     {
@@ -509,7 +527,7 @@
       "status": "matched",
       "sourceNumericCode": "012",
       "featureIds": [
-        "country-235"
+        "country-DZA"
       ]
     },
     {
@@ -524,7 +542,7 @@
       "status": "matched",
       "sourceNumericCode": "218",
       "featureIds": [
-        "country-177"
+        "country-ECU"
       ]
     },
     {
@@ -532,7 +550,7 @@
       "status": "matched",
       "sourceNumericCode": "233",
       "featureIds": [
-        "country-172"
+        "country-EST"
       ]
     },
     {
@@ -540,7 +558,7 @@
       "status": "matched",
       "sourceNumericCode": "818",
       "featureIds": [
-        "country-176"
+        "country-EGY"
       ]
     },
     {
@@ -548,7 +566,7 @@
       "status": "matched",
       "sourceNumericCode": "732",
       "featureIds": [
-        "country-104"
+        "country-SAH"
       ],
       "viewpointSensitive": true,
       "note": "Western Sahara boundaries reflect this source viewpoint."
@@ -558,7 +576,7 @@
       "status": "matched",
       "sourceNumericCode": "232",
       "featureIds": [
-        "country-173"
+        "country-ERI"
       ]
     },
     {
@@ -566,7 +584,7 @@
       "status": "matched",
       "sourceNumericCode": "724",
       "featureIds": [
-        "country-054"
+        "country-ESP"
       ]
     },
     {
@@ -574,7 +592,7 @@
       "status": "matched",
       "sourceNumericCode": "231",
       "featureIds": [
-        "country-171"
+        "country-ETH"
       ]
     },
     {
@@ -582,7 +600,7 @@
       "status": "matched",
       "sourceNumericCode": "246",
       "featureIds": [
-        "country-169"
+        "country-FIN"
       ]
     },
     {
@@ -590,7 +608,7 @@
       "status": "matched",
       "sourceNumericCode": "242",
       "featureIds": [
-        "country-170"
+        "country-FJI"
       ]
     },
     {
@@ -598,7 +616,7 @@
       "status": "matched",
       "sourceNumericCode": "238",
       "featureIds": [
-        "country-022"
+        "country-FLK"
       ]
     },
     {
@@ -606,7 +624,7 @@
       "status": "matched",
       "sourceNumericCode": "583",
       "featureIds": [
-        "country-009"
+        "country-FSM"
       ]
     },
     {
@@ -614,7 +632,7 @@
       "status": "matched",
       "sourceNumericCode": "234",
       "featureIds": [
-        "country-182"
+        "country-FRO"
       ]
     },
     {
@@ -622,7 +640,7 @@
       "status": "matched",
       "sourceNumericCode": "250",
       "featureIds": [
-        "country-160"
+        "country-FRA"
       ]
     },
     {
@@ -630,7 +648,7 @@
       "status": "matched",
       "sourceNumericCode": "266",
       "featureIds": [
-        "country-159"
+        "country-GAB"
       ]
     },
     {
@@ -638,7 +656,7 @@
       "status": "matched",
       "sourceNumericCode": "826",
       "featureIds": [
-        "country-031"
+        "country-GBR"
       ]
     },
     {
@@ -646,7 +664,7 @@
       "status": "matched",
       "sourceNumericCode": "308",
       "featureIds": [
-        "country-153"
+        "country-GRD"
       ]
     },
     {
@@ -654,7 +672,7 @@
       "status": "matched",
       "sourceNumericCode": "268",
       "featureIds": [
-        "country-157"
+        "country-GEO"
       ]
     },
     {
@@ -669,7 +687,7 @@
       "status": "matched",
       "sourceNumericCode": "831",
       "featureIds": [
-        "country-029"
+        "country-GGY"
       ]
     },
     {
@@ -677,7 +695,7 @@
       "status": "matched",
       "sourceNumericCode": "288",
       "featureIds": [
-        "country-155"
+        "country-GHA"
       ]
     },
     {
@@ -692,7 +710,7 @@
       "status": "matched",
       "sourceNumericCode": "304",
       "featureIds": [
-        "country-181"
+        "country-GRL"
       ]
     },
     {
@@ -700,7 +718,7 @@
       "status": "matched",
       "sourceNumericCode": "270",
       "featureIds": [
-        "country-158"
+        "country-GMB"
       ]
     },
     {
@@ -708,7 +726,7 @@
       "status": "matched",
       "sourceNumericCode": "324",
       "featureIds": [
-        "country-151"
+        "country-GIN"
       ]
     },
     {
@@ -723,7 +741,7 @@
       "status": "matched",
       "sourceNumericCode": "226",
       "featureIds": [
-        "country-174"
+        "country-GNQ"
       ]
     },
     {
@@ -731,7 +749,7 @@
       "status": "matched",
       "sourceNumericCode": "300",
       "featureIds": [
-        "country-154"
+        "country-GRC"
       ]
     },
     {
@@ -739,7 +757,7 @@
       "status": "matched",
       "sourceNumericCode": "239",
       "featureIds": [
-        "country-017"
+        "country-SGS"
       ]
     },
     {
@@ -747,7 +765,7 @@
       "status": "matched",
       "sourceNumericCode": "320",
       "featureIds": [
-        "country-152"
+        "country-GTM"
       ]
     },
     {
@@ -755,7 +773,7 @@
       "status": "matched",
       "sourceNumericCode": "316",
       "featureIds": [
-        "country-013"
+        "country-GUM"
       ]
     },
     {
@@ -763,7 +781,7 @@
       "status": "matched",
       "sourceNumericCode": "624",
       "featureIds": [
-        "country-150"
+        "country-GNB"
       ]
     },
     {
@@ -771,7 +789,7 @@
       "status": "matched",
       "sourceNumericCode": "328",
       "featureIds": [
-        "country-149"
+        "country-GUY"
       ]
     },
     {
@@ -779,7 +797,15 @@
       "status": "matched",
       "sourceNumericCode": "344",
       "featureIds": [
-        "country-197"
+        "country-HKG"
+      ]
+    },
+    {
+      "code": "HM",
+      "status": "matched",
+      "sourceNumericCode": "334",
+      "featureIds": [
+        "country-HMD"
       ]
     },
     {
@@ -787,7 +813,7 @@
       "status": "matched",
       "sourceNumericCode": "340",
       "featureIds": [
-        "country-147"
+        "country-HND"
       ]
     },
     {
@@ -795,7 +821,7 @@
       "status": "matched",
       "sourceNumericCode": "191",
       "featureIds": [
-        "country-188"
+        "country-HRV"
       ]
     },
     {
@@ -803,7 +829,7 @@
       "status": "matched",
       "sourceNumericCode": "332",
       "featureIds": [
-        "country-148"
+        "country-HTI"
       ]
     },
     {
@@ -811,7 +837,7 @@
       "status": "matched",
       "sourceNumericCode": "348",
       "featureIds": [
-        "country-146"
+        "country-HUN"
       ]
     },
     {
@@ -826,7 +852,7 @@
       "status": "matched",
       "sourceNumericCode": "360",
       "featureIds": [
-        "country-143"
+        "country-IDN"
       ]
     },
     {
@@ -834,7 +860,7 @@
       "status": "matched",
       "sourceNumericCode": "372",
       "featureIds": [
-        "country-140"
+        "country-IRL"
       ]
     },
     {
@@ -842,7 +868,7 @@
       "status": "matched",
       "sourceNumericCode": "376",
       "featureIds": [
-        "country-138"
+        "country-ISR"
       ],
       "viewpointSensitive": true,
       "note": "Israel and Palestine boundaries reflect this source viewpoint."
@@ -852,7 +878,7 @@
       "status": "matched",
       "sourceNumericCode": "833",
       "featureIds": [
-        "country-030"
+        "country-IMN"
       ]
     },
     {
@@ -860,7 +886,7 @@
       "status": "matched",
       "sourceNumericCode": "356",
       "featureIds": [
-        "country-144"
+        "country-IND"
       ],
       "viewpointSensitive": true,
       "note": "The source has an unnumbered Siachen Glacier geometry."
@@ -870,7 +896,7 @@
       "status": "matched",
       "sourceNumericCode": "086",
       "featureIds": [
-        "country-018"
+        "country-IOT"
       ]
     },
     {
@@ -878,7 +904,7 @@
       "status": "matched",
       "sourceNumericCode": "368",
       "featureIds": [
-        "country-141"
+        "country-IRQ"
       ]
     },
     {
@@ -886,7 +912,7 @@
       "status": "matched",
       "sourceNumericCode": "364",
       "featureIds": [
-        "country-142"
+        "country-IRN"
       ]
     },
     {
@@ -894,7 +920,7 @@
       "status": "matched",
       "sourceNumericCode": "352",
       "featureIds": [
-        "country-145"
+        "country-ISL"
       ]
     },
     {
@@ -902,7 +928,7 @@
       "status": "matched",
       "sourceNumericCode": "380",
       "featureIds": [
-        "country-137"
+        "country-ITA"
       ]
     },
     {
@@ -910,7 +936,7 @@
       "status": "matched",
       "sourceNumericCode": "832",
       "featureIds": [
-        "country-028"
+        "country-JEY"
       ]
     },
     {
@@ -918,7 +944,7 @@
       "status": "matched",
       "sourceNumericCode": "388",
       "featureIds": [
-        "country-136"
+        "country-JAM"
       ]
     },
     {
@@ -926,7 +952,7 @@
       "status": "matched",
       "sourceNumericCode": "400",
       "featureIds": [
-        "country-134"
+        "country-JOR"
       ]
     },
     {
@@ -934,7 +960,7 @@
       "status": "matched",
       "sourceNumericCode": "392",
       "featureIds": [
-        "country-135"
+        "country-JPN"
       ]
     },
     {
@@ -942,7 +968,7 @@
       "status": "matched",
       "sourceNumericCode": "404",
       "featureIds": [
-        "country-132"
+        "country-KEN"
       ]
     },
     {
@@ -950,7 +976,7 @@
       "status": "matched",
       "sourceNumericCode": "417",
       "featureIds": [
-        "country-128"
+        "country-KGZ"
       ]
     },
     {
@@ -958,7 +984,7 @@
       "status": "matched",
       "sourceNumericCode": "116",
       "featureIds": [
-        "country-204"
+        "country-KHM"
       ]
     },
     {
@@ -966,7 +992,7 @@
       "status": "matched",
       "sourceNumericCode": "296",
       "featureIds": [
-        "country-131"
+        "country-KIR"
       ]
     },
     {
@@ -974,7 +1000,7 @@
       "status": "matched",
       "sourceNumericCode": "174",
       "featureIds": [
-        "country-193"
+        "country-COM"
       ]
     },
     {
@@ -982,7 +1008,7 @@
       "status": "matched",
       "sourceNumericCode": "659",
       "featureIds": [
-        "country-073"
+        "country-KNA"
       ]
     },
     {
@@ -990,7 +1016,7 @@
       "status": "matched",
       "sourceNumericCode": "408",
       "featureIds": [
-        "country-089"
+        "country-PRK"
       ]
     },
     {
@@ -998,7 +1024,15 @@
       "status": "matched",
       "sourceNumericCode": "410",
       "featureIds": [
-        "country-055"
+        "country-KOR"
+      ]
+    },
+    {
+      "code": "KW",
+      "status": "matched",
+      "sourceNumericCode": "414",
+      "featureIds": [
+        "country-KWT"
       ]
     },
     {
@@ -1006,7 +1040,7 @@
       "status": "matched",
       "sourceNumericCode": "136",
       "featureIds": [
-        "country-023"
+        "country-CYM"
       ]
     },
     {
@@ -1014,7 +1048,7 @@
       "status": "matched",
       "sourceNumericCode": "398",
       "featureIds": [
-        "country-133"
+        "country-KAZ"
       ]
     },
     {
@@ -1022,7 +1056,7 @@
       "status": "matched",
       "sourceNumericCode": "418",
       "featureIds": [
-        "country-127"
+        "country-LAO"
       ]
     },
     {
@@ -1030,7 +1064,7 @@
       "status": "matched",
       "sourceNumericCode": "422",
       "featureIds": [
-        "country-125"
+        "country-LBN"
       ]
     },
     {
@@ -1038,7 +1072,7 @@
       "status": "matched",
       "sourceNumericCode": "662",
       "featureIds": [
-        "country-072"
+        "country-LCA"
       ]
     },
     {
@@ -1046,7 +1080,7 @@
       "status": "matched",
       "sourceNumericCode": "438",
       "featureIds": [
-        "country-121"
+        "country-LIE"
       ]
     },
     {
@@ -1054,7 +1088,7 @@
       "status": "matched",
       "sourceNumericCode": "144",
       "featureIds": [
-        "country-053"
+        "country-LKA"
       ]
     },
     {
@@ -1062,7 +1096,7 @@
       "status": "matched",
       "sourceNumericCode": "430",
       "featureIds": [
-        "country-123"
+        "country-LBR"
       ]
     },
     {
@@ -1070,7 +1104,7 @@
       "status": "matched",
       "sourceNumericCode": "426",
       "featureIds": [
-        "country-124"
+        "country-LSO"
       ]
     },
     {
@@ -1078,7 +1112,7 @@
       "status": "matched",
       "sourceNumericCode": "440",
       "featureIds": [
-        "country-120"
+        "country-LTU"
       ]
     },
     {
@@ -1086,7 +1120,7 @@
       "status": "matched",
       "sourceNumericCode": "442",
       "featureIds": [
-        "country-119"
+        "country-LUX"
       ]
     },
     {
@@ -1094,7 +1128,15 @@
       "status": "matched",
       "sourceNumericCode": "428",
       "featureIds": [
-        "country-126"
+        "country-LVA"
+      ]
+    },
+    {
+      "code": "LY",
+      "status": "matched",
+      "sourceNumericCode": "434",
+      "featureIds": [
+        "country-LBY"
       ]
     },
     {
@@ -1102,7 +1144,7 @@
       "status": "matched",
       "sourceNumericCode": "504",
       "featureIds": [
-        "country-103"
+        "country-MAR"
       ]
     },
     {
@@ -1110,7 +1152,7 @@
       "status": "matched",
       "sourceNumericCode": "492",
       "featureIds": [
-        "country-108"
+        "country-MCO"
       ]
     },
     {
@@ -1118,7 +1160,7 @@
       "status": "matched",
       "sourceNumericCode": "498",
       "featureIds": [
-        "country-107"
+        "country-MDA"
       ]
     },
     {
@@ -1126,7 +1168,7 @@
       "status": "matched",
       "sourceNumericCode": "499",
       "featureIds": [
-        "country-105"
+        "country-MNE"
       ]
     },
     {
@@ -1134,7 +1176,7 @@
       "status": "matched",
       "sourceNumericCode": "663",
       "featureIds": [
-        "country-163"
+        "country-MAF"
       ]
     },
     {
@@ -1142,7 +1184,7 @@
       "status": "matched",
       "sourceNumericCode": "450",
       "featureIds": [
-        "country-117"
+        "country-MDG"
       ]
     },
     {
@@ -1150,7 +1192,7 @@
       "status": "matched",
       "sourceNumericCode": "584",
       "featureIds": [
-        "country-010"
+        "country-MHL"
       ]
     },
     {
@@ -1158,7 +1200,7 @@
       "status": "matched",
       "sourceNumericCode": "807",
       "featureIds": [
-        "country-118"
+        "country-MKD"
       ]
     },
     {
@@ -1166,7 +1208,7 @@
       "status": "matched",
       "sourceNumericCode": "466",
       "featureIds": [
-        "country-113"
+        "country-MLI"
       ]
     },
     {
@@ -1174,7 +1216,7 @@
       "status": "matched",
       "sourceNumericCode": "104",
       "featureIds": [
-        "country-205"
+        "country-MMR"
       ]
     },
     {
@@ -1182,7 +1224,7 @@
       "status": "matched",
       "sourceNumericCode": "496",
       "featureIds": [
-        "country-106"
+        "country-MNG"
       ]
     },
     {
@@ -1190,7 +1232,7 @@
       "status": "matched",
       "sourceNumericCode": "446",
       "featureIds": [
-        "country-196"
+        "country-MAC"
       ]
     },
     {
@@ -1198,7 +1240,7 @@
       "status": "matched",
       "sourceNumericCode": "580",
       "featureIds": [
-        "country-011"
+        "country-MNP"
       ]
     },
     {
@@ -1213,7 +1255,7 @@
       "status": "matched",
       "sourceNumericCode": "478",
       "featureIds": [
-        "country-111"
+        "country-MRT"
       ]
     },
     {
@@ -1221,7 +1263,7 @@
       "status": "matched",
       "sourceNumericCode": "500",
       "featureIds": [
-        "country-027"
+        "country-MSR"
       ]
     },
     {
@@ -1229,7 +1271,7 @@
       "status": "matched",
       "sourceNumericCode": "470",
       "featureIds": [
-        "country-112"
+        "country-MLT"
       ]
     },
     {
@@ -1237,7 +1279,7 @@
       "status": "matched",
       "sourceNumericCode": "480",
       "featureIds": [
-        "country-110"
+        "country-MUS"
       ]
     },
     {
@@ -1245,7 +1287,7 @@
       "status": "matched",
       "sourceNumericCode": "462",
       "featureIds": [
-        "country-114"
+        "country-MDV"
       ]
     },
     {
@@ -1253,7 +1295,7 @@
       "status": "matched",
       "sourceNumericCode": "454",
       "featureIds": [
-        "country-116"
+        "country-MWI"
       ]
     },
     {
@@ -1261,7 +1303,7 @@
       "status": "matched",
       "sourceNumericCode": "484",
       "featureIds": [
-        "country-109"
+        "country-MEX"
       ]
     },
     {
@@ -1269,7 +1311,7 @@
       "status": "matched",
       "sourceNumericCode": "458",
       "featureIds": [
-        "country-115"
+        "country-MYS"
       ]
     },
     {
@@ -1277,7 +1319,7 @@
       "status": "matched",
       "sourceNumericCode": "508",
       "featureIds": [
-        "country-102"
+        "country-MOZ"
       ]
     },
     {
@@ -1285,7 +1327,7 @@
       "status": "matched",
       "sourceNumericCode": "516",
       "featureIds": [
-        "country-101"
+        "country-NAM"
       ]
     },
     {
@@ -1293,7 +1335,7 @@
       "status": "matched",
       "sourceNumericCode": "540",
       "featureIds": [
-        "country-166"
+        "country-NCL"
       ]
     },
     {
@@ -1301,7 +1343,7 @@
       "status": "matched",
       "sourceNumericCode": "562",
       "featureIds": [
-        "country-091"
+        "country-NER"
       ]
     },
     {
@@ -1309,7 +1351,7 @@
       "status": "matched",
       "sourceNumericCode": "574",
       "featureIds": [
-        "country-228"
+        "country-NFK"
       ]
     },
     {
@@ -1317,7 +1359,7 @@
       "status": "matched",
       "sourceNumericCode": "566",
       "featureIds": [
-        "country-090"
+        "country-NGA"
       ]
     },
     {
@@ -1325,7 +1367,7 @@
       "status": "matched",
       "sourceNumericCode": "558",
       "featureIds": [
-        "country-092"
+        "country-NIC"
       ]
     },
     {
@@ -1333,7 +1375,7 @@
       "status": "matched",
       "sourceNumericCode": "528",
       "featureIds": [
-        "country-096"
+        "country-NLD"
       ]
     },
     {
@@ -1341,7 +1383,7 @@
       "status": "matched",
       "sourceNumericCode": "578",
       "featureIds": [
-        "country-088"
+        "country-NOR"
       ]
     },
     {
@@ -1349,7 +1391,7 @@
       "status": "matched",
       "sourceNumericCode": "524",
       "featureIds": [
-        "country-099"
+        "country-NPL"
       ]
     },
     {
@@ -1357,7 +1399,7 @@
       "status": "matched",
       "sourceNumericCode": "520",
       "featureIds": [
-        "country-100"
+        "country-NRU"
       ]
     },
     {
@@ -1365,7 +1407,7 @@
       "status": "matched",
       "sourceNumericCode": "570",
       "featureIds": [
-        "country-094"
+        "country-NIU"
       ]
     },
     {
@@ -1373,7 +1415,15 @@
       "status": "matched",
       "sourceNumericCode": "554",
       "featureIds": [
-        "country-093"
+        "country-NZL"
+      ]
+    },
+    {
+      "code": "OM",
+      "status": "matched",
+      "sourceNumericCode": "512",
+      "featureIds": [
+        "country-OMN"
       ]
     },
     {
@@ -1381,7 +1431,7 @@
       "status": "matched",
       "sourceNumericCode": "591",
       "featureIds": [
-        "country-084"
+        "country-PAN"
       ]
     },
     {
@@ -1389,7 +1439,7 @@
       "status": "matched",
       "sourceNumericCode": "604",
       "featureIds": [
-        "country-081"
+        "country-PER"
       ]
     },
     {
@@ -1397,7 +1447,7 @@
       "status": "matched",
       "sourceNumericCode": "258",
       "featureIds": [
-        "country-165"
+        "country-PYF"
       ]
     },
     {
@@ -1405,7 +1455,7 @@
       "status": "matched",
       "sourceNumericCode": "598",
       "featureIds": [
-        "country-083"
+        "country-PNG"
       ]
     },
     {
@@ -1413,7 +1463,7 @@
       "status": "matched",
       "sourceNumericCode": "608",
       "featureIds": [
-        "country-080"
+        "country-PHL"
       ]
     },
     {
@@ -1421,7 +1471,7 @@
       "status": "matched",
       "sourceNumericCode": "586",
       "featureIds": [
-        "country-086"
+        "country-PAK"
       ],
       "viewpointSensitive": true,
       "note": "The source has an unnumbered Siachen Glacier geometry."
@@ -1431,7 +1481,7 @@
       "status": "matched",
       "sourceNumericCode": "616",
       "featureIds": [
-        "country-079"
+        "country-POL"
       ]
     },
     {
@@ -1439,7 +1489,7 @@
       "status": "matched",
       "sourceNumericCode": "666",
       "featureIds": [
-        "country-161"
+        "country-SPM"
       ]
     },
     {
@@ -1447,7 +1497,7 @@
       "status": "matched",
       "sourceNumericCode": "612",
       "featureIds": [
-        "country-020"
+        "country-PCN"
       ]
     },
     {
@@ -1455,7 +1505,7 @@
       "status": "matched",
       "sourceNumericCode": "630",
       "featureIds": [
-        "country-015"
+        "country-PRI"
       ]
     },
     {
@@ -1463,7 +1513,7 @@
       "status": "matched",
       "sourceNumericCode": "275",
       "featureIds": [
-        "country-139"
+        "country-PSX"
       ],
       "viewpointSensitive": true,
       "note": "Palestine boundaries reflect this source viewpoint."
@@ -1473,7 +1523,7 @@
       "status": "matched",
       "sourceNumericCode": "620",
       "featureIds": [
-        "country-078"
+        "country-PRT"
       ]
     },
     {
@@ -1481,7 +1531,7 @@
       "status": "matched",
       "sourceNumericCode": "585",
       "featureIds": [
-        "country-085"
+        "country-PLW"
       ]
     },
     {
@@ -1489,7 +1539,7 @@
       "status": "matched",
       "sourceNumericCode": "600",
       "featureIds": [
-        "country-082"
+        "country-PRY"
       ]
     },
     {
@@ -1497,7 +1547,7 @@
       "status": "matched",
       "sourceNumericCode": "634",
       "featureIds": [
-        "country-077"
+        "country-QAT"
       ]
     },
     {
@@ -1512,7 +1562,7 @@
       "status": "matched",
       "sourceNumericCode": "642",
       "featureIds": [
-        "country-076"
+        "country-ROU"
       ]
     },
     {
@@ -1520,7 +1570,7 @@
       "status": "matched",
       "sourceNumericCode": "688",
       "featureIds": [
-        "country-065"
+        "country-SRB"
       ]
     },
     {
@@ -1528,7 +1578,7 @@
       "status": "matched",
       "sourceNumericCode": "643",
       "featureIds": [
-        "country-075"
+        "country-RUS"
       ],
       "viewpointSensitive": true,
       "note": "Russia and Ukraine boundaries reflect this source viewpoint."
@@ -1538,7 +1588,7 @@
       "status": "matched",
       "sourceNumericCode": "646",
       "featureIds": [
-        "country-074"
+        "country-RWA"
       ]
     },
     {
@@ -1546,7 +1596,7 @@
       "status": "matched",
       "sourceNumericCode": "682",
       "featureIds": [
-        "country-067"
+        "country-SAU"
       ]
     },
     {
@@ -1554,7 +1604,7 @@
       "status": "matched",
       "sourceNumericCode": "090",
       "featureIds": [
-        "country-059"
+        "country-SLB"
       ]
     },
     {
@@ -1562,7 +1612,7 @@
       "status": "matched",
       "sourceNumericCode": "690",
       "featureIds": [
-        "country-064"
+        "country-SYC"
       ]
     },
     {
@@ -1570,7 +1620,7 @@
       "status": "matched",
       "sourceNumericCode": "729",
       "featureIds": [
-        "country-052"
+        "country-SDN"
       ]
     },
     {
@@ -1578,7 +1628,7 @@
       "status": "matched",
       "sourceNumericCode": "752",
       "featureIds": [
-        "country-048"
+        "country-SWE"
       ]
     },
     {
@@ -1586,7 +1636,7 @@
       "status": "matched",
       "sourceNumericCode": "702",
       "featureIds": [
-        "country-062"
+        "country-SGP"
       ]
     },
     {
@@ -1594,7 +1644,7 @@
       "status": "matched",
       "sourceNumericCode": "654",
       "featureIds": [
-        "country-019"
+        "country-SHN"
       ]
     },
     {
@@ -1602,7 +1652,7 @@
       "status": "matched",
       "sourceNumericCode": "705",
       "featureIds": [
-        "country-061"
+        "country-SVN"
       ]
     },
     {
@@ -1617,7 +1667,7 @@
       "status": "matched",
       "sourceNumericCode": "703",
       "featureIds": [
-        "country-060"
+        "country-SVK"
       ]
     },
     {
@@ -1625,7 +1675,7 @@
       "status": "matched",
       "sourceNumericCode": "694",
       "featureIds": [
-        "country-063"
+        "country-SLE"
       ]
     },
     {
@@ -1633,7 +1683,7 @@
       "status": "matched",
       "sourceNumericCode": "674",
       "featureIds": [
-        "country-069"
+        "country-SMR"
       ]
     },
     {
@@ -1641,7 +1691,7 @@
       "status": "matched",
       "sourceNumericCode": "686",
       "featureIds": [
-        "country-066"
+        "country-SEN"
       ]
     },
     {
@@ -1649,7 +1699,7 @@
       "status": "matched",
       "sourceNumericCode": "706",
       "featureIds": [
-        "country-057"
+        "country-SOM"
       ],
       "viewpointSensitive": true,
       "note": "The source also has an unnumbered Somaliland geometry."
@@ -1659,7 +1709,7 @@
       "status": "matched",
       "sourceNumericCode": "740",
       "featureIds": [
-        "country-050"
+        "country-SUR"
       ]
     },
     {
@@ -1667,7 +1717,7 @@
       "status": "matched",
       "sourceNumericCode": "728",
       "featureIds": [
-        "country-051"
+        "country-SDS"
       ]
     },
     {
@@ -1675,7 +1725,7 @@
       "status": "matched",
       "sourceNumericCode": "678",
       "featureIds": [
-        "country-068"
+        "country-STP"
       ]
     },
     {
@@ -1683,7 +1733,7 @@
       "status": "matched",
       "sourceNumericCode": "222",
       "featureIds": [
-        "country-175"
+        "country-SLV"
       ]
     },
     {
@@ -1691,7 +1741,7 @@
       "status": "matched",
       "sourceNumericCode": "534",
       "featureIds": [
-        "country-240"
+        "country-SXM"
       ]
     },
     {
@@ -1699,7 +1749,7 @@
       "status": "matched",
       "sourceNumericCode": "760",
       "featureIds": [
-        "country-046"
+        "country-SYR"
       ]
     },
     {
@@ -1707,7 +1757,7 @@
       "status": "matched",
       "sourceNumericCode": "748",
       "featureIds": [
-        "country-049"
+        "country-SWZ"
       ]
     },
     {
@@ -1722,7 +1772,7 @@
       "status": "matched",
       "sourceNumericCode": "796",
       "featureIds": [
-        "country-026"
+        "country-TCA"
       ]
     },
     {
@@ -1730,7 +1780,7 @@
       "status": "matched",
       "sourceNumericCode": "148",
       "featureIds": [
-        "country-199"
+        "country-TCD"
       ]
     },
     {
@@ -1738,7 +1788,7 @@
       "status": "matched",
       "sourceNumericCode": "260",
       "featureIds": [
-        "country-167"
+        "country-ATF"
       ]
     },
     {
@@ -1746,7 +1796,7 @@
       "status": "matched",
       "sourceNumericCode": "768",
       "featureIds": [
-        "country-040"
+        "country-TGO"
       ]
     },
     {
@@ -1754,7 +1804,7 @@
       "status": "matched",
       "sourceNumericCode": "764",
       "featureIds": [
-        "country-042"
+        "country-THA"
       ]
     },
     {
@@ -1762,7 +1812,7 @@
       "status": "matched",
       "sourceNumericCode": "762",
       "featureIds": [
-        "country-044"
+        "country-TJK"
       ]
     },
     {
@@ -1777,7 +1827,7 @@
       "status": "matched",
       "sourceNumericCode": "626",
       "featureIds": [
-        "country-041"
+        "country-TLS"
       ]
     },
     {
@@ -1785,7 +1835,7 @@
       "status": "matched",
       "sourceNumericCode": "795",
       "featureIds": [
-        "country-035"
+        "country-TKM"
       ]
     },
     {
@@ -1793,7 +1843,7 @@
       "status": "matched",
       "sourceNumericCode": "788",
       "featureIds": [
-        "country-037"
+        "country-TUN"
       ]
     },
     {
@@ -1801,7 +1851,7 @@
       "status": "matched",
       "sourceNumericCode": "776",
       "featureIds": [
-        "country-039"
+        "country-TON"
       ]
     },
     {
@@ -1809,7 +1859,7 @@
       "status": "matched",
       "sourceNumericCode": "792",
       "featureIds": [
-        "country-036"
+        "country-TUR"
       ]
     },
     {
@@ -1817,22 +1867,23 @@
       "status": "matched",
       "sourceNumericCode": "780",
       "featureIds": [
-        "country-038"
+        "country-TTO"
       ]
     },
     {
       "code": "TV",
-      "status": "unmatched",
+      "status": "matched",
       "sourceNumericCode": "798",
-      "featureIds": [],
-      "reason": "ISO numeric code 798 has no distinct geometry in this source."
+      "featureIds": [
+        "country-TUV"
+      ]
     },
     {
       "code": "TW",
       "status": "matched",
       "sourceNumericCode": "158",
       "featureIds": [
-        "country-045"
+        "country-TWN"
       ],
       "viewpointSensitive": true,
       "note": "Taiwan is separately identified by this source viewpoint."
@@ -1842,7 +1893,7 @@
       "status": "matched",
       "sourceNumericCode": "834",
       "featureIds": [
-        "country-043"
+        "country-TZA"
       ]
     },
     {
@@ -1850,7 +1901,7 @@
       "status": "matched",
       "sourceNumericCode": "804",
       "featureIds": [
-        "country-033"
+        "country-UKR"
       ],
       "viewpointSensitive": true,
       "note": "Russia and Ukraine boundaries reflect this source viewpoint."
@@ -1860,7 +1911,7 @@
       "status": "matched",
       "sourceNumericCode": "800",
       "featureIds": [
-        "country-034"
+        "country-UGA"
       ]
     },
     {
@@ -1875,7 +1926,7 @@
       "status": "matched",
       "sourceNumericCode": "840",
       "featureIds": [
-        "country-016"
+        "country-USA"
       ]
     },
     {
@@ -1883,7 +1934,7 @@
       "status": "matched",
       "sourceNumericCode": "858",
       "featureIds": [
-        "country-008"
+        "country-URY"
       ]
     },
     {
@@ -1891,7 +1942,7 @@
       "status": "matched",
       "sourceNumericCode": "860",
       "featureIds": [
-        "country-007"
+        "country-UZB"
       ]
     },
     {
@@ -1899,7 +1950,7 @@
       "status": "matched",
       "sourceNumericCode": "336",
       "featureIds": [
-        "country-005"
+        "country-VAT"
       ]
     },
     {
@@ -1907,7 +1958,7 @@
       "status": "matched",
       "sourceNumericCode": "670",
       "featureIds": [
-        "country-071"
+        "country-VCT"
       ]
     },
     {
@@ -1915,7 +1966,7 @@
       "status": "matched",
       "sourceNumericCode": "862",
       "featureIds": [
-        "country-004"
+        "country-VEN"
       ]
     },
     {
@@ -1923,7 +1974,7 @@
       "status": "matched",
       "sourceNumericCode": "092",
       "featureIds": [
-        "country-025"
+        "country-VGB"
       ]
     },
     {
@@ -1931,7 +1982,7 @@
       "status": "matched",
       "sourceNumericCode": "850",
       "featureIds": [
-        "country-012"
+        "country-VIR"
       ]
     },
     {
@@ -1939,7 +1990,7 @@
       "status": "matched",
       "sourceNumericCode": "704",
       "featureIds": [
-        "country-003"
+        "country-VNM"
       ]
     },
     {
@@ -1947,7 +1998,7 @@
       "status": "matched",
       "sourceNumericCode": "548",
       "featureIds": [
-        "country-006"
+        "country-VUT"
       ]
     },
     {
@@ -1955,7 +2006,7 @@
       "status": "matched",
       "sourceNumericCode": "876",
       "featureIds": [
-        "country-162"
+        "country-WLF"
       ]
     },
     {
@@ -1963,7 +2014,7 @@
       "status": "matched",
       "sourceNumericCode": "882",
       "featureIds": [
-        "country-070"
+        "country-WSM"
       ]
     },
     {
@@ -1971,16 +2022,16 @@
       "status": "ambiguous",
       "sourceNumericCode": null,
       "featureIds": [
-        "country-130"
+        "country-KOS"
       ],
-      "reason": "The source includes an unnumbered Kosovo geometry, but no numeric ISO feature ID; a manual viewpoint-specific match is required."
+      "reason": "Natural Earth has a separate Kosovo geometry, but this view has no reviewed statistical-territory association for it."
     },
     {
       "code": "YE",
       "status": "matched",
       "sourceNumericCode": "887",
       "featureIds": [
-        "country-002"
+        "country-YEM"
       ]
     },
     {
@@ -1995,7 +2046,7 @@
       "status": "matched",
       "sourceNumericCode": "710",
       "featureIds": [
-        "country-056"
+        "country-ZAF"
       ]
     },
     {
@@ -2003,7 +2054,7 @@
       "status": "matched",
       "sourceNumericCode": "894",
       "featureIds": [
-        "country-001"
+        "country-ZMB"
       ]
     },
     {
@@ -2011,20 +2062,22 @@
       "status": "matched",
       "sourceNumericCode": "716",
       "featureIds": [
-        "country-000"
+        "country-ZWE"
       ]
+    },
+    {
+      "code": "ZZ",
+      "status": "unmatched",
+      "sourceNumericCode": null,
+      "featureIds": [],
+      "reason": "No separate Natural Earth 1:50m Admin-0 country geometry for this CLDR territory."
     }
   ],
   "unassignedFeatureIds": [
-    "country-058",
-    "country-087",
-    "country-122",
-    "country-129",
-    "country-130",
-    "country-185",
-    "country-226",
-    "country-227",
-    "country-238",
-    "country-239"
+    "country-SOL",
+    "country-KOS",
+    "country-CYN",
+    "country-IOA",
+    "country-KAS"
   ]
 }

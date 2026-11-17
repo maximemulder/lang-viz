@@ -1,340 +1,226 @@
-"""Validate and compile the pinned, prejoined CLDR territory supplement.
-
-The CSV is a fixed branch snapshot. Its upstream CLDR release and preprocessing
-recipe are unknown; this adapter does not claim to reconstruct them.
-"""
+"""Build CLDR 49 territory observations, preserving unresolved Glottolog joins."""
 
 from __future__ import annotations
 
 import argparse
-import csv
-import hashlib
 import json
 import re
 import tempfile
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from pathlib import Path
+
+from pipeline.administrative.mapping import CATALOG, SOURCE, check_file, read_mapping
+from pipeline.administrative.mapping import sha256 as file_sha256
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 PIN = HERE / "sources.json"
-SOURCE = ROOT / "data/administrative/source/cldr_glottolog_joined.csv"
-CATALOG = ROOT / "data/administrative/glottolog/languages.csv"
+CLDR = ROOT / "data/administrative/cldr/supplementalData-49.xml"
+ENGLISH = ROOT / "data/administrative/cldr/en-49.xml"
 OUTPUT = ROOT / "app/public/administrative/observations.json"
 
-COLUMNS = (
-    "territory_code",
-    "un_containment_codes",
-    "language_raw_code",
-    "territory_population",
-    "territory_gdp_usd",
-    "territory_literacy_percent",
-    "population_percent",
-    "speaker_count",
-    "official_status",
-    "language_literacy_percent",
-    "language_writing_percent",
-    "iso639_3",
-    "ID",
-    "glottocode",
-    "glottolog_name",
-    "family_glottocode",
-    "glottolog_macroarea",
-    "latitude",
-    "longitude",
-    "glottolog_countries",
-)
-CATALOG_FIELDS = {
-    "ID": "ID",
-    "glottolog_name": "Name",
-    "iso639_3": "ISO639P3code",
-    "family_glottocode": "Family_ID",
-    "glottolog_macroarea": "Macroarea",
-    "glottolog_countries": "Countries",
-}
-STATUSES = {
-    "unspecified",
-    "official",
-    "official_regional",
-    "de_facto_official",
-    "official_minority",
-}
+STATUSES = {"official", "official_regional", "de_facto_official", "official_minority"}
 
 
-def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def language_names(path: Path) -> dict[str, str]:
+    root = ET.parse(path).getroot()
+    languages = root.find("./localeDisplayNames/languages")
+    if languages is None:
+        raise ValueError("CLDR English names are missing")
+    return {
+        row.get("type"): row.text
+        for row in languages
+        if row.tag == "language" and row.get("type") and row.text and not row.get("alt")
+    }
 
 
-def check_file(path: Path, spec: dict) -> None:
-    if (
-        not path.is_file()
-        or path.is_symlink()
-        or path.stat().st_size != spec["bytes"]
-        or sha256(path) != spec["sha256"]
-    ):
-        raise ValueError(f"Missing or modified pinned source: {path}")
-
-
-def read_rows(path: Path, required: set[str]) -> list[dict[str, str]]:
-    with path.open(encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        if reader.fieldnames is None or len(reader.fieldnames) != len(set(reader.fieldnames)):
-            raise ValueError(f"Missing or repeated CSV header: {path}")
-        missing = required - set(reader.fieldnames)
-        if missing:
-            raise ValueError(f"Missing CSV columns in {path}: {', '.join(sorted(missing))}")
-        rows = list(reader)
-    if not rows or any(None in row or any(value is None for value in row.values()) for row in rows):
-        raise ValueError(f"Empty or malformed CSV rows: {path}")
-    return rows
-
-
-def decimal(value: str, label: str, *, low: int = 0, high: int | None = None) -> Decimal:
-    try:
-        number = Decimal(value)
-    except InvalidOperation as error:
-        raise ValueError(f"Invalid {label}: {value!r}") from error
-    if not number.is_finite() or number < low or (high is not None and number > high):
-        raise ValueError(f"Out-of-range {label}: {value!r}")
-    return number
-
-
-def optional_decimal(value: str, label: str, *, low: int = 0, high: int | None = None) -> None:
-    if value:
-        decimal(value, label, low=low, high=high)
-
-
-def compile_data(source: Path, catalog: Path, pin: dict) -> dict:
-    check_file(source, pin["joinedCsv"])
-    check_file(catalog, pin["glottolog"])
-    records = read_rows(source, set(COLUMNS))
-    catalog_rows = read_rows(
-        catalog, {"Glottocode", "Name", "Level", "Language_ID", *CATALOG_FIELDS.values()}
-    )
-    catalog_by_id: dict[str, dict[str, str]] = {}
-    for row in catalog_rows:
-        code = row["Glottocode"]
-        if code in catalog_by_id:
-            raise ValueError(f"Duplicate Glottolog ID: {code}")
-        catalog_by_id[code] = row
-
-    territories: dict[str, dict] = {}
-    associations: dict[str, dict] = {}
-    observations: list[dict] = []
-    keys: set[tuple[str, str]] = set()
-    by_glottocode: Counter[str] = Counter()
-    levels: Counter[str] = Counter()
-    for line, row in enumerate(records, 2):
-        territory, language = row["territory_code"], row["language_raw_code"]
-        where = f"CSV line {line} ({territory}/{language})"
-        if not re.fullmatch(r"[A-Z]{2}", territory):
-            raise ValueError(f"Invalid territory code at {where}")
-        if not re.fullmatch(r"[a-z]{2,3}(?:_[A-Za-z0-9]+)*", language):
-            raise ValueError(f"Invalid CLDR language code at {where}")
-        key = territory, language
-        if key in keys:
-            raise ValueError(f"Duplicate territory/language observation at {where}")
-        keys.add(key)
-        population = decimal(row["territory_population"], f"population at {where}")
-        decimal(row["territory_gdp_usd"], f"GDP at {where}")
-        decimal(row["territory_literacy_percent"], f"territory literacy at {where}", high=100)
-        percent = decimal(row["population_percent"], f"language percent at {where}", high=100)
-        count = decimal(row["speaker_count"], f"speaker count at {where}")
-        if count != count.to_integral_value() or abs(count - (population * percent / 100)) > 1:
-            raise ValueError(f"Speaker count does not match the source estimate at {where}")
-        optional_decimal(
-            row["language_literacy_percent"], f"language literacy at {where}", high=100
-        )
-        optional_decimal(row["language_writing_percent"], f"writing percent at {where}", high=100)
-        if row["official_status"] not in STATUSES:
-            raise ValueError(f"Unknown official status at {where}")
-        for field, low, high in (("latitude", -90, 90), ("longitude", -180, 180)):
-            optional_decimal(row[field], f"{field} at {where}", low=low, high=high)
-        if bool(row["latitude"]) != bool(row["longitude"]):
-            raise ValueError(f"Incomplete Glottolog coordinates at {where}")
-
-        territory_values = {
-            "code": territory,
-            "unContainmentCodes": row["un_containment_codes"],
-            "population": row["territory_population"],
-            "gdpUsd": row["territory_gdp_usd"],
-            "literacyPercent": row["territory_literacy_percent"],
-        }
-        if territory in territories and territories[territory] != territory_values:
-            raise ValueError(f"Conflicting territory values at {where}")
-        territories[territory] = territory_values
-
-        glottocode = row["glottocode"]
-        if not re.fullmatch(r"[a-z]{4}[0-9]{4}", glottocode):
-            raise ValueError(f"Invalid Glottocode at {where}")
-        glottolog = catalog_by_id.get(glottocode)
-        if glottolog is None:
-            raise ValueError(f"Unmatched Glottocode at {where}: {glottocode}")
-        for source_field, catalog_field in CATALOG_FIELDS.items():
-            if row[source_field] != glottolog[catalog_field]:
-                raise ValueError(f"Glottolog {source_field} mismatch at {where}")
-        if row["ID"] != glottocode or glottolog["ID"] != glottocode:
-            raise ValueError(f"Glottolog ID mismatch at {where}")
-        for source_field, catalog_field in (("latitude", "Latitude"), ("longitude", "Longitude")):
-            if row[source_field] and abs(
-                Decimal(row[source_field]) - Decimal(glottolog[catalog_field])
-            ) > Decimal("1e-10"):
-                raise ValueError(f"Glottolog {source_field} mismatch at {where}")
-        level = glottolog["Level"]
-        if level not in {"language", "dialect", "family"}:
-            raise ValueError(f"Unexpected Glottolog level at {where}: {level}")
-        association = {
-            "sourceLanguageCode": language,
-            "glottocode": glottocode,
-            "matchMethod": "source_join_verified_against_pinned_glottolog",
-            "glottologLevel": level,
-            "glottologLanguageParentId": glottolog["Language_ID"] or None,
-            "iso6393": row["iso639_3"] or None,
-            "name": row["glottolog_name"],
-            "familyId": row["family_glottocode"] or None,
-            "macroareas": row["glottolog_macroarea"].split(";")
-            if row["glottolog_macroarea"]
-            else [],
-            "latitude": row["latitude"] or None,
-            "longitude": row["longitude"] or None,
-            "glottologCountries": row["glottolog_countries"].split(";")
-            if row["glottolog_countries"]
-            else [],
-        }
-        if language in associations and associations[language] != association:
-            raise ValueError(f"Conflicting language association at {where}")
-        associations[language] = association
-        by_glottocode[glottocode] += 1
-        levels[level] += 1
-        observations.append(
+def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin: dict) -> dict:
+    check_file(cldr, pin["cldrSupplemental"])
+    check_file(english, pin["cldrEnglish"])
+    # The pinned join supplies reviewed language associations only. Missing joins
+    # remain visible as CLDR-only languages.
+    known, family_names = read_mapping(joined, catalog, pin)
+    names = language_names(english)
+    root = ET.parse(cldr).getroot()
+    info = root.find("territoryInfo")
+    containment = root.find("territoryContainment")
+    if info is None or containment is None:
+        raise ValueError("CLDR territoryInfo or territoryContainment is missing")
+    numeric_parents: dict[str, list[str]] = defaultdict(list)
+    for group in containment:
+        parent = group.get("type")
+        if parent and parent.isdigit():
+            for child in (group.get("contains") or "").split():
+                numeric_parents[child].append(parent)
+    territories = []
+    observations = []
+    source_codes: set[str] = set()
+    unsupported: Counter[str] = Counter()
+    for item in info:
+        code = item.get("type")
+        if code is None or not re.fullmatch(r"[A-Z]{2}", code):
+            raise ValueError(f"Invalid CLDR territory code: {code}")
+        values = {key: item.get(key) for key in ("population", "gdp", "literacyPercent")}
+        if any(value is None for value in values.values()):
+            raise ValueError(f"Incomplete CLDR territory: {code}")
+        territories.append(
             {
-                "territoryCode": territory,
-                "sourceLanguageCode": language,
-                "populationPercent": row["population_percent"],
-                "speakerCount": row["speaker_count"],
-                "officialStatus": row["official_status"],
-                "languageLiteracyPercent": row["language_literacy_percent"] or None,
-                "languageWritingPercent": row["language_writing_percent"] or None,
+                "code": code,
+                "unContainmentCodes": ";".join(numeric_parents.get(code, [])),
+                "population": values["population"],
+                "gdpUsd": values["gdp"],
+                "literacyPercent": values["literacyPercent"],
             }
         )
-
-    territory_percent_sums: dict[str, Decimal] = defaultdict(Decimal)
-    territory_glottocode_counts: Counter[tuple[str, str]] = Counter()
+        for row in item.findall("languagePopulation"):
+            language = row.get("type")
+            percent = row.get("populationPercent")
+            if (
+                language is None
+                or not re.fullmatch(r"[a-z]{2,3}(?:_[A-Za-z0-9]+)*", language)
+                or percent is None
+            ):
+                raise ValueError(f"Invalid CLDR language in {code}")
+            status = row.get("officialStatus") or "unspecified"
+            if status != "unspecified" and status not in STATUSES:
+                raise ValueError(f"Unsupported CLDR official status: {status}")
+            count = round(Decimal(values["population"]) * Decimal(percent) / 100)
+            observations.append(
+                {
+                    "territoryCode": code,
+                    "sourceLanguageCode": language,
+                    "populationPercent": percent,
+                    "speakerCount": str(count),
+                    "officialStatus": status,
+                    "languageLiteracyPercent": row.get("literacyPercent"),
+                    "languageWritingPercent": row.get("writingPercent"),
+                }
+            )
+            source_codes.add(language)
+            if language not in known:
+                unsupported[language] += 1
+    if len(territories) != 258 or len(observations) != 1630:
+        raise ValueError("Unexpected CLDR 49 territory or observation count")
+    if len({row["code"] for row in territories}) != len(territories):
+        raise ValueError("Repeated CLDR territory")
+    associations = []
+    for code in sorted(source_codes):
+        if code in known:
+            associations.append(known[code])
+        else:
+            associations.append(
+                {
+                    "sourceLanguageCode": code,
+                    "glottocode": None,
+                    "matchMethod": "unresolved",
+                    "glottologLevel": None,
+                    "glottologLanguageParentId": None,
+                    "iso6393": None,
+                    "name": names.get(code) or code,
+                    "familyId": None,
+                    "macroareas": [],
+                    "latitude": None,
+                    "longitude": None,
+                    "glottologCountries": [],
+                }
+            )
+    glottocodes = {item["glottocode"] for item in associations if item["glottocode"] is not None}
+    family_ids = {item["familyId"] for item in associations if item["familyId"]}
+    families = [{"id": key, "name": family_names[key]} for key in sorted(family_ids)]
+    atlas = [
+        {"glottocode": key, "status": "unresolved", "matchMethod": None, "atlasLanguageId": None}
+        for key in sorted(glottocodes)
+    ]
+    by_territory: dict[str, Decimal] = defaultdict(Decimal)
     for row in observations:
-        territory_percent_sums[row["territoryCode"]] += Decimal(row["populationPercent"])
-        territory_glottocode_counts[
-            (row["territoryCode"], associations[row["sourceLanguageCode"]]["glottocode"])
-        ] += 1
-    family_ids = sorted({item["familyId"] for item in associations.values() if item["familyId"]})
-    families = []
-    for family_id in family_ids:
-        catalog_family = catalog_by_id.get(family_id)
-        if not catalog_family or catalog_family["Level"] != "family" or not catalog_family["Name"]:
-            raise ValueError(f"Missing or invalid Glottolog family: {family_id}")
-        families.append({"id": family_id, "name": catalog_family["Name"]})
-    diagnostics = {
+        by_territory[row["territoryCode"]] += Decimal(row["populationPercent"])
+    coverage = {
         "observationCount": len(observations),
         "territoryCount": len(territories),
         "sourceLanguageCount": len(associations),
-        "glottocodeCount": len(by_glottocode),
+        "glottocodeCount": len(glottocodes),
         "familyCount": len(families),
-        "glottologLevels": dict(sorted(levels.items())),
+        "unresolvedLanguageCount": len(unsupported),
+        "unresolvedObservationCount": sum(unsupported.values()),
+        "territoriesWithoutObservations": [
+            row["code"] for row in territories if row["code"] not in by_territory
+        ],
         "territoriesWithOverlappingPercentages": sum(
-            total > 100 for total in territory_percent_sums.values()
+            total > 100 for total in by_territory.values()
         ),
-        "territoryGlottocodeDuplicateGroups": sum(
-            count > 1 for count in territory_glottocode_counts.values()
-        ),
-        "unmatchedGlottocodes": 0,
     }
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "manifest": {
             "sourceBranchCommit": pin["sourceBranchCommit"],
             "cldrRelease": pin["cldrRelease"],
             "cldrSourceFile": pin["cldrSourceFile"],
+            "cldrSupplemental": pin["cldrSupplemental"],
+            "cldrEnglish": pin["cldrEnglish"],
             "joinedCsv": pin["joinedCsv"],
             "glottolog": pin["glottolog"],
-            "producerRevision": f"sha256:{sha256(Path(__file__))}",
+            "producerRevision": f"sha256:{file_sha256(Path(__file__))}",
             "attribution": [
                 {
-                    "name": "Unicode CLDR territory-language data",
-                    "sourceUrl": "https://github.com/unicode-org/cldr",
+                    "name": "Unicode CLDR 49 territory-language data",
+                    "sourceUrl": "https://cldr.unicode.org/index/downloads",
                     "license": "Unicode-3.0",
-                    "licenseUrl": "https://github.com/unicode-org/cldr/blob/main/LICENSE",
-                    "note": "Upstream release and joined-CSV preprocessing recipe unverified",
                 },
                 {
-                    "name": "Glottolog 5.3 CLDF",
-                    "citation": "Hammarström, Forkel, Haspelmath & Bank (2026), Glottolog 5.3",
+                    "name": "Glottolog 5.3 CLDF, for reviewed language associations",
                     "sourceUrl": "https://github.com/glottolog/glottolog-cldf",
                     "license": "CC-BY-4.0",
-                    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
                 },
             ],
-            "coverage": diagnostics,
+            "coverage": coverage,
         },
-        "territories": [territories[key] for key in sorted(territories)],
+        "territories": territories,
         "observations": observations,
-        "languageAssociations": [associations[key] for key in sorted(associations)],
+        "languageAssociations": associations,
         "families": families,
-        "atlasAssociations": [
-            {
-                "glottocode": key,
-                "status": "unresolved",
-                "matchMethod": None,
-                "atlasLanguageId": None,
-            }
-            for key in sorted(by_glottocode)
-        ],
+        "atlasAssociations": atlas,
     }
 
 
-def expected_bytes(source: Path, catalog: Path) -> bytes:
+def expected_bytes() -> bytes:
     pin = json.loads(PIN.read_text(encoding="utf-8"))
     return (
-        json.dumps(compile_data(source, catalog, pin), ensure_ascii=False, separators=(",", ":"))
+        json.dumps(
+            compile_release(CLDR, ENGLISH, SOURCE, CATALOG, pin),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
         + "\n"
-    ).encode("utf-8")
+    ).encode()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("build", "verify"))
-    parser.add_argument("--source", type=Path, default=SOURCE)
-    parser.add_argument("--catalog", type=Path, default=CATALOG)
-    parser.add_argument("--output", type=Path, default=OUTPUT)
     args = parser.parse_args()
     try:
-        expected = expected_bytes(args.source, args.catalog)
-        if args.command == "verify":
-            if (
-                not args.output.is_file()
-                or args.output.is_symlink()
-                or args.output.read_bytes() != expected
-            ):
-                raise ValueError(f"Missing or stale administrative supplement: {args.output}")
-        else:
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            if (
-                not args.output.is_file()
-                or args.output.is_symlink()
-                or args.output.read_bytes() != expected
-            ):
-                with tempfile.NamedTemporaryFile(
-                    dir=args.output.parent, prefix=".observations-", delete=False
-                ) as handle:
-                    staged = Path(handle.name)
-                    try:
-                        handle.write(expected)
-                        handle.flush()
-                        staged.replace(args.output)
-                    finally:
-                        staged.unlink(missing_ok=True)
-        print(f"Verified administrative supplement ({len(expected):,} bytes): {args.output}")
-    except (OSError, ValueError, KeyError) as error:
+        expected = expected_bytes()
+        if args.command == "build" and (
+            not OUTPUT.is_file() or OUTPUT.is_symlink() or OUTPUT.read_bytes() != expected
+        ):
+            OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                dir=OUTPUT.parent, prefix=".observations-", delete=False
+            ) as handle:
+                staged = Path(handle.name)
+                try:
+                    handle.write(expected)
+                    handle.flush()
+                    staged.replace(OUTPUT)
+                finally:
+                    staged.unlink(missing_ok=True)
+        if not OUTPUT.is_file() or OUTPUT.is_symlink() or OUTPUT.read_bytes() != expected:
+            raise ValueError(f"Missing or stale administrative supplement: {OUTPUT}")
+    except (OSError, ValueError, KeyError, ET.ParseError) as error:
         parser.exit(1, f"Administrative supplement {args.command} failed: {error}\n")
+    print(f"Verified CLDR 49 administrative supplement ({len(expected):,} bytes)")
 
 
 if __name__ == "__main__":

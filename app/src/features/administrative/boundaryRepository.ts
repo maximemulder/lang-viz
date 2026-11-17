@@ -4,7 +4,8 @@ type Coordinate = [number, number]
 
 export interface BoundaryFeature {
   readonly featureId: string
-  readonly topologyIndex: number
+  readonly sourceId: string
+  readonly sourceAlpha2Code: string | null
   readonly sourceNumericId: string | null
   readonly sourceName: string
   readonly point: readonly [number, number]
@@ -43,8 +44,8 @@ export function indexBoundaries(indexValue: unknown, crosswalkValue: unknown): B
   const index = indexValue
   const crosswalk = crosswalkValue
   if (
-    index.schemaVersion !== 1 ||
-    crosswalk.schemaVersion !== 1 ||
+    index.schemaVersion !== 2 ||
+    crosswalk.schemaVersion !== 2 ||
     typeof index.viewId !== 'string' ||
     index.viewId !== crosswalk.viewId ||
     !Array.isArray(index.features) ||
@@ -57,7 +58,13 @@ export function indexBoundaries(indexValue: unknown, crosswalkValue: unknown): B
     if (
       !record(feature) ||
       typeof feature.featureId !== 'string' ||
-      !Number.isInteger(feature.topologyIndex) ||
+      typeof feature.sourceId !== 'string' ||
+      !(
+        feature.sourceAlpha2Code === null ||
+        (typeof feature.sourceAlpha2Code === 'string' &&
+          /^[A-Z]{2}$/.test(feature.sourceAlpha2Code))
+      ) ||
+      typeof feature.sourceName !== 'string' ||
       !Array.isArray(feature.point) ||
       feature.point.length !== 2 ||
       feature.point.some((value) => typeof value !== 'number' || !Number.isFinite(value)) ||
@@ -87,17 +94,17 @@ export function indexBoundaries(indexValue: unknown, crosswalkValue: unknown): B
   }
   const points: FeatureCollection = {
     type: 'FeatureCollection',
-    features: features.flatMap((feature) => {
+    features: features.map((feature) => {
       const territoryCode = featureToCode.get(feature.featureId)
-      return territoryCode
-        ? [
-            {
-              type: 'Feature' as const,
-              geometry: { type: 'Point' as const, coordinates: [...feature.point] },
-              properties: { territoryCode, featureId: feature.featureId },
-            },
-          ]
-        : []
+      return {
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [...feature.point] },
+        properties: {
+          territoryCode: territoryCode ?? null,
+          featureId: feature.featureId,
+          sourceName: feature.sourceName,
+        },
+      }
     }),
   }
   return { viewId: index.viewId, features, associations, featureToCode, points }
@@ -112,23 +119,6 @@ export function loadBoundaryIndex(): Promise<BoundaryIndex> {
       throw error
     })
   return indexPromise
-}
-
-interface Topology {
-  readonly type: 'Topology'
-  readonly objects: {
-    readonly countries: {
-      readonly geometries: readonly {
-        readonly type: 'Polygon' | 'MultiPolygon'
-        readonly arcs: number[][] | number[][][]
-      }[]
-    }
-  }
-  readonly arcs: readonly (readonly (readonly [number, number])[])[]
-  readonly transform: {
-    readonly scale: readonly [number, number]
-    readonly translate: readonly [number, number]
-  }
 }
 
 /** Keep a ring on each side of the date line before MapLibre tiles the GeoJSON. */
@@ -206,60 +196,35 @@ function splitAtAntimeridian(coordinates: Coordinate[]): Coordinate[][] {
   return rings.length ? rings : [coordinates]
 }
 
-/** Decode only this pinned countries topology. The reviewed crosswalk supplies all IDs. */
+/** Validate the pinned GeoJSON and attach reviewed statistical associations. */
 export function decodeBoundaryGeometry(value: unknown, index: BoundaryIndex): FeatureCollection {
-  if (
-    !record(value) ||
-    value.type !== 'Topology' ||
-    !record(value.objects) ||
-    !record(value.objects.countries) ||
-    !Array.isArray(value.objects.countries.geometries) ||
-    !Array.isArray(value.arcs) ||
-    !record(value.transform)
-  )
-    throw new Error('Invalid boundary topology.')
-  const topology = value as unknown as Topology
-  if (topology.objects.countries.geometries.length !== index.features.length)
-    throw new Error('Boundary topology does not match feature index.')
-  const [sx, sy] = topology.transform.scale
-  const [tx, ty] = topology.transform.translate
-  const decoded = topology.arcs.map((arc) => {
-    let x = 0
-    let y = 0
-    return arc.map(([dx, dy]): Coordinate => {
-      x += dx
-      y += dy
-      return [x * sx + tx, y * sy + ty]
-    })
-  })
-  const ring = (ids: readonly number[]): Coordinate[] => {
-    const result: Coordinate[] = []
-    for (const id of ids) {
-      const arc = decoded[id >= 0 ? id : ~id]
-      if (!arc) throw new Error('Boundary topology has an invalid arc.')
-      const segment = id >= 0 ? arc : [...arc].reverse()
-      result.push(...(result.length ? segment.slice(1) : segment))
-    }
-    return result
-  }
+  if (!record(value) || value.type !== 'FeatureCollection' || !Array.isArray(value.features))
+    throw new Error('Invalid boundary GeoJSON.')
+  const source = value as unknown as FeatureCollection
+  if (source.features.length !== index.features.length)
+    throw new Error('Boundary GeoJSON does not match feature index.')
   return {
     type: 'FeatureCollection',
-    features: topology.objects.countries.geometries.map((item, position) => {
+    features: source.features.map((item, position) => {
       const feature = index.features[position]
-      if (!feature || feature.topologyIndex !== position)
+      if (!feature || item.id !== feature.featureId)
         throw new Error('Boundary feature order mismatch.')
       const territoryCode = index.featureToCode.get(feature.featureId) ?? null
+      if (
+        !item.geometry ||
+        (item.geometry.type !== 'Polygon' && item.geometry.type !== 'MultiPolygon')
+      )
+        throw new Error('Invalid boundary polygon.')
       const sourceParts =
-        item.type === 'Polygon' ? [item.arcs as number[][]] : (item.arcs as number[][][])
-      const parts = sourceParts.flatMap((part) => {
-        const rings = part.map(ring)
-        return rings.length === 1 && rings[0]
-          ? splitAtAntimeridian(rings[0]).map((coordinates) => [coordinates])
-          : [rings]
-      })
+        item.geometry.type === 'Polygon' ? [item.geometry.coordinates] : item.geometry.coordinates
+      const parts = sourceParts.flatMap((rings) =>
+        rings.length === 1 && rings[0]
+          ? splitAtAntimeridian(rings[0] as Coordinate[]).map((coordinates) => [coordinates])
+          : [rings],
+      )
       const firstPart = parts[0]
       const geometry: Geometry =
-        item.type === 'Polygon' && parts.length === 1 && firstPart
+        item.geometry.type === 'Polygon' && parts.length === 1 && firstPart
           ? { type: 'Polygon', coordinates: firstPart }
           : { type: 'MultiPolygon', coordinates: parts }
       return {
@@ -268,6 +233,7 @@ export function decodeBoundaryGeometry(value: unknown, index: BoundaryIndex): Fe
         geometry,
         properties: {
           featureId: feature.featureId,
+          sourceName: feature.sourceName,
           territoryCode,
           status: territoryCode
             ? index.associations.get(territoryCode)?.viewpointSensitive
@@ -282,7 +248,7 @@ export function decodeBoundaryGeometry(value: unknown, index: BoundaryIndex): Fe
 
 let geometryPromise: Promise<FeatureCollection> | undefined
 export function loadBoundaryGeometry(index: BoundaryIndex): Promise<FeatureCollection> {
-  geometryPromise ??= read('geometry.topojson')
+  geometryPromise ??= read('geometry.geojson')
     .then((value) => decodeBoundaryGeometry(value, index))
     .catch((error: unknown) => {
       geometryPromise = undefined

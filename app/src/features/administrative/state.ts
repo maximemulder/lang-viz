@@ -66,7 +66,9 @@ export const boundaryPresentationAtom = atom<{
   hover: 'language',
 })
 export const hoveredAdministrativeAreaAtom = atom<{
-  readonly code: string
+  readonly featureId: string
+  readonly sourceName: string
+  readonly territoryCode: string | null
   readonly longitude: number
   readonly latitude: number
 } | null>(null)

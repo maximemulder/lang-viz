@@ -13,34 +13,46 @@ const asset = (name: string) =>
 
 test('the pinned boundary crosswalk keeps markers and polygons independent of CLDR values', () => {
   const index = indexBoundaries(asset('feature-index.json'), asset('crosswalk.json'))
-  assert.equal(index.features.length, 241)
-  assert.equal(index.associations.size, 251)
-  assert.equal(index.points.features.length, 231)
+  assert.equal(index.features.length, 242)
+  assert.equal(index.associations.size, 258)
+  assert.equal(index.points.features.length, 242)
   assert.equal(index.associations.get('XK')?.status, 'ambiguous')
   assert.equal(index.associations.get('XK')?.featureIds.length, 1)
   assert.equal(
-    index.points.features.some((feature) => feature.properties?.territoryCode === 'XK'),
-    false,
+    index.points.features.some((feature) => feature.properties?.featureId === 'country-KOS'),
+    true,
   )
   assert.equal(index.associations.get('PS')?.viewpointSensitive, true)
 
-  const geometry = decodeBoundaryGeometry(asset('geometry.topojson'), index)
-  assert.equal(geometry.features.length, 241)
-  assert.equal(geometry.features.filter((feature) => feature.properties?.territoryCode).length, 231)
+  const geometry = decodeBoundaryGeometry(asset('geometry.geojson'), index)
+  assert.equal(geometry.features.length, 242)
+  assert.equal(geometry.features.filter((feature) => feature.properties?.territoryCode).length, 237)
   assert.equal(
-    geometry.features.find((feature) => feature.properties?.featureId === 'country-139')?.properties
+    geometry.features.find((feature) => feature.properties?.featureId === 'country-PSX')?.properties
       ?.territoryCode,
     'PS',
   )
   assert.equal(
-    geometry.features.find((feature) => feature.properties?.featureId === 'country-139')?.properties
+    geometry.features.find((feature) => feature.properties?.featureId === 'country-PSX')?.properties
       ?.status,
     'sensitive',
   )
   assert.equal(
-    geometry.features.find((feature) => feature.properties?.featureId === 'country-000')?.geometry
+    geometry.features.find((feature) => feature.properties?.featureId === 'country-LBY')?.geometry
       .type,
     'Polygon',
+  )
+  assert.equal(
+    geometry.features.find((feature) => feature.id === 'country-LBY')?.properties?.territoryCode,
+    'LY',
+  )
+  assert.equal(
+    geometry.features.find((feature) => feature.id === 'country-SOL')?.properties?.territoryCode,
+    null,
+  )
+  assert.equal(
+    geometry.features.find((feature) => feature.id === 'country-IOA')?.properties?.territoryCode,
+    null,
   )
   assert.equal(
     geometry.features.every((feature) => !('metricValue' in (feature.properties ?? {}))),
@@ -48,20 +60,18 @@ test('the pinned boundary crosswalk keeps markers and polygons independent of CL
   )
 })
 
-test('a topology from another boundary view is rejected', () => {
+test('a geometry file from another boundary view is rejected', () => {
   const index = indexBoundaries(asset('feature-index.json'), asset('crosswalk.json'))
   const invalid = {
-    type: 'Topology',
-    objects: { countries: { geometries: [] } },
-    arcs: [],
-    transform: { scale: [1, 1], translate: [0, 0] },
+    type: 'FeatureCollection',
+    features: [],
   }
   assert.throws(() => decodeBoundaryGeometry(invalid, index), /does not match/)
 })
 
 test('date-line countries are split before polygon and border rendering', () => {
   const index = indexBoundaries(asset('feature-index.json'), asset('crosswalk.json'))
-  const geometry = decodeBoundaryGeometry(asset('geometry.topojson'), index)
+  const geometry = decodeBoundaryGeometry(asset('geometry.geojson'), index)
   for (const [name, minimumParts] of [
     ['Russia', 101],
     ['Fiji', 21],

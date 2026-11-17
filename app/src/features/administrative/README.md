@@ -5,13 +5,14 @@ its loader is called. It has no import from the atlas repository or boundary
 package. A missing or invalid supplement affects only its own load state; the
 atlas can load normally.
 
-`repository.ts` validates schema version 2, provenance fields, coverage counts,
+`repository.ts` validates the schema version 3 release (and older version 2 fixtures), provenance fields, coverage counts,
 all foreign keys, and unique source territory/language pairs before indexing.
 Concurrent loads share one request and failures may be retried. The supplement
-contains 251 territories, 761 source language codes, 57 named families and
-1,488 observations in the pinned snapshot. `model.ts` retains source IDs and
-numeric strings. Family names come from the same pinned Glottolog catalog as
-the language associations; they are not atlas family names.
+contains 258 territories, 798 source language codes, 57 named families and
+1,630 observations from pinned CLDR 49. `model.ts` retains source IDs and
+numeric strings. 37 language codes lack a reviewed Glottolog association;
+their CLDR observations remain available without a fabricated family.
+Family names come from the pinned Glottolog catalog, not the atlas catalog.
 
 `selectors.ts` exposes pure search, detail, and metric functions. Reported
 speaker counts are estimates. Family totals are sums of reported estimates,
@@ -31,7 +32,7 @@ first opened. It then stays mounted across header switches, preserving search,
 selection, and scroll state. Its search covers source territory codes and
 browser-localized area names, source language names/codes, and Glottolog family
 names/IDs. Details use ranked per-row estimates rather than exclusive shares;
-the UI explains overlap, source lineage, and the unknown CLDR release. The
+the UI explains overlap and source lineage. The CLDR source is pinned to release 49. The
 panel never calls atlas language-detail actions. It has a local data failure
 and retry state. The map and language catalog have independent error boundaries
 so their failures do not hide this panel.
@@ -44,7 +45,7 @@ panel is visible.
 `boundaryRepository.ts` loads the reviewed crosswalk and representative points
 from the separate ADM-02 package on first Administrative view or when Area mode
 is selected.
-It fetches and decodes the pinned TopoJSON when Borders or Area inspection is
+It fetches and validates the pinned GeoJSON when Borders or Area inspection is
 enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
 renders markers, hover outlines, optional full borders and eligible metric fills.
 The map information control always carries boundary source credits and
@@ -53,10 +54,11 @@ Loading and retry messages appear only while needed. Selection-specific viewpoin
 notes appear in the detail panel. Every full
 border uses the same paint, regardless of whether its association is
 viewpoint-sensitive or has no matched CLDR area.
-Geometry selection and a
-focus request require an explicit matched crosswalk entry; ambiguous or
-unmatched CLDR areas remain searchable without a shape. Fetch failures stay
-within this optional layer and can be retried.
+Every Natural Earth source shape is inspectable in Area mode. Selection of
+CLDR details and a focus request require an explicit matched crosswalk entry;
+ambiguous shapes show their source name and explain that no reviewed match
+exists. Unmatched CLDR areas remain searchable without a shape. Fetch failures
+stay within this optional layer and can be retried.
 
 The current boundary package contains only one Natural Earth view. The static
 GitHub Pages deployment has no client-country signal, so it always renders that

@@ -10,7 +10,15 @@ from pathlib import Path
 import pytest
 
 from pipeline.administrative import sources
-from pipeline.administrative.build import COLUMNS, compile_data
+from pipeline.administrative.build import (
+    CATALOG,
+    CLDR,
+    ENGLISH,
+    PIN,
+    SOURCE,
+    compile_release,
+)
+from pipeline.administrative.mapping import read_mapping
 
 
 def fixture(tmp_path: Path) -> tuple[Path, Path, dict]:
@@ -76,7 +84,7 @@ def fixture(tmp_path: Path) -> tuple[Path, Path, dict]:
         "Countries": "AA",
     }
     with source.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=COLUMNS)
+        writer = csv.DictWriter(handle, fieldnames=rows[0])
         writer.writeheader()
         writer.writerows(rows)
     with catalog.open("w", newline="", encoding="utf-8") as handle:
@@ -114,30 +122,44 @@ def fixture(tmp_path: Path) -> tuple[Path, Path, dict]:
     return source, catalog, pin
 
 
-def test_retains_script_rows_and_keeps_join_separate(tmp_path: Path) -> None:
+def test_mapping_keeps_script_codes_and_validates_families(tmp_path: Path) -> None:
     source, catalog, pin = fixture(tmp_path)
-    result = compile_data(source, catalog, pin)
-    assert len(result["observations"]) == 2
-    assert [row["sourceLanguageCode"] for row in result["observations"]] == ["en", "en_Latn"]
-    assert {row["glottocode"] for row in result["languageAssociations"]} == {"stan1293"}
-    assert result["families"] == [{"id": "indo1319", "name": "Indo-European"}]
-    assert result["atlasAssociations"] == [
-        {
-            "glottocode": "stan1293",
-            "status": "unresolved",
-            "matchMethod": None,
-            "atlasLanguageId": None,
-        }
-    ]
-    assert result["manifest"]["coverage"]["territoryGlottocodeDuplicateGroups"] == 1
-    assert result["manifest"]["coverage"]["unmatchedGlottocodes"] == 0
+    associations, families = read_mapping(source, catalog, pin)
+    assert set(associations) == {"en", "en_Latn"}
+    assert {row["glottocode"] for row in associations.values()} == {"stan1293"}
+    assert families == {"indo1319": "Indo-European"}
+
+
+def test_official_cldr_release_preserves_missing_territories_and_unresolved_languages() -> None:
+    if not all(path.exists() for path in (CLDR, ENGLISH, SOURCE, CATALOG)):
+        pytest.skip("Restore pinned CLDR and Glottolog sources")
+    pin = json.loads(PIN.read_text())
+    result = compile_release(CLDR, ENGLISH, SOURCE, CATALOG, pin)
+    assert result["schemaVersion"] == 3
+    assert result["manifest"]["cldrRelease"] == "49"
+    coverage = result["manifest"]["coverage"]
+    assert (coverage["territoryCount"], coverage["observationCount"]) == (258, 1630)
+    assert coverage["territoriesWithoutObservations"] == ["ZZ"]
+    by_code = {row["code"]: row for row in result["territories"]}
+    assert {"LY", "OM", "KW", "SO"}.issubset(by_code)
+    assert by_code["LY"]["unContainmentCodes"] == "015"
+    assert any(
+        row["territoryCode"] == "LY" and row["sourceLanguageCode"] == "ar"
+        for row in result["observations"]
+    )
+    arabic = next(
+        row for row in result["languageAssociations"] if row["sourceLanguageCode"] == "ar"
+    )
+    assert arabic["name"] == "Arabic"
+    assert arabic["matchMethod"] == "unresolved"
+    assert arabic["glottocode"] is None
 
 
 def test_tampered_source_is_rejected_before_export(tmp_path: Path) -> None:
     source, catalog, pin = fixture(tmp_path)
     source.write_bytes(source.read_bytes() + b"\n")
     with pytest.raises(ValueError, match="modified pinned source"):
-        compile_data(source, catalog, pin)
+        read_mapping(source, catalog, pin)
 
 
 def test_restored_source_is_verified_and_modified_copy_is_preserved(
@@ -192,10 +214,9 @@ def test_github_blob_response_decodes_pinned_source(
 @pytest.mark.parametrize(
     "column,value,message",
     [
-        ("population_percent", "101", "Out-of-range"),
-        ("speaker_count", "999", "does not match"),
         ("glottocode", "xxxx0000", "Unmatched Glottocode"),
-        ("language_raw_code", "en", "Duplicate territory/language"),
+        ("language_raw_code", "bogus!", "Invalid CLDR language code"),
+        ("glottolog_name", "Wrong", "Glottolog association mismatch"),
     ],
 )
 def test_invalid_join_and_values_fail(
@@ -206,7 +227,7 @@ def test_invalid_join_and_values_fail(
         rows = list(csv.DictReader(handle))
     rows[1][column] = value
     with source.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=COLUMNS)
+        writer = csv.DictWriter(handle, fieldnames=rows[0])
         writer.writeheader()
         writer.writerows(rows)
     pin["joinedCsv"] = {
@@ -214,4 +235,4 @@ def test_invalid_join_and_values_fail(
         "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
     }
     with pytest.raises(ValueError, match=message):
-        compile_data(source, catalog, pin)
+        read_mapping(source, catalog, pin)

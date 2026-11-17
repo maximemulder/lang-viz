@@ -25,6 +25,8 @@ def main():
     feature_index = json.loads((boundary_assets / "feature-index.json").read_text())
     nl_feature = next(item for item in crosswalk["territories"] if item["code"] == "NL")["featureIds"][0]
     nl_point = next(item for item in feature_index["features"] if item["featureId"] == nl_feature)["point"]
+    ly_point = next(item for item in feature_index["features"] if item["featureId"] == "country-LBY")["point"]
+    somaliland_point = next(item for item in feature_index["features"] if item["featureId"] == "country-SOL")["point"]
     report: BrowserReport = {"passed": False, "checks": []}
     with browser_session(args.output, dev=not args.production) as (browser, origin):
         path = "/lang-viz/" if args.production else "/"
@@ -67,7 +69,7 @@ def main():
 
         def hover_geo(coordinates):
             x, y = js("return window.overlapTest.inspect(arguments[0]).point", coordinates)
-            browser.call("POST", "/actions", {"actions": [{"type": "pointer", "id": "administrative-map-pointer", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y}]}]})
+            browser.call("POST", "/actions", {"actions": [{"type": "pointer", "id": "administrative-map-pointer", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x + 20, "y": y + 20}, {"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y}]}]})
 
         try:
             wait_for(lambda: js("return !!document.querySelector('.maplibregl-canvas')"), 45, "map")
@@ -75,8 +77,8 @@ def main():
             assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "false"
             assert js("return document.querySelector('.map-area-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
             assert js("return document.querySelector('.map-area-controls__inspect button:last-child').getAttribute('aria-pressed')") == "false"
-            assert not js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.topojson'))")
-            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Natural Earth 4.1.0')"), 20, "map information with borders off")
+            assert not js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.geojson'))")
+            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Natural Earth 5.1.1')"), 20, "map information with borders off")
             js("window.adminAttributionText = document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim()")
             wait_for(lambda: js("return !document.querySelector('.maplibregl-ctrl-attrib').classList.contains('maplibregl-compact-show')"), 10, "folded map information")
             assert js("return document.querySelector('.maplibregl-ctrl-attrib-button').getBoundingClientRect().width > 0")
@@ -104,7 +106,7 @@ window.fetch = (...args) => {
             assert js("return document.querySelector('.geography-sidebar__language').hidden")
             assert js("return window.savedAdministrativeMap === document.querySelector('.maplibregl-canvas')")
             report["checks"].append("header and persistent map")
-            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Points mark source geometries')"), 20, "administrative map information")
+            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Points identify source geometries')"), 20, "administrative map information")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             assert not js("return !!document.querySelector('.administrative-map-legend')")
             assert js("return !!document.querySelector('.maplibregl-ctrl-attrib-button')")
@@ -116,10 +118,10 @@ window.fetch = (...args) => {
             browser.screenshot(args.output / "map-information.png")
             js("document.querySelector('.maplibregl-ctrl-attrib-button').click()")
             assert not js("return document.querySelector('.maplibregl-ctrl-attrib').classList.contains('maplibregl-compact-show')")
-            assert not js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.topojson'))")
+            assert not js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.geojson'))")
             js("""window.administrativeFetch = window.fetch;
 window.fetch = (...args) => {
-  if (String(args[0]).endsWith('/geometry.topojson')) {
+  if (String(args[0]).endsWith('/geometry.geojson')) {
     window.fetch = window.administrativeFetch;
     return Promise.resolve(new Response('', {status: 503}));
   }
@@ -130,14 +132,14 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return !!document.querySelector('.administrative-map-status[role=alert]')"), 30, "failed boundary load")
             assert not js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-polygon-hits']).length")
             button("Retry", ".administrative-map-status")
-            wait_for(lambda: js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.topojson'))"), 30, "boundary topology")
+            wait_for(lambda: js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.geojson'))"), 30, "boundary geometry")
             js("window.overlapTest.camera([5.3,52.1],5)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Netherlands camera")
             hits = wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-polygon-hits'])") or None, 20, "rendered polygon hit")
             assert any(hit["properties"].get("territoryCode") == "NL" for hit in hits), hits
             assert not js("return window.overlapTest.layerState('administrative-boundary-lines')")
             hover_geo([6.2, 53.1])
-            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == 'NL' and s['sourceLoaded'] else None), 20, "hovered area outline")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == nl_feature and s['sourceLoaded'] else None), 20, "hovered area outline")
             outline = js("return window.overlapTest.layerState('administrative-hover-outline')")
             assert (outline["color"], outline["width"], outline["opacity"]) == ("#111111", 3, 0.95)
             assert not js("return window.overlapTest.layerState('administrative-hover-halo')")
@@ -156,12 +158,34 @@ window.fetch = (...args) => {
             report["checks"].append("border-off polygon picker selects the CLDR area")
             js("document.querySelector('.map-area-controls__borders').click()")
             wait_for(lambda: js("return !!window.overlapTest.layerState('administrative-boundary-lines')"), 15, "visible boundary lines")
-            assert "Natural Earth 4.1.0" in js("return document.querySelector('.administrative-attribution').textContent")
+            assert "Natural Earth 5.1.1" in js("return document.querySelector('.administrative-attribution').textContent")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             js("[...document.querySelectorAll('input[name=administrative-metric]')][1].click()")
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='NL'&&h.properties.metricValue>0)"), 15, "matched metric fill")
             report["checks"].append("opt-in boundaries and metric control")
+
+            js("window.overlapTest.camera(arguments[0],4)", ly_point)
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Libya camera")
+            wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-polygon-hits']).some(h=>h.properties.territoryCode==='LY')", ly_point), 20, "Libya polygon")
+            wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='LY'&&h.properties.metricValue>0)", ly_point), 15, "Libya CLDR 49 fill")
+            click_geo(ly_point)
+            wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='LY'"), 15, "Libya selection")
+            assert "Arabic" in js("return document.querySelector('.administrative-detail').textContent")
+            report["checks"].append("Libya has a polygon and CLDR 49 observations")
+
+            js("window.overlapTest.camera(arguments[0],4)", somaliland_point)
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Somaliland camera")
+            wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-polygon-hits']).some(h=>h.properties.featureId==='country-SOL')", somaliland_point), 20, "Somaliland polygon")
+            assert not js("return window.overlapTest.queryLayers(arguments[0],['administrative-metric-fill']).some(h=>h.properties.featureId==='country-SOL')", somaliland_point)
+            hover_geo(somaliland_point)
+            wait_for(lambda: js("return document.querySelector('.maplibregl-popup')?.textContent.includes('Somaliland')"), 10, "Somaliland popup")
+            assert "No reviewed CLDR match for this shape" in js("return document.querySelector('.maplibregl-popup').textContent")
+            click_geo(somaliland_point)
+            assert js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='LY'")
+            report["checks"].append("Somaliland remains visible and inspectable without invented data")
+            js("window.overlapTest.camera([5.3,52.1],5)")
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Netherlands camera restored")
 
             type_query("XK")
             wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='XK')"), 10, "unmatched area search")

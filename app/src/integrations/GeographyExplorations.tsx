@@ -50,10 +50,10 @@ export default function GeographyExplorations({
           setBoundary((current) => ({ ...current, hover }))
         },
         hitLayers: [AREA_POINT_LAYER, AREA_POLYGON_LAYER],
-        onHover: (code, longitude, latitude) =>
-          setHoveredArea(code ? { code, longitude, latitude } : null),
-        onSelect: (code) => {
-          if (code) selectArea({ kind: 'territory', id: code })
+        onHover: (area, longitude, latitude) =>
+          setHoveredArea(area ? { ...area, longitude, latitude } : null),
+        onSelect: (area) => {
+          if (area?.territoryCode) selectArea({ kind: 'territory', id: area.territoryCode })
         },
       }}
       mapLayers={

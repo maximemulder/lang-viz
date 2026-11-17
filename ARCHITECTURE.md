@@ -127,13 +127,13 @@ Workers or sharding require evidence from slower devices; the local acceptance
 measurements and their limits are in [the handoff](WALS_PORT_PLAN.md).
 
 Administrative language statistics use a separate CLDR supplement rather than
-the atlas catalog schema. `pipeline/administrative/` restores a pinned joined
-CSV and Glottolog CLDF snapshot, verifies their hashes, and builds a versioned
-`observations.json` with source territory and language IDs. The original CLDR
-release and joined CSV producer are unknown and are disclosed in the asset.
-`pipeline/administrative/boundaries/` independently restores a pinned Natural
-Earth 4.1.0 / world-atlas 2.0.2 topology and builds a reviewed territory
-crosswalk plus feature index. Boundary IDs, representative points, and
+the atlas catalog schema. `pipeline/administrative/` restores pinned CLDR 49
+XML, a Glottolog CLDF snapshot, and a legacy reviewed language crosswalk,
+verifies their hashes, and builds `observations.json` with source territory
+and language IDs. CLDR codes without reviewed Glottolog links retain their
+observations. `pipeline/administrative/boundaries/` independently restores
+Natural Earth's pinned 1:50m Admin-0 countries file (5.1.1, overall release
+5.1.2) and builds a reviewed territory crosswalk plus feature index. Boundary IDs, representative points, and
 political viewpoint do not enter the observations asset. The ordinary Pages
 workflow validates both packages before the frontend build; generated browser
 assets are ignored by Git and excluded from Biome formatting.

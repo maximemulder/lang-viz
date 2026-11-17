@@ -14,19 +14,24 @@ const numberString = (value: unknown, max?: number): value is string =>
   Number(value) >= 0 &&
   (max === undefined || Number(value) <= max)
 const count = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0
+const pinnedSource = (value: unknown): boolean =>
+  record(value) && string(value.url) && code(value.sha256, /^[a-f0-9]{64}$/) && count(value.bytes)
 function fail(reason: string): never {
   throw new Error(`Invalid administrative supplement: ${reason}`)
 }
 
 /** Validate all joins before publishing any data to the administrative view. */
 export function indexAdministrative(value: unknown): AdministrativeRepository {
-  if (!record(value) || value.schemaVersion !== 2 || !record(value.manifest)) fail('schema')
+  if (!record(value) || value.schemaVersion !== 3 || !record(value.manifest)) fail('schema')
   const { manifest } = value
   if (
     !code(manifest.sourceBranchCommit, /^[a-f0-9]{40}$/) ||
     !code(manifest.producerRevision, /^sha256:[a-f0-9]{64}$/) ||
     !nullableString(manifest.cldrRelease) ||
     !nullableString(manifest.cldrSourceFile) ||
+    manifest.cldrRelease !== '49' ||
+    !pinnedSource(manifest.cldrSupplemental) ||
+    !pinnedSource(manifest.cldrEnglish) ||
     !record(manifest.joinedCsv) ||
     !code(manifest.joinedCsv.sha256, /^[a-f0-9]{64}$/) ||
     !count(manifest.joinedCsv.bytes) ||
@@ -49,6 +54,9 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
     !count(coverage.sourceLanguageCount) ||
     !count(coverage.glottocodeCount) ||
     !count(coverage.familyCount) ||
+    !count(coverage.unresolvedLanguageCount) ||
+    !count(coverage.unresolvedObservationCount) ||
+    !strings(coverage.territoriesWithoutObservations) ||
     !Array.isArray(value.territories) ||
     !Array.isArray(value.observations) ||
     !Array.isArray(value.languageAssociations) ||
@@ -80,9 +88,14 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
     if (
       !record(language) ||
       !code(language.sourceLanguageCode, /^[a-z]{2,3}(?:_[A-Za-z0-9]+)*$/) ||
-      !code(language.glottocode, /^[a-z]{4}[0-9]{4}$/) ||
-      language.matchMethod !== 'source_join_verified_against_pinned_glottolog' ||
-      !['language', 'dialect', 'family'].includes(String(language.glottologLevel)) ||
+      !nullableString(language.glottocode) ||
+      (language.glottocode !== null && !code(language.glottocode, /^[a-z]{4}[0-9]{4}$/)) ||
+      (language.glottocode === null
+        ? language.matchMethod !== 'unresolved' ||
+          language.glottologLevel !== null ||
+          language.familyId !== null
+        : language.matchMethod !== 'source_join_verified_against_pinned_glottolog' ||
+          !['language', 'dialect', 'family'].includes(String(language.glottologLevel))) ||
       !nullableString(language.glottologLanguageParentId) ||
       !nullableString(language.iso6393) ||
       !string(language.name) ||
@@ -114,7 +127,7 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
       language.sourceLanguageCode,
       language as unknown as AdministrativeSupplement['languageAssociations'][number],
     )
-    glottocodes.add(language.glottocode)
+    if (typeof language.glottocode === 'string') glottocodes.add(language.glottocode)
   }
   const atlasIds = new Set<string>()
   for (const association of value.atlasAssociations) {
@@ -159,6 +172,7 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
   const byLanguage = new Map<string, Observation[]>()
   const byFamily = new Map<string, Observation[]>()
   const keys = new Set<string>()
+  let unresolvedObservationCount = 0
   for (const item of value.observations) {
     if (
       !record(item) ||
@@ -194,7 +208,9 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
       map.set(id, [...(map.get(id) ?? []), observation])
     add(byTerritory, item.territoryCode)
     add(byLanguage, item.sourceLanguageCode)
-    const family = languageByCode.get(item.sourceLanguageCode)?.familyId
+    const language = languageByCode.get(item.sourceLanguageCode)
+    if (language?.glottocode === null) unresolvedObservationCount++
+    const family = language?.familyId
     if (family) add(byFamily, family)
   }
   if (
@@ -202,10 +218,19 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
     value.languageAssociations.length !== coverage.sourceLanguageCount ||
     value.observations.length !== coverage.observationCount ||
     glottocodes.size !== coverage.glottocodeCount ||
-    [...territoryByCode.keys()].some((id) => !byTerritory.has(id)) ||
     [...languageByCode.keys()].some((id) => !byLanguage.has(id))
   )
     fail('coverage')
+  if (
+    [...territoryByCode.keys()]
+      .filter((id) => !byTerritory.has(id))
+      .sort()
+      .join(',') !== (coverage.territoriesWithoutObservations as string[]).join(',') ||
+    [...languageByCode.values()].filter((language) => language.glottocode === null).length !==
+      coverage.unresolvedLanguageCount ||
+    unresolvedObservationCount !== coverage.unresolvedObservationCount
+  )
+    fail('unresolved coverage')
   return {
     data: value as unknown as AdministrativeSupplement,
     territoryByCode,

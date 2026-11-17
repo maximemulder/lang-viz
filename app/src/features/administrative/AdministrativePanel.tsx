@@ -161,8 +161,11 @@ const Details = ({
     return (
       <section className="administrative-detail" aria-label="Language details">
         <p className="administrative-muted">
-          Source language code {language.sourceLanguageCode}; Glottolog {language.glottocode}. This
-          association does not identify an atlas speaker polygon.
+          Source language code {language.sourceLanguageCode}
+          {language.glottocode
+            ? `; Glottolog ${language.glottocode}`
+            : '; no reviewed Glottolog match'}
+          . This association does not identify an atlas speaker polygon.
         </p>
         <dl className="administrative-facts">
           <div>

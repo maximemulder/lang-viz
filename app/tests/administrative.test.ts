@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { createStore } from 'jotai/vanilla'
 import {
@@ -26,11 +27,17 @@ import {
 import { mapCameraIntentAtom } from '../src/state/mapCameraIntent.ts'
 
 const fixture = () => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   manifest: {
     sourceBranchCommit: 'a'.repeat(40),
-    cldrRelease: null,
-    cldrSourceFile: null,
+    cldrRelease: '49',
+    cldrSourceFile: 'https://example.org/cldr',
+    cldrSupplemental: {
+      url: 'https://example.org/supplemental.xml',
+      sha256: 'a'.repeat(64),
+      bytes: 100,
+    },
+    cldrEnglish: { url: 'https://example.org/en.xml', sha256: 'a'.repeat(64), bytes: 100 },
     producerRevision: `sha256:${'b'.repeat(64)}`,
     joinedCsv: { sha256: 'c'.repeat(64), bytes: 100 },
     glottolog: { sha256: 'd'.repeat(64), bytes: 100, commit: 'e'.repeat(40) },
@@ -41,6 +48,9 @@ const fixture = () => ({
       sourceLanguageCount: 2,
       glottocodeCount: 1,
       familyCount: 1,
+      unresolvedLanguageCount: 0,
+      unresolvedObservationCount: 0,
+      territoriesWithoutObservations: [],
     },
   },
   territories: [
@@ -94,6 +104,24 @@ const fixture = () => ({
       languageWritingPercent: null,
     },
   ],
+})
+
+test('CLDR 49 release keeps Libya observations and unresolved language joins', () => {
+  const data = JSON.parse(
+    readFileSync(new URL('../public/administrative/observations.json', import.meta.url), 'utf8'),
+  ) as unknown
+  const repository = indexAdministrative(data)
+  assert.equal(repository.data.manifest.cldrRelease, '49')
+  assert.equal(repository.data.manifest.coverage.territoryCount, 258)
+  assert.deepEqual(
+    selectTerritory(repository, 'LY')?.observations.map(
+      (row) => row.observation.sourceLanguageCode,
+    ),
+    ['ar'],
+  )
+  assert.equal(repository.languageByCode.get('ar')?.glottocode, null)
+  assert.equal(repository.languageByCode.get('ar')?.name, 'Arabic')
+  assert.equal(selectTerritory(repository, 'ZZ')?.observations.length, 0)
 })
 
 test('administrative selectors keep source rows, overlapping shares, and sums labeled as estimates', () => {

@@ -26,9 +26,9 @@ export interface Observation {
 
 export interface LanguageAssociation {
   readonly sourceLanguageCode: string
-  readonly glottocode: string
-  readonly matchMethod: string
-  readonly glottologLevel: 'language' | 'dialect' | 'family'
+  readonly glottocode: string | null
+  readonly matchMethod: 'source_join_verified_against_pinned_glottolog' | 'unresolved'
+  readonly glottologLevel: 'language' | 'dialect' | 'family' | null
   readonly glottologLanguageParentId: string | null
   readonly iso6393: string | null
   readonly name: string
@@ -48,11 +48,17 @@ export interface AtlasAssociation {
 }
 
 export interface AdministrativeSupplement {
-  readonly schemaVersion: 2
+  readonly schemaVersion: 3
   readonly manifest: {
     readonly sourceBranchCommit: string
     readonly cldrRelease: string | null
     readonly cldrSourceFile: string | null
+    readonly cldrSupplemental: {
+      readonly url: string
+      readonly sha256: string
+      readonly bytes: number
+    }
+    readonly cldrEnglish: { readonly url: string; readonly sha256: string; readonly bytes: number }
     readonly producerRevision: string
     readonly joinedCsv: { readonly sha256: string; readonly bytes: number }
     readonly glottolog: { readonly sha256: string; readonly bytes: number; readonly commit: string }
@@ -67,6 +73,9 @@ export interface AdministrativeSupplement {
       readonly sourceLanguageCount: number
       readonly glottocodeCount: number
       readonly familyCount: number
+      readonly unresolvedLanguageCount: number
+      readonly unresolvedObservationCount: number
+      readonly territoriesWithoutObservations: readonly string[]
     }
   }
   readonly territories: readonly Territory[]

@@ -12,7 +12,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from pipeline.administrative.build import CATALOG, PIN, SOURCE, check_file
+from pipeline.administrative.build import CATALOG, CLDR, ENGLISH, PIN, SOURCE, check_file
 
 
 def read_pin() -> dict:
@@ -104,9 +104,32 @@ def restore_catalog(output: Path, pin: dict) -> None:
             staged.unlink(missing_ok=True)
 
 
+def restore_download(output: Path, spec: dict) -> None:
+    if output.exists() or output.is_symlink():
+        check_file(output, spec)
+        return
+    output.parent.mkdir(parents=True, exist_ok=True)
+    request = urllib.request.Request(
+        spec["url"], headers={"User-Agent": "lang-viz-administrative-source"}
+    )
+    with urllib.request.urlopen(request, timeout=120) as response:
+        data = response.read(spec["bytes"] + 1)
+    with tempfile.NamedTemporaryFile(dir=output.parent, prefix=".cldr-", delete=False) as handle:
+        staged = Path(handle.name)
+        try:
+            handle.write(data)
+            handle.flush()
+            check_file(staged, spec)
+            staged.replace(output)
+        finally:
+            staged.unlink(missing_ok=True)
+
+
 def verify(source: Path, catalog: Path, pin: dict) -> None:
     check_file(source, pin["joinedCsv"])
     check_file(catalog, pin["glottolog"])
+    check_file(CLDR, pin["cldrSupplemental"])
+    check_file(ENGLISH, pin["cldrEnglish"])
 
 
 def main() -> None:
@@ -121,6 +144,8 @@ def main() -> None:
         if args.command == "restore":
             restore_joined(args.source, pin, from_git=args.from_git)
             restore_catalog(args.catalog, pin)
+            restore_download(CLDR, pin["cldrSupplemental"])
+            restore_download(ENGLISH, pin["cldrEnglish"])
         verify(args.source, args.catalog, pin)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Administrative source {args.command} failed: {error}\n")
