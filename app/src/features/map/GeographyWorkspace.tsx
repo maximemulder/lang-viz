@@ -73,11 +73,7 @@ export default function GeographyWorkspace({
           className="map-shell"
           aria-label={administrative ? 'Administrative areas map' : 'Language map'}
         >
-          <WorldMap
-            administrative={administrative}
-            areaInteraction={areaInteraction}
-            mapAttribution={mapAttribution}
-          >
+          <WorldMap areaInteraction={areaInteraction} mapAttribution={mapAttribution}>
             {mapLayers}
           </WorldMap>
         </section>

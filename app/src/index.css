@@ -1064,41 +1064,6 @@ h2 {
   color: #a23d26;
 }
 
-.map-hint {
-  position: absolute;
-  bottom: 1.5rem;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.6rem 0.85rem;
-  transform: translateX(-50%);
-  border: 1px solid rgb(29 43 39 / 12%);
-  border-radius: 999px;
-  color: var(--ink);
-  background: rgb(248 246 238 / 92%);
-  box-shadow: 0 0.5rem 1.5rem rgb(31 46 40 / 16%);
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-  pointer-events: none;
-  backdrop-filter: blur(8px);
-}
-
-.map-hint__marker {
-  width: 0.55rem;
-  height: 0.55rem;
-  border: 2px solid var(--paper);
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.map-hint--active .map-hint__marker {
-  background: #4f9d69;
-  box-shadow: 0 0 0 1px #4f9d69;
-}
-
 .language-inspector.maplibregl-popup {
   z-index: 2;
   pointer-events: none;

@@ -36,7 +36,6 @@ import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
   initializeDefaultMapAtom,
-  mapEntriesAtom,
   overlapModeAtom,
   selectedMapAreasAtom,
   temporalViewAtom,
@@ -215,30 +214,12 @@ const LanguageLayers = memo(() => {
   )
 })
 
-const MapHint = () => {
-  const entries = useAtomValue(mapEntriesAtom)
-  const visibleInPeriodCount = useAtomValue(selectedMapAreasAtom).length
-  const matches = useAtomValue(walsAreaMatchesAtom)
-  if (matches) return null
-
-  return (
-    <div className={`map-hint${visibleInPeriodCount ? ' map-hint--active' : ''}`} role="status">
-      <span className="map-hint__marker" aria-hidden="true" />
-      {entries.length
-        ? `${visibleInPeriodCount.toLocaleString()} of ${entries.length.toLocaleString()} map entries shown`
-        : 'Select entries in Explore, then Add to map'}
-    </div>
-  )
-}
-
 export const WorldMap = ({
   children,
-  administrative,
   areaInteraction,
   mapAttribution,
 }: {
   readonly children?: ReactNode
-  readonly administrative: boolean
   readonly areaInteraction: AreaInteraction
   readonly mapAttribution: string
 }) => {
@@ -550,7 +531,6 @@ export const WorldMap = ({
       />
 
       <Suspense fallback={null}>
-        {!administrative && <MapHint />}
         {hoverInspection && !inspection && (
           <LanguageInspector
             inspection={hoverInspection}
