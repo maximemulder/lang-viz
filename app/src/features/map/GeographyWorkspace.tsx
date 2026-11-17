@@ -49,6 +49,13 @@ export default function GeographyWorkspace({
       lexical,
   )
   const hasDetails = administrative ? Boolean(administrativeSelection) : hasLanguageDetails
+  const coverLanguageControls =
+    !administrative && Boolean(languagePanel.detailId) && languagePanel.detailPlacement === 'cover'
+  const dockMapDetails =
+    !administrative &&
+    Boolean(languagePanel.detailId) &&
+    languagePanel.detailOrigin === 'map' &&
+    languagePanel.detailPlacement === 'beside'
   const [administrativeVisited, setAdministrativeVisited] = useState(false)
   useEffect(() => {
     if (administrative) setAdministrativeVisited(true)
@@ -79,7 +86,10 @@ export default function GeographyWorkspace({
         </section>
       </WorkspaceBoundary>
       {hasDetails && (
-        <aside className="geography-inspector" aria-label="Details">
+        <aside
+          className={`geography-inspector${coverLanguageControls ? ' geography-inspector--cover' : ''}${dockMapDetails ? ' geography-inspector--map-docked' : ''}`}
+          aria-label="Details"
+        >
           {administrative ? (
             <Suspense fallback={<p className="workspace-loading">Loading details…</p>}>
               <AdministrativeDetails />
@@ -97,7 +107,7 @@ export default function GeographyWorkspace({
           )}
         </aside>
       )}
-      <div className="geography-sidebar">
+      <div className="geography-sidebar" inert={coverLanguageControls}>
         <div className="geography-sidebar__language" hidden={administrative}>
           <WorkspaceBoundary name="language catalog" onRetry={retry}>
             <Suspense fallback={<LanguageFinderFallback />}>

@@ -152,6 +152,27 @@ h1 {
   flex: 1;
 }
 
+.atlas-workspace:has(> .geography-inspector--cover) {
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+}
+
+.atlas-workspace:has(> .geography-inspector--cover) > .map-shell {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.atlas-workspace > .geography-inspector--cover {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.atlas-workspace:has(> .geography-inspector--cover) > .geography-sidebar {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 .language-finder__inspection {
   min-height: 0;
   overflow: hidden;
@@ -1200,6 +1221,26 @@ h2 {
   .atlas-workspace:has(> .geography-inspector) {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(16rem, 38dvh) minmax(12rem, 30dvh) minmax(36rem, 62dvh);
+  }
+
+  .atlas-workspace:has(> .geography-inspector--cover) {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(16rem, 38dvh) minmax(36rem, 62dvh);
+  }
+
+  .atlas-workspace:has(> .geography-inspector--cover) > .map-shell {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .atlas-workspace > .geography-inspector--cover,
+  .atlas-workspace:has(> .geography-inspector--cover) > .geography-sidebar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .atlas-workspace:has(> .geography-inspector--map-docked) {
+    grid-template-rows: minmax(16rem, 38dvh) minmax(36rem, 62dvh) minmax(36rem, 62dvh);
   }
 
   .language-finder {

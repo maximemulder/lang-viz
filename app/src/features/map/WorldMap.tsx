@@ -42,8 +42,8 @@ import {
 } from '../../state/atlasState'
 import {
   focusLanguageOnMapAtom,
+  inspectLanguageFromMapAtom,
   languageMapNavigationAtom,
-  openLanguageDetailsAtom,
 } from '../../state/languageControls'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
@@ -225,7 +225,7 @@ export const WorldMap = ({
   const initializeDefaultMap = useSetAtom(initializeDefaultMapAtom)
   useEffect(() => initializeDefaultMap(), [initializeDefaultMap])
   const matches = useAtomValue(walsAreaMatchesAtom)
-  const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const openDetails = useSetAtom(inspectLanguageFromMapAtom)
   const focusLanguage = useSetAtom(focusLanguageOnMapAtom)
   const [hoverInspection, setHoverInspection] = useState<MapInspection | null>(null)
   const hoverRef = useRef<MapInspection | null>(null)

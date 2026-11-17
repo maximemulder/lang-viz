@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import './detailsHeader.css'
 
-/** Detail headers show the selected identity and close; actions live in the body. */
+/** Detail headers show the selected identity, optional layout action, and close. */
 export const DetailsHeader = ({
   title,
   titleId,
   subtitle,
+  action,
   onClose,
   closeLabel,
   className = '',
@@ -15,6 +16,7 @@ export const DetailsHeader = ({
   readonly title: string
   readonly titleId?: string
   readonly subtitle?: ReactNode
+  readonly action?: ReactNode
   readonly onClose: () => void
   readonly closeLabel: string
   readonly className?: string
@@ -28,6 +30,7 @@ export const DetailsHeader = ({
       </h3>
       {subtitle && <small className="details-header__subtitle">{subtitle}</small>}
     </div>
+    {action}
     <button
       type="button"
       className={`details-header__icon ${closeClassName}`}

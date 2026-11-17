@@ -196,6 +196,35 @@ def check_focus(browser, output):
         browser.call('POST','/actions',{'actions':[{'type':'pointer','id':'map-pointer','parameters':{'pointerType':'mouse'},'actions':actions}]})
     map_action()
     wait_for(lambda: browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')"), 10, 'map click language details')
+    assert browser.js("""
+        const map = document.querySelector('.map-shell').getBoundingClientRect();
+        const details = document.querySelector('.geography-inspector').getBoundingClientRect();
+        const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+        return map.right <= details.left + 1 &&
+            Math.abs(details.left - controls.left) < 1 &&
+            Math.abs(details.right - controls.right) < 1 &&
+            Math.abs(details.top - controls.top) < 1 &&
+            Math.abs(details.bottom - controls.bottom) < 1 &&
+            document.querySelector('.geography-sidebar').inert &&
+            document.querySelector('#language-panel-explore input[type=search]').value === 'abkh1242';
+    """), 'Map inspection covers the retained sidebar without narrowing the map further'
+    assert browser.js("""
+        const search = document.querySelector('#language-panel-map input[type=search]');
+        search.focus();
+        return document.activeElement !== search;
+    """), 'Covered controls cannot receive keyboard focus'
+    browser.js("document.querySelector('[aria-label=\"Show language controls beside details\"]').click()")
+    assert browser.js("""
+        const details = document.querySelector('.geography-inspector').getBoundingClientRect();
+        const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+        return details.right <= controls.left + 1 && !document.querySelector('.geography-sidebar').inert &&
+            document.querySelector('.on-map-list').clientHeight >= 88;
+    """), 'Placement control shows the full main sidebar beside details'
+    ready()
+    map_action()
+    assert browser.js("return !!document.querySelector('[aria-label=\"Show details over language controls\"]')"), 'Manual placement survives another map inspection'
+    browser.js("document.querySelector('[aria-label=\"Show details over language controls\"]').click()")
+    assert browser.js("return document.querySelector('.geography-sidebar').inert"), 'Placement control covers the main sidebar again'
     outlined([german], selected=True)
     assert ready()['camera']['zoom'] == 3
     x, y = browser.js('return window.overlapTest.inspect([5,52]).point')
@@ -208,10 +237,38 @@ def check_focus(browser, output):
     assert browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')")
     assert not browser.js("return !!document.querySelector('.map-isolation-control')")
     browser.js('document.querySelector(".finder-detail button[aria-label=\\"Close language details\\"]").click()')
+    assert browser.js("return document.activeElement?.matches('.map-shell .maplibregl-canvas')"), 'Closing map inspection restores map focus'
     browser.js('window.overlapTest.camera([10,51],3)')
     ready()
     map_action(double=True)
     wait_for(lambda: browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')") and browser.snapshot()['camera']['zoom'] > 3.5, 15, 'first double-click target retained')
+    browser.call('POST', '/window/rect', {'width': 390, 'height': 844})
+    assert browser.js("""
+        const map = document.querySelector('.map-shell').getBoundingClientRect();
+        const details = document.querySelector('.geography-inspector').getBoundingClientRect();
+        const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+        return map.bottom <= details.top + 1 &&
+            Math.abs(details.top - controls.top) < 1 &&
+            Math.abs(details.bottom - controls.bottom) < 1 &&
+            document.documentElement.scrollWidth <= innerWidth;
+    """), 'Map inspection covers the sidebar on narrow screens'
+    browser.js("document.querySelector('[aria-label=\"Show language controls beside details\"]').click()")
+    assert browser.js("""
+        const details = document.querySelector('.geography-inspector').getBoundingClientRect();
+        const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+        return details.height >= 500 && details.bottom <= controls.top + 1 &&
+            !document.querySelector('.geography-sidebar').inert &&
+            document.documentElement.scrollWidth <= innerWidth;
+    """), 'Narrow docked view gives each panel its own full-height section'
+    browser.call('POST', '/window/rect', {'width': 1440, 'height': 900})
+    browser.js("document.querySelector('.finder-detail__reveal').click()")
+    assert browser.js("""
+        const map = document.querySelector('.map-shell').getBoundingClientRect();
+        const details = document.querySelector('.geography-inspector').getBoundingClientRect();
+        const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+        return map.right <= details.left + 1 && details.right <= controls.left + 1 &&
+            !document.querySelector('#language-panel-explore').hidden;
+    """), 'Showing the language in classification restores side-by-side browsing'
     print('Sidebar pointer/keyboard previews, profile navigation, pinned context, style recovery, and aggregate framing passed', flush=True)
     return {'searchHover':'passed','keyboard':'passed','profileNavigation':'passed','pinnedContext':'passed','aggregateContributors':len(expected)}
 

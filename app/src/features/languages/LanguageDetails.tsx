@@ -25,6 +25,7 @@ import {
   languagePanelAtom,
   openLanguageDetailsAtom,
   revealLanguageAtom,
+  toggleLanguageDetailPlacementAtom,
 } from '../../state/languageControls'
 import { searchCoverageAtom } from '../../state/searchSelection'
 import { LanguageFeatures } from '../wals/LanguageFeatures.tsx'
@@ -45,6 +46,7 @@ export const LanguageDetails = () => {
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const closeDetails = useSetAtom(closeLanguageDetailsAtom)
+  const togglePlacement = useSetAtom(toggleLanguageDetailPlacementAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const groups = useAtomValue(mapGroupsAtom)
   const removeEntry = useSetAtom(removeMapEntryAtom)
@@ -74,6 +76,10 @@ export const LanguageDetails = () => {
     targetGeometry(profileTarget, data, availability, coverage, hierarchy, entries).length > 0
   if (!detail) return null
   const classification = detail.classification
+  const placementLabel =
+    panel.detailPlacement === 'cover'
+      ? 'Show language controls beside details'
+      : 'Show details over language controls'
   return (
     <section
       {...preview}
@@ -93,12 +99,39 @@ export const LanguageDetails = () => {
             {detail.iso6393 ? ` · ${detail.iso6393}` : ''}
           </>
         }
+        action={
+          panel.detailOrigin === 'map' && (
+            <button
+              type="button"
+              className="details-header__icon"
+              aria-label={placementLabel}
+              title={placementLabel}
+              onClick={togglePlacement}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d={
+                    panel.detailPlacement === 'cover'
+                      ? 'M12 8H4m0 0 3-3M4 8l3 3'
+                      : 'M4 8h8m0 0-3-3M12 8l-3 3'
+                  }
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )
+        }
         closeLabel="Close language details"
         onClose={() => {
-          const origin = document.querySelector<HTMLElement>(
-            `#language-panel-${panel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
-          )
-          const restoreFocus = origin ?? document.getElementById(`language-tab-${panel.view}`)
+          const restoreFocus =
+            panel.detailOrigin === 'map'
+              ? document.querySelector<HTMLElement>('.map-shell .maplibregl-canvas')
+              : (document.querySelector<HTMLElement>(
+                  `#language-panel-${panel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
+                ) ?? document.getElementById(`language-tab-${panel.view}`))
           closeDetails()
           restoreFocus?.focus({ preventScroll: true })
         }}

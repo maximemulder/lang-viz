@@ -2,7 +2,7 @@ import { useAtomValue, useSetAtom } from 'jotai'
 import { Popup } from 'react-map-gl/maplibre'
 import { walsAreaMatchesAtom } from '../../integrations/wals/areaState'
 import { atlasDataAtom, languageColorsAtom, selectedMapAreasAtom } from '../../state/atlasState'
-import { openLanguageDetailsAtom } from '../../state/languageControls'
+import { inspectLanguageFromMapAtom } from '../../state/languageControls'
 import { readableWalsValue, WALS_TITLES } from '../wals/cards'
 import { walsRepositoryAtom } from '../wals/state'
 
@@ -24,7 +24,7 @@ export const LanguageInspector = ({
     colors = useAtomValue(languageColorsAtom)
   const matches = useAtomValue(walsAreaMatchesAtom),
     repository = useAtomValue(walsRepositoryAtom)
-  const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const openDetails = useSetAtom(inspectLanguageFromMapAtom)
   const countryNames = new Intl.DisplayNames(['en'], { type: 'region' })
   const seen = new Set<string>()
   const entries = inspection.variantIds.flatMap((id) => {
