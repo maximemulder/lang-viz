@@ -46,9 +46,13 @@ from the separate ADM-02 package on first Administrative view or when Area mode
 is selected.
 It fetches and decodes the pinned TopoJSON when Borders or Area inspection is
 enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
-renders markers, hover outlines, optional full borders and eligible metric fills,
-plus source and viewpoint notes. Every full border uses the same paint, regardless
-of whether its association is viewpoint-sensitive or has no matched CLDR area.
+renders markers, hover outlines, optional full borders and eligible metric fills.
+The map information control always carries boundary source credits and
+interpretation notes, including when the optional boundary sources are hidden.
+Loading and retry messages appear only while needed. Selection-specific viewpoint
+notes appear in the detail panel. Every full
+border uses the same paint, regardless of whether its association is
+viewpoint-sensitive or has no matched CLDR area.
 Geometry selection and a
 focus request require an explicit matched crosswalk entry; ambiguous or
 unmatched CLDR areas remain searchable without a shape. Fetch failures stay

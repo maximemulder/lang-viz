@@ -23,12 +23,14 @@ const AdministrativeDetails = lazy(() =>
 export default function GeographyWorkspace({
   visible,
   administrative,
+  mapAttribution,
   mapLayers,
   areaInteraction,
   sidebarHeader,
 }: {
   readonly visible: boolean
   readonly administrative: boolean
+  readonly mapAttribution: string
   readonly mapLayers?: ReactNode
   readonly areaInteraction: AreaInteraction
   readonly sidebarHeader?: ReactNode
@@ -67,7 +69,11 @@ export default function GeographyWorkspace({
     <>
       <WorkspaceBoundary name="atlas data" onRetry={retry}>
         <section ref={mapShell} className="map-shell" aria-label="Language map">
-          <WorldMap administrative={administrative} areaInteraction={areaInteraction}>
+          <WorldMap
+            administrative={administrative}
+            areaInteraction={areaInteraction}
+            mapAttribution={mapAttribution}
+          >
             {mapLayers}
           </WorldMap>
         </section>

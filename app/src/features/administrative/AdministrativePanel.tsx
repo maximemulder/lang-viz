@@ -268,6 +268,8 @@ export const AdministrativeDetails = () => {
         : repository.familyById.get(selection.id)?.name
   if (!title) return null
   const canFocusMap = boundaryIndex?.associations.get(selection.id)?.status === 'matched'
+  const boundaryAssociation =
+    selection.kind === 'territory' ? boundaryIndex?.associations.get(selection.id) : undefined
   return (
     <div className="administrative-detail-scroll">
       <DetailsHeader
@@ -298,6 +300,9 @@ export const AdministrativeDetails = () => {
           No matched polygon or representative point in this boundary view. The CLDR observations
           remain available below.
         </p>
+      )}
+      {boundaryAssociation?.viewpointSensitive && boundaryAssociation.note && (
+        <p className="administrative-note">{boundaryAssociation.note}</p>
       )}
       <Details
         repository={repository}

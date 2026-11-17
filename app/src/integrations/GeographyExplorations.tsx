@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { lazy, Suspense } from 'react'
+import { ADMINISTRATIVE_ATTRIBUTION } from '../features/administrative/attribution.ts'
 import { AREA_POINT_LAYER, AREA_POLYGON_LAYER } from '../features/administrative/boundaryLayers.ts'
 import {
   boundaryPresentationAtom,
@@ -36,6 +37,7 @@ export default function GeographyExplorations({
     <GeographyWorkspace
       visible={visible}
       administrative={administrative}
+      mapAttribution={ADMINISTRATIVE_ATTRIBUTION}
       areaInteraction={{
         enabled: boundary.hover === 'area',
         borders: boundary.borders,

@@ -105,7 +105,6 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
 
   const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
   const hoveredCode = areaMode ? hovered?.code : null
-  const selectedAssociation = selectedCode ? index?.associations.get(selectedCode) : null
   const values = useMemo(() => {
     const result: Record<string, number> = {}
     if (!repository || !session.metric || !index) return result
@@ -117,16 +116,6 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
     return result
   }, [repository, session.metric, index])
   const maxValue = Math.max(...Object.values(values), 1)
-  const metricLabel =
-    session.metric?.kind === 'territory-population'
-      ? 'Reported territory population'
-      : session.metric?.kind === 'territory-literacy'
-        ? 'Territory literacy'
-        : session.metric?.kind === 'language-estimate'
-          ? `${repository?.languageByCode.get(session.metric.sourceLanguageCode)?.name ?? session.metric.sourceLanguageCode} speaker estimate`
-          : session.metric?.kind === 'family-estimate'
-            ? `${repository?.familyById.get(session.metric.familyId)?.name ?? session.metric.familyId} estimate sum`
-            : null
   const filledGeometry = useMemo<FeatureCollection | null>(() => {
     if (!geometry) return null
     return {
@@ -150,12 +139,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   return (
     <>
       {showGeometry && filledGeometry && (
-        <Source
-          id="administrative-boundaries"
-          type="geojson"
-          data={filledGeometry}
-          attribution="Administrative boundary view: Natural Earth 4.1.0 / world-atlas 2.0.2 (source viewpoint)"
-        >
+        <Source id="administrative-boundaries" type="geojson" data={filledGeometry}>
           {presentation.borders && session.metric && (
             <Layer
               id="administrative-metric-fill"
@@ -255,58 +239,26 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           <strong>{label(hovered.code)}</strong> <span>{hovered.code}</span>
         </Popup>
       )}
-      {(presentation.borders || showPoints) && (
-        <div className="administrative-map-legend" role="status">
-          <strong>Administrative areas</strong>
-          {presentation.borders ? (
-            <>
-              {!filledGeometry && !error && <span>Loading boundary geometry…</span>}
-              <span>Natural Earth 4.1.0 / world-atlas 2.0.2 boundaries · source viewpoint</span>
-              <span>
-                Boundaries reflect this source's viewpoint. Some shapes have no matched CLDR area.
-              </span>
-              {metricLabel && (
-                <span>
-                  Teal fill: {metricLabel}, relative to the largest matched value (
-                  {new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(maxValue)}
-                  ). No fill means no reported value or no reviewed match.
-                </span>
-              )}
-            </>
-          ) : (
-            <span>
-              Points identify source geometries, not speaker locations. Borders are off.
-              {areaMode && ' Hover an area to outline its boundary.'}
-            </span>
-          )}
-          {presentation.hover === 'language' && (
-            <span>Choose Administrative area in Hover to inspect areas on the map.</span>
-          )}
-          {selectedCode && selectedAssociation && selectedAssociation.status !== 'matched' && (
-            <span>
-              {label(selectedCode)} ({selectedCode}) has no matched polygon in this view.
-            </span>
-          )}
-          {selectedCode && selectedAssociation?.viewpointSensitive && (
-            <span>
-              {label(selectedCode)} ({selectedCode}): {selectedAssociation.note}
-            </span>
-          )}
-          {error && (
-            <span role="alert">
-              {error}{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setError('')
-                  setRetry((value) => value + 1)
-                }}
-              >
-                Retry
-              </button>
-            </span>
-          )}
+      {(showPoints || showGeometry) && error ? (
+        <div className="administrative-map-status" role="alert">
+          {error}{' '}
+          <button
+            type="button"
+            onClick={() => {
+              setError('')
+              setRetry((value) => value + 1)
+            }}
+          >
+            Retry
+          </button>
         </div>
+      ) : (
+        showGeometry &&
+        !filledGeometry && (
+          <div className="administrative-map-status" role="status">
+            Loading boundary geometry…
+          </div>
+        )
       )}
     </>
   )

@@ -55,6 +55,7 @@ import { InspectionHighlight } from './InspectionHighlight'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
 import { LanguageMapCamera, LanguageMapPreview } from './LanguageMapFocus'
 import { pickLanguageVariants } from './languagePicking'
+import { MapAttribution } from './MapAttribution'
 import { MapBackground } from './MapBackground'
 import { MapSettings, type ProjectionMode } from './MapSettings'
 import { diagnosticsEnabled } from './overlap/diagnostics'
@@ -229,10 +230,12 @@ export const WorldMap = ({
   children,
   administrative,
   areaInteraction,
+  mapAttribution,
 }: {
   readonly children?: ReactNode
   readonly administrative: boolean
   readonly areaInteraction: AreaInteraction
+  readonly mapAttribution: string
 }) => {
   const data = useAtomValue(atlasDataAtom)
   const initializeDefaultMap = useSetAtom(initializeDefaultMapAtom)
@@ -381,6 +384,7 @@ export const WorldMap = ({
       id="atlas-map"
       initialViewState={INITIAL_VIEW}
       mapStyle={MAP_STYLE}
+      attributionControl={false}
       projection={PROJECTIONS[projectionMode]}
       minZoom={0.5}
       maxZoom={12}
@@ -495,6 +499,7 @@ export const WorldMap = ({
       {children}
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />
+      <MapAttribution attribution={mapAttribution} />
 
       <MapSettings
         projectionMode={projectionMode}
