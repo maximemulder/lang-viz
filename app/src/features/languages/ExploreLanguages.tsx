@@ -97,7 +97,7 @@ const LanguageRow = ({
       data-language-id={language.id}
       data-inspected={panel.detailId === language.id}
       className={`language-row${active ? ' language-row--active' : ''}${usable ? '' : ' language-row--unavailable'}`}
-      style={{ paddingLeft: `${4 + row.depth * 14}px`, minWidth: `${280 + row.depth * 14}px` }}
+      style={{ paddingLeft: `${16 + row.depth * 14}px`, minWidth: `${292 + row.depth * 14}px` }}
       onFocus={onFocus}
       onClick={(event) => {
         event.currentTarget.focus()
@@ -433,58 +433,58 @@ export const ExploreLanguages = () => {
             })}
           </div>
         </div>
-      </SidebarSection>
-      <footer className="finder-actions explore-footer">
-        <div className="finder-bulk">
-          <p aria-live="polite">
-            <strong>{selectedIds.length.toLocaleString()} selected</strong>
-          </p>
-          <button
-            type="button"
-            className="finder-add"
-            disabled={!mappableSelected}
-            onClick={() => addSelection()}
-          >
-            Add to map
-          </button>
-          <SidebarPane
-            className="finder-bulk__coverage"
-            title="Add options"
-            summary={`${coverage === 'own' ? 'Own area' : 'Entry + descendants'} · ${coloring === 'uniform' ? 'One color' : 'Hierarchy colors'}`}
-          >
-            <label>
-              Coloring
-              <select
-                aria-label="Coloring for selected entries"
-                value={coloring}
-                onChange={(event) => {
-                  setColoring(event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy')
-                }}
-              >
-                <option value="hierarchy">Color by hierarchy</option>
-                <option value="uniform">One color per group</option>
-              </select>
-            </label>
-            <label>
-              Include
-              <select
-                aria-label="Coverage for selected entries"
-                value={coverage}
-                onChange={(event) => {
-                  setCoverage(event.currentTarget.value === 'own' ? 'own' : 'branch')
-                }}
-              >
-                <option value="branch">This entry and its descendants</option>
-                <option value="own">Only this entry’s area</option>
-              </select>
-            </label>
-            <p>
-              Descendants take precedence where they overlap ancestors; broader coverage remains
-              elsewhere.
+        <footer className="finder-actions explore-footer">
+          <div className="finder-bulk">
+            <p aria-live="polite">
+              <strong>{selectedIds.length.toLocaleString()} selected</strong>
             </p>
-          </SidebarPane>
-        </div>
-      </footer>
+            <button
+              type="button"
+              className="finder-add"
+              disabled={!mappableSelected}
+              onClick={() => addSelection()}
+            >
+              Add to map
+            </button>
+            <SidebarPane
+              className="finder-bulk__coverage"
+              title="Add options"
+              summary={`${coverage === 'own' ? 'Own area' : 'Entry + descendants'} · ${coloring === 'uniform' ? 'One color' : 'Hierarchy colors'}`}
+            >
+              <label>
+                Coloring
+                <select
+                  aria-label="Coloring for selected entries"
+                  value={coloring}
+                  onChange={(event) => {
+                    setColoring(event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy')
+                  }}
+                >
+                  <option value="hierarchy">Color by hierarchy</option>
+                  <option value="uniform">One color per group</option>
+                </select>
+              </label>
+              <label>
+                Include
+                <select
+                  aria-label="Coverage for selected entries"
+                  value={coverage}
+                  onChange={(event) => {
+                    setCoverage(event.currentTarget.value === 'own' ? 'own' : 'branch')
+                  }}
+                >
+                  <option value="branch">This entry and its descendants</option>
+                  <option value="own">Only this entry’s area</option>
+                </select>
+              </label>
+              <p>
+                Descendants take precedence where they overlap ancestors; broader coverage remains
+                elsewhere.
+              </p>
+            </SidebarPane>
+          </div>
+        </footer>
+      </SidebarSection>
     </div>
   )
 }

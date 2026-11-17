@@ -159,7 +159,7 @@ h1 {
 
 .search-field {
   display: block;
-  padding: 0 0.75rem 0.5rem;
+  padding: 0 0.75rem;
 }
 
 h2 {
@@ -200,7 +200,6 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.55rem;
-  margin-top: 0.65rem;
 }
 
 .finder-filters label,
@@ -1652,7 +1651,7 @@ h2 {
   gap: 0.35rem;
   min-height: 2rem;
   color: var(--ink);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   cursor: pointer;
   list-style: none;
 }
@@ -1674,7 +1673,7 @@ h2 {
 }
 
 .sidebar-pane__title {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .sidebar-pane__summary {
@@ -1701,6 +1700,10 @@ h2 {
   padding: 0.25rem 0 0.65rem 1.1rem;
 }
 
+.explore-controls .sidebar-pane__content {
+  padding-top: 0.5rem;
+}
+
 .sidebar-pane__header:focus-visible,
 .language-finder :is(button, select, input, textarea, summary):focus-visible {
   outline: 2px solid var(--accent);
@@ -1709,7 +1712,6 @@ h2 {
 
 .explore-footer {
   flex: 0 0 auto;
-  margin-top: auto;
   max-height: min(15rem, 30dvh);
   overflow: auto;
   border-top: 1px solid rgb(29 43 39 / 12%);
@@ -1792,6 +1794,7 @@ h2 {
 .explore-search-controls {
   flex: 0 1 auto;
   min-height: 0;
+  padding-top: 0.5rem;
   overflow: auto;
   overscroll-behavior: contain;
 }
