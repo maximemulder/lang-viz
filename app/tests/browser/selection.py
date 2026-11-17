@@ -57,6 +57,7 @@ def check_selection(browser, output):
     assert state() == entries, 'Filters do not change pinned groups'
     assert browser.js("return document.querySelector('.finder-add').disabled")
     assert '3 selected' in browser.js("return document.querySelector('.finder-bulk').textContent")
+    assert '0 available to add' in browser.js("return document.querySelector('.finder-bulk').textContent")
     sources(browser, 'Asher')
     browser.js("document.querySelector('.finder-options').open=false")
     view(browser, 'map')

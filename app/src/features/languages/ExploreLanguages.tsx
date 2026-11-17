@@ -71,7 +71,6 @@ const LanguageRow = ({
   if (!available) return null
   const usable = hasCoverage(available, coverage)
   const isSelected = selectedIds.includes(language.id)
-  const status = usable ? 'Area available' : available.hasAnyAreas ? 'Filtered out' : 'No areas'
   const availabilityLabel = usable
     ? coverage === 'branch'
       ? 'Areas available for this entry and its descendants'
@@ -85,13 +84,13 @@ const LanguageRow = ({
       {...preview}
       role="treeitem"
       aria-label={`${language.name}, ${language.level}, ${availabilityLabel}`}
+      title={usable ? undefined : availabilityLabel}
       data-area-mode={coverage}
-      data-area-status={status}
       aria-level={row.depth + 1}
       aria-posinset={row.position}
       aria-setsize={row.siblingCount}
       aria-expanded={row.childCount ? expanded : undefined}
-      aria-checked={isSelected}
+      aria-checked={usable || isSelected ? isSelected : undefined}
       tabIndex={active ? 0 : -1}
       data-tree-key={row.key}
       data-language-id={language.id}
@@ -130,9 +129,6 @@ const LanguageRow = ({
           onDetails()
         }}
         className="language-row__identity"
-        title={[`${language.name} · ${language.level} · ${language.id}`, context]
-          .filter(Boolean)
-          .join('\n')}
       >
         <span className="language-row__name">
           <span className="language-row__label">{language.name}</span>
@@ -147,23 +143,15 @@ const LanguageRow = ({
         </span>
         {context && <small className="language-row__context">{context}</small>}
       </button>
-      {!usable && (
-        <span
-          className="language-row__area-status language-row__area-status--unavailable"
-          title={availabilityLabel}
-        >
-          {status}
-        </span>
+      {usable && (
+        <input
+          type="checkbox"
+          tabIndex={-1}
+          aria-label={`Select ${language.name}`}
+          checked={isSelected}
+          onChange={() => toggleSelected(language.id)}
+        />
       )}
-      <input
-        type="checkbox"
-        tabIndex={-1}
-        aria-label={`Select ${language.name}`}
-        title={`${availabilityLabel}. Select for a bulk action; the map stays as it is until Add to map.`}
-        checked={isSelected}
-        disabled={!usable && !isSelected}
-        onChange={() => toggleSelected(language.id)}
-      />
     </div>
   )
 }
@@ -291,10 +279,7 @@ export const ExploreLanguages = () => {
           focusRow(rows.findIndex((candidate) => candidate.key === row.parentKey))
         break
       case ' ':
-        if (
-          selectedIdSet.has(row.language.id) ||
-          hasCoverage(availability.get(row.language.id), coverage)
-        )
+        if (hasCoverage(availability.get(row.language.id), coverage))
           toggleSelected(row.language.id)
         break
       case 'Enter':
@@ -437,6 +422,9 @@ export const ExploreLanguages = () => {
           <div className="finder-bulk">
             <p aria-live="polite">
               <strong>{selectedIds.length.toLocaleString()} selected</strong>
+              {mappableSelected < selectedIds.length && (
+                <small>{mappableSelected.toLocaleString()} available to add</small>
+              )}
             </p>
             <button
               type="button"

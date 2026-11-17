@@ -44,7 +44,7 @@ def main():
                 language_id = f"dlac1987china:{slug}"
                 variant_id = f"dlac1987china:contemporary:{language_id}"
                 row = search(browser, label, language_id)
-                assert not row["disabled"] and "source-defined" in row["text"], row
+                assert not row["unavailable"] and "source-defined" in row["text"], row
                 search(browser, language_id.upper(), language_id)
                 open_details(browser)
                 details = browser.js("return document.querySelector('.finder-detail').textContent")

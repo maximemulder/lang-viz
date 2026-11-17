@@ -52,7 +52,10 @@ def search(browser, query, glottocode):
             """
             const row = [...document.querySelectorAll('.language-row')]
               .find(row => row.dataset.languageId === arguments[0]);
-            return row ? {text: row.textContent, label: row.getAttribute('aria-label'), disabled: row.querySelector('input').disabled, level: row.getAttribute('aria-level')} : null;
+            return row ? {text: row.textContent, label: row.getAttribute('aria-label'),
+                unavailable: row.classList.contains('language-row--unavailable'),
+                checkbox: !!row.querySelector('input[type=checkbox]'),
+                tooltip: row.title, level: row.getAttribute('aria-level')} : null;
             """,
             glottocode,
         ),

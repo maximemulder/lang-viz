@@ -314,8 +314,9 @@ def main():
                 return [...document.querySelectorAll('.language-row[aria-level="1"]')].map(row => ({
                     id: row.dataset.languageId,
                     unavailable: row.classList.contains('language-row--unavailable'),
-                    status: row.dataset.areaStatus,
-                    reason: row.getAttribute('aria-label'),
+                    tooltip: row.title,
+                    checkbox: !!row.querySelector('input[type=checkbox]'),
+                    identityTooltip: row.querySelector('.language-row__identity').title,
                     color: getComputedStyle(row).color
                 }));
             """)
@@ -323,20 +324,23 @@ def main():
             assert any(not row["unavailable"] for row in grouped_results), grouped_results
             assert [row["unavailable"] for row in grouped_results] == sorted(row["unavailable"] for row in grouped_results)
             aggregate = next(row for row in grouped_results if row["id"] == 'abkh1243')
-            assert not aggregate["unavailable"] and aggregate["status"] == 'Area available'
+            assert not aggregate["unavailable"] and aggregate["checkbox"] and not aggregate["tooltip"]
             for row in grouped_results:
+                assert not row["identityTooltip"], "The repeated language tooltip is gone"
                 if row["unavailable"]:
-                    assert row["status"] == 'No areas' and row["reason"]
+                    assert "No areas" in row["tooltip"] and not row["checkbox"]
                     assert row["color"] != aggregate["color"], "The whole unavailable row is muted"
             browser.screenshot(output / "search-area-groups.png")
             results["searchAreaGroups"] = grouped_results
 
             # Unmapped entries must remain discoverable, including by original-script aliases.
             results["unmappedLanguage"] = search(browser, "ache1244", "ache1244")
-            assert results["unmappedLanguage"]["disabled"]
-            assert "No area" in results["unmappedLanguage"]["text"]
+            assert results["unmappedLanguage"]["unavailable"]
+            assert not results["unmappedLanguage"]["checkbox"]
+            assert "No area" in results["unmappedLanguage"]["tooltip"]
+            assert "No area" not in results["unmappedLanguage"]["text"]
             results["unmappedDialectAlias"] = search(browser, "上海", "shan1293")
-            assert results["unmappedDialectAlias"]["disabled"]
+            assert results["unmappedDialectAlias"]["unavailable"]
             assert "dialect" in results["unmappedDialectAlias"]["label"]
             results["selectionGroups"] = check_selection(browser, output)
             results["comparisons"] = check_comparisons(browser, output)
