@@ -766,6 +766,10 @@ h2 {
   color: #214e3a;
 }
 
+.map-area-controls__borders:disabled {
+  cursor: default;
+}
+
 .map-area-controls__inspect {
   display: flex;
   height: 2.5rem;

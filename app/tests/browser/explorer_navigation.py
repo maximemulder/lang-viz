@@ -50,9 +50,9 @@ def main():
             ]:
                 send(action)
             before = snapshot()
-            send({"type": "workspace", "workspace": "geography"})
+            send({"type": "workspace", "workspace": "map"})
             geography = check("Geography URL")
-            assert "workspace=geography" in geography["href"]
+            assert "workspace=map" in geography["href"]
             send({"type": "workspace", "workspace": "etymology"})
             after = check("customized workspace round trip")
             for field in ("trail", "selection", "comparison", "search"):
@@ -61,7 +61,7 @@ def main():
             browser.screenshot(args.output / "customized-session.png")
 
             browser.call("POST", "/back", {})
-            wait_for(lambda: snapshot()["route"]["workspace"] == "geography", 10, "Back")
+            wait_for(lambda: snapshot()["route"]["workspace"] == "map", 10, "Back")
             check("native Back")
             browser.call("POST", "/forward", {})
             wait_for(lambda: snapshot()["route"]["workspace"] == "etymology", 10, "Forward")
@@ -82,11 +82,11 @@ def main():
             wait_for(lambda: snapshot()["route"]["word"] == "69562", 10, "hash change")
             state = check("live legacy hash change")
             assert state["resolved"]["conceptId"] == "1001"
-            send({"type": "workspace", "workspace": "geography"})
+            send({"type": "workspace", "workspace": "map"})
             browser.call("POST", "/refresh", {})
             ready()
             state = check("refresh preserves Geography and comparison URL")
-            assert state["route"]["workspace"] == "geography"
+            assert state["route"]["workspace"] == "map"
             assert state["route"]["word"] == "69562"
             assert state["resolved"]["conceptId"] == "1001"
             assert not state["session"]["overlay"]["enabled"]

@@ -20,8 +20,8 @@ import {
   administrativeRepositoryAtom,
   administrativeSessionAtom,
   boundaryIndexAtom,
-  boundaryPresentationAtom,
   hoveredAdministrativeAreaAtom,
+  languageBordersAtom,
 } from './state.ts'
 
 const label = (code: string) => {
@@ -33,7 +33,7 @@ const label = (code: string) => {
 }
 
 export default function BoundaryLayer({ administrative }: { readonly administrative: boolean }) {
-  const presentation = useAtomValue(boundaryPresentationAtom)
+  const languageBorders = useAtomValue(languageBordersAtom)
   const session = useAtomValue(administrativeSessionAtom)
   const repository = useAtomValue(administrativeRepositoryAtom)
   const hovered = useAtomValue(hoveredAdministrativeAreaAtom)
@@ -46,11 +46,11 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   const [geometry, setGeometry] = useState<FeatureCollection | null>(null)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
-  const areaMode = presentation.hover === 'area'
-  const showPoints = administrative || areaMode
-  const showGeometry = presentation.borders || areaMode
+  const areaMode = administrative
+  const showPoints = areaMode
+  const showGeometry = areaMode || languageBorders
   useEffect(() => {
-    if (!showPoints && !presentation.borders) return
+    if (!showPoints && !languageBorders) return
     if (retry) setError('')
     let active = true
     void loadBoundaryIndex()
@@ -68,7 +68,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
     return () => {
       active = false
     }
-  }, [showPoints, presentation.borders, retry, publishIndex])
+  }, [showPoints, languageBorders, retry, publishIndex])
   useEffect(() => {
     if (!showGeometry || !index) return
     if (retry) setError('')
@@ -140,7 +140,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
     <>
       {showGeometry && filledGeometry && (
         <Source id="administrative-boundaries" type="geojson" data={filledGeometry}>
-          {presentation.borders && session.metric && (
+          {session.metric && (
             <Layer
               id="administrative-metric-fill"
               type="fill"
@@ -159,7 +159,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
-          {presentation.borders && selectedCode && (
+          {selectedCode && (
             <Layer
               id="administrative-selected-area"
               type="fill"
@@ -167,17 +167,15 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               paint={{ 'fill-color': '#eca647', 'fill-opacity': 0.25 }}
             />
           )}
-          {presentation.borders && (
-            <Layer
-              id="administrative-boundary-lines"
-              type="line"
-              paint={{
-                'line-color': '#566b66',
-                'line-width': 0.8,
-                'line-opacity': 0.78,
-              }}
-            />
-          )}
+          <Layer
+            id="administrative-boundary-lines"
+            type="line"
+            paint={{
+              'line-color': '#566b66',
+              'line-width': 0.8,
+              'line-opacity': 0.78,
+            }}
+          />
           {hoveredFeatureId && (
             <Layer
               id="administrative-hover-outline"

@@ -176,7 +176,7 @@ test('explicit atlas and trail camera requests supersede one another without rep
   store.set(focusLanguageOnMapAtom, { languageId: 'opaque:latin' })
   assert.notStrictEqual(store.get(mapCameraIntentAtom), intent)
   store.set(explorerActionAtom, { type: 'workspace', workspace: 'etymology' })
-  store.set(explorerActionAtom, { type: 'workspace', workspace: 'geography' })
+  store.set(explorerActionAtom, { type: 'workspace', workspace: 'map' })
   assert.equal(store.get(mapCameraIntentAtom), null)
 })
 

@@ -37,7 +37,7 @@ export const addTrailAreasAtom = atom(null, async (get, set) => {
   const trail = get(atlasWordTrailAtom)
   const repository = get(etymologyRepositoryAtom)
   const session = get(explorerSessionAtom)
-  if (!trail || !repository || session.workspace !== 'geography') return
+  if (!trail || !repository || session.workspace !== 'map' || session.mapMode !== 'language') return
   const operation = {
     trail,
     context: geographyContextKey(get(geographyContextAtom)),

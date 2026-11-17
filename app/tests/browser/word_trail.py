@@ -117,7 +117,7 @@ def main():
             wait_for(lambda: bool(text(".finder-detail")), 10, "language profile")
 
         try:
-            open_page("#workspace=geography")
+            open_page("#workspace=map")
             map_ready()
             assert hits[base + "etymology/word-trails.json"] == 0
             assert browser.js(r"""
@@ -134,7 +134,7 @@ def main():
             browser.js("window.overlapTest.configure(arguments[0])", SCENARIOS[0])
             browser.settled(60, fail_on_error=True)
             initial_entries = browser.js("return window.overlapTest.mapEntryState()")
-            workspace("Word histories")
+            workspace("Etymologies")
             ready()
             button("wine ↗")
             select_control(browser, ".word-controls select", "6")
@@ -148,7 +148,7 @@ def main():
             assert state["camera"]["zoom"] <= 3.21, "Explicit show must actually focus the map"
             assert state["wordTrail"]["layers"] == ["word-trail-casing", "word-trail-lines"]
             assert len(state["wordTrail"]["links"]["features"]) > 0
-            assert f"{count} forms" in text(".word-map-summary h2")
+            assert f"{count} forms" in text(".word-map-summary .details-header__subtitle")
             assert browser.js("return window.overlapTest.mapEntryState()") == initial_entries
             check(
                 "explicit current trail renders independent links/points without changing pinned comparisons"
@@ -156,10 +156,10 @@ def main():
             browser.screenshot(args.output / "trail.png")
             # No camera replay or geometry work when returning through workspace navigation.
             settled = browser.snapshot()
-            workspace("Word histories")
+            workspace("Etymologies")
             ready()
             assert graph_ids() == ids
-            workspace("Geography")
+            workspace("Languages")
             map_ready()
             after = browser.snapshot()
             assert after["camera"] == settled["camera"]
@@ -174,7 +174,7 @@ def main():
             assert "word=69562" in browser.js("return location.hash")
             assert graph_ids() == ids
             assert "Selected word" in text(".word-details")
-            workspace("Geography")
+            workspace("Languages")
             map_ready()
             browser.js("document.querySelector('.word-map-summary details').open=true")
             assert (
@@ -190,14 +190,14 @@ def main():
             check(
                 "overlapping historical stages inspect evidence without resetting root or trail options"
             )
-            workspace("Geography")
+            workspace("Languages")
             map_ready()
             before = browser.js("return window.overlapTest.mapEntryState()")
             browser.js("""[...document.querySelectorAll('.word-map-summary button')].find(e=>e.textContent==='Add matched language areas').click();
-                [...document.querySelectorAll('nav[aria-label=Workspace] button')].find(e=>e.textContent==='Word histories').click()""")
+                [...document.querySelectorAll('nav[aria-label=Workspace] button')].find(e=>e.textContent==='Etymologies').click()""")
             ready()
             assert browser.js("return window.overlapTest.mapEntryState()") == before
-            workspace("Geography")
+            workspace("Languages")
             map_ready()
             check("navigation cancels an in-flight area addition without changing comparisons")
             button("Add matched language areas")
@@ -271,7 +271,7 @@ def main():
                 assert expected in text(".word-notice"), text(".word-notice")
                 assert "word=69562" in browser.js("return location.hash")
                 assert graph_ids() == ids
-                workspace("Geography")
+                workspace("Languages")
                 map_ready()
                 check(
                     f"represented atlas entry {identity} opens lexical scope or explicit search fallback"
@@ -283,16 +283,16 @@ def main():
                 lambda: bool(text(".language-inspector--pinned")), 10, "pinned polygon inspector"
             )
             browser.js(
-                "document.querySelector('.language-inspector--pinned [aria-label=\"Browse word entries for English\"]').click()"
+                "document.querySelector('.geography-inspector [aria-label=\"Browse word entries for English\"]').click()"
             )
             ready()
             assert "Browsing entries for English" in text(".word-notice")
             assert "word=69562" in browser.js("return location.hash")
-            check("pinned polygon inspector adds lexical navigation alongside existing details")
+            check("pinned polygon opens language details with lexical navigation")
             # A pending older profile camera must not override a newer show-trail request.
             control["bounds"] = "delay"
             control["release"].clear()
-            open_page("#workspace=geography&word=69562")
+            open_page("#workspace=map&word=69562")
             map_ready()
             requests = hits[base + "data/geometry-bounds.json"]
             select_result_details("stan1293", "stan1293")
@@ -301,7 +301,7 @@ def main():
                 10,
                 "delayed profile bounds",
             )
-            workspace("Word histories")
+            workspace("Etymologies")
             ready()
             button("Show current word trail")
             map_ready()
@@ -317,14 +317,14 @@ def main():
             assert browser.snapshot()["camera"] == camera
             check("late profile bounds cannot override a newer explicit trail focus")
             # Change the traced word while overlay remains enabled; ordinary workspace return does not fit.
-            workspace("Word histories")
+            workspace("Etymologies")
             ready()
             button("water ↗")
             water_count = len(graph_ids())
-            workspace("Geography")
+            workspace("Languages")
             map_ready()
-            assert "water" in text(".word-map-summary h2")
-            assert f"{water_count} forms" in text(".word-map-summary h2")
+            assert "water" in text(".word-map-summary .details-header__title")
+            assert f"{water_count} forms" in text(".word-map-summary .details-header__subtitle")
             assert browser.snapshot()["camera"] == camera
             button("Focus current trail")
             map_ready()

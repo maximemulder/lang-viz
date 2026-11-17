@@ -24,11 +24,11 @@ maps a territory to a polygon or a language to an atlas geometry.
 selection IDs, and metric choice. A selection or load completion never changes
 the map camera. An explicit territory focus creates a request in the shared
 `mapCameraIntentAtom`; `BoundaryLayer` resolves a reviewed representative
-point for that request. Header view changes keep the current map camera
+point for that request. Map mode changes keep the current map camera
 position.
 
-`AdministrativePanel.tsx` is loaded only when the Administrative header view is
-first opened. It then stays mounted across header switches, preserving search,
+`AdministrativePanel.tsx` is loaded only when Areas mode is first opened.
+It then stays mounted across map mode switches, preserving search,
 selection, and scroll state. Its search covers source territory codes and
 browser-localized area names, source language names/codes, and Glottolog family
 names/IDs. Details use ranked per-row estimates rather than exclusive shares;
@@ -37,17 +37,16 @@ panel never calls atlas language-detail actions. It has a local data failure
 and retry state. The map and language catalog have independent error boundaries
 so their failures do not hide this panel.
 
-The app header and URL route own Geography / Administrative / Word histories.
-The map workspace stays mounted between Geography and Administrative. The
-existing language sidebar is hidden, not unmounted, while the administrative
-panel is visible.
+The header switches between Languages and Etymologies. The map's Languages / Areas
+control switches both the sidebar and map picker, and the URL records the selected
+map mode. The map stays mounted across modes. The language sidebar is hidden,
+not unmounted, while the administrative panel is visible.
 
 `boundaryRepository.ts` loads the reviewed crosswalk and representative points
-from the separate ADM-02 package on first Administrative view or when Area mode
-is selected.
-It fetches and validates the pinned GeoJSON when Borders or Area inspection is
+from the separate ADM-02 package when Areas mode is first selected.
+It fetches and validates the pinned GeoJSON when borders are visible or Areas mode is
 enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
-renders markers, hover outlines, optional full borders and eligible metric fills.
+renders markers, hover outlines, borders and eligible metric fills.
 The map information control always carries boundary source credits and
 interpretation notes, including when the optional boundary sources are hidden.
 Loading and retry messages appear only while needed. Selection-specific viewpoint
@@ -70,10 +69,9 @@ documented source view; it must never silently reassign CLDR observations.
 
 `GeographyExplorations` owns the optional layer and supplies a small generic
 interaction adapter to `WorldMap`. The map host chooses exactly one pointer
-picker at a time. Area mode uses a transparent polygon hit layer and outlines
-the area under the pointer, even with Borders off. Language mode continues to
-inspect language polygons. Borders off hides the full boundary network and metric
-fills. The border icon and Language / Area segmented button sit beside map
-settings, with borders off and Language selected by default. The two top-left
-controls do not modify atlas language selections, filters, CLDR values, or the
-camera.
+picker at a time. Areas mode shows borders, uses a transparent polygon hit layer,
+and outlines the area under the pointer. Languages mode inspects language polygons;
+its border button optionally shows the administrative boundary network. The border
+button stays selected and disabled in Areas mode. The
+Languages / Areas control sits beside map settings, with Languages selected by
+default. Switching modes preserves the camera, searches, and selections.

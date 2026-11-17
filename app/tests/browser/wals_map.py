@@ -429,7 +429,7 @@ def run_case(output, *, fixture):
                 )
 
             # Keep the lexical trail and WALS exploration simultaneously, with independent controls.
-            click_text(browser, "Word histories")
+            click_text(browser, "Etymologies")
             wait_for(
                 lambda: browser.js("return !!document.querySelector('.word-explorer-heading')"),
                 40,
@@ -563,13 +563,13 @@ def run_case(output, *, fixture):
             )
 
             camera = browser.snapshot()["camera"]
-            click_text(browser, "Word histories")
+            click_text(browser, "Etymologies")
             wait_for(
                 lambda: browser.js("return !!document.querySelector('.word-explorer-heading')"),
                 20,
                 "workspace round trip",
             )
-            click_text(browser, "Geography")
+            click_text(browser, "Languages")
             settled(browser)
             assert browser.snapshot()["camera"] == camera
             click_text(browser, "Clear WALS overlay")

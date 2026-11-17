@@ -14,18 +14,17 @@ export const App = () => {
   const dispatch = useSetAtom(explorerActionAtom)
   const [connected, setConnected] = useState(false)
   const [lexicalAttempt, setLexicalAttempt] = useState(0)
-  const [geographyVisited, setGeographyVisited] = useState(false)
+  const [mapVisited, setMapVisited] = useState(false)
   useEffect(() => {
     const disconnect = connectExplorerNavigation(store, window)
     setConnected(true)
     return disconnect
   }, [store])
   useEffect(() => {
-    if (connected && session.workspace !== 'etymology') setGeographyVisited(true)
+    if (connected && session.workspace === 'map') setMapVisited(true)
   }, [connected, session.workspace])
-  const geography = session.workspace === 'geography'
-  const administrative = session.workspace === 'administrative'
-  const mapWorkspace = geography || administrative
+  const mapWorkspace = session.workspace === 'map'
+  const administrative = session.mapMode === 'area'
   return (
     <MapProvider>
       <div className="app-shell">
@@ -37,24 +36,17 @@ export const App = () => {
           <nav className="workspace-nav" aria-label="Workspace">
             <button
               type="button"
-              aria-pressed={geography}
-              onClick={() => dispatch({ type: 'workspace', workspace: 'geography' })}
+              aria-pressed={mapWorkspace}
+              onClick={() => dispatch({ type: 'workspace', workspace: 'map' })}
             >
-              Geography
-            </button>
-            <button
-              type="button"
-              aria-pressed={administrative}
-              onClick={() => dispatch({ type: 'workspace', workspace: 'administrative' })}
-            >
-              Administrative
+              Languages
             </button>
             <button
               type="button"
               aria-pressed={session.workspace === 'etymology'}
               onClick={() => dispatch({ type: 'workspace', workspace: 'etymology' })}
             >
-              Word histories
+              Etymologies
             </button>
           </nav>
           <p className="app-summary">Explore where languages are spoken and how they relate.</p>
@@ -62,13 +54,13 @@ export const App = () => {
         <main className="workspace-host">
           {connected ? (
             <>
-              {(geographyVisited || mapWorkspace) && (
+              {(mapVisited || mapWorkspace) && (
                 <div className="workspace-panel atlas-workspace" hidden={!mapWorkspace}>
-                  <WorkspaceBoundary name="the geography workspace">
+                  <WorkspaceBoundary name="the map workspace">
                     <Suspense
                       fallback={
                         <p className="workspace-loading" role="status">
-                          Loading geography…
+                          Loading map…
                         </p>
                       }
                     >

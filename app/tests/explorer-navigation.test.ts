@@ -79,10 +79,11 @@ class MemoryBrowser implements NavigationBrowser {
   }
 }
 
-test('empty, legacy, concept-only, and explicit Geography links parse without dataset access', () => {
-  assert.equal(parseExplorerRoute('').route.workspace, 'geography')
+test('empty, concept-only, and explicit Map links parse without dataset access', () => {
+  assert.equal(parseExplorerRoute('').route.workspace, 'map')
   assert.deepEqual(parseExplorerRoute('#word=69562&view=family').route, {
     workspace: 'etymology',
+    mapMode: 'language',
     word: '69562',
     view: 'family',
     concept: null,
@@ -92,21 +93,27 @@ test('empty, legacy, concept-only, and explicit Geography links parse without da
     parseExplorerRoute('#concept=1001&collection=1&view=family').route.workspace,
     'etymology',
   )
-  assert.equal(
-    parseExplorerRoute('#workspace=geography&word=69562&view=family').route.workspace,
-    'geography',
-  )
-  assert.equal(parseExplorerRoute('#workspace=administrative').route.workspace, 'administrative')
+  assert.equal(parseExplorerRoute('#workspace=map&word=69562&view=family').route.workspace, 'map')
+  assert.equal(parseExplorerRoute('#workspace=map&mode=area').route.mapMode, 'area')
 })
 
-test('canonical route round trips preserve workspace, root, view, concept, and collection', () => {
-  for (const workspace of ['geography', 'administrative', 'etymology'] as const) {
-    for (const view of ['history', 'family'] as const) {
-      for (const word of [null, '69562']) {
-        const route: ExplorerRoute = { workspace, word, view, concept: '1001', collection: '1' }
-        const encoded = serializeExplorerRoute(route)
-        assert.deepEqual(parseExplorerRoute(encoded), { route, issues: [] })
-        assert.equal(serializeExplorerRoute(parseExplorerRoute(encoded).route), encoded)
+test('canonical route round trips preserve workspace, map mode, root, view, concept, and collection', () => {
+  for (const workspace of ['map', 'etymology'] as const) {
+    for (const mapMode of ['language', 'area'] as const) {
+      for (const view of ['history', 'family'] as const) {
+        for (const word of [null, '69562']) {
+          const route: ExplorerRoute = {
+            workspace,
+            mapMode,
+            word,
+            view,
+            concept: '1001',
+            collection: '1',
+          }
+          const encoded = serializeExplorerRoute(route)
+          assert.deepEqual(parseExplorerRoute(encoded), { route, issues: [] })
+          assert.equal(serializeExplorerRoute(parseExplorerRoute(encoded).route), encoded)
+        }
       }
     }
   }
@@ -122,8 +129,9 @@ test('malformed encoding, invalid IDs, duplicate fields, and unknown enums norma
     '#word=',
     '#word=1&word=2',
     '#workspace=other',
+    '#mode=other',
     '#view=other',
-    '#workspace=geography&workspace=etymology',
+    '#workspace=map&workspace=etymology',
   ]) {
     const parsed = parseExplorerRoute(hash)
     assert.ok(parsed.issues.length > 0, hash)
@@ -164,7 +172,7 @@ test('meaningful navigation pushes history; settings, selection, and canonicaliz
   assert.equal(browser.pushes, 4)
   send({ type: 'show-trail' })
   assert.equal(browser.pushes, 5)
-  assert.equal(parseExplorerRoute(new URL(browser.location.href).hash).route.workspace, 'geography')
+  assert.equal(parseExplorerRoute(new URL(browser.location.href).hash).route.workspace, 'map')
   send({ type: 'clear-overlay' })
   assert.equal(browser.pushes, 5)
   dispose()
@@ -177,14 +185,38 @@ test('Back/Forward restores explicit comparison scope without the old root-defau
   store.set(explorerActionAtom, { type: 'trace', id: '69562' })
   store.set(explorerActionAtom, { type: 'comparison', conceptId: '1001', collectionId: '1' })
   const before = sessionRoute(store.get(explorerSessionAtom))
-  store.set(explorerActionAtom, { type: 'workspace', workspace: 'geography' })
+  store.set(explorerActionAtom, { type: 'workspace', workspace: 'map' })
   const pushes = browser.pushes
   browser.back()
   assert.deepEqual(sessionRoute(store.get(explorerSessionAtom)), before)
   browser.forward()
-  assert.equal(store.get(explorerSessionAtom).workspace, 'geography')
+  assert.equal(store.get(explorerSessionAtom).workspace, 'map')
   assert.equal(store.get(explorerSessionAtom).comparison.conceptId, '1001')
   assert.equal(browser.pushes, pushes)
+  dispose()
+})
+
+test('map mode survives Etymologies and follows browser history', () => {
+  const browser = new MemoryBrowser(),
+    store = createStore()
+  const dispose = connectExplorerNavigation(store, browser)
+  const send = (action: ExplorerAction) => store.set(explorerActionAtom, action)
+  send({ type: 'map-mode', mode: 'area' })
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  assert.match(browser.location.href, /workspace=map&mode=area/)
+  send({ type: 'workspace', workspace: 'etymology' })
+  send({ type: 'workspace', workspace: 'map' })
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  browser.back()
+  assert.equal(store.get(explorerSessionAtom).workspace, 'etymology')
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  browser.back()
+  assert.equal(store.get(explorerSessionAtom).workspace, 'map')
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  send({ type: 'map-mode', mode: 'language' })
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'language')
+  browser.back()
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
   dispose()
 })
 
@@ -221,19 +253,20 @@ test('incidental edits cannot overwrite an external hash before its queued event
   dispose()
 })
 
-test('refreshing a Geography URL keeps Geography and encoded lexical navigation', () => {
+test('refreshing a Map URL keeps its mode and encoded lexical navigation', () => {
   const browser = new MemoryBrowser(),
     store = createStore()
   const dispose = connectExplorerNavigation(store, browser)
   store.set(explorerActionAtom, { type: 'trace', id: '69562' })
   store.set(explorerActionAtom, { type: 'comparison', conceptId: '1001', collectionId: '1' })
-  store.set(explorerActionAtom, { type: 'workspace', workspace: 'geography' })
+  store.set(explorerActionAtom, { type: 'map-mode', mode: 'area' })
   const route = sessionRoute(store.get(explorerSessionAtom))
   dispose()
   const reloaded = createStore(),
     nextBrowser = new MemoryBrowser(browser.location.href)
   const disconnect = connectExplorerNavigation(reloaded, nextBrowser)
   assert.deepEqual(sessionRoute(reloaded.get(explorerSessionAtom)), route)
+  assert.equal(reloaded.get(explorerSessionAtom).mapMode, 'area')
   assert.equal(reloaded.get(explorerSessionAtom).overlay.enabled, false)
   disconnect()
 })

@@ -348,13 +348,13 @@ def production_checks(output):
         search(browser, "iris1253", "iris1253")
         open_details(browser)
         record(browser, "ird")
-        click_text(browser, "Word histories")
+        click_text(browser, "Etymologies")
         wait_for(
             lambda: browser.js("return !!document.querySelector('.lexical-panel')"),
             15,
             "word workspace",
         )
-        click_text(browser, "Geography")
+        click_text(browser, "Languages")
         record(browser, "ird")
         assert (
             browser.js(
@@ -439,7 +439,7 @@ def production_checks(output):
             30,
             "profile word navigation",
         )
-        click_text(browser, "Geography")
+        click_text(browser, "Languages")
         record(browser, "eng")
         assert browser.js("return window.overlapTest.mapEntryState()") == pinned
         report["checks"].append(

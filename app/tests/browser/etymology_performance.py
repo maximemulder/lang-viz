@@ -199,10 +199,10 @@ def main():
                             v for k, v in hits.items() if k.endswith("/etymology/word-trails.json")
                         )
                         browser.js(
-                            "[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Geography').click()"
+                            "[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Languages').click()"
                         )
                         browser.js(
-                            "[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Word histories').click()"
+                            "[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Etymologies').click()"
                         )
                         wait_for(
                             lambda: browser.js(

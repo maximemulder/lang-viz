@@ -220,17 +220,17 @@ def main():
             click(".word-controls input[type=checkbox]")
             click(".word-controls label:last-of-type input")
             before = snapshot()
-            button("Geography", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Languages", "document.querySelector('nav[aria-label=Workspace]')")
             wait_for(
                 lambda: "Unable to open atlas data" in text(".workspace-error"),
                 30,
                 "atlas failure boundary",
             )
-            button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
             ready()
             assert snapshot() == before
             check("selected word, expansion and trail options survive workspace round trip")
-            button("Geography", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Languages", "document.querySelector('nav[aria-label=Workspace]')")
             faults["atlas"] = "ready"
             button("Retry atlas data")
             wait_for(
@@ -244,7 +244,7 @@ def main():
             map_camera = browser.js("return window.overlapTest.snapshot().camera")
             assert map_entries
             browser.js("window.savedMapCanvas = document.querySelector('.maplibregl-canvas')")
-            button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
             ready()
             assert snapshot() == before
             check("atlas retries independently and preserves lexical session")
@@ -263,7 +263,7 @@ def main():
             )
             assert "No concept entry recorded" in text(".word-table")
             before = snapshot()
-            button("Geography", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Languages", "document.querySelector('nav[aria-label=Workspace]')")
             assert browser.js(
                 "return window.savedMapCanvas === document.querySelector('.maplibregl-canvas')"
             )
@@ -272,7 +272,7 @@ def main():
             )
             assert browser.js("return window.overlapTest.mapEntryState()") == map_entries
             assert browser.js("return window.overlapTest.snapshot().camera") == map_camera
-            button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
             ready()
             assert snapshot() == before
             check(
@@ -318,8 +318,8 @@ def main():
             check("keyboard search, results, trace, nodes and relationship evidence")
             # Keep selected relationship through another workspace switch.
             before = snapshot()
-            button("Geography", "document.querySelector('nav[aria-label=Workspace]')")
-            button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Languages", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
             ready()
             assert snapshot() == before
             assert hits[lexical_path] == 1
@@ -358,7 +358,7 @@ def main():
                 "lexical loading state",
             )
             browser.js(
-                "location.hash='#workspace=geography&word=38213&view=family&concept=1094&collection=1'"
+                "location.hash='#workspace=map&word=38213&view=family&concept=1094&collection=1'"
             )
             wait_for(
                 lambda: not browser.js("return !!document.querySelector('.lexical-panel')"),
@@ -372,13 +372,13 @@ def main():
                 "Geography after delayed load",
             )
             assert not browser.js("return !!document.querySelector('.lexical-panel')")
-            button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
             ready()
             assert "word=38213" in browser.js("return location.hash")
             assert "concept=1094" in browser.js("return location.hash")
             assert "water (n)" in text(".word-explorer-heading h2")
             check("loading retains newer word and comparison navigation")
-            button("Geography", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Languages", "document.querySelector('nav[aria-label=Workspace]')")
             browser.call("POST", "/refresh", {})
             wait_for(
                 lambda: browser.js("return !!window.overlapTest?.snapshot().mapLoaded"),
@@ -387,7 +387,7 @@ def main():
             )
             assert not browser.js("return !!document.querySelector('.lexical-panel')")
             assert "word=38213" in browser.js("return location.hash")
-            button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+            button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
             ready()
             assert "water (n)" in text(".word-explorer-heading h2")
             check("real app refresh retains Geography and explicit comparison")
@@ -395,14 +395,14 @@ def main():
             for failure in ("fail", "invalid"):
                 faults["lexical"] = failure
                 requests = hits[lexical_path]
-                open_page("#workspace=geography")
+                open_page("#workspace=map")
                 wait_for(
                     lambda: browser.js("return !!window.overlapTest?.snapshot().mapLoaded"),
                     45,
                     "geographic workspace",
                 )
                 assert hits[lexical_path] == requests
-                button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+                button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
                 wait_for(
                     lambda: "Word histories unavailable" in text(".word-loading"),
                     20,
@@ -411,9 +411,9 @@ def main():
                 assert hits[lexical_path] == requests + 1
                 error = text(".word-loading")
                 assert "HTTP 503" in error if failure == "fail" else "unsupported schema" in error
-                button("Geography", "document.querySelector('nav[aria-label=Workspace]')")
+                button("Languages", "document.querySelector('nav[aria-label=Workspace]')")
                 assert browser.js("return window.overlapTest.snapshot().mapLoaded")
-                button("Word histories", "document.querySelector('nav[aria-label=Workspace]')")
+                button("Etymologies", "document.querySelector('nav[aria-label=Workspace]')")
                 wait_for(
                     lambda: "Word histories unavailable" in text(".word-loading"),
                     20,

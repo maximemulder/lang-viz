@@ -62,7 +62,7 @@ for (const [sourceId, featureId, atlasId, defaultId] of [
     assert.strictEqual(store.get(explorerSessionAtom), lexical)
     store.set(closeLanguageDetailsAtom)
     store.set(explorerActionAtom, { type: 'workspace', workspace: 'etymology' })
-    store.set(explorerActionAtom, { type: 'workspace', workspace: 'geography' })
+    store.set(explorerActionAtom, { type: 'workspace', workspace: 'map' })
     // No component owns the selection: another resolver sees the same session choice.
     assert.equal(profile(store, atlasId).sourceId, sourceId)
     assert.equal(profile(store, atlasId).featureId, featureId)
@@ -186,7 +186,7 @@ test('visibility, workspace return and clearing never replay camera intent or cl
   store.set(showWalsExamplesAtom, { sourceId: 'ird', featureId: '12A' })
   store.set(explorerActionAtom, { type: 'workspace', workspace: 'etymology' })
   assert.equal(store.get(walsCameraRequestAtom), null)
-  store.set(explorerActionAtom, { type: 'workspace', workspace: 'geography' })
+  store.set(explorerActionAtom, { type: 'workspace', workspace: 'map' })
   assert.equal(store.get(walsCameraRequestAtom), null)
   store.set(setWalsOverlayVisibilityAtom, false)
   store.set(setWalsOverlayVisibilityAtom, true)

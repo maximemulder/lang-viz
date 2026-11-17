@@ -57,14 +57,8 @@ export const administrativeSessionAtom = atom<AdministrativeSession>({
   metric: null,
 })
 
-/** Presentation preferences never enter the CLDR repository or atlas session. */
-export const boundaryPresentationAtom = atom<{
-  readonly borders: boolean
-  readonly hover: 'language' | 'area'
-}>({
-  borders: false,
-  hover: 'language',
-})
+/** Languages mode remembers its optional borders across mode switches. */
+export const languageBordersAtom = atom(false)
 export const hoveredAdministrativeAreaAtom = atom<{
   readonly featureId: string
   readonly sourceName: string

@@ -97,7 +97,8 @@ export const walsCameraRequestAtom = atom((get) => {
     request === get(mapCameraIntentAtom) &&
     request.specification === overlay &&
     overlay?.visible &&
-    get(explorerSessionAtom).workspace === 'geography'
+    get(explorerSessionAtom).workspace === 'map' &&
+    get(explorerSessionAtom).mapMode === 'language'
     ? request
     : null
 })
@@ -110,7 +111,7 @@ export const focusWalsExamplesAtom = atom(null, (get, set) => {
       ?.has(specification.featureId)
   )
     return false
-  set(explorerActionAtom, { type: 'workspace', workspace: 'geography' })
+  set(explorerActionAtom, { type: 'map-mode', mode: 'language' })
   const request = { specification }
   set(languageMapNavigationAtom, null)
   set(focusRequestAtom, request)

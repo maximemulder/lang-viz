@@ -3,13 +3,13 @@ import { lazy, Suspense } from 'react'
 import { ADMINISTRATIVE_ATTRIBUTION } from '../features/administrative/attribution.ts'
 import { AREA_POINT_LAYER, AREA_POLYGON_LAYER } from '../features/administrative/boundaryLayers.ts'
 import {
-  boundaryPresentationAtom,
   hoveredAdministrativeAreaAtom,
+  languageBordersAtom,
   selectAdministrativeAtom,
 } from '../features/administrative/state.ts'
 import GeographyWorkspace from '../features/map/GeographyWorkspace.tsx'
 import { walsSessionAtom } from '../features/wals/state.ts'
-import { explorerSessionAtom } from '../state/explorerState.ts'
+import { explorerActionAtom, explorerSessionAtom } from '../state/explorerState.ts'
 import { wordTrailVisibleAtom } from './etymology/visibility.ts'
 import './geographyExplorations.css'
 
@@ -30,7 +30,8 @@ export default function GeographyExplorations({
   const lexical = useAtomValue(explorerSessionAtom).overlay.enabled
   const wordVisible = useAtomValue(wordTrailVisibleAtom)
   const wals = useAtomValue(walsSessionAtom).overlay
-  const [boundary, setBoundary] = useAtom(boundaryPresentationAtom)
+  const [languageBorders, setLanguageBorders] = useAtom(languageBordersAtom)
+  const dispatch = useSetAtom(explorerActionAtom)
   const setHoveredArea = useSetAtom(hoveredAdministrativeAreaAtom)
   const selectArea = useSetAtom(selectAdministrativeAtom)
   return (
@@ -39,15 +40,15 @@ export default function GeographyExplorations({
       administrative={administrative}
       mapAttribution={ADMINISTRATIVE_ATTRIBUTION}
       areaInteraction={{
-        enabled: boundary.hover === 'area',
-        borders: boundary.borders,
+        enabled: administrative,
+        borders: administrative || languageBorders,
         onBordersChange: (borders) => {
           setHoveredArea(null)
-          setBoundary((current) => ({ ...current, borders }))
+          setLanguageBorders(borders)
         },
-        onHoverModeChange: (hover) => {
+        onHoverModeChange: (mode) => {
           setHoveredArea(null)
-          setBoundary((current) => ({ ...current, hover }))
+          dispatch({ type: 'map-mode', mode })
         },
         hitLayers: [AREA_POINT_LAYER, AREA_POLYGON_LAYER],
         onHover: (area, longitude, latitude) =>
@@ -58,7 +59,7 @@ export default function GeographyExplorations({
       }}
       mapLayers={
         <>
-          {(administrative || boundary.borders || boundary.hover === 'area') && (
+          {(administrative || languageBorders) && (
             <Suspense fallback={null}>
               <BoundaryLayer administrative={administrative} />
             </Suspense>

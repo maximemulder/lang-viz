@@ -68,7 +68,11 @@ export default function GeographyWorkspace({
   return (
     <>
       <WorkspaceBoundary name="atlas data" onRetry={retry}>
-        <section ref={mapShell} className="map-shell" aria-label="Language map">
+        <section
+          ref={mapShell}
+          className="map-shell"
+          aria-label={administrative ? 'Administrative areas map' : 'Language map'}
+        >
           <WorldMap
             administrative={administrative}
             areaInteraction={areaInteraction}

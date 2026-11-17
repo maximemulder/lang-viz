@@ -31,13 +31,10 @@ export const parseExplorerRoute = (
   }
   const workspace = single('workspace')
   const view = single('view')
-  if (
-    workspace !== null &&
-    workspace !== 'geography' &&
-    workspace !== 'administrative' &&
-    workspace !== 'etymology'
-  )
+  if (workspace !== null && workspace !== 'map' && workspace !== 'etymology')
     issues.push('Unknown workspace')
+  const mode = single('mode')
+  if (mode !== null && mode !== 'language' && mode !== 'area') issues.push('Unknown map mode')
   if (view !== null && view !== 'history' && view !== 'family') issues.push('Unknown word view')
   const word = id('word'),
     concept = id('concept'),
@@ -45,13 +42,12 @@ export const parseExplorerRoute = (
   return {
     route: {
       workspace:
-        workspace === 'administrative'
-          ? 'administrative'
-          : workspace === 'etymology' ||
-              (!params.has('workspace') &&
-                (word !== null || concept !== null || collection !== null || view === 'family'))
-            ? 'etymology'
-            : 'geography',
+        workspace === 'etymology' ||
+        (!params.has('workspace') &&
+          (word !== null || concept !== null || collection !== null || view === 'family'))
+          ? 'etymology'
+          : 'map',
+      mapMode: mode === 'area' ? 'area' : 'language',
       word,
       view: view === 'family' ? 'family' : 'history',
       concept,
@@ -63,6 +59,7 @@ export const parseExplorerRoute = (
 
 export const serializeExplorerRoute = (route: ExplorerRoute): string => {
   const params = new URLSearchParams({ workspace: route.workspace })
+  if (route.mapMode === 'area') params.set('mode', 'area')
   if (route.word !== null) params.set('word', route.word)
   if (
     route.workspace === 'etymology' ||

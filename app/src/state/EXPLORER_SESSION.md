@@ -45,7 +45,7 @@ unknown root yields an empty trail and an explicit resolution issue.
 | `comparison-filter` | Retains family and include-missing preferences across navigation |
 | `search` | Edits query/scope; editing text preserves scope, choosing a scope replaces an atlas target |
 | `language-words` | Opens lexical exploration with a target classification and empty query; keeps the existing trail and comparison |
-| `show-trail` | Enables the live overlay, opens Geography, and issues an explicit camera request; no-op without a root |
+| `show-trail` | Enables the live overlay, opens Languages mode, and issues an explicit camera request; no-op without a root |
 | `clear-overlay` | Hides the overlay and cancels pending camera focus |
 | `restore-route` | Applies URL navigation; changing root resets word-specific evidence/expansion/discovery, while a workspace-only change preserves them |
 
@@ -71,9 +71,10 @@ Canonical example:
 ```
 
 The encoded fields are `workspace`, optional decimal word ID, `view` (`history`
-or `family`), optional concept ID, and optional collection ID. Geography URLs
-explicitly say `workspace=geography`, even when lexical navigation fields are
-retained. Legacy `#word=...&view=...` links open etymology. Concept-only comparison
+or `family`), optional concept ID, optional collection ID, and map mode
+(`language` or `area`). Map URLs use `workspace=map`; Areas adds `mode=area`.
+Lexical navigation fields can be retained in map URLs. Links without an explicit
+workspace and with `#word=...&view=...` open etymology. Concept-only comparison
 links are also supported. Unset comparison IDs use deterministic defaults from
 the focused word and chosen collection after data is ready.
 
@@ -112,14 +113,14 @@ screenshots to `test-results/explorer-navigation/` by default.
 For manual review, run `npm run dev` and open
 `/tests/browser/explorer-navigation.html` on Vite's displayed origin. The test-only
 page has Wine/Water and workspace buttons plus a session readout. Edit fragments,
-use Back/Forward, and refresh Geography. A link with `concept=1001&collection=1`
+use Back/Forward, and refresh the map. A link with `concept=1001&collection=1`
 must retain that comparison rather than defaulting to the focused wine concept.
 This fixture is not part of the production app. ETY-03 now connects the same
 adapter once in `App.tsx`, before mounting either workspace. The lexical loader
 validates the compiled browser contract, caches successful/in-flight requests,
 and publishes only ready data. Unmounted consumers ignore completion; remounts
 reuse the request. It never writes session defaults from asynchronous callbacks.
-Geography remains mounted after its first visit and is resized on return. Data
+The map remains mounted after its first visit and is resized on return. Data
 failures retry independently; a rejected atlas request is evicted and its async
 atom can refresh without resetting the exploration store.
 

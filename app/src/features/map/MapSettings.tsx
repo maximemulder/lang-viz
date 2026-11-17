@@ -129,8 +129,15 @@ export const MapSettings = ({
               className="map-settings__toggle map-area-controls__borders"
               type="button"
               aria-label="Administrative borders"
-              title={areaInteraction.borders ? 'Hide borders' : 'Show borders'}
+              title={
+                areaInteraction.enabled
+                  ? 'Borders are always shown in Areas'
+                  : areaInteraction.borders
+                    ? 'Hide borders'
+                    : 'Show borders'
+              }
               aria-pressed={areaInteraction.borders}
+              disabled={areaInteraction.enabled}
               onClick={() => areaInteraction.onBordersChange(!areaInteraction.borders)}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -141,7 +148,7 @@ export const MapSettings = ({
                   strokeLinejoin="round"
                 />
                 <path
-                  d="m9 3 1.5 5-2 4 2 3L9 19m6-14-1 4 2 3-1 3v6"
+                  d="m9 3 1.5 5-2 4 2 3L9 19m6-14-1 4 2 3v6"
                   stroke="currentColor"
                   strokeWidth="1.5"
                   strokeLinejoin="round"
@@ -158,7 +165,7 @@ export const MapSettings = ({
                 aria-pressed={!areaInteraction.enabled}
                 onClick={() => areaInteraction.onHoverModeChange('language')}
               >
-                Language
+                Languages
               </button>
               <button
                 className="map-area-controls__inspect-button"
@@ -168,7 +175,7 @@ export const MapSettings = ({
                 aria-pressed={areaInteraction.enabled}
                 onClick={() => areaInteraction.onHoverModeChange('area')}
               >
-                Area
+                Areas
               </button>
             </fieldset>
           </div>

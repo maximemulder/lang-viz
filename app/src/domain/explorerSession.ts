@@ -1,6 +1,7 @@
 import type { LanguageClassification } from './atlas.ts'
 
-export type Workspace = 'geography' | 'administrative' | 'etymology'
+export type Workspace = 'map' | 'etymology'
+export type MapMode = 'language' | 'area'
 export type WordView = 'history' | 'family'
 export interface TrailSpecification {
   readonly root: string | null
@@ -16,6 +17,7 @@ export interface LanguageWordTarget {
 }
 export interface ExplorerSession {
   readonly workspace: Workspace
+  readonly mapMode: MapMode
   readonly trail: TrailSpecification
   readonly view: WordView
   readonly selection: EvidenceSelection
@@ -38,7 +40,8 @@ export interface ExplorerSession {
 }
 
 export const createExplorerSession = (): ExplorerSession => ({
-  workspace: 'geography',
+  workspace: 'map',
+  mapMode: 'language',
   trail: { root: null, depth: 4, branches: true, placeholders: false, expanded: new Set() },
   view: 'history',
   selection: null,
@@ -49,6 +52,7 @@ export const createExplorerSession = (): ExplorerSession => ({
 
 export interface ExplorerRoute {
   readonly workspace: Workspace
+  readonly mapMode: MapMode
   readonly word: string | null
   readonly view: WordView
   readonly concept: string | null
@@ -57,6 +61,7 @@ export interface ExplorerRoute {
 
 export const sessionRoute = (session: ExplorerSession): ExplorerRoute => ({
   workspace: session.workspace,
+  mapMode: session.mapMode,
   word: session.trail.root,
   view: session.view,
   concept: session.comparison.conceptId,
@@ -65,6 +70,7 @@ export const sessionRoute = (session: ExplorerSession): ExplorerRoute => ({
 
 export type ExplorerAction =
   | { readonly type: 'workspace'; readonly workspace: Workspace }
+  | { readonly type: 'map-mode'; readonly mode: MapMode }
   | { readonly type: 'trace'; readonly id: string }
   | { readonly type: 'inspect-trail-word'; readonly id: string }
   | { readonly type: 'view'; readonly view: WordView }
@@ -102,6 +108,10 @@ export const reduceExplorerSession = (
       return session.workspace === action.workspace
         ? session
         : { ...session, workspace: action.workspace, overlay: cancelledFocus }
+    case 'map-mode':
+      return session.workspace === 'map' && session.mapMode === action.mode
+        ? session
+        : { ...session, workspace: 'map', mapMode: action.mode, overlay: cancelledFocus }
     case 'trace':
       return {
         ...session,
@@ -198,7 +208,8 @@ export const reduceExplorerSession = (
       const id = session.overlay.focusSequence + 1
       return {
         ...session,
-        workspace: 'geography',
+        workspace: 'map',
+        mapMode: 'language',
         overlay: { enabled: true, focusSequence: id, focusRequest: { id } },
       }
     }
@@ -209,6 +220,7 @@ export const reduceExplorerSession = (
       const current = sessionRoute(session)
       if (
         current.workspace === route.workspace &&
+        current.mapMode === route.mapMode &&
         current.word === route.word &&
         current.view === route.view &&
         current.concept === route.concept &&
@@ -219,6 +231,7 @@ export const reduceExplorerSession = (
       return {
         ...session,
         workspace: route.workspace,
+        mapMode: route.mapMode,
         view: route.view,
         trail: changedWord
           ? { ...session.trail, root: route.word, expanded: new Set() }
@@ -245,6 +258,7 @@ export const isCurrentTrailFocus = (
   session: ExplorerSession,
   request: NonNullable<ExplorerSession['overlay']['focusRequest']>,
 ) =>
-  session.workspace === 'geography' &&
+  session.workspace === 'map' &&
+  session.mapMode === 'language' &&
   session.overlay.enabled &&
   session.overlay.focusRequest === request

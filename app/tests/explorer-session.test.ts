@@ -36,13 +36,11 @@ const configuredSession = () => {
 
 test('workspace round trips preserve all exploration settings and evidence', () => {
   const before = configuredSession()
-  const geography = reduceExplorerSession(before, { type: 'workspace', workspace: 'geography' })
-  const administrative = reduceExplorerSession(geography, {
-    type: 'workspace',
-    workspace: 'administrative',
-  })
-  const after = reduceExplorerSession(administrative, { type: 'workspace', workspace: 'etymology' })
-  assert.deepEqual(after, before)
+  const map = reduceExplorerSession(before, { type: 'workspace', workspace: 'map' })
+  const areas = reduceExplorerSession(map, { type: 'map-mode', mode: 'area' })
+  const after = reduceExplorerSession(areas, { type: 'workspace', workspace: 'etymology' })
+  assert.equal(after.workspace, before.workspace)
+  assert.equal(after.mapMode, 'area')
   assert.equal(after.trail, before.trail)
   assert.equal(after.comparison, before.comparison)
   assert.equal(after.search, before.search)
@@ -120,6 +118,7 @@ test('unknown URL IDs remain visible as errors and never select an unrelated def
     type: 'restore-route',
     route: {
       workspace: 'etymology',
+      mapMode: 'language',
       word: '9999',
       view: 'family',
       concept: '9998',
@@ -207,12 +206,12 @@ test('data arriving after a newer language request resolves only the current sco
     },
   })
   store.set(explorerActionAtom, { type: 'search', query: 'typed while loading' })
-  store.set(explorerActionAtom, { type: 'workspace', workspace: 'geography' })
+  store.set(explorerActionAtom, { type: 'workspace', workspace: 'map' })
   complete(explorerRepository())
   await pending
   assert.equal(store.get(resolvedExplorerAtom)?.languageId, '2')
   assert.equal(store.get(explorerSessionAtom).search.query, 'typed while loading')
-  assert.equal(store.get(explorerSessionAtom).workspace, 'geography')
+  assert.equal(store.get(explorerSessionAtom).workspace, 'map')
 })
 
 test('delayed map focus is cancelled by newer trail, navigation, clearing, or focus requests', async () => {

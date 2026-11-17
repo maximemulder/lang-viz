@@ -105,7 +105,7 @@ selects support keyboard use; profiles retain their internal scrolling.
 `features/wals/session.ts` stores per-profile source/feature choices, standalone
 inspection and one overlay specification above component lifetimes. A new Jotai
 store starts a new session. WALS has no URL fields or reload persistence. Existing
-Geography/Word histories history remains owned by the explorer navigation adapter.
+Map/Etymologies history remains owned by the explorer navigation adapter.
 
 UI callers should use the validated actions in `integrations/wals/state.ts`:
 
@@ -113,7 +113,7 @@ UI callers should use the validated actions in `integrations/wals/state.ts`:
 | --- | --- |
 | `selectWalsVarietyAtom` | Requires a ready association to the requested profile; saves that profile's source choice, clears its previously revealed feature when the variety changes, cancels pending camera intent, preserves overlay origin |
 | `inspectWalsObservationAtom` | Requires the exact source/feature observation; retains both IDs, saves an associated profile choice, opens that atlas profile with `moveMap: false`, cancels prior focus |
-| `showWalsExamplesAtom` | Requires an observation; establishes one visible source/feature specification, opens Geography and issues explicit camera intent |
+| `showWalsExamplesAtom` | Requires an observation; establishes one visible source/feature specification, opens Languages mode and issues explicit camera intent |
 | `focusWalsExamplesAtom` | Issues fresh intent for the current visible specification; no-op without one |
 | `setWalsOverlayVisibilityAtom` | Changes visibility, cancels WALS focus without replaying it when shown again |
 | `clearWalsOverlayAtom` | Removes only the WALS overlay and owned focus request; retains profile choices, source inspection, lexical state and newer external camera intent |
@@ -128,7 +128,7 @@ inspection is required. The inspection stores the profile ID opened by the
 original explicit action, if any, so late association cannot hide a standalone
 inspection or reopen a closed profile. Closing standalone inspection clears only
 that inspection, preserving profile choices and the overlay. Inspection and variety selection stay in the current
-workspace; show/focus explicitly opens Geography.
+workspace; show/focus explicitly opens Languages mode.
 
 The overlay stores the selected source/feature IDs and visibility. The current
 map uses `areaMatching.ts` and `areaState.ts` to match the exact recorded category
@@ -205,7 +205,7 @@ exported observation. Ordinary tests remain fixture-only.
 ## Map controls and coexistence
 
 **Find languages like this** highlights all eligible existing language areas with
-the selected recorded category and explicitly focuses Geography. Inspection retains
+the selected recorded category and explicitly focuses Languages mode. Inspection retains
 the overlay origin and does not move the map. Clearing highlights retains language
 choices, word-history state and pinned entries. No new workspace is added.
 
