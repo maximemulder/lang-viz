@@ -17,7 +17,7 @@ import {
   selectedMapAreasAtom,
   setMapGroupStyleAtom,
 } from '../../state/atlasState'
-import { languagePanelAtom, openLanguageDetailsAtom } from '../../state/languageControls'
+import { inspectLanguageFromSidebarAtom, languagePanelAtom } from '../../state/languageControls'
 import { LanguagePreviewItem } from './LanguagePreview'
 
 type MapRow =
@@ -47,7 +47,7 @@ export const OnMapLanguages = () => {
   const removeGroup = useSetAtom(removeMapGroupAtom)
   const setGroupStyle = useSetAtom(setMapGroupStyleAtom)
   const clear = useSetAtom(clearMapSelectionAtom)
-  const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const inspectLanguage = useSetAtom(inspectLanguageFromSidebarAtom)
   const panel = useAtomValue(languagePanelAtom)
   const [query, setQuery] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set())
@@ -210,7 +210,9 @@ export const OnMapLanguages = () => {
                       type="button"
                       className="on-map-group__identity on-map-row__identity"
                       title={`${name} · ${row.description}`}
-                      onClick={() => openDetails({ languageId: group.rootId, groupId: group.id })}
+                      onClick={() =>
+                        inspectLanguage({ languageId: group.rootId, groupId: group.id })
+                      }
                     >
                       <strong>{name}</strong>
                       <small>{row.description}</small>
@@ -305,7 +307,9 @@ export const OnMapLanguages = () => {
                   aria-label={`Details for ${name}`}
                   aria-current={panel.detailEntryId === entry.id ? 'true' : undefined}
                   title={`${name} · ${description}`}
-                  onClick={() => openDetails({ languageId: entry.languageId, entryId: entry.id })}
+                  onClick={() =>
+                    inspectLanguage({ languageId: entry.languageId, entryId: entry.id })
+                  }
                 >
                   <strong>{name}</strong>
                   <small>{description}</small>

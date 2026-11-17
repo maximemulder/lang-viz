@@ -1,13 +1,11 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
 import { useMemo } from 'react'
 import { DetailsHeader } from '../../components/DetailsHeader'
-import { DetailsMapAction } from '../../components/DetailsMapAction'
 import { SidebarPane } from '../../components/SidebarPane'
 import { mappedBranchForLanguage } from '../../domain/aggregation'
 import { languageAncestors } from '../../domain/hierarchy'
 import { targetGeometry } from '../../domain/languageFocus'
 import { mapEntryDescription } from '../../domain/mapEntries'
-import { hasCoverage } from '../../domain/mapGroups'
 import { temporalQualityLabel } from '../../domain/temporal'
 import {
   atlasDataAtom,
@@ -24,45 +22,34 @@ import {
 } from '../../state/atlasState'
 import {
   closeLanguageDetailsAtom,
-  editGeographyFiltersAtom,
-  focusLanguageOnMapAtom,
   languagePanelAtom,
   openLanguageDetailsAtom,
   revealLanguageAtom,
 } from '../../state/languageControls'
-import {
-  searchCoverageAtom,
-  searchSelectionAtom,
-  toggleSearchSelectionAtom,
-} from '../../state/searchSelection'
+import { searchCoverageAtom } from '../../state/searchSelection'
 import { LanguageFeatures } from '../wals/LanguageFeatures.tsx'
-import { GeographyFilterSummary } from './GeographyFilters'
 import { GeometrySourceRecords } from './GeometrySourceRecords'
 import { useLanguagePreview } from './LanguagePreview'
 import { LanguageWordsButton } from './LanguageWordsButton.tsx'
 import { PinnedMapEntries } from './PinnedMapEntries'
 
 export const LanguageDetails = () => {
-  const [panel, setPanel] = useAtom(languagePanelAtom)
+  const panel = useAtomValue(languagePanelAtom)
   const data = useAtomValue(atlasDataAtom)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
   const coverage = useAtomValue(searchCoverageAtom)
   const overrides = useAtomValue(geometryOverridesAtom)
   const colors = useAtomValue(languageColorsAtom)
-  const selectedIds = useAtomValue(searchSelectionAtom)
-  const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
   const areas = useAtomValue(selectedMapAreasAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const closeDetails = useSetAtom(closeLanguageDetailsAtom)
-  const editGeography = useSetAtom(editGeographyFiltersAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const groups = useAtomValue(mapGroupsAtom)
   const removeEntry = useSetAtom(removeMapEntryAtom)
   const removeGroup = useSetAtom(removeMapGroupAtom)
   const reveal = useSetAtom(revealLanguageAtom)
-  const focusOnMap = useSetAtom(focusLanguageOnMapAtom)
   const profileTarget = {
     languageId: panel.detailId ?? '',
     ...(panel.detailEntryId ? { entryId: panel.detailEntryId } : {}),
@@ -79,7 +66,6 @@ export const LanguageDetails = () => {
   const detailVariants = detailAvailability?.ownVariants ?? []
   const activeVariant =
     detailVariants.find((variant) => variant.id === overrides[detailId ?? '']) ?? detailVariants[0]
-  const selected = detailId !== null && selectedIds.includes(detailId)
   const focusedEntry = entries.find(
     (entry) => entry.id === panel.detailEntryId && entry.languageId === detailId,
   )
@@ -88,38 +74,6 @@ export const LanguageDetails = () => {
     targetGeometry(profileTarget, data, availability, coverage, hierarchy, entries).length > 0
   if (!detail) return null
   const classification = detail.classification
-  const draftSelection = (
-    <>
-      <div className="detail-selection">
-        <span
-          className="language-swatch"
-          style={{ backgroundColor: colors.get(detail.id) }}
-          aria-hidden="true"
-        />
-        <span>{selected ? 'Selected in Explore' : 'Select for Add to map'}</span>
-        <button
-          type="button"
-          disabled={!selected && !hasCoverage(detailAvailability, coverage)}
-          onClick={() => {
-            toggleSelected(detail.id)
-            setPanel({ ...panel, view: 'explore' })
-          }}
-        >
-          {selected ? 'Deselect' : 'Select'}
-        </button>
-      </div>
-      <p className="finder-detail__context">
-        <GeographyFilterSummary />{' '}
-        <button
-          type="button"
-          aria-label="Change sources and period"
-          onClick={() => editGeography()}
-        >
-          Change
-        </button>
-      </p>
-    </>
-  )
   return (
     <section
       {...preview}
@@ -149,7 +103,6 @@ export const LanguageDetails = () => {
           restoreFocus?.focus({ preventScroll: true })
         }}
       />
-      <DetailsMapAction disabled={!canFocusMap} onFocus={() => focusOnMap(profileTarget)} />
       <div
         id="focused-language-body"
         className="finder-detail__body"
@@ -196,9 +149,7 @@ export const LanguageDetails = () => {
               Remove entry
             </button>
           </div>
-        ) : (
-          draftSelection
-        )}
+        ) : null}
         {!canFocusMap && (
           <p className="finder-detail__context" role="status">
             {(panel.detailEntryId && !focusedEntry) || (panel.detailGroupId && !focusedGroup)
@@ -221,12 +172,6 @@ export const LanguageDetails = () => {
             </div>
           )}
           <PinnedMapEntries languageId={detail.id} focusedEntryId={panel.detailEntryId} />
-          <h4>Geography for the next Add to map</h4>
-          <p>
-            Select entries in Explore, then choose Add to map. By default, each group includes its
-            entry and all mapped descendants.
-          </p>
-          {(focusedEntry || focusedGroup) && draftSelection}
           {mappedBranch && mappedBranch.languageIds.length > 0 && (
             <details className="finder-detail__aggregation">
               <summary>

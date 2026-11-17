@@ -36,9 +36,12 @@ def main():
             """), "Two browsing views, with geography filters in Explore and no empty details pane"
             assert browser.js("""
                 const labels=[...document.querySelectorAll('.finder-actions button')].map(b=>b.textContent.trim());
-                return labels.includes('Select all') && labels.includes('Clear selection') &&
+                const select=[...document.querySelectorAll('.finder-actions button')].find(b=>b.textContent.trim()==='Select all');
+                const clear=[...document.querySelectorAll('.finder-actions button')].find(b=>b.textContent.trim()==='Clear selection');
+                return select && clear && select.parentElement===clear.parentElement &&
+                    !!document.querySelector('.explore-footer .finder-add') &&
                     !labels.some(s=>s.includes('Select roots') || s.includes('Show branches on map'));
-            """), 'Explore uses the restored selection controls'
+            """), 'Explore groups draft selection controls above results and Add to map below'
             assert browser.js("""
                 const list=document.querySelector('.language-list').getBoundingClientRect();
                 const footer=document.querySelector('.explore-footer').getBoundingClientRect();
@@ -46,12 +49,12 @@ def main():
                 const search=document.querySelector('#explore-search-content');
                 return !sources.open && sources.querySelector('summary').textContent.includes('Data sources') &&
                     search.contains(document.querySelector('.search-field')) &&
-                    search.contains(document.querySelector('.finder-scope')) &&
+                    !document.querySelector('.finder-scope') &&
                     document.querySelector('.search-field').getClientRects().length>0 &&
                     footer.top >= list.bottom - 1 &&
                     !document.querySelector('.map-settings__panel .color-controls') &&
                     document.querySelector('#on-map-colors-content').hidden;
-            """), 'Data sources and Colors start collapsed, and Search contains the query, area, and results'
+            """), 'Data sources and Colors start collapsed, and Search contains the global query and results'
             map_section(browser, 'colors')
             assert browser.js("""
                 return !document.querySelector('#on-map-entries-content').hidden &&
@@ -114,6 +117,10 @@ def main():
 
             # Expanding a family is independent of drawing it, and shows immediate groups.
             search(browser, "abkh1242", "abkh1242")
+            assert browser.js("""
+                return !document.querySelector('.language-row__children') &&
+                    !document.querySelector('.language-row__identity').textContent.includes('on map');
+            """), 'Explore rows omit child and on-map counts'
             browser.js("document.querySelector('.language-row__disclosure').click()")
             children = wait_for(
                 lambda: browser.js("""

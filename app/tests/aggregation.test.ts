@@ -155,7 +155,6 @@ const explore = (
     matches,
     hierarchy,
     browseRoots: false,
-    viewportLanguageIds: null,
     availability: availability(),
     modes: {},
     ...overrides,
@@ -297,29 +296,6 @@ test('empty world search groups classification roots and preserves expanded bran
   assert.deepEqual(
     rows.map(({ language }) => language.id),
     ['family', 'gap', 'unmapped', 'language', 'isolate'],
-  )
-})
-
-test('viewport scope follows chosen own or descendant geometry, including empty viewports', () => {
-  const matches = searchCatalog(data.languageSearchIndex, '')
-  const visible = new Set(['other-dialect'])
-  assert.deepEqual(
-    explore(matches, { viewportLanguageIds: visible }).roots.map(({ id }) => id),
-    ['unmapped', 'other-dialect'],
-  )
-  assert.deepEqual(
-    explore(matches, {
-      viewportLanguageIds: visible,
-      modes: { family: 'descendants', unmapped: 'own' },
-    }).roots.map(({ id }) => id),
-    ['family', 'other-dialect'],
-  )
-  assert.deepEqual(explore(matches, { viewportLanguageIds: new Set() }).roots, [])
-  assert.deepEqual(
-    explore(searchCatalog(data.languageSearchIndex, 'nested'), { viewportLanguageIds: visible })
-      .roots,
-    [],
-    'Geographic scope intersects text matches rather than introducing nonmatching entries',
   )
 })
 

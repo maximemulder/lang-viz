@@ -18,17 +18,14 @@ import {
 import { hasCoverage } from '../../domain/mapGroups'
 import {
   atlasDataAtom,
-  finderScopeAtom,
   geographyAvailabilityAtom,
   languageHierarchyAtom,
   languageQueryAtom,
-  mapEntriesAtom,
-  viewportLanguageIdsAtom,
 } from '../../state/atlasState'
 
 import {
+  inspectLanguageFromSidebarAtom,
   languagePanelAtom,
-  openLanguageDetailsAtom,
   revealLanguageIdAtom,
 } from '../../state/languageControls'
 import {
@@ -65,7 +62,6 @@ const LanguageRow = ({
 }: LanguageRowProps) => {
   const { language } = row
   const selectedIds = useAtomValue(searchSelectionAtom)
-  const entries = useAtomValue(mapEntriesAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
   const coverage = useAtomValue(searchCoverageAtom)
   const panel = useAtomValue(languagePanelAtom)
@@ -75,7 +71,6 @@ const LanguageRow = ({
   if (!available) return null
   const usable = hasCoverage(available, coverage)
   const isSelected = selectedIds.includes(language.id)
-  const selectedCount = entries.filter(({ languageId }) => languageId === language.id).length
   const status = usable ? 'Area available' : available.hasAnyAreas ? 'Filtered out' : 'No areas'
   const availabilityLabel = usable
     ? coverage === 'branch'
@@ -143,15 +138,11 @@ const LanguageRow = ({
           <span className="language-row__label">{language.name}</span>
           {language.classification.kind === 'source' && (
             <small
-              className="language-row__children"
+              className="language-row__source-tag"
               title="Defined by the source; no matched Glottocode"
             >
               source-defined
             </small>
-          )}
-          {row.childCount > 0 && <small className="language-row__children">{row.childCount}</small>}
-          {selectedCount > 0 && (
-            <small className="language-row__children">{selectedCount} on map</small>
           )}
         </span>
         {context && <small className="language-row__context">{context}</small>}
@@ -179,10 +170,8 @@ const LanguageRow = ({
 
 export const ExploreLanguages = () => {
   const data = useAtomValue(atlasDataAtom)
-  const viewportIds = useAtomValue(viewportLanguageIdsAtom)
   const [selectedIds, setSelectedIds] = useAtom(searchSelectionAtom)
   const [query, setQuery] = useAtom(languageQueryAtom)
-  const [scope, setScope] = useAtom(finderScopeAtom)
   const selectResults = useSetAtom(selectSearchResultsAtom)
   const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
   const addSelection = useSetAtom(addSearchSelectionToMapAtom)
@@ -195,18 +184,14 @@ export const ExploreLanguages = () => {
   const pendingFocus = useRef<string | null>(null)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
-  const openDetails = useSetAtom(openLanguageDetailsAtom)
+  const inspectLanguage = useSetAtom(inspectLanguageFromSidebarAtom)
   const [revealId, setRevealId] = useAtom(revealLanguageIdAtom)
   const panel = useAtomValue(languagePanelAtom)
   const isSearching = Boolean(query.trim())
-  const isBrowsingRoots = !isSearching && scope === 'world'
+  const isBrowsingRoots = !isSearching
   const matches = useMemo(
     () => searchCatalog(data.languageSearchIndex, query),
     [data.languageSearchIndex, query],
-  )
-  const searchViewportIds = useMemo(
-    () => (scope === 'viewport' ? new Set(viewportIds) : null),
-    [scope, viewportIds],
   )
   const { roots, showableIds } = useMemo(
     () =>
@@ -214,12 +199,11 @@ export const ExploreLanguages = () => {
         matches,
         hierarchy,
         browseRoots: isBrowsingRoots,
-        viewportLanguageIds: searchViewportIds,
         availability,
         modes: {},
         coverage,
       }),
-    [matches, hierarchy, isBrowsingRoots, searchViewportIds, availability, coverage],
+    [matches, hierarchy, isBrowsingRoots, availability, coverage],
   )
   const rows = useMemo(
     () => flattenLanguageHierarchy(hierarchy, roots, expandedKeys),
@@ -260,8 +244,6 @@ export const ExploreLanguages = () => {
   const selectedIdSet = new Set(selectedIds)
   const areAllFilteredSelected =
     showableIds.length > 0 && showableIds.every((id) => selectedIdSet.has(id))
-  const resultIds = new Set(roots.map(({ id }) => id))
-  const selectedInResults = selectedIds.filter((id) => resultIds.has(id)).length
   const mappableSelected = selectedIds.filter((id) =>
     hasCoverage(availability.get(id), coverage),
   ).length
@@ -316,7 +298,7 @@ export const ExploreLanguages = () => {
           toggleSelected(row.language.id)
         break
       case 'Enter':
-        openDetails(row.language.id)
+        inspectLanguage(row.language.id)
         break
       default:
         return
@@ -340,11 +322,10 @@ export const ExploreLanguages = () => {
     }
     setExpandedKeys(next)
     setQuery('')
-    setScope('world')
     setFocusedKey(key)
     pendingFocus.current = key
     setRevealId(null)
-  }, [panel.view, revealId, data, hierarchy, expandedKeys, setQuery, setScope, setRevealId])
+  }, [panel.view, revealId, data, hierarchy, expandedKeys, setQuery, setRevealId])
   return (
     <div className="explore-view">
       <div className="explore-controls">
@@ -373,31 +354,10 @@ export const ExploreLanguages = () => {
               }}
             />
           </label>
-          <label className="finder-scope">
-            <span>Search area</span>
-            <select
-              value={scope}
-              onChange={(event) => {
-                setScope(event.currentTarget.value === 'viewport' ? 'viewport' : 'world')
-                pendingFocus.current = null
-                setFocusedKey(null)
-                virtualizer.scrollToOffset(0)
-              }}
-            >
-              <option value="world">Whole world</option>
-              <option value="viewport">Current map ({viewportIds.length})</option>
-            </select>
-          </label>
           <div className="finder-actions">
             <p aria-live="polite">
               <strong>{roots.length.toLocaleString()}</strong>{' '}
-              {isBrowsingRoots ? 'roots' : roots.length === 1 ? 'match' : 'matches'} ·{' '}
-              {showableIds.length.toLocaleString()} mappable
-              <small>
-                {isBrowsingRoots
-                  ? `${data.languages.length.toLocaleString()} entries in the classification`
-                  : 'Expand a match to browse all its children'}
-              </small>
+              {isBrowsingRoots ? 'roots' : roots.length === 1 ? 'match' : 'matches'}
             </p>
             <div>
               <button
@@ -410,6 +370,14 @@ export const ExploreLanguages = () => {
                 title="Select all mappable results, including those beyond the visible list. Expanded children are selected separately."
               >
                 Select all
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={!selectedIds.length}
+                onClick={() => setSelectedIds([])}
+              >
+                Clear selection
               </button>
             </div>
           </div>
@@ -425,10 +393,7 @@ export const ExploreLanguages = () => {
           aria-label={isBrowsingRoots ? 'Language classification' : 'Expandable search results'}
         >
           {rows.length === 0 && (
-            <p className="finder-empty">
-              No matching entries{scope === 'viewport' ? ' in the current map area' : ''}. Try
-              another name or identifier.
-            </p>
+            <p className="finder-empty">No matching entries. Try another name or identifier.</p>
           )}
           <div
             className="language-list__sizer"
@@ -460,7 +425,7 @@ export const ExploreLanguages = () => {
                     onFocus={() => {
                       setFocusedKey(row.key)
                     }}
-                    onDetails={() => openDetails(row.language.id)}
+                    onDetails={() => inspectLanguage(row.language.id)}
                     onKeyDown={(event) => handleTreeKey(event, row, virtualRow.index)}
                   />
                 </div>
@@ -472,29 +437,16 @@ export const ExploreLanguages = () => {
       <footer className="finder-actions explore-footer">
         <div className="finder-bulk">
           <p aria-live="polite">
-            <strong>{selectedIds.length.toLocaleString()} selected</strong> ·{' '}
-            {selectedInResults.toLocaleString()} in these results
+            <strong>{selectedIds.length.toLocaleString()} selected</strong>
           </p>
-          <div className="finder-bulk__actions">
-            <button
-              type="button"
-              className="button-secondary"
-              disabled={!selectedIds.length}
-              onClick={() => {
-                setSelectedIds([])
-              }}
-            >
-              Clear selection
-            </button>
-            <button
-              type="button"
-              className="finder-add"
-              disabled={!mappableSelected}
-              onClick={() => addSelection()}
-            >
-              Add to map
-            </button>
-          </div>
+          <button
+            type="button"
+            className="finder-add"
+            disabled={!mappableSelected}
+            onClick={() => addSelection()}
+          >
+            Add to map
+          </button>
           <SidebarPane
             className="finder-bulk__coverage"
             title="Add options"
@@ -528,7 +480,7 @@ export const ExploreLanguages = () => {
             </label>
             <p>
               Descendants take precedence where they overlap ancestors; broader coverage remains
-              elsewhere. Search area filters results and does not clip added areas.
+              elsewhere.
             </p>
           </SidebarPane>
         </div>

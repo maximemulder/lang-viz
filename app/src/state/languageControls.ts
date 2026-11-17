@@ -66,6 +66,15 @@ export const openLanguageDetailsAtom = atom(
   },
 )
 
+/** Sidebar identity activation inspects and frames the same representation. */
+export const inspectLanguageFromSidebarAtom = atom(
+  null,
+  (_get, set, target: string | LanguageMapTarget) => {
+    set(openLanguageDetailsAtom, target)
+    set(focusLanguageOnMapAtom, typeof target === 'string' ? { languageId: target } : target)
+  },
+)
+
 export const closeLanguageDetailsAtom = atom(null, (get, set) => {
   if (get(mapCameraIntentAtom) === get(languageMapNavigationAtom)) set(mapCameraIntentAtom, null)
   set(languageMapNavigationAtom, null)
@@ -75,12 +84,6 @@ export const closeLanguageDetailsAtom = atom(null, (get, set) => {
     detailGroupId: null,
     detailEntryId: null,
   })
-})
-
-export const geographyFiltersRequestedAtom = atom(false)
-export const editGeographyFiltersAtom = atom(null, (get, set) => {
-  set(languagePanelAtom, { ...get(languagePanelAtom), view: 'explore' })
-  set(geographyFiltersRequestedAtom, true)
 })
 
 /** Explore consumes this request after becoming visible and reveals the complete ancestry. */

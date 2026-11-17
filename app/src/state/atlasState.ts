@@ -47,9 +47,7 @@ export const atlasDataAtom = atomWithRefresh(async () => loadAtlasData())
 
 export const languageQueryAtom = atom('')
 export const geographyDatasetFilterAtom = atom<GeographyDatasetSelection>(['asher2007world'])
-export const finderScopeAtom = atom<'world' | 'viewport'>('world')
 export const temporalViewAtom = atom<TemporalViewSelection>('contemporary')
-export const viewportLanguageIdsAtom = atom<readonly LanguageId[]>([])
 export const mapEntriesAtom = atom<readonly MapEntry[]>([])
 const defaultMapInitializedAtom = atom(false)
 /** Populate the first map with the complete default source, once per session. */

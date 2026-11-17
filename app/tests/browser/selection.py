@@ -30,7 +30,7 @@ def check_selection(browser, output):
     open_details(browser, expand=False)
     search(browser, 'dari1250', 'dari1250')
     assert not browser.js("return document.querySelector('.language-row input').checked"), 'Parents do not check descendants'
-    assert '0 in these results' in browser.js("return document.querySelector('.finder-bulk').textContent")
+    assert '1 selected' in browser.js("return document.querySelector('.finder-bulk').textContent")
     select_result(browser, 'dari1250')
     search(browser, 'abkh1242', 'abkh1242')
     select_result(browser, 'abkh1242')

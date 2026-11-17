@@ -3,7 +3,6 @@ import { test } from 'node:test'
 import { buildGeographyAvailability, mapAreaSelectionKey } from '../src/domain/aggregation.ts'
 import type { AtlasData, GeometryVariant, Language } from '../src/domain/atlas.ts'
 import { buildColorTopology, buildSemanticPalette } from '../src/domain/colors.ts'
-import { prepareExploreResults } from '../src/domain/exploration.ts'
 import { buildLanguageHierarchy } from '../src/domain/hierarchy.ts'
 import { resolveMapEntries } from '../src/domain/mapEntries.ts'
 import {
@@ -42,7 +41,6 @@ const data = {
 } as AtlasData
 const hierarchy = buildLanguageHierarchy(languages)
 const topology = buildColorTopology(hierarchy)
-const availability = buildGeographyAvailability(data, hierarchy, 'contemporary', ['a'], {})
 const colors = buildSemanticPalette(hierarchy, topology, ['family', 'other']).colors
 const required = <T>(value: T | undefined): T => {
   assert.ok(value)
@@ -81,7 +79,6 @@ test('branch groups include mapped parents and every descendant; overlapping roo
   assert.deepEqual(own.map(({ languageId }) => languageId).sort(), ['child', 'family'])
   assert.ok(resolveMapEntries(own, data, colors).every((area) => !area.refines))
 })
-
 test('repeated Add to map preserves IDs and styles, and restores removed group members', () => {
   const initial = addMapGroupEntries([], plan(['family']))
   const styled = initial.map((entry) => ({
@@ -166,27 +163,4 @@ test('uniform and hierarchy colors use identical coverage; entry overrides win',
   const recolored = resolveMapEntries(entries, data, colors, new Map([[groupId, customPalette]]))
   assert.equal(recolored.find(({ languageId }) => languageId === 'family')?.color, '#cc5500')
   assert.equal(mapAreaSelectionKey(recolored), mapAreaSelectionKey(detailed))
-})
-
-test('viewport search finds deeply mapped descendants even when their mapped parent is outside', () => {
-  const result = prepareExploreResults({
-    matches: languages,
-    hierarchy,
-    browseRoots: false,
-    viewportLanguageIds: new Set(['dialect']),
-    availability,
-    modes: {},
-    coverage: 'branch',
-  })
-  assert.deepEqual(result.showableIds.sort(), ['child', 'dialect', 'family'])
-  const own = prepareExploreResults({
-    matches: languages,
-    hierarchy,
-    browseRoots: false,
-    viewportLanguageIds: new Set(['dialect']),
-    availability,
-    modes: {},
-    coverage: 'own',
-  })
-  assert.deepEqual(own.showableIds, ['dialect'])
 })

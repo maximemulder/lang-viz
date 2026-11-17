@@ -39,7 +39,6 @@ import {
   overlapModeAtom,
   selectedMapAreasAtom,
   temporalViewAtom,
-  viewportLanguageIdsAtom,
 } from '../../state/atlasState'
 import {
   focusLanguageOnMapAtom,
@@ -248,10 +247,8 @@ export const WorldMap = ({
   const inspectionDirtyRef = useRef(false)
   const pendingHoverEventRef = useRef<MapLayerMouseEvent | null>(null)
   const hoverQueryFrameRef = useRef<number | null>(null)
-  const viewportDirtyRef = useRef(true)
   const pendingClickRef = useRef<MapHit | null>(null)
   const clickTimerRef = useRef<number | null>(null)
-  const setViewportLanguageIds = useSetAtom(viewportLanguageIdsAtom)
 
   const areaMode = areaInteraction.enabled
   const cancelClickTimer = useCallback(() => {
@@ -475,31 +472,17 @@ export const WorldMap = ({
       onMoveStart={(event) => {
         if (event.originalEvent) setCameraIntent(null)
         inspectionDirtyRef.current = true
-        viewportDirtyRef.current = true
       }}
       onSourceData={(event) => {
         if (event.sourceId?.startsWith('language-overlap-regions-'))
           inspectionDirtyRef.current = true
-        if (event.sourceId === LANGUAGE_SOURCE_ID) viewportDirtyRef.current = true
       }}
-      onIdle={(event) => {
+      onIdle={() => {
         if (inspectionDirtyRef.current) {
           inspectionDirtyRef.current = false
           if (lastHoverEventRef.current && !areaInteraction?.enabled)
             queryHover(lastHoverEventRef.current)
         }
-
-        // Hover repaints also become idle; viewport discovery only needs new
-        // camera/source data, not a scan of every language on each hover.
-        if (!viewportDirtyRef.current || !event.target.getLayer(LANGUAGE_HIT_LAYER_ID)) return
-        viewportDirtyRef.current = false
-        const languageIds = event.target
-          .queryRenderedFeatures({ layers: [LANGUAGE_HIT_LAYER_ID] })
-          .flatMap((feature) => {
-            const languageId = feature.properties.language_id
-            return typeof languageId === 'string' ? [languageId] : []
-          })
-        setViewportLanguageIds([...new Set(languageIds)])
       }}
     >
       {!BASEMAP_DISABLED && <MapBackground mode={backgroundMode} />}

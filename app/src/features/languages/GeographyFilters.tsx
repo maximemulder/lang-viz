@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue } from 'jotai'
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { SidebarPane } from '../../components/SidebarPane'
 import type {
   AtlasData,
@@ -8,7 +8,6 @@ import type {
 } from '../../domain/atlas'
 import { isTemporalViewSelection, TEMPORAL_VIEWS, temporalView } from '../../domain/temporal'
 import { atlasDataAtom, geographyDatasetFilterAtom, temporalViewAtom } from '../../state/atlasState'
-import { geographyFiltersRequestedAtom } from '../../state/languageControls'
 
 interface GeographySourceFilterProps {
   readonly data: AtlasData
@@ -182,18 +181,9 @@ export const GeographyFilters = () => {
   const data = useAtomValue(atlasDataAtom)
   const [datasetFilter, setDatasetFilter] = useAtom(geographyDatasetFilterAtom)
   const [period, setPeriod] = useAtom(temporalViewAtom)
-  const [requested, setRequested] = useAtom(geographyFiltersRequestedAtom)
-  const rootRef = useRef<HTMLDetailsElement>(null)
-  useEffect(() => {
-    if (!requested || !rootRef.current) return
-    rootRef.current.open = true
-    rootRef.current.querySelector('summary')?.focus({ preventScroll: true })
-    setRequested(false)
-  }, [requested, setRequested])
   return (
     <SidebarPane
       className="finder-options"
-      ref={rootRef}
       title="Data sources"
       summary={<GeographyFilterSummary />}
     >

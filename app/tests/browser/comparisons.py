@@ -86,10 +86,6 @@ def check_comparisons(browser, output):
     browser.js("document.querySelector('.on-map-group .on-map-row__remove').click()")
     wait_for(lambda: len(state()) == 2, 10, 'remove one source/period group')
     assert {e['id'] for e in state()} == {contemporary['id'], traditional['id']}
-    browser.js("document.querySelector('.finder-detail__more').open=true;document.querySelector('[aria-label=\"Change sources and period\"]').click()")
-    wait_for(lambda: browser.js("return !document.querySelector('#language-panel-explore').hidden && document.querySelector('.finder-options').open"), 10, 'edit geography')
-    assert browser.js("return document.activeElement===document.querySelector('.finder-options > summary')")
-
     # Two complete family groups preserve their own source coverage and styles.
     browser.js('window.overlapTest.configure({languageIds:[],center:[112,28],zoom:6})')
     search(browser, 'sino1245', 'sino1245')

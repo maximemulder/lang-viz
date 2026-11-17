@@ -41,14 +41,15 @@ def main():
         assert language_style['icon'] and language_style['label']
         assert browser.js("""
             const header = document.querySelector('.finder-detail .details-header');
-            const action = document.querySelector('.finder-detail .details-map-action__button');
             return header.querySelector('.details-header__title').textContent.trim() === 'English' &&
                 !header.querySelector('.details-header__eyebrow') &&
                 !header.querySelector('.details-header__title button') &&
                 !header.querySelector('button[aria-expanded]') &&
-                !header.contains(action) &&
-                action.getBoundingClientRect().top >= header.getBoundingClientRect().bottom &&
-                action.textContent.trim() === 'Focus on map' &&
+                !document.querySelector('.finder-detail .details-map-action') &&
+                !document.querySelector('.finder-detail .detail-selection') &&
+                !document.querySelector('.finder-detail__context') &&
+                !document.querySelector('.finder-detail [aria-label="Change sources and period"]') &&
+                !document.querySelector('.finder-detail__more')?.textContent.includes('Geography for the next Add to map') &&
                 !document.querySelector('#focused-language-body').hidden;
         """)
 
@@ -79,10 +80,7 @@ def main():
             "details pane closes",
         )
 
-        browser.js("""
-            [...document.querySelectorAll('.workspace-nav button')]
-                .find(button => button.textContent.trim() === 'Administrative').click();
-        """)
+        browser.js("document.querySelector('.map-area-controls__inspect button:last-child').click()")
         wait_for(
             lambda: browser.js("return !!document.querySelector('.administrative-results button')"),
             30,
@@ -114,17 +112,17 @@ def main():
         assert browser.js("return document.querySelector('.administrative-results').clientHeight >= 80")
 
         # Follow area -> language -> family and check that the same header updates its identity.
-        for label, selector in [
-            ('language', '.administrative-observation__top button'),
-            ('family', '.administrative-detail .administrative-link'),
-        ]:
+        for label in ('language', 'family'):
             title = browser.js("""
-                const button = document.querySelector(arguments[0]);
+                const button = arguments[0] === 'language'
+                    ? [...document.querySelectorAll('.administrative-observation__top button')]
+                        .find(button => button.querySelector('.administrative-code')?.textContent === 'ps')
+                    : document.querySelector('.administrative-detail .administrative-link');
                 const clone = button.cloneNode(true);
                 clone.querySelector('.administrative-code')?.remove();
                 button.click();
                 return clone.textContent.trim();
-            """, selector)
+            """, label)
             wait_for(
                 lambda title=title: browser.js("""
                     const header = document.querySelector('.administrative-inspector-header');
