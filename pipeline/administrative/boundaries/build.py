@@ -17,6 +17,7 @@ from pathlib import Path
 import shapefile
 from shapely.geometry import MultiPolygon, Point, Polygon, shape
 from shapely.validation import make_valid
+
 from pipeline.geometry_bounds import geometry_bounds
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -41,10 +42,13 @@ def territory_codes(source: Path) -> set[str]:
     info = root.find("territoryInfo")
     if info is None:
         raise ValueError("CLDR source has no territoryInfo")
-    codes = [item.get("type") for item in info]
-    if len(codes) != len(set(codes)) or any(
-        code is None or not re.fullmatch(r"[A-Z]{2}", code) for code in codes
-    ):
+    codes = []
+    for item in info:
+        code = item.get("type")
+        if code is None or not re.fullmatch(r"[A-Z]{2}", code):
+            raise ValueError("Invalid CLDR territory inventory")
+        codes.append(code)
+    if len(codes) != len(set(codes)):
         raise ValueError("Invalid CLDR territory inventory")
     return set(codes)
 
@@ -110,38 +114,56 @@ def read_shapes(archive: Path, spec: dict) -> tuple[list[dict], list[dict]]:
         features: list[dict] = []
         geometry: list[dict] = []
         for item in reader.iterShapeRecords():
-            source = item.record.as_dict()
+            record, source_shape = item.record, item.shape
+            if record is None or source_shape is None:
+                raise ValueError("Incomplete Natural Earth shape record")
+            source = record.as_dict()
             key, name = source["ADM0_A3"], source["ADMIN"]
-            if not re.fullmatch(r"[A-Z0-9]{3}", key) or not isinstance(name, str):
+            if (
+                not isinstance(key, str)
+                or not re.fullmatch(r"[A-Z0-9]{3}", key)
+                or not isinstance(name, str)
+            ):
                 raise ValueError("Invalid Natural Earth country identifier")
             feature_id = f"country-{key}"
-            source_geometry = rounded_geometry(item.shape.__geo_interface__)
+            source_geometry = rounded_geometry(dict(source_shape.__geo_interface__))
             polygon = focus_polygon(source_geometry)
             # Natural Earth's default ISO fields intentionally use -99 for
             # some areas (including France and Norway); the EH field retains
             # their ISO identifiers without changing the polygon viewpoint.
             numeric = source["ISO_N3_EH"]
-            label_name = min((source["NAME"], source["NAME_LONG"]), key=len)
-            label_point = [source["LABEL_X"], source["LABEL_Y"]]
+            alpha2 = source["ISO_A2_EH"]
+            short_name, long_name = source["NAME"], source["NAME_LONG"]
+            label_x, label_y = source["LABEL_X"], source["LABEL_Y"]
             min_label = source["MIN_LABEL"]
             label_rank = source["LABELRANK"]
             if (
-                not label_name
-                or not all(math.isfinite(value) for value in label_point + [min_label])
-                or not -180 <= label_point[0] <= 180
-                or not -90 <= label_point[1] <= 90
-                or not 0 <= min_label <= 24
+                not isinstance(short_name, str)
+                or not isinstance(long_name, str)
+                or not isinstance(label_x, (int, float))
+                or not isinstance(label_y, (int, float))
+                or not isinstance(min_label, (int, float))
                 or not isinstance(label_rank, int)
+                or not short_name
+                or not long_name
+                or not all(math.isfinite(value) for value in (label_x, label_y, min_label))
+                or not -180 <= label_x <= 180
+                or not -90 <= label_y <= 90
+                or not 0 <= min_label <= 24
                 or not 1 <= label_rank <= 10
             ):
                 raise ValueError(f"Invalid Natural Earth label for {key}")
+            label_name = min((short_name, long_name), key=len)
+            label_point = [label_x, label_y]
             feature = {
                 "featureId": feature_id,
                 "sourceId": key,
-                "sourceAlpha2Code": source["ISO_A2_EH"]
-                if re.fullmatch(r"[A-Z]{2}", source["ISO_A2_EH"])
+                "sourceAlpha2Code": alpha2
+                if isinstance(alpha2, str) and re.fullmatch(r"[A-Z]{2}", alpha2)
                 else None,
-                "sourceNumericId": numeric if re.fullmatch(r"[0-9]{3}", numeric) else None,
+                "sourceNumericId": numeric
+                if isinstance(numeric, str) and re.fullmatch(r"[0-9]{3}", numeric)
+                else None,
                 "sourceName": name,
                 "point": representative_point(polygon),
                 "labelName": label_name,

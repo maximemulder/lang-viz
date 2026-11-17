@@ -349,7 +349,7 @@ Check the Python pipeline, browser tests, and app scripts from the repository ro
 
 ```sh
 uv run pyrefly check
-uv run ruff check pipeline app/tests/browser app/scripts
+uv run ruff check
 uv run pytest
 ```
 

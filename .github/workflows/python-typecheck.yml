@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
       - run: uv sync --dev
       - run: uv run pyrefly check
-      - run: uv run ruff check pipeline app/tests/browser app/scripts
+      - run: uv run ruff check
       - name: Build pinned tile-join
         run: |
           bash pipeline/atlas/fetch-sources.sh --tippecanoe-only

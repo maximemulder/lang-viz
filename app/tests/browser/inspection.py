@@ -80,7 +80,9 @@ def lifecycle(browser, output):
         )
         expect_highlight(browser, english)
         wait_for(
-            lambda: browser.js("return document.querySelector('.language-inspector')?.getBoundingClientRect().left") != before,
+            lambda before=before: browser.js(
+                "return document.querySelector('.language-inspector')?.getBoundingClientRect().left"
+            ) != before,
             10,
             "language hover popup follows pointer",
         )

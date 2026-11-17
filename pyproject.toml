@@ -23,6 +23,11 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+include = ["pipeline/**/*.py", "app/tests/browser/**/*.py", "app/scripts/**/*.py"]
+
+[tool.ruff.lint]
+# This workspace mount reports tracked 644 Python files as executable (777).
+ignore = ["EXE002"]
 
 [tool.pyrefly]
 python-version = "3.12"

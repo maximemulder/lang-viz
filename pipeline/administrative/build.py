@@ -29,11 +29,12 @@ def language_names(path: Path) -> dict[str, str]:
     languages = root.find("./localeDisplayNames/languages")
     if languages is None:
         raise ValueError("CLDR English names are missing")
-    return {
-        row.get("type"): row.text
-        for row in languages
-        if row.tag == "language" and row.get("type") and row.text and not row.get("alt")
-    }
+    names = {}
+    for row in languages:
+        code, name = row.get("type"), row.text
+        if row.tag == "language" and code and name and not row.get("alt"):
+            names[code] = name
+    return names
 
 
 def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin: dict) -> dict:
@@ -58,20 +59,23 @@ def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin:
     observations = []
     source_codes: set[str] = set()
     unsupported: Counter[str] = Counter()
+    by_territory: dict[str, Decimal] = defaultdict(Decimal)
     for item in info:
         code = item.get("type")
         if code is None or not re.fullmatch(r"[A-Z]{2}", code):
             raise ValueError(f"Invalid CLDR territory code: {code}")
-        values = {key: item.get(key) for key in ("population", "gdp", "literacyPercent")}
-        if any(value is None for value in values.values()):
+        population = item.get("population")
+        gdp = item.get("gdp")
+        literacy = item.get("literacyPercent")
+        if population is None or gdp is None or literacy is None:
             raise ValueError(f"Incomplete CLDR territory: {code}")
         territories.append(
             {
                 "code": code,
                 "unContainmentCodes": ";".join(numeric_parents.get(code, [])),
-                "population": values["population"],
-                "gdpUsd": values["gdp"],
-                "literacyPercent": values["literacyPercent"],
+                "population": population,
+                "gdpUsd": gdp,
+                "literacyPercent": literacy,
             }
         )
         for row in item.findall("languagePopulation"):
@@ -86,7 +90,7 @@ def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin:
             status = row.get("officialStatus") or "unspecified"
             if status != "unspecified" and status not in STATUSES:
                 raise ValueError(f"Unsupported CLDR official status: {status}")
-            count = round(Decimal(values["population"]) * Decimal(percent) / 100)
+            count = round(Decimal(population) * Decimal(percent) / 100)
             observations.append(
                 {
                     "territoryCode": code,
@@ -98,6 +102,7 @@ def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin:
                     "languageWritingPercent": row.get("writingPercent"),
                 }
             )
+            by_territory[code] += Decimal(percent)
             source_codes.add(language)
             if language not in known:
                 unsupported[language] += 1
@@ -129,9 +134,6 @@ def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin:
     glottocodes = {item["glottocode"] for item in associations if item["glottocode"] is not None}
     family_ids = {item["familyId"] for item in associations if item["familyId"]}
     families = [{"id": key, "name": family_names[key]} for key in sorted(family_ids)]
-    by_territory: dict[str, Decimal] = defaultdict(Decimal)
-    for row in observations:
-        by_territory[row["territoryCode"]] += Decimal(row["populationPercent"])
     coverage = {
         "observationCount": len(observations),
         "territoryCount": len(territories),
