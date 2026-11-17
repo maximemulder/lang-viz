@@ -45,7 +45,7 @@ const Details = ({
     return (
       <section className="administrative-detail" aria-label="Territory details">
         <p className="administrative-muted">
-          CLDR statistical area. This code is independent of any displayed polygon.
+          CLDR statistical region. This code is independent of any displayed polygon.
         </p>
         <dl className="administrative-facts">
           <div>
@@ -144,7 +144,7 @@ export const AdministrativeDetails = () => {
           onClose={() => select(null)}
         />
         <DetailsMapAction disabled={false} onFocus={() => focusShape(shape.featureId)} />
-        <p className="administrative-note">No CLDR data is linked to this area.</p>
+        <p className="administrative-note">No CLDR data is linked to this region.</p>
       </div>
     )
   }
@@ -270,7 +270,7 @@ export default function AdministrativePanel() {
             selected={session.searchKind}
             onSelect={setKind}
             tabs={[
-              { value: 'territory', label: 'Areas' },
+              { value: 'territory', label: 'Regions' },
               { value: 'language', label: 'Languages' },
               { value: 'family', label: 'Families' },
             ]}
@@ -352,7 +352,7 @@ export default function AdministrativePanel() {
               </p>
             </fieldset>
             <label className="administrative-search-field">
-              Find {session.searchKind === 'territory' ? 'an area' : `a ${session.searchKind}`}
+              Find {session.searchKind === 'territory' ? 'a region' : `a ${session.searchKind}`}
               <input
                 type="search"
                 value={session.query}
@@ -363,7 +363,7 @@ export default function AdministrativePanel() {
             <section className="administrative-results" aria-label="Search results">
               <p>
                 {number(results.length)}{' '}
-                {session.searchKind === 'territory' ? 'areas' : `${session.searchKind}s`}
+                {session.searchKind === 'territory' ? 'regions' : `${session.searchKind}s`}
                 {results.length > visibleResults.length
                   ? ` · first ${visibleResults.length} shown`
                   : ''}
@@ -396,11 +396,11 @@ export default function AdministrativePanel() {
               </p>
               <p>
                 The joined file’s original CLDR release and preprocessing are unverified. Its source
-                codes are independent of map borders; browser-localized area names are display
+                codes are independent of map borders; browser-localized region names are display
                 labels only.
               </p>
               <p>
-                Snapshot: {number(repository.data.manifest.coverage.territoryCount)} areas,{' '}
+                Snapshot: {number(repository.data.manifest.coverage.territoryCount)} regions,{' '}
                 {number(repository.data.manifest.coverage.observationCount)} observations. CLDR
                 release: {repository.data.manifest.cldrRelease ?? 'unknown'}.
               </p>

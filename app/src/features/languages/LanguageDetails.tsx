@@ -29,7 +29,7 @@ import {
   toggleLanguageDetailPlacementAtom,
 } from '../../state/languageControls'
 import { searchCoverageAtom } from '../../state/searchSelection'
-import { LanguageAreas } from '../administrative/LanguageAreas.tsx'
+import { LanguageRegions } from '../administrative/LanguageRegions.tsx'
 import { administrativeRepositoryAtom, selectAdministrativeAtom } from '../administrative/state.ts'
 import { LanguageFeatures } from '../wals/LanguageFeatures.tsx'
 import { GeometrySourceRecords } from './GeometrySourceRecords'
@@ -209,8 +209,8 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
             </p>
           )}
         </LanguageSummarySection>
-        <LanguageSummarySection section="areas">
-          <LanguageAreas
+        <LanguageSummarySection section="regions">
+          <LanguageRegions
             glottocode={detail?.classification.kind === 'glottolog' ? detail.id : null}
             sourceCode={sourceCode}
           />

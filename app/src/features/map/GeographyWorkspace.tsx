@@ -11,7 +11,7 @@ import { LanguageDetails } from '../languages/LanguageDetails.tsx'
 import { LanguageFinder, LanguageFinderFallback } from '../languages/LanguageFinder.tsx'
 import { WalsStandaloneInspection } from '../wals/LanguageFeatures.tsx'
 import { walsSessionAtom } from '../wals/state.ts'
-import { type AreaInteraction, WorldMap } from './WorldMap.tsx'
+import { type RegionInteraction, WorldMap } from './WorldMap.tsx'
 
 const AdministrativePanel = lazy(() => import('../administrative/AdministrativePanel.tsx'))
 const AdministrativeDetails = lazy(() =>
@@ -26,14 +26,14 @@ export default function GeographyWorkspace({
   administrative,
   mapAttribution,
   mapLayers,
-  areaInteraction,
+  regionInteraction,
   sidebarHeader,
 }: {
   readonly visible: boolean
   readonly administrative: boolean
   readonly mapAttribution: string
   readonly mapLayers?: ReactNode
-  readonly areaInteraction: AreaInteraction
+  readonly regionInteraction: RegionInteraction
   readonly sidebarHeader?: ReactNode
 }) {
   const maps = useMap()
@@ -63,7 +63,7 @@ export default function GeographyWorkspace({
     if (administrative) setAdministrativeVisited(true)
   }, [administrative])
   useEffect(() => {
-    if (administrative) setSummarySection('areas', true)
+    if (administrative) setSummarySection('regions', true)
   }, [administrative, setSummarySection])
   useEffect(() => {
     if (!visible) return
@@ -83,9 +83,9 @@ export default function GeographyWorkspace({
         <section
           ref={mapShell}
           className="map-shell"
-          aria-label={administrative ? 'Administrative areas map' : 'Language map'}
+          aria-label={administrative ? 'Administrative regions map' : 'Language map'}
         >
-          <WorldMap areaInteraction={areaInteraction} mapAttribution={mapAttribution}>
+          <WorldMap regionInteraction={regionInteraction} mapAttribution={mapAttribution}>
             {mapLayers}
           </WorldMap>
         </section>

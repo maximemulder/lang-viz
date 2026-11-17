@@ -72,7 +72,7 @@ Canonical example:
 
 The encoded fields are `workspace`, optional decimal word ID, `view` (`history`
 or `family`), optional concept ID, optional collection ID, and map mode
-(`language` or `area`). Map URLs use `workspace=map`; Areas adds `mode=area`.
+(`language` or `region`). Map URLs use `workspace=map`; Regions adds `mode=region`.
 Lexical navigation fields can be retained in map URLs. Links without an explicit
 workspace and with `#word=...&view=...` open etymology. Concept-only comparison
 links are also supported. Unset comparison IDs use deterministic defaults from

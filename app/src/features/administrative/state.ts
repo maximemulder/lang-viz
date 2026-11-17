@@ -62,7 +62,7 @@ export const administrativeSessionAtom = atom<AdministrativeSession>({
 
 /** Languages mode remembers its optional borders across mode switches. */
 export const languageBordersAtom = atom(false)
-export const hoveredAdministrativeAreaAtom = atom<string | null>(null)
+export const hoveredAdministrativeRegionAtom = atom<string | null>(null)
 export const boundaryIndexAtom = atom<BoundaryIndex | null>(null)
 
 export const setAdministrativeQueryAtom = atom(null, (get, set, query: string) =>

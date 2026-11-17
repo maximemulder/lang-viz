@@ -24,7 +24,7 @@ export const App = () => {
     if (connected && session.workspace === 'map') setMapVisited(true)
   }, [connected, session.workspace])
   const mapWorkspace = session.workspace === 'map'
-  const administrative = session.mapMode === 'area'
+  const administrative = session.mapMode === 'region'
   return (
     <MapProvider>
       <div className="app-shell">

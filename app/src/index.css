@@ -704,7 +704,7 @@ h2 {
 }
 
 .map-settings__toolbar,
-.map-area-controls {
+.map-region-controls {
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -712,7 +712,7 @@ h2 {
 
 .map-settings__toggle,
 .map-settings__panel,
-.map-area-controls__inspect {
+.map-region-controls__inspect {
   border: 1px solid rgb(29 43 39 / 12%);
   border-radius: 0.65rem;
   background: rgb(248 246 238 / 96%);
@@ -734,21 +734,21 @@ h2 {
 
 .map-settings__toggle:hover,
 .map-settings__toggle[aria-expanded="true"],
-.map-area-controls__inspect-button:hover {
+.map-region-controls__inspect-button:hover {
   background: var(--paper);
 }
 
-.map-area-controls__borders[aria-pressed="true"],
-.map-area-controls__inspect-button[aria-pressed="true"] {
+.map-region-controls__borders[aria-pressed="true"],
+.map-region-controls__inspect-button[aria-pressed="true"] {
   background: #dce9df;
   color: #214e3a;
 }
 
-.map-area-controls__borders:disabled {
+.map-region-controls__borders:disabled {
   cursor: default;
 }
 
-.map-area-controls__inspect {
+.map-region-controls__inspect {
   display: flex;
   height: 2.5rem;
   padding: 0;
@@ -756,7 +756,7 @@ h2 {
   overflow: hidden;
 }
 
-.map-area-controls__inspect-button {
+.map-region-controls__inspect-button {
   min-width: 3.35rem;
   padding: 0 0.5rem;
   border: 0;
@@ -768,7 +768,7 @@ h2 {
   cursor: pointer;
 }
 
-.map-area-controls__inspect-button + .map-area-controls__inspect-button {
+.map-region-controls__inspect-button + .map-region-controls__inspect-button {
   border-left: 1px solid rgb(29 43 39 / 12%);
 }
 

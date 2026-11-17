@@ -15,12 +15,12 @@ def main():
         assert browser.js("""
             const toggles = [...document.querySelectorAll('.finder-detail .language-summary-section .sidebar-section__toggle')];
             return toggles.map(toggle => [toggle.querySelector('.sidebar-pane__title').textContent.trim(), toggle.getAttribute('aria-expanded')]);
-        """) == [["Genealogy", "true"], ["Areas", "false"], ["Map", "false"], ["Features", "false"], ["Etymology", "false"]]
+        """) == [["Genealogy", "true"], ["Regions", "false"], ["Map", "false"], ["Features", "false"], ["Etymology", "false"]]
         assert not browser.js("return performance.getEntriesByType('resource').some(entry => entry.name.endsWith('/administrative/observations.json'))")
         browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
-        wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail .administrative-observations')"), 20, "lazy CLDR areas")
-        assert browser.js("return document.querySelectorAll('.finder-detail .language-cldr-areas__code').length >= 2")
-        browser.screenshot(output / "atlas-language-areas.png")
+        wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail .administrative-observations')"), 20, "lazy CLDR regions")
+        assert browser.js("return document.querySelectorAll('.finder-detail .language-cldr-regions__code').length >= 2")
+        browser.screenshot(output / "atlas-language-regions.png")
         browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
         browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(4) .sidebar-section__toggle').click()")
         browser.js("document.querySelector('.finder-detail__path button').click()")
@@ -97,7 +97,7 @@ def main():
             "details pane closes",
         )
 
-        browser.js("document.querySelector('.map-area-controls__inspect button:last-child').click()")
+        browser.js("document.querySelector('.map-region-controls__inspect button:last-child').click()")
         wait_for(
             lambda: browser.js("return !!document.querySelector('.administrative-results button')"),
             30,
@@ -125,7 +125,7 @@ def main():
                 action.getBoundingClientRect().top >= header.getBoundingClientRect().bottom &&
                 action.textContent.trim() === 'Focus on map';
         """)
-        browser.screenshot(output / "area-details.png")
+        browser.screenshot(output / "region-details.png")
         assert browser.js("return document.querySelector('.administrative-results').clientHeight >= 80")
 
         # CLDR language selection uses the same panel and atlas content.
@@ -140,17 +140,17 @@ def main():
                 sections[1].querySelector('.sidebar-section__toggle').getAttribute('aria-expanded') === 'true' &&
                 !!sections[1].querySelector('.administrative-observations') &&
                 !!sections[3].querySelector('.wals-panel');
-        """), "CLDR language uses atlas language panel with CLDR areas"
+        """), "CLDR language uses atlas language panel with CLDR regions"
         browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(5) .sidebar-section__toggle').click()")
         assert browser.js("return !!document.querySelector('.finder-detail .language-word-entries')")
         browser.screenshot(output / "administrative-language-details.png")
         browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
-        browser.js("document.querySelectorAll('.map-area-controls__inspect button')[0].click()")
-        browser.js("document.querySelectorAll('.map-area-controls__inspect button')[1].click()")
+        browser.js("document.querySelectorAll('.map-region-controls__inspect button')[0].click()")
+        browser.js("document.querySelectorAll('.map-region-controls__inspect button')[1].click()")
         wait_for(
             lambda: browser.js("return document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle')?.getAttribute('aria-expanded') === 'true'"),
             10,
-            "Areas reopens on entering the administrative view",
+            "Regions reopens on entering the administrative view",
         )
         browser.js("document.querySelector('#administrative-tab-language').click()")
         browser.js("""

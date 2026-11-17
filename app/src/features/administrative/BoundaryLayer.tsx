@@ -10,7 +10,7 @@ import {
   INSPECTION_LINE_OPACITY,
   INSPECTION_LINE_WIDTH,
 } from '../map/geometry/boundaryInspection.ts'
-import { AREA_LABEL_ZOOMS, AREA_POINT_LAYER, AREA_POLYGON_LAYER } from './boundaryLayers.ts'
+import { REGION_LABEL_ZOOMS, REGION_POINT_LAYER, REGION_POLYGON_LAYER } from './boundaryLayers.ts'
 import {
   type BoundaryIndex,
   loadBoundaryGeometry,
@@ -22,7 +22,7 @@ import {
   administrativeRepositoryAtom,
   administrativeSessionAtom,
   boundaryIndexAtom,
-  hoveredAdministrativeAreaAtom,
+  hoveredAdministrativeRegionAtom,
   languageBordersAtom,
 } from './state.ts'
 
@@ -32,7 +32,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   const languageBorders = useAtomValue(languageBordersAtom)
   const session = useAtomValue(administrativeSessionAtom)
   const repository = useAtomValue(administrativeRepositoryAtom)
-  const hovered = useAtomValue(hoveredAdministrativeAreaAtom)
+  const hovered = useAtomValue(hoveredAdministrativeRegionAtom)
   const request = useAtomValue(administrativeCameraRequestAtom)
   const intent = useAtomValue(mapCameraIntentAtom)
   const store = useStore()
@@ -42,8 +42,8 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   const [geometry, setGeometry] = useState<FeatureCollection | null>(null)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
-  const areaMode = administrative
-  const showGeometry = areaMode || languageBorders
+  const regionMode = administrative
+  const showGeometry = regionMode || languageBorders
   useEffect(() => {
     if (!showGeometry) return
     if (retry) setError('')
@@ -100,7 +100,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
 
   const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
   const selectedShape = session.selection?.kind === 'source-shape' ? session.selection.id : null
-  const hoveredFeatureId = areaMode ? hovered : null
+  const hoveredFeatureId = regionMode ? hovered : null
   const selectedFeatureIds = selectedShape
     ? [selectedShape]
     : (index?.associations.get(selectedCode ?? '')?.featureIds ?? [])
@@ -170,7 +170,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               'line-opacity': 0.78,
             }}
           />
-          {areaMode && hoveredFeatureId && (
+          {regionMode && hoveredFeatureId && (
             <Layer
               id="administrative-hover-outline"
               source="administrative-boundaries"
@@ -185,7 +185,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
-          {areaMode && selectedFeatureIds.length > 0 && (
+          {regionMode && selectedFeatureIds.length > 0 && (
             <Layer
               id="administrative-selection-outline"
               type="line"
@@ -199,9 +199,9 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
-          {areaMode && (
+          {regionMode && (
             <Layer
-              id={AREA_POLYGON_LAYER}
+              id={REGION_POLYGON_LAYER}
               type="fill"
               beforeId={LABEL_ANCHOR}
               paint={{ 'fill-color': '#000000', 'fill-opacity': 0 }}
@@ -209,10 +209,10 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           )}
         </Source>
       )}
-      {areaMode && index && (
+      {regionMode && index && (
         <Source id="administrative-points" type="geojson" data={index.points}>
           <Layer
-            id={AREA_POINT_LAYER}
+            id={REGION_POINT_LAYER}
             type="circle"
             beforeId={LABEL_ANCHOR}
             // A small invisible target keeps tiny source shapes inspectable.
@@ -223,9 +223,9 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           />
         </Source>
       )}
-      {areaMode && index && (
+      {regionMode && index && (
         <Source id="administrative-labels" type="geojson" data={index.labels}>
-          {AREA_LABEL_ZOOMS.map((zoom) => (
+          {REGION_LABEL_ZOOMS.map((zoom) => (
             <Layer
               key={zoom}
               id={`administrative-labels-${zoom}`}

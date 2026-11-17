@@ -5,7 +5,7 @@ import { languageOpacityAtom, overlapModeAtom, stripeThicknessAtom } from '../..
 import { BIOMES } from './biomes'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
 import { globeLandPath, mercatorLandPath } from './projectionIcons'
-import type { AreaInteraction } from './WorldMap.tsx'
+import type { RegionInteraction } from './WorldMap.tsx'
 
 export type ProjectionMode = 'globe' | 'mercator'
 
@@ -62,13 +62,13 @@ export const MapSettings = ({
   onProjectionChange,
   backgroundMode,
   onBackgroundChange,
-  areaInteraction,
+  regionInteraction,
 }: {
   readonly backgroundMode: BackgroundMode
   readonly onBackgroundChange: (mode: BackgroundMode) => void
   readonly projectionMode: ProjectionMode
   readonly onProjectionChange: (mode: ProjectionMode) => void
-  readonly areaInteraction: AreaInteraction
+  readonly regionInteraction: RegionInteraction
 }) => {
   const tooltipId = useId()
   const [open, setOpen] = useState(false)
@@ -123,22 +123,22 @@ export const MapSettings = ({
             />
           </svg>
         </button>
-        {areaInteraction && (
-          <div className="map-area-controls">
+        {regionInteraction && (
+          <div className="map-region-controls">
             <button
-              className="map-settings__toggle map-area-controls__borders"
+              className="map-settings__toggle map-region-controls__borders"
               type="button"
               aria-label="Administrative borders"
               title={
-                areaInteraction.enabled
-                  ? 'Borders are always shown in Areas'
-                  : areaInteraction.borders
+                regionInteraction.enabled
+                  ? 'Borders are always shown in Regions'
+                  : regionInteraction.borders
                     ? 'Hide borders'
                     : 'Show borders'
               }
-              aria-pressed={areaInteraction.borders}
-              disabled={areaInteraction.enabled}
-              onClick={() => areaInteraction.onBordersChange(!areaInteraction.borders)}
+              aria-pressed={regionInteraction.borders}
+              disabled={regionInteraction.enabled}
+              onClick={() => regionInteraction.onBordersChange(!regionInteraction.borders)}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path
@@ -155,27 +155,27 @@ export const MapSettings = ({
                 />
               </svg>
             </button>
-            <fieldset className="map-area-controls__inspect">
+            <fieldset className="map-region-controls__inspect">
               <legend className="visually-hidden">Inspect on map</legend>
               <button
-                className="map-area-controls__inspect-button"
+                className="map-region-controls__inspect-button"
                 type="button"
                 title="Inspect languages on map"
                 aria-label="Inspect languages on map"
-                aria-pressed={!areaInteraction.enabled}
-                onClick={() => areaInteraction.onHoverModeChange('language')}
+                aria-pressed={!regionInteraction.enabled}
+                onClick={() => regionInteraction.onHoverModeChange('language')}
               >
                 Languages
               </button>
               <button
-                className="map-area-controls__inspect-button"
+                className="map-region-controls__inspect-button"
                 type="button"
-                title="Inspect administrative areas on map"
-                aria-label="Inspect administrative areas on map"
-                aria-pressed={areaInteraction.enabled}
-                onClick={() => areaInteraction.onHoverModeChange('area')}
+                title="Inspect administrative regions on map"
+                aria-label="Inspect administrative regions on map"
+                aria-pressed={regionInteraction.enabled}
+                onClick={() => regionInteraction.onHoverModeChange('region')}
               >
-                Areas
+                Regions
               </button>
             </fieldset>
           </div>

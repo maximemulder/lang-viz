@@ -37,10 +37,10 @@ const configuredSession = () => {
 test('workspace round trips preserve all exploration settings and evidence', () => {
   const before = configuredSession()
   const map = reduceExplorerSession(before, { type: 'workspace', workspace: 'map' })
-  const areas = reduceExplorerSession(map, { type: 'map-mode', mode: 'area' })
-  const after = reduceExplorerSession(areas, { type: 'workspace', workspace: 'etymology' })
+  const regions = reduceExplorerSession(map, { type: 'map-mode', mode: 'region' })
+  const after = reduceExplorerSession(regions, { type: 'workspace', workspace: 'etymology' })
   assert.equal(after.workspace, before.workspace)
-  assert.equal(after.mapMode, 'area')
+  assert.equal(after.mapMode, 'region')
   assert.equal(after.trail, before.trail)
   assert.equal(after.comparison, before.comparison)
   assert.equal(after.search, before.search)

@@ -2,13 +2,13 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { lazy, Suspense } from 'react'
 import { ADMINISTRATIVE_ATTRIBUTION } from '../features/administrative/attribution.ts'
 import {
-  AREA_LABEL_LAYERS,
-  AREA_POINT_LAYER,
-  AREA_POLYGON_LAYER,
+  REGION_LABEL_LAYERS,
+  REGION_POINT_LAYER,
+  REGION_POLYGON_LAYER,
 } from '../features/administrative/boundaryLayers.ts'
 import {
   focusAdministrativeShapeAtom,
-  hoveredAdministrativeAreaAtom,
+  hoveredAdministrativeRegionAtom,
   languageBordersAtom,
   selectAdministrativeAtom,
 } from '../features/administrative/state.ts'
@@ -37,37 +37,37 @@ export default function GeographyExplorations({
   const wals = useAtomValue(walsSessionAtom).overlay
   const [languageBorders, setLanguageBorders] = useAtom(languageBordersAtom)
   const dispatch = useSetAtom(explorerActionAtom)
-  const setHoveredArea = useSetAtom(hoveredAdministrativeAreaAtom)
-  const selectArea = useSetAtom(selectAdministrativeAtom)
+  const setHoveredRegion = useSetAtom(hoveredAdministrativeRegionAtom)
+  const selectRegion = useSetAtom(selectAdministrativeAtom)
   const focusShape = useSetAtom(focusAdministrativeShapeAtom)
   return (
     <GeographyWorkspace
       visible={visible}
       administrative={administrative}
       mapAttribution={ADMINISTRATIVE_ATTRIBUTION}
-      areaInteraction={{
+      regionInteraction={{
         enabled: administrative,
         borders: administrative || languageBorders,
         onBordersChange: (borders) => {
-          setHoveredArea(null)
+          setHoveredRegion(null)
           setLanguageBorders(borders)
         },
         onHoverModeChange: (mode) => {
-          setHoveredArea(null)
+          setHoveredRegion(null)
           dispatch({ type: 'map-mode', mode })
         },
-        hitLayers: [...AREA_LABEL_LAYERS, AREA_POINT_LAYER, AREA_POLYGON_LAYER],
-        onHover: (area) => setHoveredArea(area?.featureId ?? null),
-        onSelect: (area) => {
-          if (area)
-            selectArea(
-              area.territoryCode
-                ? { kind: 'territory', id: area.territoryCode }
-                : { kind: 'source-shape', id: area.featureId },
+        hitLayers: [...REGION_LABEL_LAYERS, REGION_POINT_LAYER, REGION_POLYGON_LAYER],
+        onHover: (region) => setHoveredRegion(region?.featureId ?? null),
+        onSelect: (region) => {
+          if (region)
+            selectRegion(
+              region.territoryCode
+                ? { kind: 'territory', id: region.territoryCode }
+                : { kind: 'source-shape', id: region.featureId },
             )
         },
-        onFocus: (area) => {
-          focusShape(area.featureId)
+        onFocus: (region) => {
+          focusShape(region.featureId)
         },
       }}
       mapLayers={

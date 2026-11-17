@@ -33,7 +33,7 @@ observations.
 
 The five unassigned shapes are **Somaliland**, **Kosovo**, **Northern Cyprus**,
 **Indian Ocean Territories**, and **Siachen Glacier**. All source shapes retain borders,
-label positions, and representative points and can be inspected in Area mode.
+label positions, and representative points and can be inspected in Regions mode.
 They receive no metric fill.
 Somalia's `SO` observations are assigned only to the source's Somalia polygon;
 they are not copied to Somaliland. Kosovo's `XK` observations remain

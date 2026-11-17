@@ -27,41 +27,41 @@ the map camera. An explicit territory focus creates a request in the shared
 that request. Map mode changes keep the current map camera
 position.
 
-`AdministrativePanel.tsx` is loaded only when Areas mode is first opened.
+`AdministrativePanel.tsx` is loaded only when Regions mode is first opened.
 It then stays mounted across map mode switches, preserving search,
 selection, and scroll state. Its search covers source territory codes and
-browser-localized area names, source language names/codes, and Glottolog family
+browser-localized region names, source language names/codes, and Glottolog family
 names/IDs. Details use ranked per-row estimates rather than exclusive shares;
 the UI explains overlap and source lineage. The CLDR source is pinned to release 49.
 The panel has a local data failure and retry state. The map and language catalog
 have independent error boundaries so their failures do not hide this panel.
 
-Language details use the same panel in either map mode. Its Areas section loads
+Language details use the same panel in either map mode. Its Regions section loads
 CLDR observations when opened, and exact Glottocodes connect reviewed CLDR
 language codes to atlas records. Script variants remain separate. CLDR records
 without a reviewed Glottocode retain their source identity and cannot show atlas
 features or word histories.
 
-The header switches between Languages and Etymologies. The map's Languages / Areas
+The header switches between Languages and Etymologies. The map's Languages / Regions
 control switches both the sidebar and map picker, and the URL records the selected
 map mode. The map stays mounted across modes. The language sidebar is hidden,
 not unmounted, while the administrative panel is visible.
 
 `boundaryRepository.ts` loads the reviewed crosswalk, label positions, representative points, and
 main-polygon focus bounds (so overseas islands do not pull a mainland focus away)
-from the separate ADM-02 package when Areas mode is first selected.
-It fetches and validates the pinned GeoJSON when borders are visible or Areas mode is
+from the separate ADM-02 package when Regions mode is first selected.
+It fetches and validates the pinned GeoJSON when borders are visible or Regions mode is
 enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
-renders zoom-dependent area names, hover outlines, borders and eligible metric fills.
+renders zoom-dependent region names, hover outlines, borders and eligible metric fills.
 The map information control always carries boundary source credits and
 interpretation notes, including when the optional boundary sources are hidden.
 Loading and retry messages appear only while needed. Selection-specific viewpoint
 notes appear in the detail panel. Every full
 border uses the same paint, regardless of whether its association is
-viewpoint-sensitive or has no matched CLDR area.
-Every Natural Earth source shape is inspectable in Area mode. Shapes without a
+viewpoint-sensitive or has no matched CLDR region.
+Every Natural Earth source shape is inspectable in Regions mode. Shapes without a
 reviewed CLDR match open a source-shape sidebar with a no-data message and can
-still be focused. Unmatched CLDR areas remain searchable without a shape. Fetch failures
+still be focused. Unmatched CLDR regions remain searchable without a shape. Fetch failures
 stay within this optional layer and can be retried.
 
 The current boundary package contains only one Natural Earth view. The static
@@ -74,11 +74,11 @@ documented source view; it must never silently reassign CLDR observations.
 
 `GeographyExplorations` owns the optional layer and supplies a small generic
 interaction adapter to `WorldMap`. The map host chooses exactly one pointer
-picker at a time. Areas mode shows borders, uses a transparent polygon hit layer,
-and outlines the area under the pointer. Click opens sidebar details and double-click
+picker at a time. Regions mode shows borders, uses a transparent polygon hit layer,
+and outlines the region under the pointer. Click opens sidebar details and double-click
 also fits the shape on the map, following the same rule as Languages mode.
 Languages mode inspects language polygons;
 its border button optionally shows the administrative boundary network. The border
-button stays selected and disabled in Areas mode. The
-Languages / Areas control sits beside map settings, with Languages selected by
+button stays selected and disabled in Regions mode. The
+Languages / Regions control sits beside map settings, with Languages selected by
 default. Switching modes preserves the camera, searches, and selections.

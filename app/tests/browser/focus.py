@@ -183,7 +183,7 @@ def check_focus(browser, output):
     outlined(expected, selected=True)
     assert browser.js("return !!document.querySelector('.focused-map-entry[data-group-id]')")
     assert not aggregate['errors']
-    # Pointer activation follows the same inspect/then-focus sequence as Areas mode.
+    # Pointer activation follows the same inspect/then-focus sequence as Regions mode.
     browser.js('window.overlapTest.configure({languageIds:["stan1295","dutc1256"],center:[10,51],zoom:3})')
     ready()
     hit = browser.js('return window.overlapTest.inspect([10,51])')

@@ -94,12 +94,12 @@ test('empty, concept-only, and explicit Map links parse without dataset access',
     'etymology',
   )
   assert.equal(parseExplorerRoute('#workspace=map&word=69562&view=family').route.workspace, 'map')
-  assert.equal(parseExplorerRoute('#workspace=map&mode=area').route.mapMode, 'area')
+  assert.equal(parseExplorerRoute('#workspace=map&mode=region').route.mapMode, 'region')
 })
 
 test('canonical route round trips preserve workspace, map mode, root, view, concept, and collection', () => {
   for (const workspace of ['map', 'etymology'] as const) {
-    for (const mapMode of ['language', 'area'] as const) {
+    for (const mapMode of ['language', 'region'] as const) {
       for (const view of ['history', 'family'] as const) {
         for (const word of [null, '69562']) {
           const route: ExplorerRoute = {
@@ -201,22 +201,22 @@ test('map mode survives Etymologies and follows browser history', () => {
     store = createStore()
   const dispose = connectExplorerNavigation(store, browser)
   const send = (action: ExplorerAction) => store.set(explorerActionAtom, action)
-  send({ type: 'map-mode', mode: 'area' })
-  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
-  assert.match(browser.location.href, /workspace=map&mode=area/)
+  send({ type: 'map-mode', mode: 'region' })
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'region')
+  assert.match(browser.location.href, /workspace=map&mode=region/)
   send({ type: 'workspace', workspace: 'etymology' })
   send({ type: 'workspace', workspace: 'map' })
-  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'region')
   browser.back()
   assert.equal(store.get(explorerSessionAtom).workspace, 'etymology')
-  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'region')
   browser.back()
   assert.equal(store.get(explorerSessionAtom).workspace, 'map')
-  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'region')
   send({ type: 'map-mode', mode: 'language' })
   assert.equal(store.get(explorerSessionAtom).mapMode, 'language')
   browser.back()
-  assert.equal(store.get(explorerSessionAtom).mapMode, 'area')
+  assert.equal(store.get(explorerSessionAtom).mapMode, 'region')
   dispose()
 })
 
@@ -259,14 +259,14 @@ test('refreshing a Map URL keeps its mode and encoded lexical navigation', () =>
   const dispose = connectExplorerNavigation(store, browser)
   store.set(explorerActionAtom, { type: 'trace', id: '69562' })
   store.set(explorerActionAtom, { type: 'comparison', conceptId: '1001', collectionId: '1' })
-  store.set(explorerActionAtom, { type: 'map-mode', mode: 'area' })
+  store.set(explorerActionAtom, { type: 'map-mode', mode: 'region' })
   const route = sessionRoute(store.get(explorerSessionAtom))
   dispose()
   const reloaded = createStore(),
     nextBrowser = new MemoryBrowser(browser.location.href)
   const disconnect = connectExplorerNavigation(reloaded, nextBrowser)
   assert.deepEqual(sessionRoute(reloaded.get(explorerSessionAtom)), route)
-  assert.equal(reloaded.get(explorerSessionAtom).mapMode, 'area')
+  assert.equal(reloaded.get(explorerSessionAtom).mapMode, 'region')
   assert.equal(reloaded.get(explorerSessionAtom).overlay.enabled, false)
   disconnect()
 })

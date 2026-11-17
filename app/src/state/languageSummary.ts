@@ -1,11 +1,11 @@
 import { atom } from 'jotai'
 
-export type LanguageSummarySection = 'genealogy' | 'areas' | 'map' | 'features' | 'etymology'
+export type LanguageSummarySection = 'genealogy' | 'regions' | 'map' | 'features' | 'etymology'
 
 /** Disclosure preferences belong to the summary, not to an individual language. */
 export const languageSummarySectionsAtom = atom<Record<LanguageSummarySection, boolean>>({
   genealogy: true,
-  areas: false,
+  regions: false,
   map: false,
   features: false,
   etymology: false,

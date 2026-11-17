@@ -1,7 +1,7 @@
 import type { LanguageClassification } from './atlas.ts'
 
 export type Workspace = 'map' | 'etymology'
-export type MapMode = 'language' | 'area'
+export type MapMode = 'language' | 'region'
 export type WordView = 'history' | 'family'
 export interface TrailSpecification {
   readonly root: string | null

@@ -12,7 +12,7 @@ import {
 import './administrative.css'
 
 /** Exact Glottocode identity, after the CLDR source join has been validated. */
-export function LanguageAreas({
+export function LanguageRegions({
   glottocode,
   sourceCode,
 }: {
@@ -32,13 +32,13 @@ export function LanguageAreas({
   if (!repository)
     return loadState.status === 'error' ? (
       <div className="administrative-panel__status" role="alert">
-        <p>Area estimates could not be loaded. {loadState.message}</p>
+        <p>Region estimates could not be loaded. {loadState.message}</p>
         <button type="button" onClick={() => void load()}>
-          Retry area estimates
+          Retry region estimates
         </button>
       </div>
     ) : (
-      <p role="status">Loading CLDR area estimates…</p>
+      <p role="status">Loading CLDR region estimates…</p>
     )
 
   const codes = glottocode
@@ -48,9 +48,9 @@ export function LanguageAreas({
     : sourceCode && repository.languageByCode.has(sourceCode)
       ? [sourceCode]
       : []
-  if (!codes.length) return <p>No CLDR area estimates are linked to this language.</p>
+  if (!codes.length) return <p>No CLDR region estimates are linked to this language.</p>
   return (
-    <div className="language-cldr-areas">
+    <div className="language-cldr-regions">
       <p className="administrative-muted">
         CLDR territory estimates describe reported language use, not atlas speaker polygons. Script
         variants may overlap; their estimates are shown separately.
@@ -59,16 +59,18 @@ export function LanguageAreas({
         const detail = selectLanguage(repository, code)
         if (!detail) return null
         return (
-          <div key={code} className="language-cldr-areas__code">
+          <div key={code} className="language-cldr-regions__code">
             <ObservationList
               rows={detail.observations}
               heading={
-                codes.length > 1 ? `${detail.language.name} · ${code}` : `Reported areas · ${code}`
+                codes.length > 1
+                  ? `${detail.language.name} · ${code}`
+                  : `Reported regions · ${code}`
               }
               destination="territory"
               onSelect={(selection) => {
                 select(selection)
-                dispatch({ type: 'map-mode', mode: 'area' })
+                dispatch({ type: 'map-mode', mode: 'region' })
               }}
               names={names}
             />

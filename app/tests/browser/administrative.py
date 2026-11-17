@@ -82,10 +82,10 @@ def main():
         try:
             wait_for(lambda: js("return !!document.querySelector('.maplibregl-canvas')"), 45, "map")
             wait_for(lambda: js("return !!window.overlapTest"), 30, "map test bridge")
-            assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "false"
-            js("window.initialAreaControlLeft = document.querySelector('.map-area-controls__inspect').getBoundingClientRect().left")
-            assert js("return document.querySelector('.map-area-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
-            assert js("return document.querySelector('.map-area-controls__inspect button:last-child').getAttribute('aria-pressed')") == "false"
+            assert js("return document.querySelector('.map-region-controls__borders').getAttribute('aria-pressed')") == "false"
+            js("window.initialRegionControlLeft = document.querySelector('.map-region-controls__inspect').getBoundingClientRect().left")
+            assert js("return document.querySelector('.map-region-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
+            assert js("return document.querySelector('.map-region-controls__inspect button:last-child').getAttribute('aria-pressed')") == "false"
             assert not js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.geojson'))")
             wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Natural Earth 5.1.1')"), 20, "map information with borders off")
             js("window.adminAttributionText = document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim()")
@@ -102,7 +102,7 @@ window.fetch = (...args) => {
   }
   return window.administrativeFetch(...args);
 }""")
-            button("Areas", ".map-area-controls__inspect")
+            button("Regions", ".map-region-controls__inspect")
             wait_for(lambda: js("return !!document.querySelector('.administrative-panel__status[role=alert]')"), 30, "failed CLDR load")
             assert js("return window.savedAdministrativeMap === document.querySelector('.maplibregl-canvas')")
             button("Retry data load", ".administrative-panel__status")
@@ -111,14 +111,14 @@ window.fetch = (...args) => {
                 30,
                 "administrative data",
             )
-            assert "workspace=map&mode=area" in js("return location.hash")
+            assert "workspace=map&mode=region" in js("return location.hash")
             assert js("return document.querySelector('.geography-sidebar__language').hidden")
-            assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "true"
-            assert js("return document.querySelector('.map-area-controls__borders').disabled")
-            assert js("return document.querySelector('.map-area-controls__inspect').getBoundingClientRect().left === window.initialAreaControlLeft")
+            assert js("return document.querySelector('.map-region-controls__borders').getAttribute('aria-pressed')") == "true"
+            assert js("return document.querySelector('.map-region-controls__borders').disabled")
+            assert js("return document.querySelector('.map-region-controls__inspect').getBoundingClientRect().left === window.initialRegionControlLeft")
             assert js("return window.savedAdministrativeMap === document.querySelector('.maplibregl-canvas')")
             report["checks"].append("header and persistent map")
-            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Area names appear as you zoom in')"), 20, "administrative map information")
+            wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Region names appear as you zoom in')"), 20, "administrative map information")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             assert not js("return !!document.querySelector('.administrative-map-legend')")
             assert js("return !!document.querySelector('.maplibregl-ctrl-attrib-button')")
@@ -130,7 +130,7 @@ window.fetch = (...args) => {
             browser.screenshot(args.output / "map-information.png")
             js("document.querySelector('.maplibregl-ctrl-attrib-button').click()")
             assert not js("return document.querySelector('.maplibregl-ctrl-attrib').classList.contains('maplibregl-compact-show')")
-            assert js("return document.querySelector('.map-area-controls__inspect button:last-child').getAttribute('aria-pressed')") == "true"
+            assert js("return document.querySelector('.map-region-controls__inspect button:last-child').getAttribute('aria-pressed')") == "true"
             wait_for(lambda: js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.geojson'))"), 30, "boundary geometry")
             js("window.overlapTest.camera(arguments[0],1.35)", us_label)
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "world label zoom")
@@ -138,7 +138,7 @@ window.fetch = (...args) => {
             js("window.overlapTest.camera(arguments[0],2.5)", us_label)
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "country label zoom")
             wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-labels-2']).some(h=>h.properties.labelName==='United States')", us_label), 20, "United States label")
-            report["checks"].append("Area names appear at Natural Earth zoom thresholds")
+            report["checks"].append("Region names appear at Natural Earth zoom thresholds")
             js("window.overlapTest.camera([5.3,52.1],5)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Netherlands camera")
             wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-labels-2','administrative-labels-3','administrative-labels-4','administrative-labels-5']).some(h=>h.properties.labelName==='Netherlands')", nl_label), 20, "Netherlands label")
@@ -146,26 +146,26 @@ window.fetch = (...args) => {
             assert any(hit["properties"].get("territoryCode") == "NL" for hit in hits), hits
             assert js("return !!window.overlapTest.layerState('administrative-boundary-lines')")
             hover_geo([6.2, 53.1])
-            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == nl_feature and s['sourceLoaded'] else None), 20, "hovered area outline")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == nl_feature and s['sourceLoaded'] else None), 20, "hovered region outline")
             outline = js("return window.overlapTest.layerState('administrative-hover-outline')")
             assert (outline["color"], outline["width"], outline["opacity"]) == ("#111111", 3, 0.95)
             assert js("return Math.min(...[2,3,4,5,6,7].map(z=>window.overlapTest.layerState('administrative-labels-'+z).order)) > window.overlapTest.layerState('administrative-hover-outline').order")
             assert not js("return window.overlapTest.layerState('administrative-hover-halo')")
             assert not js("return !!document.querySelector('.maplibregl-popup')")
-            browser.screenshot(args.output / "area-hover.png")
-            report["checks"].append("Area mode shows borders and outlines hovered polygons")
+            browser.screenshot(args.output / "region-hover.png")
+            report["checks"].append("Regions mode shows borders and outlines hovered polygons")
             click_geo([6.2, 53.1])
-            wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'"), 15, "polygon area selection")
-            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-selection-outline')")) and nl_feature in s['filter'][-1][-1] else None), 10, "selected area outline")
+            wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'"), 15, "polygon region selection")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-selection-outline')")) and nl_feature in s['filter'][-1][-1] else None), 10, "selected region outline")
             hover_geo(be_point)
-            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == be_feature else None), 10, "second area hover")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == be_feature else None), 10, "second region hover")
             selected_outline = js("return window.overlapTest.layerState('administrative-selection-outline')")
             assert nl_feature in selected_outline['filter'][-1][-1]
             assert (selected_outline['color'], selected_outline['width'], selected_outline['opacity']) == ('#111111', 3, 0.95)
             assert selected_outline['order'] > js("return window.overlapTest.layerState('administrative-hover-outline').order")
             assert not js("return window.overlapTest.layerState('administrative-selection-halo')")
             assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-selection-outline').order")
-            report["checks"].append("selected and hovered areas keep separate outlines")
+            report["checks"].append("selected and hovered regions keep separate outlines")
             assert js("""
                 const details = document.querySelector('.geography-inspector');
                 const controls = document.querySelector('.administrative-panel');
@@ -173,21 +173,21 @@ window.fetch = (...args) => {
                     !controls.contains(document.querySelector('.administrative-detail')) &&
                     document.querySelector('.administrative-results').clientHeight >= 80;
             """)
-            report["checks"].append("polygon picker selects the CLDR area")
+            report["checks"].append("polygon picker selects the CLDR region")
             assert not js("return window.overlapTest.snapshot().moving")
             js("window.overlapTest.camera([5.3,52.1],4)")
-            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "area double-click setup")
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "region double-click setup")
             double_click_geo([6.2, 53.1])
-            wait_for(lambda: js("return window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "area double-click focus")
+            wait_for(lambda: js("return window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "region double-click focus")
             assert js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'")
-            report["checks"].append("area double-click fits shape and retains details")
+            report["checks"].append("region double-click fits shape and retains details")
             assert "Natural Earth 5.1.1" in js("return document.querySelector('.administrative-attribution').textContent")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             js("[...document.querySelectorAll('input[name=administrative-metric]')][1].click()")
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='NL'&&h.properties.metricValue>0)"), 15, "matched metric fill")
             assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-metric-fill').order")
-            report["checks"].append("Area borders and metric control")
+            report["checks"].append("Region borders and metric control")
 
             js("window.overlapTest.camera(arguments[0],4)", ly_point)
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Libya camera")
@@ -212,7 +212,7 @@ window.fetch = (...args) => {
             click_geo(somaliland_point)
             wait_for(lambda: js("return document.querySelector('.administrative-inspector-header')?.textContent.includes('Somaliland')"), 10, "Somaliland sidebar")
             wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-selection-outline')")) and 'country-SOL' in s['filter'][-1][-1] else None), 10, "Somaliland selected outline")
-            assert "No CLDR data is linked to this area" in js("return document.querySelector('.administrative-detail-scroll').textContent")
+            assert "No CLDR data is linked to this region" in js("return document.querySelector('.administrative-detail-scroll').textContent")
             assert not js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
             double_click_geo(somaliland_point)
             wait_for(lambda: js("return window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "Somaliland double-click focus")
@@ -221,12 +221,12 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Netherlands camera restored")
 
             type_query("XK")
-            wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='XK')"), 10, "unmatched area search")
+            wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='XK')"), 10, "unmatched region search")
             select_code("XK")
             assert js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
             assert "No matched polygon" in js("return document.querySelector('.administrative-detail-scroll').textContent")
             report["checks"].append("ambiguous territory remains searchable without a polygon")
-            button("Areas", ".administrative-search-kind")
+            button("Regions", ".administrative-search-kind")
 
             type_query("NL")
             wait_for(
@@ -265,35 +265,35 @@ window.fetch = (...args) => {
             assert "Family details" == js("return document.querySelector('.administrative-detail').getAttribute('aria-label')")
             report["checks"].append("language and family details")
 
-            button("Languages", ".map-area-controls__inspect")
+            button("Languages", ".map-region-controls__inspect")
             assert js("return document.querySelector('#language-tab-map').getAttribute('aria-selected')") == "true"
-            assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "false"
-            button("Areas", ".map-area-controls__inspect")
+            assert js("return document.querySelector('.map-region-controls__borders').getAttribute('aria-pressed')") == "false"
+            button("Regions", ".map-region-controls__inspect")
             assert js("return document.querySelector('.administrative-detail').getAttribute('aria-label')") == "Family details"
             assert js("return document.querySelector('.administrative-search-field input').value") == "Indo-European"
             assert js("return window.savedAdministrativeMap === document.querySelector('.maplibregl-canvas')")
-            assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "true"
-            assert js("return document.querySelector('.map-area-controls__borders').disabled")
+            assert js("return document.querySelector('.map-region-controls__borders').getAttribute('aria-pressed')") == "true"
+            assert js("return document.querySelector('.map-region-controls__borders').disabled")
             assert not js("return !!document.querySelector('.administrative-map-status')")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             assert js("return !!window.overlapTest.layerState('administrative-boundary-lines')")
             wait_for(
                 lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-polygon-hits']).length>0"),
                 10,
-                "area picker after mode return",
+                "region picker after mode return",
             )
             click_geo(nl_point)
             wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'"), 10, "visible marker selection")
-            report["checks"].append("marker and polygon remain selectable in Area mode")
-            js("document.querySelector('.map-area-controls__inspect button:first-of-type').click()")
-            assert js("return document.querySelector('.map-area-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
-            assert js("return document.querySelector('.map-area-controls__inspect button:last-child').getAttribute('aria-pressed')") == "false"
-            wait_for(lambda: js("return !window.overlapTest.layerState('administrative-polygon-hits') && !window.overlapTest.layerState('administrative-hover-outline')"), 10, "area layers removed in Language mode")
+            report["checks"].append("marker and polygon remain selectable in Regions mode")
+            js("document.querySelector('.map-region-controls__inspect button:first-of-type').click()")
+            assert js("return document.querySelector('.map-region-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
+            assert js("return document.querySelector('.map-region-controls__inspect button:last-child').getAttribute('aria-pressed')") == "false"
+            wait_for(lambda: js("return !window.overlapTest.layerState('administrative-polygon-hits') && !window.overlapTest.layerState('administrative-hover-outline')"), 10, "region layers removed in Language mode")
             report["checks"].append("segmented control switches back to language inspection")
             report["checks"].append("both sidebars and map survive view round trip")
             browser.screenshot(args.output / "administrative.png")
 
-            js("document.querySelector('.map-area-controls__inspect button:last-child').click()")
+            js("document.querySelector('.map-region-controls__inspect button:last-child').click()")
             js("window.overlapTest.camera([100,60],2.5)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Russia camera")
             wait_for(
@@ -318,32 +318,32 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return window.innerWidth <= 600"), 10, "narrow viewport")
             assert js("return [...document.querySelectorAll('.map-settings__toolbar button')].every(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth})")
             assert js("return !!document.querySelector('.administrative-results button')")
-            assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "true"
-            assert js("return document.querySelector('.map-area-controls__borders').disabled")
+            assert js("return document.querySelector('.map-region-controls__borders').getAttribute('aria-pressed')") == "true"
+            assert js("return document.querySelector('.map-region-controls__borders').disabled")
             assert js("return !!window.overlapTest.layerState('administrative-boundary-lines')")
             assert js("return !!window.overlapTest.layerState('administrative-polygon-hits')")
-            language = browser.call("POST", "/element", {"using": "css selector", "value": ".map-area-controls__inspect button:first-of-type"})["element-6066-11e4-a52e-4f735466cecf"]
+            language = browser.call("POST", "/element", {"using": "css selector", "value": ".map-region-controls__inspect button:first-of-type"})["element-6066-11e4-a52e-4f735466cecf"]
             browser.call("POST", f"/element/{language}/value", {"text": "\ue007"})
-            assert js("return document.querySelector('.map-area-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
+            assert js("return document.querySelector('.map-region-controls__inspect button:first-of-type').getAttribute('aria-pressed')") == "true"
             wait_for(lambda: js("return !window.overlapTest.layerState('administrative-polygon-hits')"), 10, "language mode polygon removal")
-            area = browser.call("POST", "/element", {"using": "css selector", "value": ".map-area-controls__inspect button:last-child"})["element-6066-11e4-a52e-4f735466cecf"]
-            browser.call("POST", f"/element/{area}/value", {"text": "\ue007"})
-            assert js("return document.querySelector('.map-area-controls__inspect button:last-child').getAttribute('aria-pressed')") == "true"
+            region = browser.call("POST", "/element", {"using": "css selector", "value": ".map-region-controls__inspect button:last-child"})["element-6066-11e4-a52e-4f735466cecf"]
+            browser.call("POST", f"/element/{region}/value", {"text": "\ue007"})
+            assert js("return document.querySelector('.map-region-controls__inspect button:last-child').getAttribute('aria-pressed')") == "true"
             report["checks"].append("narrow layout and keyboard map controls")
             for background in ("minimal", "biomes", "terrain", "satellite"):
                 js("document.querySelector('input[name=map-background][value='+arguments[0]+']').click()", background)
                 assert js("return document.querySelector('input[name=map-background][value='+arguments[0]+']').checked", background)
                 assert js("return !!window.overlapTest.layerState('administrative-polygon-hits')")
                 assert js("return !!window.overlapTest.layerState('administrative-boundary-lines')")
-            report["checks"].append("all backgrounds keep Area picking and borders")
-            js("document.querySelector('.map-area-controls__inspect button:first-of-type').click()")
+            report["checks"].append("all backgrounds keep region picking and borders")
+            js("document.querySelector('.map-region-controls__inspect button:first-of-type').click()")
             wait_for(lambda: js("return !window.overlapTest.layerState('administrative-polygon-hits')"), 10, "hidden administrative source")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             assert js("return document.querySelector('.maplibregl-ctrl-attrib-button').getBoundingClientRect().width > 0")
-            js("document.querySelector('.map-area-controls__borders').click()")
+            js("document.querySelector('.map-region-controls__borders').click()")
             wait_for(lambda: js("return !!window.overlapTest.layerState('administrative-boundary-lines')"), 15, "Geography borders on")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
-            js("document.querySelector('.map-area-controls__borders').click()")
+            js("document.querySelector('.map-region-controls__borders').click()")
             wait_for(lambda: js("return !window.overlapTest.layerState('administrative-boundary-lines')"), 10, "Geography borders off")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             report["checks"].append("map information stays folded and unchanged across Languages border states")

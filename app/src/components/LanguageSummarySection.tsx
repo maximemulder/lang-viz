@@ -9,7 +9,7 @@ import { SidebarSection } from './SidebarPane'
 
 const titles: Record<Section, string> = {
   genealogy: 'Genealogy',
-  areas: 'Areas',
+  regions: 'Regions',
   map: 'Map',
   features: 'Features',
   etymology: 'Etymology',
