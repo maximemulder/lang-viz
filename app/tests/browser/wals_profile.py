@@ -391,7 +391,7 @@ def production_checks(output):
 
         # Existing profile and lexical controls remain present and usable.
         assert browser.js(
-            "return !!document.querySelector('.finder-detail__path') && !!document.querySelector('.finder-detail__more') && !!document.querySelector('.finder-detail__reveal')"
+            "return !!document.querySelector('.finder-detail__path') && document.querySelectorAll('.finder-detail .language-summary-section').length === 5 && !!document.querySelector('.finder-detail__reveal')"
         )
         browser.call("POST", "/window/rect", {"width": 390, "height": 844})
         browser.js("document.querySelector('.wals-card[data-feature-id=\"87A\"]').scrollIntoView()")

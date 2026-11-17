@@ -22,7 +22,7 @@ function fail(reason: string): never {
 
 /** Validate all joins before publishing any data to the administrative view. */
 export function indexAdministrative(value: unknown): AdministrativeRepository {
-  if (!record(value) || value.schemaVersion !== 3 || !record(value.manifest)) fail('schema')
+  if (!record(value) || value.schemaVersion !== 4 || !record(value.manifest)) fail('schema')
   const { manifest } = value
   if (
     !code(manifest.sourceBranchCommit, /^[a-f0-9]{40}$/) ||
@@ -60,7 +60,6 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
     !Array.isArray(value.territories) ||
     !Array.isArray(value.observations) ||
     !Array.isArray(value.languageAssociations) ||
-    !Array.isArray(value.atlasAssociations) ||
     !Array.isArray(value.families)
   )
     fail('collections')
@@ -129,21 +128,6 @@ export function indexAdministrative(value: unknown): AdministrativeRepository {
     )
     if (typeof language.glottocode === 'string') glottocodes.add(language.glottocode)
   }
-  const atlasIds = new Set<string>()
-  for (const association of value.atlasAssociations) {
-    if (
-      !record(association) ||
-      !code(association.glottocode, /^[a-z]{4}[0-9]{4}$/) ||
-      !glottocodes.has(association.glottocode) ||
-      atlasIds.has(association.glottocode) ||
-      association.status !== 'unresolved' ||
-      association.matchMethod !== null ||
-      association.atlasLanguageId !== null
-    )
-      fail('atlas association')
-    atlasIds.add(association.glottocode)
-  }
-  if (atlasIds.size !== glottocodes.size) fail('missing atlas association')
   const familyById = new Map<string, { readonly id: string; readonly name: string }>()
   for (const family of value.families) {
     if (

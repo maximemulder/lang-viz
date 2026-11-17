@@ -30,7 +30,7 @@ import {
 import { mapCameraIntentAtom } from '../src/state/mapCameraIntent.ts'
 
 const fixture = () => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   manifest: {
     sourceBranchCommit: 'a'.repeat(40),
     cldrRelease: '49',
@@ -74,9 +74,6 @@ const fixture = () => ({
     longitude: null,
     glottologCountries: [],
   })),
-  atlasAssociations: [
-    { glottocode: 'test1234', status: 'unresolved', matchMethod: null, atlasLanguageId: null },
-  ],
   families: [{ id: 'fami1234', name: 'Example family' }],
   observations: [
     {
@@ -125,6 +122,26 @@ test('CLDR 49 release keeps Libya observations and unresolved language joins', (
   assert.equal(repository.languageByCode.get('ar')?.glottocode, null)
   assert.equal(repository.languageByCode.get('ar')?.name, 'Arabic')
   assert.equal(selectTerritory(repository, 'ZZ')?.observations.length, 0)
+})
+
+test('reviewed CLDR Glottocodes resolve to exact atlas identities', () => {
+  const repository = indexAdministrative(
+    JSON.parse(
+      readFileSync(new URL('../public/administrative/observations.json', import.meta.url), 'utf8'),
+    ),
+  )
+  const atlas = JSON.parse(
+    readFileSync(new URL('../public/data/languages.json', import.meta.url), 'utf8'),
+  ) as { id: string; classification: { kind: string; glottocode?: string } }[]
+  const atlasById = new Map(atlas.map((language) => [language.id, language]))
+  const matched = repository.data.languageAssociations.filter((language) => language.glottocode)
+  assert.equal(matched.length, 761)
+  assert.equal(repository.data.languageAssociations.length - matched.length, 37)
+  for (const language of matched) {
+    const target = atlasById.get(language.glottocode ?? '')
+    assert.equal(target?.classification.kind, 'glottolog')
+    assert.equal(target?.classification.glottocode, language.glottocode)
+  }
 })
 
 test('administrative selectors keep source rows, overlapping shares, and sums labeled as estimates', () => {
@@ -182,10 +199,6 @@ test('repository rejects broken joins, repeated rows, bad counts, and unsupporte
     },
     (data: ReturnType<typeof fixture>) => {
       data.manifest.coverage.observationCount = 4
-    },
-    (data: ReturnType<typeof fixture>) => {
-      const first = data.atlasAssociations[0]
-      if (first) first.glottocode = 'bad'
     },
     (data: ReturnType<typeof fixture>) => {
       const first = data.observations[0]

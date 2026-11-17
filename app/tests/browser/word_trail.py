@@ -115,6 +115,10 @@ def main():
                 identity,
             )
             wait_for(lambda: bool(text(".finder-detail")), 10, "language profile")
+            browser.js("""
+                const toggle = document.querySelector('.finder-detail .language-summary-section:nth-child(5) .sidebar-section__toggle');
+                if (toggle.getAttribute('aria-expanded') === 'false') toggle.click();
+            """)
 
         try:
             open_page("#workspace=map")
@@ -283,7 +287,11 @@ def main():
                 lambda: bool(text(".language-inspector--pinned")), 10, "pinned polygon inspector"
             )
             browser.js(
-                "document.querySelector('.geography-inspector [aria-label=\"Browse word entries for English\"]').click()"
+                """
+                const toggle = document.querySelector('.finder-detail .language-summary-section:nth-child(5) .sidebar-section__toggle');
+                if (toggle.getAttribute('aria-expanded') === 'false') toggle.click();
+                document.querySelector('.geography-inspector [aria-label="Browse word entries for English"]').click();
+                """
             )
             ready()
             assert "Browsing entries for English" in text(".word-notice")

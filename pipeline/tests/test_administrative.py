@@ -135,7 +135,7 @@ def test_official_cldr_release_preserves_missing_territories_and_unresolved_lang
         pytest.skip("Restore pinned CLDR and Glottolog sources")
     pin = json.loads(PIN.read_text())
     result = compile_release(CLDR, ENGLISH, SOURCE, CATALOG, pin)
-    assert result["schemaVersion"] == 3
+    assert result["schemaVersion"] == 4
     assert result["manifest"]["cldrRelease"] == "49"
     coverage = result["manifest"]["coverage"]
     assert (coverage["territoryCount"], coverage["observationCount"]) == (258, 1630)

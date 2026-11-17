@@ -177,7 +177,7 @@
   gap: 0.5rem;
   font-size: 0.72rem;
 }
-.administrative-panel .administrative-observation__top button,
+.administrative-observations .administrative-observation__top button,
 .administrative-link {
   padding: 0;
   border: 0;
@@ -185,6 +185,10 @@
   color: #245c53;
   text-align: left;
   text-decoration: underline;
+}
+.language-cldr-areas__code + .language-cldr-areas__code {
+  margin-top: 0.85rem;
+  border-top: 1px solid rgb(29 43 39 / 12%);
 }
 .administrative-observations__definition {
   margin: 0 0 0.35rem;

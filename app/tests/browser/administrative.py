@@ -197,6 +197,11 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='LY'"), 15, "Libya selection")
             assert "Arabic" in js("return document.querySelector('.administrative-detail').textContent")
             report["checks"].append("Libya has a polygon and CLDR 49 observations")
+            js("document.querySelector('.administrative-observation__top button').click()")
+            wait_for(lambda: js("return !!document.querySelector('.finder-detail')"), 10, "unmatched CLDR language")
+            assert "No reviewed Glottocode" in js("return document.querySelector('.finder-detail').textContent")
+            assert not js("return !!document.querySelector('.finder-detail .language-word-entries')")
+            report["checks"].append("unmatched CLDR language keeps its source identity")
 
             js("window.overlapTest.camera(arguments[0],4)", somaliland_point)
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Somaliland camera")
@@ -251,8 +256,12 @@ window.fetch = (...args) => {
                 "language search",
             )
             select_code("ku_Cyrl")
-            assert "Sum of estimates" in js("return document.querySelector('.administrative-detail').textContent")
-            button("Indo-European", ".administrative-detail")
+            assert js("return !!document.querySelector('.finder-detail .administrative-observations')")
+            assert js("return document.querySelectorAll('.finder-detail .language-summary-section').length === 5")
+            button("Families", ".administrative-search-kind")
+            type_query("Indo-European")
+            wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='indo1319')"), 10, "family search")
+            select_code("indo1319")
             assert "Family details" == js("return document.querySelector('.administrative-detail').getAttribute('aria-label')")
             report["checks"].append("language and family details")
 
@@ -261,7 +270,7 @@ window.fetch = (...args) => {
             assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "false"
             button("Areas", ".map-area-controls__inspect")
             assert js("return document.querySelector('.administrative-detail').getAttribute('aria-label')") == "Family details"
-            assert js("return document.querySelector('.administrative-search-field input').value") == "ku_Cyrl"
+            assert js("return document.querySelector('.administrative-search-field input').value") == "Indo-European"
             assert js("return window.savedAdministrativeMap === document.querySelector('.maplibregl-canvas')")
             assert js("return document.querySelector('.map-area-controls__borders').getAttribute('aria-pressed')") == "true"
             assert js("return document.querySelector('.map-area-controls__borders').disabled")

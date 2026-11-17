@@ -102,6 +102,7 @@ def check_focus(browser, output):
     old_camera = browser.snapshot()['camera']
     open_details(browser, expand=False)
     assert not browser.js("return !!document.querySelector('.finder-detail .details-map-action')")
+    browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(3) .sidebar-section__toggle').click()")
     assert 'No mapped area' in browser.js("return document.querySelector('.finder-detail').textContent")
     outlined([], selected=True)
     assert ready()['camera'] == old_camera

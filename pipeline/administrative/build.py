@@ -129,10 +129,6 @@ def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin:
     glottocodes = {item["glottocode"] for item in associations if item["glottocode"] is not None}
     family_ids = {item["familyId"] for item in associations if item["familyId"]}
     families = [{"id": key, "name": family_names[key]} for key in sorted(family_ids)]
-    atlas = [
-        {"glottocode": key, "status": "unresolved", "matchMethod": None, "atlasLanguageId": None}
-        for key in sorted(glottocodes)
-    ]
     by_territory: dict[str, Decimal] = defaultdict(Decimal)
     for row in observations:
         by_territory[row["territoryCode"]] += Decimal(row["populationPercent"])
@@ -152,7 +148,7 @@ def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin:
         ),
     }
     return {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "manifest": {
             "sourceBranchCommit": pin["sourceBranchCommit"],
             "cldrRelease": pin["cldrRelease"],
@@ -180,7 +176,6 @@ def compile_release(cldr: Path, english: Path, joined: Path, catalog: Path, pin:
         "observations": observations,
         "languageAssociations": associations,
         "families": families,
-        "atlasAssociations": atlas,
     }
 
 

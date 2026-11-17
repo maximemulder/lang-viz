@@ -5,8 +5,8 @@ its loader is called. It has no import from the atlas repository or boundary
 package. A missing or invalid supplement affects only its own load state; the
 atlas can load normally.
 
-`repository.ts` validates the schema version 3 release (and older version 2 fixtures), provenance fields, coverage counts,
-all foreign keys, and unique source territory/language pairs before indexing.
+`repository.ts` validates the schema version 4 release, provenance fields,
+coverage counts, all foreign keys, and unique source territory/language pairs before indexing.
 Concurrent loads share one request and failures may be retried. The supplement
 contains 258 territories, 798 source language codes, 57 named families and
 1,630 observations from pinned CLDR 49. `model.ts` retains source IDs and
@@ -32,10 +32,15 @@ It then stays mounted across map mode switches, preserving search,
 selection, and scroll state. Its search covers source territory codes and
 browser-localized area names, source language names/codes, and Glottolog family
 names/IDs. Details use ranked per-row estimates rather than exclusive shares;
-the UI explains overlap and source lineage. The CLDR source is pinned to release 49. The
-panel never calls atlas language-detail actions. It has a local data failure
-and retry state. The map and language catalog have independent error boundaries
-so their failures do not hide this panel.
+the UI explains overlap and source lineage. The CLDR source is pinned to release 49.
+The panel has a local data failure and retry state. The map and language catalog
+have independent error boundaries so their failures do not hide this panel.
+
+Language details use the same panel in either map mode. Its Areas section loads
+CLDR observations when opened, and exact Glottocodes connect reviewed CLDR
+language codes to atlas records. Script variants remain separate. CLDR records
+without a reviewed Glottocode retain their source identity and cannot show atlas
+features or word histories.
 
 The header switches between Languages and Etymologies. The map's Languages / Areas
 control switches both the sidebar and map picker, and the URL records the selected

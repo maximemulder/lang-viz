@@ -291,22 +291,19 @@ export const LanguageFeatures = ({ profileId }: { readonly profileId: string }) 
       aria-label="Language features from WALS"
       aria-busy={loading.status === 'loading'}
     >
-      <h4>How this language works</h4>
       {!repository ? (
-        <>
-          {loading.status === 'loading' ? (
-            <p role="status">Loading language features…</p>
-          ) : (
-            <>
-              {loading.status === 'error' && (
-                <p role="alert">Feature data could not be loaded. {loading.message}</p>
-              )}
-              <button type="button" onClick={() => load()}>
-                {loading.status === 'error' ? 'Retry WALS features' : 'Load WALS features'}
-              </button>
-            </>
-          )}
-        </>
+        loading.status === 'loading' ? (
+          <p role="status">Loading language features…</p>
+        ) : (
+          <>
+            {loading.status === 'error' && (
+              <p role="alert">Feature data could not be loaded. {loading.message}</p>
+            )}
+            <button type="button" onClick={() => load()}>
+              {loading.status === 'error' ? 'Retry WALS features' : 'Load WALS features'}
+            </button>
+          </>
+        )
       ) : !profile ? (
         <p role="status">Associating WALS with the complete atlas catalog…</p>
       ) : (

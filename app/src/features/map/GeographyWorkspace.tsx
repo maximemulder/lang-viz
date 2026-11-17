@@ -5,6 +5,7 @@ import { WorkspaceBoundary } from '../../components/WorkspaceBoundary.tsx'
 import { atlasDataAtom } from '../../state/atlasState.ts'
 import { explorerSessionAtom } from '../../state/explorerState.ts'
 import { languagePanelAtom } from '../../state/languageControls.ts'
+import { setLanguageSummarySectionAtom } from '../../state/languageSummary.ts'
 import { administrativeSessionAtom } from '../administrative/state.ts'
 import { LanguageDetails } from '../languages/LanguageDetails.tsx'
 import { LanguageFinder, LanguageFinderFallback } from '../languages/LanguageFinder.tsx'
@@ -38,6 +39,7 @@ export default function GeographyWorkspace({
   const maps = useMap()
   const mapShell = useRef<HTMLElement>(null)
   const retry = useSetAtom(atlasDataAtom)
+  const setSummarySection = useSetAtom(setLanguageSummarySectionAtom)
   const languagePanel = useAtomValue(languagePanelAtom)
   const administrativeSelection = useAtomValue(administrativeSessionAtom).selection
   const wals = useAtomValue(walsSessionAtom)
@@ -60,6 +62,9 @@ export default function GeographyWorkspace({
   useEffect(() => {
     if (administrative) setAdministrativeVisited(true)
   }, [administrative])
+  useEffect(() => {
+    if (administrative) setSummarySection('areas', true)
+  }, [administrative, setSummarySection])
   useEffect(() => {
     if (!visible) return
     const shell = mapShell.current
@@ -90,7 +95,13 @@ export default function GeographyWorkspace({
           className={`geography-inspector${coverLanguageControls ? ' geography-inspector--cover' : ''}${dockMapDetails ? ' geography-inspector--map-docked' : ''}`}
           aria-label="Details"
         >
-          {administrative ? (
+          {administrative && administrativeSelection?.kind === 'language' ? (
+            <WorkspaceBoundary name="language details" onRetry={retry}>
+              <Suspense fallback={<p className="workspace-loading">Loading details…</p>}>
+                <LanguageDetails sourceCode={administrativeSelection.id} />
+              </Suspense>
+            </WorkspaceBoundary>
+          ) : administrative ? (
             <Suspense fallback={<p className="workspace-loading">Loading details…</p>}>
               <AdministrativeDetails />
             </Suspense>

@@ -11,7 +11,24 @@ def main():
         assert not browser.js("return !!document.querySelector('.geography-inspector')")
 
         search(browser, "stan1293", "stan1293")
-        open_details(browser)
+        open_details(browser, expand=False)
+        assert browser.js("""
+            const toggles = [...document.querySelectorAll('.finder-detail .language-summary-section .sidebar-section__toggle')];
+            return toggles.map(toggle => [toggle.querySelector('.sidebar-pane__title').textContent.trim(), toggle.getAttribute('aria-expanded')]);
+        """) == [["Genealogy", "true"], ["Areas", "false"], ["Map", "false"], ["Features", "false"], ["Etymology", "false"]]
+        assert not browser.js("return performance.getEntriesByType('resource').some(entry => entry.name.endsWith('/administrative/observations.json'))")
+        browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
+        wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail .administrative-observations')"), 20, "lazy CLDR areas")
+        assert browser.js("return document.querySelectorAll('.finder-detail .language-cldr-areas__code').length >= 2")
+        browser.screenshot(output / "atlas-language-areas.png")
+        browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
+        browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(4) .sidebar-section__toggle').click()")
+        browser.js("document.querySelector('.finder-detail__path button').click()")
+        assert browser.js("""
+            return document.querySelector('.finder-detail .language-summary-section:nth-child(4) .sidebar-section__toggle').getAttribute('aria-expanded') === 'true' &&
+                document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').getAttribute('aria-expanded') === 'false';
+        """), "Language changes retain disclosure preferences"
+        open_details(browser, expand=False)
         assert browser.js("""
             const pane = document.querySelector('.geography-inspector');
             const details = document.querySelector('.finder-detail');
@@ -49,7 +66,7 @@ def main():
                 !document.querySelector('.finder-detail .detail-selection') &&
                 !document.querySelector('.finder-detail__context') &&
                 !document.querySelector('.finder-detail [aria-label="Change sources and period"]') &&
-                !document.querySelector('.finder-detail__more')?.textContent.includes('Geography for the next Add to map') &&
+                !document.querySelector('.finder-detail')?.textContent.includes('Geography for the next Add to map') &&
                 !document.querySelector('#focused-language-body').hidden;
         """)
 
@@ -111,28 +128,41 @@ def main():
         browser.screenshot(output / "area-details.png")
         assert browser.js("return document.querySelector('.administrative-results').clientHeight >= 80")
 
-        # Follow area -> language -> family and check that the same header updates its identity.
-        for label in ('language', 'family'):
-            title = browser.js("""
-                const button = arguments[0] === 'language'
-                    ? [...document.querySelectorAll('.administrative-observation__top button')]
-                        .find(button => button.querySelector('.administrative-code')?.textContent === 'ps')
-                    : document.querySelector('.administrative-detail .administrative-link');
-                const clone = button.cloneNode(true);
-                clone.querySelector('.administrative-code')?.remove();
-                button.click();
-                return clone.textContent.trim();
-            """, label)
-            wait_for(
-                lambda title=title: browser.js("""
-                    const header = document.querySelector('.administrative-inspector-header');
-                    return header?.querySelector('.details-header__title').textContent.trim() === arguments[0] &&
-                        !header.querySelector('.details-header__eyebrow') &&
-                        !header.querySelector('button[aria-expanded]');
-                """, title),
-                10,
-                f"{label} identity in shared header",
-            )
+        # CLDR language selection uses the same panel and atlas content.
+        browser.js("""
+            [...document.querySelectorAll('.administrative-observation__top button')]
+                .find(button => button.querySelector('.administrative-code')?.textContent === 'ps').click();
+        """)
+        wait_for(lambda: browser.js("return !!document.querySelector('.geography-inspector .finder-detail')"), 10, "shared language panel")
+        assert browser.js("""
+            const sections = [...document.querySelectorAll('.finder-detail .language-summary-section')];
+            return sections.length === 5 &&
+                sections[1].querySelector('.sidebar-section__toggle').getAttribute('aria-expanded') === 'true' &&
+                !!sections[1].querySelector('.administrative-observations') &&
+                !!sections[3].querySelector('.wals-panel');
+        """), "CLDR language uses atlas language panel with CLDR areas"
+        browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(5) .sidebar-section__toggle').click()")
+        assert browser.js("return !!document.querySelector('.finder-detail .language-word-entries')")
+        browser.screenshot(output / "administrative-language-details.png")
+        browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
+        browser.js("document.querySelectorAll('.map-area-controls__inspect button')[0].click()")
+        browser.js("document.querySelectorAll('.map-area-controls__inspect button')[1].click()")
+        wait_for(
+            lambda: browser.js("return document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle')?.getAttribute('aria-expanded') === 'true'"),
+            10,
+            "Areas reopens on entering the administrative view",
+        )
+        browser.js("document.querySelector('#administrative-tab-language').click()")
+        browser.js("""
+            const input = document.querySelector('.administrative-search-field input');
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'stan1293');
+            input.dispatchEvent(new Event('input', {bubbles:true}));
+        """)
+        wait_for(lambda: browser.js("return [...document.querySelectorAll('.administrative-results button')].some(button => button.querySelector('.administrative-code')?.textContent === 'en')"), 10, "English CLDR result")
+        browser.js("[...document.querySelectorAll('.administrative-results button')].find(button => button.querySelector('.administrative-code')?.textContent === 'en').click()")
+        wait_for(lambda: browser.js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'English' && !!document.querySelector('.finder-detail .wals-card')"), 30, "English atlas features from CLDR")
+        assert browser.js("return !!document.querySelector('.finder-detail .language-word-entries')")
+        browser.js("document.querySelector('#administrative-tab-territory').click()")
         browser.js("document.querySelector('.administrative-results button').click()")
         browser.js("document.querySelector('.administrative-inspector-header button').click()")
         wait_for(

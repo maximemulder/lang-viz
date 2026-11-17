@@ -222,7 +222,8 @@ def main():
             assert browser.js("""
                 return document.activeElement.dataset.languageId === 'abkh1242' &&
                     !document.querySelector('#language-panel-explore').hidden &&
-                    !document.querySelector('.finder-detail__more').open &&
+                    document.querySelector('.finder-detail .language-summary-section:first-child .sidebar-section__toggle').getAttribute('aria-expanded') === 'true' &&
+                    [...document.querySelectorAll('.finder-detail .language-summary-section:not(:first-child) .sidebar-section__toggle')].every(toggle => toggle.getAttribute('aria-expanded') === 'false') &&
                     document.querySelector('.language-row[data-language-id=abkh1242]').dataset.inspected === 'true';
             """), "Inspection keeps keyboard focus and starts compact"
             key("\ue015")  # Down: move to the first child while details stays open.

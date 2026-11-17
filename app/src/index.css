@@ -600,18 +600,10 @@ h2 {
 }
 .finder-detail__body {
   min-height: 0;
-  padding: 0 0.75rem 0.5rem;
+  padding: 0 0 0.5rem;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-}
-.finder-detail__more {
-  margin-top: 0.4rem;
-}
-.finder-detail__more > summary {
-  color: var(--ink);
-  font-size: 0.7rem;
-  cursor: pointer;
 }
 .finder-detail h4 {
   margin: 0.75rem 0 0.35rem;
@@ -625,9 +617,8 @@ h2 {
 }
 .finder-detail__path {
   display: flex;
-  overflow-x: auto;
-  white-space: nowrap;
-  gap: 0.15rem;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.3rem;
   margin: 0.35rem 0;
 }
 .finder-detail__path button,
@@ -1786,6 +1777,18 @@ h2 {
 /* Section body layouts must never override the collapsed state. */
 .sidebar-section > .sidebar-section__content[hidden] {
   display: none;
+}
+
+.language-summary-section {
+  border-bottom: 1px solid rgb(29 43 39 / 12%);
+}
+
+.language-summary-section > .sidebar-section__content {
+  padding: 0.25rem 0.8rem 0.8rem 1.3rem;
+}
+
+.language-summary-section > .sidebar-section__content > :last-child {
+  margin-bottom: 0;
 }
 
 .explore-search[data-expanded="true"] {

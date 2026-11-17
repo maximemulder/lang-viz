@@ -40,15 +40,8 @@ export interface LanguageAssociation {
   readonly glottologCountries: readonly string[]
 }
 
-export interface AtlasAssociation {
-  readonly glottocode: string
-  readonly status: 'unresolved'
-  readonly matchMethod: null
-  readonly atlasLanguageId: null
-}
-
 export interface AdministrativeSupplement {
-  readonly schemaVersion: 3
+  readonly schemaVersion: 4
   readonly manifest: {
     readonly sourceBranchCommit: string
     readonly cldrRelease: string | null
@@ -82,7 +75,6 @@ export interface AdministrativeSupplement {
   readonly observations: readonly Observation[]
   readonly languageAssociations: readonly LanguageAssociation[]
   readonly families: readonly { readonly id: string; readonly name: string }[]
-  readonly atlasAssociations: readonly AtlasAssociation[]
 }
 
 export interface AdministrativeRepository {

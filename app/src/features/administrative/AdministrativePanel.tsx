@@ -1,16 +1,15 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import { type CSSProperties, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { DetailsHeader } from '../../components/DetailsHeader.tsx'
 import { DetailsMapAction } from '../../components/DetailsMapAction.tsx'
 import { SidebarTabs } from '../../components/SidebarTabs.tsx'
-import type { AdministrativeRepository, Observation } from './model.ts'
+import type { AdministrativeRepository } from './model.ts'
+import { number, ObservationList, percent, regionLabel } from './ObservationList.tsx'
 import {
-  type ReportedObservation,
   searchFamilies,
   searchLanguages,
   searchTerritories,
   selectFamily,
-  selectLanguage,
   selectTerritory,
 } from './selectors.ts'
 import {
@@ -28,83 +27,6 @@ import {
   setAdministrativeSearchKindAtom,
 } from './state.ts'
 import './administrative.css'
-
-const number = (value: number) =>
-  new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)
-const percent = (value: string) =>
-  `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
-const statusLabel: Record<Observation['officialStatus'], string> = {
-  unspecified: '',
-  official: 'Official',
-  official_regional: 'Official regionally',
-  de_facto_official: 'De facto official',
-  official_minority: 'Official minority',
-}
-
-/** Display names are a browser-locale convenience; source territory codes remain visible. */
-const regionLabel = (code: string, names: Intl.DisplayNames): string => {
-  try {
-    return names.of(code) || code
-  } catch {
-    return code
-  }
-}
-
-const ObservationList = ({
-  rows,
-  heading,
-  destination,
-  onSelect,
-  names,
-}: {
-  readonly rows: readonly ReportedObservation[]
-  readonly heading: string
-  readonly destination: 'language' | 'territory'
-  readonly onSelect: (selection: AdministrativeSelection) => void
-  readonly names: Intl.DisplayNames
-}) => {
-  const max = Math.max(...rows.map((row) => row.estimatedSpeakers), 1)
-  return (
-    <section className="administrative-observations" aria-label={heading}>
-      <h4>{heading}</h4>
-      <p className="administrative-observations__definition">
-        Approximate functional speakers, including later-language speakers. Each count is derived
-        from territory population and the reported percentage; rows may overlap.
-      </p>
-      <ol>
-        {rows.map((row) => {
-          const id =
-            destination === 'language'
-              ? row.observation.sourceLanguageCode
-              : row.observation.territoryCode
-          const title = destination === 'language' ? row.language.name : regionLabel(id, names)
-          return (
-            <li key={`${row.observation.territoryCode}:${row.observation.sourceLanguageCode}`}>
-              <div className="administrative-observation__top">
-                <button type="button" onClick={() => onSelect({ kind: destination, id })}>
-                  {title} <span className="administrative-code">{id}</span>
-                </button>
-                <strong>{number(row.estimatedSpeakers)}</strong>
-              </div>
-              <div
-                className="administrative-observation__bar"
-                aria-hidden="true"
-                style={
-                  { '--bar-width': `${(row.estimatedSpeakers / max) * 100}%` } as CSSProperties
-                }
-              />
-              <p>
-                {percent(row.observation.populationPercent)} of reported territory population
-                {row.observation.officialStatus !== 'unspecified' &&
-                  ` · ${statusLabel[row.observation.officialStatus]}`}
-              </p>
-            </li>
-          )
-        })}
-      </ol>
-    </section>
-  )
-}
 
 const Details = ({
   repository,
@@ -155,63 +77,7 @@ const Details = ({
       </section>
     )
   }
-  if (selection.kind === 'language') {
-    const detail = selectLanguage(repository, selection.id)
-    if (!detail) return null
-    const { language } = detail
-    return (
-      <section className="administrative-detail" aria-label="Language details">
-        <p className="administrative-muted">
-          Source language code {language.sourceLanguageCode}
-          {language.glottocode
-            ? `; Glottolog ${language.glottocode}`
-            : '; no reviewed Glottolog match'}
-          . This association does not identify an atlas speaker polygon.
-        </p>
-        <dl className="administrative-facts">
-          <div>
-            <dt>Reported areas</dt>
-            <dd>{number(detail.observations.length)}</dd>
-          </div>
-          <div>
-            <dt>Sum of estimates</dt>
-            <dd>{number(detail.sumOfReportedEstimates)}</dd>
-          </div>
-          {language.iso6393 && (
-            <div>
-              <dt>ISO 639-3</dt>
-              <dd>{language.iso6393}</dd>
-            </div>
-          )}
-        </dl>
-        <p className="administrative-note">
-          This sum adds reported territory estimates. It is not a count of distinct people; script
-          variants and language categories can overlap.
-        </p>
-        {language.familyId && (
-          <p>
-            Glottolog family:{' '}
-            <button
-              className="administrative-link"
-              type="button"
-              onClick={() =>
-                language.familyId && onSelect({ kind: 'family', id: language.familyId })
-              }
-            >
-              {repository.familyById.get(language.familyId)?.name ?? language.familyId}
-            </button>
-          </p>
-        )}
-        <ObservationList
-          rows={detail.observations}
-          heading="Reported area estimates"
-          destination="territory"
-          onSelect={onSelect}
-          names={names}
-        />
-      </section>
-    )
-  }
+  if (selection.kind === 'language') return null
   const detail = selectFamily(repository, selection.id)
   if (!detail) return null
   return (
@@ -282,13 +148,11 @@ export const AdministrativeDetails = () => {
       </div>
     )
   }
-  if (!repository) return null
+  if (!repository || selection.kind === 'language') return null
   const title =
     selection.kind === 'territory'
       ? regionLabel(selection.id, names)
-      : selection.kind === 'language'
-        ? repository.languageByCode.get(selection.id)?.name
-        : repository.familyById.get(selection.id)?.name
+      : repository.familyById.get(selection.id)?.name
   if (!title) return null
   const canFocusMap = boundaryIndex?.associations.get(selection.id)?.status === 'matched'
   const boundaryAssociation =

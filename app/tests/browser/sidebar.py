@@ -30,7 +30,12 @@ def open_details(browser, *, expand=True):
     browser.js("document.querySelector('.language-row__identity').click()")
     wait_for(lambda: browser.js("return !!document.querySelector('.finder-detail')"), 10, "entry details")
     if expand:
-        browser.js("document.querySelector('.finder-detail__more').open = true")
+        browser.js("""
+            for (const section of document.querySelectorAll('.finder-detail .language-summary-section')) {
+                const toggle = section.querySelector('.sidebar-section__toggle');
+                if (toggle.getAttribute('aria-expanded') === 'false') toggle.click();
+            }
+        """)
 
 
 def search(browser, query, glottocode):
