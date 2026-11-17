@@ -53,7 +53,9 @@ export const languagePanelAtom = atom<{
 
 export const openLanguageDetailsAtom = atom(
   null,
-  (get, set, target: string | (LanguageMapTarget & { moveMap?: boolean })) => {
+  (get, set, target: string | LanguageMapTarget) => {
+    if (get(mapCameraIntentAtom) === get(languageMapNavigationAtom)) set(mapCameraIntentAtom, null)
+    set(languageMapNavigationAtom, null)
     const panel = get(languagePanelAtom)
     set(languagePanelAtom, {
       ...panel,
@@ -61,9 +63,6 @@ export const openLanguageDetailsAtom = atom(
       detailGroupId: typeof target === 'string' ? null : (target.groupId ?? null),
       detailEntryId: typeof target === 'string' ? null : (target.entryId ?? null),
     })
-    if (typeof target === 'string' || target.moveMap !== false) {
-      set(focusLanguageOnMapAtom, typeof target === 'string' ? { languageId: target } : target)
-    }
   },
 )
 

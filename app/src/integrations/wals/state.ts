@@ -82,7 +82,7 @@ export const inspectWalsObservationAtom = atom(
     set(mapCameraIntentAtom, null)
     set(languageMapNavigationAtom, null)
     if (association?.status === 'associated')
-      set(openLanguageDetailsAtom, { languageId: association.atlasId, moveMap: false })
+      set(openLanguageDetailsAtom, { languageId: association.atlasId })
     return true
   },
 )

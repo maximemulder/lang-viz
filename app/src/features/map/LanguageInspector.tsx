@@ -102,7 +102,6 @@ export const LanguageInspector = ({
                         openDetails({
                           languageId: language.id,
                           ...(area ? { entryId: area.id } : {}),
-                          moveMap: false,
                         })
                         onClose()
                       }}

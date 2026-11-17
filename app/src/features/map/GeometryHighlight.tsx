@@ -1,4 +1,4 @@
-import { Fragment, useLayoutEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { Layer } from 'react-map-gl/maplibre'
 import {
   INSPECTION_LINE_COLOR,
@@ -15,7 +15,6 @@ export const GeometryHighlight = ({
   source,
   groups,
   variants = [],
-  halo = false,
   fillOpacity = 0,
   visible = true,
 }: {
@@ -23,7 +22,6 @@ export const GeometryHighlight = ({
   readonly source: string
   readonly groups: readonly (readonly string[])[]
   readonly variants?: readonly string[]
-  readonly halo?: boolean
   readonly fillOpacity?: number
   readonly visible?: boolean
 }) => {
@@ -40,7 +38,7 @@ export const GeometryHighlight = ({
   const filter = boundaryFilter(groups)
   return (
     <>
-      {halo && fillOpacity > 0 && (
+      {fillOpacity > 0 && (
         <Layer
           id={`${layerId}-fill`}
           source={source}
@@ -54,36 +52,20 @@ export const GeometryHighlight = ({
         />
       )}
       {[BOUNDARY_LAYER, FALLBACK_BOUNDARY_LAYER].map((layer, index) => (
-        <Fragment key={layer}>
-          {halo && (
-            <Layer
-              id={`${layerId}${index ? '-fallback' : ''}-halo`}
-              source={source}
-              source-layer={layer}
-              type="line"
-              filter={filter}
-              paint={{
-                'line-color': '#fffdf7',
-                'line-width': 5,
-                'line-opacity': visible ? 0.95 : 0,
-                'line-opacity-transition': { duration: 0 },
-              }}
-            />
-          )}
-          <Layer
-            id={`${layerId}${index ? '-fallback' : ''}-outline`}
-            source={source}
-            source-layer={layer}
-            type="line"
-            filter={filter}
-            paint={{
-              'line-color': halo ? '#392a20' : INSPECTION_LINE_COLOR,
-              'line-width': halo ? 2.5 : INSPECTION_LINE_WIDTH,
-              'line-opacity': visible ? INSPECTION_LINE_OPACITY : 0,
-              'line-opacity-transition': { duration: 0 },
-            }}
-          />
-        </Fragment>
+        <Layer
+          key={layer}
+          id={`${layerId}${index ? '-fallback' : ''}-outline`}
+          source={source}
+          source-layer={layer}
+          type="line"
+          filter={filter}
+          paint={{
+            'line-color': INSPECTION_LINE_COLOR,
+            'line-width': INSPECTION_LINE_WIDTH,
+            'line-opacity': visible ? INSPECTION_LINE_OPACITY : 0,
+            'line-opacity-transition': { duration: 0 },
+          }}
+        />
       ))}
     </>
   )

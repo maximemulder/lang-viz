@@ -24,6 +24,8 @@ def main():
     crosswalk = json.loads((boundary_assets / "crosswalk.json").read_text())
     feature_index = json.loads((boundary_assets / "feature-index.json").read_text())
     nl_feature = next(item for item in crosswalk["territories"] if item["code"] == "NL")["featureIds"][0]
+    be_feature = next(item for item in crosswalk["territories"] if item["code"] == "BE")["featureIds"][0]
+    be_point = next(item for item in feature_index["features"] if item["featureId"] == be_feature)["point"]
     nl_point = next(item for item in feature_index["features"] if item["featureId"] == nl_feature)["point"]
     nl_label = next(item for item in feature_index["features"] if item["featureId"] == nl_feature)["labelPoint"]
     us_label = next(item for item in feature_index["features"] if item["featureId"] == "country-USA")["labelPoint"]
@@ -144,7 +146,7 @@ window.fetch = (...args) => {
             assert any(hit["properties"].get("territoryCode") == "NL" for hit in hits), hits
             assert js("return !!window.overlapTest.layerState('administrative-boundary-lines')")
             hover_geo([6.2, 53.1])
-            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and nl_feature in s['filter'][-1][-1] and s['sourceLoaded'] else None), 20, "hovered area outline")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == nl_feature and s['sourceLoaded'] else None), 20, "hovered area outline")
             outline = js("return window.overlapTest.layerState('administrative-hover-outline')")
             assert (outline["color"], outline["width"], outline["opacity"]) == ("#111111", 3, 0.95)
             assert js("return Math.min(...[2,3,4,5,6,7].map(z=>window.overlapTest.layerState('administrative-labels-'+z).order)) > window.overlapTest.layerState('administrative-hover-outline').order")
@@ -154,6 +156,16 @@ window.fetch = (...args) => {
             report["checks"].append("Area mode shows borders and outlines hovered polygons")
             click_geo([6.2, 53.1])
             wait_for(lambda: js("return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='NL'"), 15, "polygon area selection")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-selection-outline')")) and nl_feature in s['filter'][-1][-1] else None), 10, "selected area outline")
+            hover_geo(be_point)
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == be_feature else None), 10, "second area hover")
+            selected_outline = js("return window.overlapTest.layerState('administrative-selection-outline')")
+            assert nl_feature in selected_outline['filter'][-1][-1]
+            assert (selected_outline['color'], selected_outline['width'], selected_outline['opacity']) == ('#111111', 3, 0.95)
+            assert selected_outline['order'] > js("return window.overlapTest.layerState('administrative-hover-outline').order")
+            assert not js("return window.overlapTest.layerState('administrative-selection-halo')")
+            assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-selection-outline').order")
+            report["checks"].append("selected and hovered areas keep separate outlines")
             assert js("""
                 const details = document.querySelector('.geography-inspector');
                 const controls = document.querySelector('.administrative-panel');
@@ -194,6 +206,7 @@ window.fetch = (...args) => {
             assert not js("return !!document.querySelector('.maplibregl-popup')")
             click_geo(somaliland_point)
             wait_for(lambda: js("return document.querySelector('.administrative-inspector-header')?.textContent.includes('Somaliland')"), 10, "Somaliland sidebar")
+            wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-selection-outline')")) and 'country-SOL' in s['filter'][-1][-1] else None), 10, "Somaliland selected outline")
             assert "No CLDR data is linked to this area" in js("return document.querySelector('.administrative-detail-scroll').textContent")
             assert not js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
             double_click_geo(somaliland_point)

@@ -112,7 +112,7 @@ UI callers should use the validated actions in `integrations/wals/state.ts`:
 | Action | Contract |
 | --- | --- |
 | `selectWalsVarietyAtom` | Requires a ready association to the requested profile; saves that profile's source choice, clears its previously revealed feature when the variety changes, cancels pending camera intent, preserves overlay origin |
-| `inspectWalsObservationAtom` | Requires the exact source/feature observation; retains both IDs, saves an associated profile choice, opens that atlas profile with `moveMap: false`, cancels prior focus |
+| `inspectWalsObservationAtom` | Requires the exact source/feature observation; retains both IDs, saves an associated profile choice, opens that atlas profile without moving the map, cancels prior focus |
 | `showWalsExamplesAtom` | Requires an observation; establishes one visible source/feature specification, opens Languages mode and issues explicit camera intent |
 | `focusWalsExamplesAtom` | Issues fresh intent for the current visible specification; no-op without one |
 | `setWalsOverlayVisibilityAtom` | Changes visibility, cancels WALS focus without replaying it when shown again |

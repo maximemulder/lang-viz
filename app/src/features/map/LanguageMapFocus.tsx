@@ -2,6 +2,7 @@ import { useAtomValue, useStore } from 'jotai'
 import { useEffect } from 'react'
 import { useMap } from 'react-map-gl/maplibre'
 import { loadGeometryBounds } from '../../data/atlasRepository'
+import type { LanguageMapTarget } from '../../domain/languageFocus'
 import { combinedBounds, targetGeometry } from '../../domain/languageFocus'
 import {
   atlasDataAtom,
@@ -23,8 +24,18 @@ import { GeometryHighlight } from './GeometryHighlight'
 import { useGeometryDisplay } from './geometry/display'
 import { GeometryPreview } from './geometry/GeometryPreview'
 
-/** Independent tiles and paint keep previews out of selected coverage/cache identities. */
-export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActive: boolean }) => {
+/** Selection and transient sidebar preview resolve through the same geometry path. */
+const LanguageTargetOutline = ({
+  target,
+  id,
+  highlightStyle,
+  coordinateDisplay,
+}: {
+  readonly target: LanguageMapTarget
+  readonly id: string
+  readonly highlightStyle: 'selected' | 'hover'
+  readonly coordinateDisplay: boolean
+}) => {
   const data = useAtomValue(atlasDataAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
   const coverage = useAtomValue(searchCoverageAtom)
@@ -32,21 +43,6 @@ export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActiv
   const entries = useAtomValue(mapEntriesAtom)
   const selected = useAtomValue(selectedMapAreasAtom)
   const { state } = useGeometryDisplay()
-  const pointer = useAtomValue(languagePointerPreviewAtom)
-  const keyboard = useAtomValue(languageKeyboardPreviewAtom)
-  const panel = useAtomValue(languagePanelAtom)
-  const target =
-    pointer?.target ??
-    (mapInspectionActive
-      ? null
-      : (keyboard?.target ??
-        (panel.detailId
-          ? {
-              languageId: panel.detailId,
-              ...(panel.detailEntryId ? { entryId: panel.detailEntryId } : {}),
-              ...(panel.detailGroupId ? { groupId: panel.detailGroupId } : {}),
-            }
-          : null)))
   const variants = targetGeometry(target, data, availability, coverage, hierarchy, entries)
   const ids = [...new Set(variants.map(({ id }) => id))].sort()
   if (!ids.length) return null
@@ -73,15 +69,67 @@ export const LanguageMapPreview = ({ mapInspectionActive }: { mapInspectionActiv
     return (
       <GeometryHighlight
         key={state.source}
-        id="language-preview"
+        id={id}
         source={state.source}
         groups={[candidates.map((area) => area.id)]}
         variants={ids}
-        halo
       />
     )
   return (
-    <GeometryPreview key={JSON.stringify(ids)} ids={ids} fillOpacity={selected.length ? 0 : 0.12} />
+    <GeometryPreview
+      key={JSON.stringify(ids)}
+      id={id}
+      ids={ids}
+      fillOpacity={highlightStyle === 'selected' ? 0 : selected.length ? 0 : 0.12}
+      coordinateDisplay={coordinateDisplay}
+    />
+  )
+}
+
+export const LanguageMapPreview = ({
+  active,
+  mapInspectionActive,
+}: {
+  readonly active: boolean
+  readonly mapInspectionActive: boolean
+}) => {
+  const pointer = useAtomValue(languagePointerPreviewAtom)
+  const keyboard = useAtomValue(languageKeyboardPreviewAtom)
+  const panel = useAtomValue(languagePanelAtom)
+  if (!active) return null
+  const selectedTarget = panel.detailId
+    ? {
+        languageId: panel.detailId,
+        ...(panel.detailEntryId ? { entryId: panel.detailEntryId } : {}),
+        ...(panel.detailGroupId ? { groupId: panel.detailGroupId } : {}),
+      }
+    : null
+  const transientTarget = pointer?.target ?? (mapInspectionActive ? null : keyboard?.target)
+  const sameTarget =
+    transientTarget &&
+    selectedTarget &&
+    transientTarget.languageId === selectedTarget.languageId &&
+    transientTarget.entryId === selectedTarget.entryId &&
+    transientTarget.groupId === selectedTarget.groupId
+  return (
+    <>
+      {transientTarget && !sameTarget && (
+        <LanguageTargetOutline
+          target={transientTarget}
+          id="language-sidebar-preview"
+          highlightStyle="hover"
+          coordinateDisplay={!selectedTarget}
+        />
+      )}
+      {selectedTarget && (
+        <LanguageTargetOutline
+          target={selectedTarget}
+          id="language-selection"
+          highlightStyle="selected"
+          coordinateDisplay
+        />
+      )}
+    </>
   )
 }
 

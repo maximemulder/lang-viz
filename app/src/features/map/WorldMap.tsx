@@ -44,7 +44,6 @@ import {
 import {
   focusLanguageOnMapAtom,
   languageMapNavigationAtom,
-  languagePointerPreviewAtom,
   openLanguageDetailsAtom,
 } from '../../state/languageControls'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
@@ -231,7 +230,6 @@ export const WorldMap = ({
   const focusLanguage = useSetAtom(focusLanguageOnMapAtom)
   const [hoverInspection, setHoverInspection] = useState<MapInspection | null>(null)
   const hoverRef = useRef<MapInspection | null>(null)
-  const sidebarPointer = useAtomValue(languagePointerPreviewAtom)
   const navigation = useAtomValue(languageMapNavigationAtom)
   const setCameraIntent = useSetAtom(mapCameraIntentAtom)
   const lastNavigation = useRef(navigation)
@@ -412,7 +410,7 @@ export const WorldMap = ({
       areaInteraction.onSelect(hit.area)
       if (focus && hit.area) areaInteraction.onFocus(hit.area)
     } else if (hit.target) {
-      openDetails({ ...hit.target, moveMap: false })
+      openDetails(hit.target)
       updateInspection(null)
       if (focus) focusLanguage(hit.target)
     } else {
@@ -513,22 +511,21 @@ export const WorldMap = ({
           paint={{ 'background-opacity': 0 }}
         />
         <InspectionHighlight
-          variantIds={
-            sidebarPointer
-              ? NO_VARIANT_IDS
-              : (hoverInspection?.variantIds ?? inspection?.variantIds ?? NO_VARIANT_IDS)
-          }
+          variantIds={hoverInspection?.variantIds ?? inspection?.variantIds ?? NO_VARIANT_IDS}
         />
-        <LanguageMapPreview mapInspectionActive={Boolean(hoverInspection || inspection)} />
-        {hoverInspection &&
-          !sidebarPointer &&
-          hoverInspection.variantIds.every((id) => !areas.some((area) => area.id === id)) && (
-            <GeometryPreview
-              key={JSON.stringify(hoverInspection.variantIds)}
-              ids={hoverInspection.variantIds}
-              fillOpacity={0}
-            />
-          )}
+        {hoverInspection?.variantIds.every((id) => !areas.some((area) => area.id === id)) && (
+          <GeometryPreview
+            key={JSON.stringify(hoverInspection.variantIds)}
+            id="language-hover"
+            ids={hoverInspection.variantIds}
+            fillOpacity={0}
+            coordinateDisplay={false}
+          />
+        )}
+        <LanguageMapPreview
+          active={!areaMode}
+          mapInspectionActive={Boolean(hoverInspection || inspection)}
+        />
         <LanguageMapCamera />
       </Suspense>
       {children}

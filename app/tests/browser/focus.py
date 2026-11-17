@@ -11,8 +11,9 @@ def check_focus(browser, output):
     german = 'asher2007world:contemporary:stan1295'
     dutch = 'asher2007world:contemporary:dutc1256'
 
-    def highlight():
-        return browser.js('return window.overlapTest.sidebarHighlight()')
+    def highlight(selected=False):
+        method = 'selectionHighlight' if selected else 'sidebarHighlight'
+        return browser.js(f'return window.overlapTest.{method}()')
 
     def ready():
         return wait_for(lambda: (s if (s := browser.snapshot())['mapLoaded'] and s['tilesLoaded'] and not s['moving'] else None), 35, 'stationary map')
@@ -28,9 +29,9 @@ def check_focus(browser, output):
         browser.call('POST','/actions',{'actions':[{'type':'key','id':'sidebar-key','actions':[{'type':'keyDown','value':value},{'type':'keyUp','value':value}]}]})
         browser.call('DELETE','/actions')
 
-    def outlined(expected):
+    def outlined(expected, selected=False):
         field = 'variantIds'
-        state = wait_for(lambda: highlight() if sorted(highlight()[field]) == sorted(expected) else None, 20, 'sidebar outline '+str(expected))
+        state = wait_for(lambda: highlight(selected) if sorted(highlight(selected)[field]) == sorted(expected) else None, 20, 'selected outline ' if selected else 'sidebar outline '+str(expected))
         if expected:
             assert state['boundaryFeatures'] > 0, state
         return state
@@ -48,7 +49,7 @@ def check_focus(browser, output):
     move('#language-tab-explore')
     outlined([])
 
-    # Keyboard focus previews too, with no camera movement until Enter.
+    # Keyboard focus previews; Enter selects details without moving the camera.
     browser.js("document.querySelector('#language-panel-explore input[type=search]').focus()")
     for _ in range(6):
         key('\ue004')
@@ -58,26 +59,26 @@ def check_focus(browser, output):
     outlined([german])
     assert browser.snapshot()['camera'] == before['camera']
     key('\ue007')
-    wait_for(lambda: browser.snapshot()['camera'] != before['camera'], 15, 'profile camera movement')
+    outlined([german], selected=True)
     focused = ready()
-    assert 5 < focused['camera']['center'][0] < 16 and 45 < focused['camera']['center'][1] < 57
-    assert focused['camera']['zoom'] <= 6 and focused['selectedCount'] == 0
-    outlined([german])
-    assert browser.js("return document.activeElement.classList.contains('language-row')"), 'Camera movement does not steal keyboard focus'
-    assert browser.js("return performance.getEntriesByType('resource').some(e=>e.name.includes('geometry-bounds.json'))")
+    assert focused['camera'] == before['camera'] and focused['selectedCount'] == 0
+    assert browser.js("return document.activeElement.classList.contains('language-row')"), 'Selection does not steal keyboard focus'
+    assert not browser.js("return performance.getEntriesByType('resource').some(e=>e.name.includes('geometry-bounds.json'))")
     browser.js("document.querySelector('#language-panel-explore input[type=search]').focus()")
     search(browser, 'dutc1256', 'dutc1256')
     move('.language-row__identity')
     outlined([dutch])
+    outlined([german], selected=True)
     assert browser.snapshot()['camera'] == focused['camera']
     move('#language-tab-explore')
-    outlined([german])
+    outlined([], selected=False)
+    outlined([german], selected=True)
     assert browser.snapshot()['camera'] == focused['camera']
     browser.screenshot(output/'profile-focus.png')
     browser.js("document.querySelector('.language-row__identity').click()")
-    wait_for(lambda: browser.snapshot()['camera'] != focused['camera'], 15, 'next profile camera movement')
+    outlined([dutch], selected=True)
     ready()
-    outlined([dutch])
+    assert browser.snapshot()['camera'] == focused['camera']
 
     # The explicit map action refocuses the selected language.
     browser.js('window.overlapTest.camera([80,20],3)')
@@ -85,22 +86,22 @@ def check_focus(browser, output):
     browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
     wait_for(lambda: browser.snapshot()['camera'] != far, 15, 'language map action refocus')
     ready()
-    outlined([dutch])
-    # A second profile click interrupts an in-flight move to the previous profile.
+    outlined([dutch], selected=True)
+    # A new selection cancels an in-flight focus request.
     browser.js('window.overlapTest.camera([80,20],3)')
     ready()
     browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
     search(browser, 'stan1295', 'stan1295')
     browser.js("document.querySelector('.language-row__identity').click()")
-    wait_for(lambda: browser.snapshot()['camera']['center'][0] < 20 and not browser.snapshot()['moving'], 20, 'latest profile wins')
+    outlined([german], selected=True)
     ready()
-    outlined([german])
+    assert browser.snapshot()['camera']['center'][0] > 20
     search(browser, 'shan1293', 'shan1293')
     old_camera = browser.snapshot()['camera']
     open_details(browser, expand=False)
     assert browser.js("return document.querySelector('.finder-detail .details-map-action__button').disabled")
     assert 'No mapped area' in browser.js("return document.querySelector('.finder-detail').textContent")
-    outlined([])
+    outlined([], selected=True)
     assert ready()['camera'] == old_camera
 
     # Pinned comparisons preview their exact geography even when Explore has no areas.
@@ -120,10 +121,10 @@ def check_focus(browser, output):
     wait_for(lambda: browser.js("return !!document.querySelector('.focused-map-entry')"), 10, 'exact pinned profile')
     ready()
     move('#language-tab-map')
-    outlined([german])
+    outlined([german], selected=True)
     browser.js('window.overlapTest.reloadStyle()')
     ready()
-    outlined([german])
+    outlined([german], selected=True)
     browser.screenshot(output/'pinned-focus.png')
     view(browser, 'explore')
     browser.js("""
@@ -134,7 +135,7 @@ def check_focus(browser, output):
     browser.js("document.querySelector('.focused-map-entry button').click()")
     wait_for(lambda: browser.snapshot()['selectedCount'] == 0, 10, 'remove focused entry')
     assert browser.js("return document.querySelector('.finder-detail .details-map-action__button').disabled")
-    outlined([])
+    outlined([], selected=True)
     assert ready()['camera'] == before_remove
 
     # Whole branches preview and frame parent coverage plus every mapped descendant.
@@ -149,7 +150,7 @@ def check_focus(browser, output):
     assert len({e['group']['id'] for e in entries}) == 1
     aggregate = ready()
     expected = [variant for entry in entries for variant in entry['variantIds']]
-    outlined(expected)
+    outlined(expected, selected=True)
     browser.screenshot(output/'family-focus.png')
     # A group's profile uses pinned members even when the search year has no areas.
     browser.js("document.querySelector('.finder-options').open=true")
@@ -163,16 +164,19 @@ def check_focus(browser, output):
     browser.js('window.overlapTest.camera([80,20],3)')
     ready()
     browser.js("document.querySelector('.on-map-group__identity').click()")
+    ready()
+    assert browser.snapshot()['camera']['center'][0] > 70
+    browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
     wait_for(lambda: not browser.snapshot()['moving'] and browser.snapshot()['camera']['center'][0] < 50, 20, 'pinned group framing')
     ready()
     move('#language-tab-map')
     # The source loaded before this profile outline was added. Its overzoomed
     # tiles must retain real boundaries, not just the visible fill layer.
-    outlined(expected)
+    outlined(expected, selected=True)
     assert browser.js("return !!document.querySelector('.focused-map-entry[data-group-id]')")
     assert not aggregate['errors']
     # Pointer activation follows the same inspect/then-focus sequence as Areas mode.
-    browser.js('window.overlapTest.configure({languageIds:["stan1295"],center:[10,51],zoom:3})')
+    browser.js('window.overlapTest.configure({languageIds:["stan1295","dutc1256"],center:[10,51],zoom:3})')
     ready()
     hit = browser.js('return window.overlapTest.inspect([10,51])')
     assert german in hit['variantIds'], hit
@@ -185,7 +189,13 @@ def check_focus(browser, output):
         browser.call('POST','/actions',{'actions':[{'type':'pointer','id':'map-pointer','parameters':{'pointerType':'mouse'},'actions':actions}]})
     map_action()
     wait_for(lambda: browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')"), 10, 'map click language details')
+    outlined([german], selected=True)
     assert ready()['camera']['zoom'] == 3
+    x, y = browser.js('return window.overlapTest.inspect([5,52]).point')
+    browser.call('POST','/actions',{'actions':[{'type':'pointer','id':'map-pointer','parameters':{'pointerType':'mouse'},'actions':[{'type':'pointerMove','origin':'viewport','x':x,'y':y}]}]})
+    wait_for(lambda: dutch in browser.js('return window.overlapTest.inspectionHighlight().variantIds'), 10, 'hovered Dutch outline')
+    outlined([german], selected=True)
+    browser.screenshot(output/'selection-and-hover.png')
     map_action(double=True)
     wait_for(lambda: browser.snapshot()['camera']['zoom'] > 3.5, 15, 'map double-click language focus')
     assert browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')")

@@ -22,12 +22,13 @@ import { useGeometryDisplay } from './display'
 import { GeometryCoverageClient } from './geometryService'
 
 const PREVIEW_MEMBER = 'geometry-preview'
-const sourceId = (zoom: number, buffer: number) => `language-preview-${zoom}-${buffer}`
+const sourceId = (id: string, zoom: number, buffer: number) => `${id}-${zoom}-${buffer}`
 
 /** An absent representation is another consumer of the same composition/cache
  * service. Displayed representations use GeometryHighlight directly instead.
  */
 const PreviewLevel = ({
+  id,
   ids,
   zoom,
   tiles,
@@ -35,6 +36,7 @@ const PreviewLevel = ({
   fillOpacity,
   ready,
 }: {
+  readonly id: string
   readonly ids: readonly string[]
   readonly zoom: number
   readonly tiles: readonly TileCoordinate[]
@@ -63,14 +65,14 @@ const PreviewLevel = ({
       { snapshot: CoverageSnapshot; buffer: number; retired: boolean }
     >()
     const collect = () => {
-      for (const [id, item] of owned) {
+      for (const [snapshotId, item] of owned) {
         if (!item.retired) continue
-        const source = map.getSource(sourceId(zoom, item.buffer))?.serialize() as
+        const source = map.getSource(sourceId(id, zoom, item.buffer))?.serialize() as
           | VectorSourceSpecification
           | undefined
         if (source?.tiles?.[0] === item.snapshot.url) continue
         releaseCoverage(item.snapshot)
-        owned.delete(id)
+        owned.delete(snapshotId)
       }
     }
     const controller = createOverlapController({
@@ -90,13 +92,13 @@ const PreviewLevel = ({
           return { snapshot, pixels: 0 }
         },
         isReady: (snapshot, buffer) => {
-          const source = map.getSource(sourceId(zoom, buffer))?.serialize() as
+          const source = map.getSource(sourceId(id, zoom, buffer))?.serialize() as
             | VectorSourceSpecification
             | undefined
           return (
             !map.isMoving() &&
             source?.tiles?.[0] === snapshot.url &&
-            map.isSourceLoaded(sourceId(zoom, buffer))
+            map.isSourceLoaded(sourceId(id, zoom, buffer))
           )
         },
         release: (snapshot) => {
@@ -123,7 +125,7 @@ const PreviewLevel = ({
       map.off('styledata', collect)
       for (const item of owned.values()) releaseCoverage(item.snapshot)
     }
-  }, [map, data, archiveUrl, selectionKey, zoom, ready])
+  }, [map, data, archiveUrl, selectionKey, zoom, ready, id])
 
   useEffect(() => {
     tilesRef.current = tiles
@@ -150,19 +152,18 @@ const PreviewLevel = ({
         (snapshot, buffer) =>
           snapshot && (
             <Source
-              key={sourceId(zoom, buffer)}
-              id={sourceId(zoom, buffer)}
+              key={sourceId(id, zoom, buffer)}
+              id={sourceId(id, zoom, buffer)}
               type="vector"
               tiles={[snapshot.url]}
               minzoom={0}
               maxzoom={zoom}
             >
               <GeometryHighlight
-                id={sourceId(zoom, buffer)}
-                source={sourceId(zoom, buffer)}
+                id={sourceId(id, zoom, buffer)}
+                source={sourceId(id, zoom, buffer)}
                 groups={[[PREVIEW_MEMBER]]}
                 variants={ids}
-                halo
                 fillOpacity={fillOpacity}
                 visible={visible && state.activeBuffer === buffer}
               />
@@ -174,25 +175,29 @@ const PreviewLevel = ({
 }
 
 export const GeometryPreview = ({
+  id,
   ids,
   fillOpacity,
+  coordinateDisplay,
 }: {
+  readonly id: string
   readonly ids: readonly string[]
   readonly fillOpacity: number
+  readonly coordinateDisplay: boolean
 }) => {
   const { state, display } = useGeometryDisplay()
   const readiness = useRef(new Map<number, boolean>())
   const ready = useCallback(
     (zoom: number, value: boolean) => {
       readiness.current.set(zoom, value)
-      if (value) display.previewReady(zoom)
+      if (value && coordinateDisplay) display.previewReady(zoom)
     },
-    [display],
+    [display, coordinateDisplay],
   )
-  useLayoutEffect(
-    () => display.previewBarrier((zoom) => readiness.current.get(zoom) === true),
-    [display],
-  )
+  useLayoutEffect(() => {
+    if (coordinateDisplay)
+      return display.previewBarrier((zoom) => readiness.current.get(zoom) === true)
+  }, [display, coordinateDisplay])
   const levels = useMemo(() => {
     const levels = new Map<number, readonly TileCoordinate[]>()
     if (state.committedTiles.length) levels.set(state.zoom, state.committedTiles)
@@ -204,7 +209,8 @@ export const GeometryPreview = ({
     <>
       {levels.map(([zoom, tiles]) => (
         <PreviewLevel
-          key={zoom}
+          key={`${id}-${zoom}`}
+          id={id}
           ids={ids}
           zoom={zoom}
           tiles={tiles}

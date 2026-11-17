@@ -18,8 +18,7 @@ import { profileWalsCatalog } from '../fixtures/wals-profile.ts'
 
 const store = createStore()
 store.set(walsAtlasCatalogAtom, profileWalsCatalog())
-const open = (languageId: string) =>
-  store.set(openLanguageDetailsAtom, { languageId, moveMap: false })
+const open = (languageId: string) => store.set(openLanguageDetailsAtom, { languageId })
 open('atlas:irish')
 // Test-only controls exercise public application actions, never React internals.
 const Fixture = () => {

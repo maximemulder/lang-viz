@@ -57,6 +57,7 @@ export interface OverlapTestApi {
     filter: unknown
   }
   sidebarHighlight(): { variantIds: readonly string[]; boundaryFeatures: number }
+  selectionHighlight(): { variantIds: readonly string[]; boundaryFeatures: number }
   reloadStyle(): void
   setTileDelay(service: TileService, milliseconds: number): void
   watchGeometry(enabled: boolean): void

@@ -232,18 +232,20 @@ export const installOverlapTestApi = (
     styleReloading = false
   }
   map.on('idle', onIdle)
+  const outlineEvidence = (prefix: string) => {
+    const evidence = [...geometryDisplay(map).highlights.keys()]
+      .filter((id) => id === prefix || id.startsWith(`${prefix}-`))
+      .map((id) => highlightBoundaryEvidence(map, id))
+    return {
+      variantIds: [...new Set(evidence.flatMap((item) => item.variantIds))].sort(),
+      boundaryFeatures: evidence.reduce((sum, item) => sum + item.boundaryFeatures, 0),
+    }
+  }
   const api = {
     ...colorControls,
     probeInspection: (center: [number, number]) => probeInspection(map, center, selectionKey()),
-    sidebarHighlight: () => {
-      const evidence = [...geometryDisplay(map).highlights.keys()]
-        .filter((id) => id.startsWith('language-preview'))
-        .map((id) => highlightBoundaryEvidence(map, id))
-      return {
-        variantIds: [...new Set(evidence.flatMap((item) => item.variantIds))].sort(),
-        boundaryFeatures: evidence.reduce((sum, item) => sum + item.boundaryFeatures, 0),
-      }
-    },
+    sidebarHighlight: () => outlineEvidence('language-sidebar-preview'),
+    selectionHighlight: () => outlineEvidence('language-selection'),
     inspectionHighlight: () =>
       inspectionHighlightState(map, parseOverlapSelection(selectionKey()).variantIds),
     configure,

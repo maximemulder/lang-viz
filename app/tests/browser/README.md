@@ -163,9 +163,9 @@ checks use WebDriver pointer actions. The default builds and previews production
 `--dev` checks development serving, and `--skip-build` reuses the current build.
 
 `test:focus-browser` checks sidebar pointer and keyboard previews for unadded areas,
-no movement on hover, profile/Enter camera movement without stealing list focus,
-persistent outlines, temporary preview precedence, repeated name clicks and rapid
-profile switching. It verifies exact pinned sources despite incompatible search
+selection without camera movement, explicit focus and double-click framing,
+persistent selected outlines alongside hover, repeated name clicks and rapid
+selection changes. It verifies exact pinned sources despite incompatible search
 filters, unavailable geometry, style restoration, and multi-contributor family
 framing. Sidebar diagnostics read the dissolved outline tiles rather than raw contributor
 feature state. Geometry tests cover contained, adjacent and overlapping descendants,

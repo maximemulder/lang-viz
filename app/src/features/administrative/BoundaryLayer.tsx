@@ -101,11 +101,9 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
   const selectedShape = session.selection?.kind === 'source-shape' ? session.selection.id : null
   const hoveredFeatureId = areaMode ? hovered : null
-  const outlinedFeatureIds = hoveredFeatureId
-    ? [hoveredFeatureId]
-    : selectedShape
-      ? [selectedShape]
-      : (index?.associations.get(selectedCode ?? '')?.featureIds ?? [])
+  const selectedFeatureIds = selectedShape
+    ? [selectedShape]
+    : (index?.associations.get(selectedCode ?? '')?.featureIds ?? [])
   const values = useMemo(() => {
     const result: Record<string, number> = {}
     if (!repository || !session.metric || !index) return result
@@ -162,19 +160,6 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
-          {(selectedCode || selectedShape) && (
-            <Layer
-              id="administrative-selected-area"
-              type="fill"
-              beforeId={LABEL_ANCHOR}
-              filter={
-                selectedShape
-                  ? ['==', ['get', 'featureId'], selectedShape]
-                  : ['==', ['get', 'territoryCode'], selectedCode]
-              }
-              paint={{ 'fill-color': '#eca647', 'fill-opacity': 0.25 }}
-            />
-          )}
           <Layer
             id="administrative-boundary-lines"
             type="line"
@@ -185,13 +170,27 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               'line-opacity': 0.78,
             }}
           />
-          {areaMode && outlinedFeatureIds.length > 0 && (
+          {areaMode && hoveredFeatureId && (
             <Layer
               id="administrative-hover-outline"
               source="administrative-boundaries"
               type="line"
               beforeId={LABEL_ANCHOR}
-              filter={['in', ['get', 'featureId'], ['literal', outlinedFeatureIds]]}
+              filter={['==', ['get', 'featureId'], hoveredFeatureId]}
+              paint={{
+                'line-color': INSPECTION_LINE_COLOR,
+                'line-width': INSPECTION_LINE_WIDTH,
+                'line-opacity': INSPECTION_LINE_OPACITY,
+                'line-opacity-transition': { duration: 0 },
+              }}
+            />
+          )}
+          {areaMode && selectedFeatureIds.length > 0 && (
+            <Layer
+              id="administrative-selection-outline"
+              type="line"
+              beforeId={LABEL_ANCHOR}
+              filter={['in', ['get', 'featureId'], ['literal', selectedFeatureIds]]}
               paint={{
                 'line-color': INSPECTION_LINE_COLOR,
                 'line-width': INSPECTION_LINE_WIDTH,
