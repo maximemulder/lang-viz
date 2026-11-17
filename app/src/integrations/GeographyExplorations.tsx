@@ -47,7 +47,7 @@ export default function GeographyExplorations({
           setHoveredArea(null)
           setBoundary((current) => ({ ...current, hover }))
         },
-        hitLayers: boundary.borders ? [AREA_POINT_LAYER, AREA_POLYGON_LAYER] : [AREA_POINT_LAYER],
+        hitLayers: [AREA_POINT_LAYER, AREA_POLYGON_LAYER],
         onHover: (code, longitude, latitude) =>
           setHoveredArea(code ? { code, longitude, latitude } : null),
         onSelect: (code) => {

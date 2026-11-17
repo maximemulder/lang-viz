@@ -1,5 +1,10 @@
 import { Fragment, useLayoutEffect } from 'react'
 import { Layer } from 'react-map-gl/maplibre'
+import {
+  INSPECTION_LINE_COLOR,
+  INSPECTION_LINE_OPACITY,
+  INSPECTION_LINE_WIDTH,
+} from './geometry/boundaryInspection'
 import { useGeometryDisplay } from './geometry/display'
 import { BOUNDARY_LAYER, boundaryFilter, FALLBACK_BOUNDARY_LAYER } from './geometryBoundaries'
 import { COVERAGE_LAYER } from './overlap/delivery'
@@ -72,9 +77,9 @@ export const GeometryHighlight = ({
             type="line"
             filter={filter}
             paint={{
-              'line-color': halo ? '#392a20' : '#111111',
-              'line-width': halo ? 2.5 : 3,
-              'line-opacity': visible ? 0.95 : 0,
+              'line-color': halo ? '#392a20' : INSPECTION_LINE_COLOR,
+              'line-width': halo ? 2.5 : INSPECTION_LINE_WIDTH,
+              'line-opacity': visible ? INSPECTION_LINE_OPACITY : 0,
               'line-opacity-transition': { duration: 0 },
             }}
           />

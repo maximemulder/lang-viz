@@ -2,10 +2,13 @@ import type { ExpressionSpecification, Map as MapLibreMap } from 'maplibre-gl'
 import { BOUNDARY_LAYER, boundaryFilter, FALLBACK_BOUNDARY_LAYER } from '../geometryBoundaries.ts'
 
 export const inspectionLayerId = (source: string) => `language-inspection-${source}`
+export const INSPECTION_LINE_COLOR = '#111111'
+export const INSPECTION_LINE_WIDTH = 3
+export const INSPECTION_LINE_OPACITY = 0.95
 export const inspectionLineOpacity: ExpressionSpecification = [
   'case',
   ['boolean', ['feature-state', 'inspected'], false],
-  0.95,
+  INSPECTION_LINE_OPACITY,
   0,
 ]
 

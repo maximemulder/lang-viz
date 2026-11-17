@@ -42,6 +42,13 @@ export interface OverlapTestApi {
     layerId: string
     properties: Record<string, unknown>
   }[]
+  layerState(id: string): {
+    filter: unknown
+    sourceLoaded: boolean
+    color: unknown
+    width: unknown
+    opacity: unknown
+  } | null
   probeInspection(center: [number, number]): Promise<InspectionProbe>
   inspectionHighlight(): {
     variantIds: readonly string[]

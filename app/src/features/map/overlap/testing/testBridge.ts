@@ -283,6 +283,18 @@ export const installOverlapTestApi = (
         properties: feature.properties,
       }))
     },
+    layerState: (id: string) => {
+      const layer = map.getLayer(id)
+      return layer
+        ? {
+            filter: map.getFilter(id),
+            sourceLoaded: map.isSourceLoaded(layer.source),
+            color: layer.type === 'line' ? map.getPaintProperty(id, 'line-color') : null,
+            width: layer.type === 'line' ? map.getPaintProperty(id, 'line-width') : null,
+            opacity: layer.type === 'line' ? map.getPaintProperty(id, 'line-opacity') : null,
+          }
+        : null
+    },
     reloadStyle: () => {
       styleReloading = true
       map.setStyle(map.getStyle(), { diff: false })

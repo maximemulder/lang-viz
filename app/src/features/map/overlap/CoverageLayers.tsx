@@ -1,7 +1,12 @@
 import { Fragment, useMemo } from 'react'
 import { Layer, Source } from 'react-map-gl/maplibre'
 import type { GeometryVariant } from '../../../domain/atlas'
-import { inspectionLayerId, inspectionLineOpacity } from '../geometry/boundaryInspection'
+import {
+  INSPECTION_LINE_COLOR,
+  INSPECTION_LINE_WIDTH,
+  inspectionLayerId,
+  inspectionLineOpacity,
+} from '../geometry/boundaryInspection'
 import { BOUNDARY_ID, BOUNDARY_LAYER, FALLBACK_BOUNDARY_LAYER } from '../geometryBoundaries'
 import { blendedFace } from './blending'
 import type { HatchingState } from './controller'
@@ -190,8 +195,8 @@ export const CoverageLayers = ({
                     source-layer={layer}
                     type="line"
                     paint={{
-                      'line-color': '#111111',
-                      'line-width': 3,
+                      'line-color': INSPECTION_LINE_COLOR,
+                      'line-width': INSPECTION_LINE_WIDTH,
                       'line-opacity': inspectionLineOpacity,
                       'line-opacity-transition': { duration: 0 },
                     }}

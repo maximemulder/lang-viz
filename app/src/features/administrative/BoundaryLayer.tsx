@@ -3,6 +3,11 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai'
 import { useEffect, useMemo, useState } from 'react'
 import { Layer, Popup, Source, useMap } from 'react-map-gl/maplibre'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
+import {
+  INSPECTION_LINE_COLOR,
+  INSPECTION_LINE_OPACITY,
+  INSPECTION_LINE_WIDTH,
+} from '../map/geometry/boundaryInspection.ts'
 import { AREA_POINT_LAYER, AREA_POLYGON_LAYER } from './boundaryLayers.ts'
 import {
   type BoundaryIndex,
@@ -41,7 +46,9 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   const [geometry, setGeometry] = useState<FeatureCollection | null>(null)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
-  const showPoints = administrative || presentation.hover === 'area'
+  const areaMode = presentation.hover === 'area'
+  const showPoints = administrative || areaMode
+  const showGeometry = presentation.borders || areaMode
   useEffect(() => {
     if (!showPoints && !presentation.borders) return
     if (retry) setError('')
@@ -63,7 +70,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
     }
   }, [showPoints, presentation.borders, retry, publishIndex])
   useEffect(() => {
-    if (!presentation.borders || !index) return
+    if (!showGeometry || !index) return
     if (retry) setError('')
     let active = true
     void loadBoundaryGeometry(index)
@@ -80,7 +87,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
     return () => {
       active = false
     }
-  }, [presentation.borders, index, retry])
+  }, [showGeometry, index, retry])
   useEffect(() => {
     if (!request || intent !== request || !index) return
     const association = index.associations.get(request.territoryCode)
@@ -97,6 +104,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
   }, [request, intent, index, current, store])
 
   const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
+  const hoveredCode = areaMode ? hovered?.code : null
   const selectedAssociation = selectedCode ? index?.associations.get(selectedCode) : null
   const values = useMemo(() => {
     const result: Record<string, number> = {}
@@ -141,14 +149,14 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
 
   return (
     <>
-      {presentation.borders && filledGeometry && (
+      {showGeometry && filledGeometry && (
         <Source
           id="administrative-boundaries"
           type="geojson"
           data={filledGeometry}
           attribution="Administrative boundary view: Natural Earth 4.1.0 / world-atlas 2.0.2 (source viewpoint)"
         >
-          {session.metric && (
+          {presentation.borders && session.metric && (
             <Layer
               id="administrative-metric-fill"
               type="fill"
@@ -167,7 +175,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
-          {selectedCode && (
+          {presentation.borders && selectedCode && (
             <Layer
               id="administrative-selected-area"
               type="fill"
@@ -175,16 +183,32 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               paint={{ 'fill-color': '#eca647', 'fill-opacity': 0.25 }}
             />
           )}
-          <Layer
-            id="administrative-boundary-lines"
-            type="line"
-            paint={{
-              'line-color': '#566b66',
-              'line-width': 0.8,
-              'line-opacity': 0.78,
-            }}
-          />
-          {presentation.hover === 'area' && (
+          {presentation.borders && (
+            <Layer
+              id="administrative-boundary-lines"
+              type="line"
+              paint={{
+                'line-color': '#566b66',
+                'line-width': 0.8,
+                'line-opacity': 0.78,
+              }}
+            />
+          )}
+          {hoveredCode && (
+            <Layer
+              id="administrative-hover-outline"
+              source="administrative-boundaries"
+              type="line"
+              filter={['==', ['get', 'territoryCode'], hoveredCode]}
+              paint={{
+                'line-color': INSPECTION_LINE_COLOR,
+                'line-width': INSPECTION_LINE_WIDTH,
+                'line-opacity': INSPECTION_LINE_OPACITY,
+                'line-opacity-transition': { duration: 0 },
+              }}
+            />
+          )}
+          {areaMode && (
             <Layer
               id={AREA_POLYGON_LAYER}
               type="fill"
@@ -219,7 +243,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           />
         </Source>
       )}
-      {presentation.hover === 'area' && hovered && (
+      {areaMode && hovered && (
         <Popup
           longitude={hovered.longitude}
           latitude={hovered.latitude}
@@ -250,7 +274,10 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               )}
             </>
           ) : (
-            <span>Points identify source geometries, not speaker locations. Borders are off.</span>
+            <span>
+              Points identify source geometries, not speaker locations. Borders are off.
+              {areaMode && ' Hover an area to outline its boundary.'}
+            </span>
           )}
           {presentation.hover === 'language' && (
             <span>Choose Administrative area in Hover to inspect areas on the map.</span>

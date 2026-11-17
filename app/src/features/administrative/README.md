@@ -42,12 +42,14 @@ existing language sidebar is hidden, not unmounted, while the administrative
 panel is visible.
 
 `boundaryRepository.ts` loads the reviewed crosswalk and representative points
-from the separate ADM-02 package on first Administrative view or area hover.
-It fetches and decodes the pinned TopoJSON only when Borders is enabled. The
-boundary package never alters CLDR observations. `BoundaryLayer.tsx` renders
-markers, opt-in outlines and eligible metric fills, plus source and viewpoint
-notes. Every outline uses the same paint, regardless of whether its association
-is viewpoint-sensitive or has no matched CLDR area. Geometry selection and a
+from the separate ADM-02 package on first Administrative view or when Area mode
+is selected.
+It fetches and decodes the pinned TopoJSON when Borders or Area inspection is
+enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
+renders markers, hover outlines, optional full borders and eligible metric fills,
+plus source and viewpoint notes. Every full border uses the same paint, regardless
+of whether its association is viewpoint-sensitive or has no matched CLDR area.
+Geometry selection and a
 focus request require an explicit matched crosswalk entry; ambiguous or
 unmatched CLDR areas remain searchable without a shape. Fetch failures stay
 within this optional layer and can be retried.
@@ -62,8 +64,10 @@ documented source view; it must never silently reassign CLDR observations.
 
 `GeographyExplorations` owns the optional layer and supplies a small generic
 interaction adapter to `WorldMap`. The map host chooses exactly one pointer
-picker at a time. Borders off removes the polygon source and its hit layer;
-area mode can then pick only visible markers. The border icon and Language / Area
-segmented button sit beside map settings, with borders off and Language selected
-by default. The two top-left controls do not
-modify atlas language selections, filters, CLDR values, or the camera.
+picker at a time. Area mode uses a transparent polygon hit layer and outlines
+the area under the pointer, even with Borders off. Language mode continues to
+inspect language polygons. Borders off hides the full boundary network and metric
+fills. The border icon and Language / Area segmented button sit beside map
+settings, with borders off and Language selected by default. The two top-left
+controls do not modify atlas language selections, filters, CLDR values, or the
+camera.
