@@ -183,6 +183,20 @@ export class OverlapComputer {
   ): AsyncGenerator<CoverageTile> {
     const selected = new Set(request.variantIds)
     const prepared = await prepareBranchCoverage(request)
+    const preparedLoads = new Map<string, Promise<CoverageTile | null>>()
+    const prefetchPrepared = (start: number) => {
+      if (!prepared) return
+      for (let i = start; i < Math.min(start + 4, request.tiles.length); i++) {
+        const tile = request.tiles[i]
+        if (!tile) continue
+        const key = prepared(tile)
+        if (!key || this.results.has(key) || preparedLoads.has(key)) continue
+        const pending = loadPrecomputedTile(key, tile, metrics, signal, this.fetcher)
+        // Cancellation can leave a prefetched tile unconsumed by this request.
+        void pending.catch(() => {})
+        preparedLoads.set(key, pending)
+      }
+    }
     const partsSelectionKey = request.parts
       ? JSON.stringify([
           'parts',
@@ -194,19 +208,16 @@ export class OverlapComputer {
         ])
       : null
     let outputVertices = 0
-    for (const tile of request.tiles) {
+    for (const [index, tile] of request.tiles.entries()) {
       if (!isCurrent()) return
+      prefetchPrepared(index)
       const preparedKey = prepared?.(tile)
       if (preparedKey) {
         let result = this.results.get(preparedKey)
         if (!result) {
-          const decoded = await loadPrecomputedTile(
-            preparedKey,
-            tile,
-            metrics,
-            signal,
-            this.fetcher,
-          )
+          const decoded = await (preparedLoads.get(preparedKey) ??
+            loadPrecomputedTile(preparedKey, tile, metrics, signal, this.fetcher))
+          preparedLoads.delete(preparedKey)
           if (!isCurrent()) return
           if (decoded) {
             result = { features: decoded.features, vertices: decoded.vertices }

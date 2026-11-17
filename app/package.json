@@ -9,6 +9,7 @@
     "precompute:parts": "node scripts/precompute-parts.ts",
     "benchmark:parts": "node scripts/benchmark-parts.ts",
     "test:branch-browser": "npm run build && uv run python -m tests.browser.branches",
+    "test:default-map-browser": "npm run build && uv run python -m tests.browser.default_map",
     "test:parts-browser": "npm run build && uv run python -m tests.browser.parts",
     "test:browser": "uv run python -m tests.browser.run",
     "test:inspection-browser": "uv run python -m tests.browser.inspection",

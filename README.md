@@ -4,6 +4,8 @@ The browser application lives in `app/`. Geography explores the Glottolog,
 Glottography, and Digital Language Atlas of China catalogs and areas. Word histories
 searches DiACL forms, recorded relationships, and concept comparisons, with an
 optional focal-point overlay alongside pinned atlas areas.
+Geography initially shows the complete Asher Contemporary map; its polygons load
+for the visible tiles and can be cleared or compared with other sources.
 
 ## Run with published data
 

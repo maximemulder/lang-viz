@@ -36,6 +36,7 @@ import {
 import {
   atlasDataAtom,
   geographyDatasetFilterAtom,
+  initializeDefaultMapAtom,
   languageColorsAtom,
   mapEntriesAtom,
   overlapModeAtom,
@@ -234,6 +235,8 @@ export const WorldMap = ({
   readonly areaInteraction: AreaInteraction
 }) => {
   const data = useAtomValue(atlasDataAtom)
+  const initializeDefaultMap = useSetAtom(initializeDefaultMapAtom)
+  useEffect(() => initializeDefaultMap(), [initializeDefaultMap])
   const [isolatedId, setIsolatedId] = useAtom(isolatedLanguageIdAtom)
   const matches = useAtomValue(walsAreaMatchesAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)

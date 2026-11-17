@@ -29,6 +29,7 @@ Run from `app/`:
 
 ```sh
 npm run test:browser
+npm run test:default-map-browser
 npm run test:browser -- --scenario britain-small
 npm run test:browser -- --runs 3 --output test-results/baseline
 npm run test:browser -- --headed --hardware

@@ -32,6 +32,10 @@ qualifications remain visible in Details and map popups.
 
 ## Working selection and groups
 
+The first Geography visit pins the complete Asher Contemporary branch view as
+ordinary groups. It initializes once per session after the catalog is ready;
+Clear map and later comparisons use the same entries and controls.
+
 Explore checkboxes use `searchSelectionAtom`, independently of map entries. The
 `searchCoverageAtom` and `searchColoringAtom` configure the next Add to map.
 `addSearchSelectionToMapAtom` builds groups from all checked identities, skips and

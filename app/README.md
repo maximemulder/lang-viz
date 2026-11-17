@@ -37,6 +37,12 @@ Semantic genealogy palettes are enabled by default. See the
 [color infrastructure](src/domain/COLORS.md) for programmatic custom colors,
 subtree anchors, comparison roots, categorical mode, and rendering behavior.
 
+On the first Geography visit, the map shows all available Asher Contemporary
+areas. The catalog loads together, while prepared polygons are fetched for the
+visible map tiles. These areas appear as ordinary pinned groups in **On map**:
+Clear map removes them for the rest of the session, and changing source or
+period filters does not alter areas already on the map.
+
 ## WALS profile features
 
 Open a language profile in Geography, then choose **Load WALS features**. Data loads

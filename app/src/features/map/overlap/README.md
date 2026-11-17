@@ -113,6 +113,9 @@ preserving the existing precision and resource policy.
 
 Exact full branch tiles remain the first choice. Reusable parts handle partial
 branches, independently selected entries and aggregates from one dataset/period.
+The first Geography view pins the complete Asher Contemporary branch, so its
+prepared tiles start in a four-request window to keep initial coverage within
+the normal interactive deadline.
 Mixed selections, unprepared zooms and missing/malformed optional assets fall back
 live. Shared geometry boundaries, fallback clipping, inspection, render modes,
 cancellation and output/pattern/publication limits still apply. Prepared parts

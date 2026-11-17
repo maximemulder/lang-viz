@@ -550,10 +550,12 @@ def browser_session(output, *, dev=False, options=None, out_dir=None):
         yield browser, origin
 
 
-def open_atlas(browser, origin, *, terrain=False, timeout=45):
+def open_atlas(browser, origin, *, terrain=False, timeout=45, preserve_default=False):
     url = origin + "/?overlap-test=1" + ("" if terrain else "&overlap-basemap=off")
     browser.call("POST", "/url", {"url": url})
     wait_for(lambda: browser.js("return !!window.overlapTest"), timeout, "application")
+    if not preserve_default:
+        browser.js("window.overlapTest.configure({languageIds:[],center:[12,18],zoom:1.35})")
 
 
 def main():

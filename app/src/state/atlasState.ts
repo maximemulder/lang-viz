@@ -34,7 +34,13 @@ import {
   replaceSubtreeMapEntries,
   resolveMapEntries,
 } from '../domain/mapEntries'
-import { type GroupColoring, groupMapEntries, type MapGroup, mapGroupId } from '../domain/mapGroups'
+import {
+  buildMapGroupEntries,
+  type GroupColoring,
+  groupMapEntries,
+  type MapGroup,
+  mapGroupId,
+} from '../domain/mapGroups'
 import { selectGlobalColorProfile } from '../domain/preparedColors'
 
 export const atlasDataAtom = atomWithRefresh(async () => loadAtlasData())
@@ -45,6 +51,35 @@ export const finderScopeAtom = atom<'world' | 'viewport'>('world')
 export const temporalViewAtom = atom<TemporalViewSelection>('contemporary')
 export const viewportLanguageIdsAtom = atom<readonly LanguageId[]>([])
 export const mapEntriesAtom = atom<readonly MapEntry[]>([])
+const defaultMapInitializedAtom = atom(false)
+/** Populate the first map with the complete default source, once per session. */
+export const initializeDefaultMapAtom = atom(null, (get, set) => {
+  if (get(defaultMapInitializedAtom)) return
+  const data = get(resolvedAtlasDataAtom)
+  if (!data) return
+  set(defaultMapInitializedAtom, true)
+  const sources = get(geographyDatasetFilterAtom)
+  if (
+    get(mapEntriesAtom).length ||
+    get(temporalViewAtom) !== 'contemporary' ||
+    sources === 'all' ||
+    sources.length !== 1 ||
+    sources[0] !== 'asher2007world'
+  )
+    return
+  set(
+    mapEntriesAtom,
+    buildMapGroupEntries(
+      get(languageHierarchyAtom).roots.map(({ id }) => id),
+      get(languageHierarchyAtom),
+      get(geographyAvailabilityAtom),
+      get(geographyContextAtom),
+      'branch',
+      'hierarchy',
+      get(colorTopologyAtom),
+    ),
+  )
+})
 /** Languoid identities for genealogy/presentation, never map-entry identities. */
 export const visibleLanguageIdsAtom = selectAtom(
   atom((get) => [...new Set(get(mapEntriesAtom).map(({ languageId }) => languageId))]),
