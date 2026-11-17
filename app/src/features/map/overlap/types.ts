@@ -72,6 +72,12 @@ export interface OverlapMetrics {
 export type OverlapResponse =
   | {
       readonly requestId: number
+      /** An optional prepared tile failed; the worker is trying parts or live geometry. */
+      readonly preparedUnavailable: true
+      readonly durationMs: number
+    }
+  | {
+      readonly requestId: number
       readonly tile: DeliveryTile
       readonly durationMs: number
     }

@@ -22,6 +22,7 @@ def main():
         state = browser.settled(60, fail_on_error=True)
         check_state(state, require_stripes=True)
         assert state["reports"][-1]["metrics"].get("precomputedTiles", 0) > 0
+        assert state["reports"][-1]["publications"] == 1
         browser.screenshot(output / "asher-contemporary.png")
 
         view(browser, "map")

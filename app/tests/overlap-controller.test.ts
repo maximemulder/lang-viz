@@ -10,6 +10,7 @@ import {
 import type { DeliveryTile } from '../src/features/map/overlap/delivery.ts'
 import { MAX_COVERAGE_VERTICES } from '../src/features/map/overlap/limits.ts'
 import { OverlapPatternError } from '../src/features/map/overlap/patterns.ts'
+import { branchCoverageSignature } from '../src/features/map/overlap/precomputed.ts'
 import type { StripeTextureWorker } from '../src/features/map/overlap/stripeTextureClient.ts'
 import {
   createStripeTextureJobs,
@@ -30,7 +31,7 @@ const tile = (x: number, features = 1): DeliveryTile => ({
   vertices: features * 5,
   patterns: features ? [{ pattern: 'overlap:A|B', variantIds: ['A', 'B'] }] : [],
 })
-const fixture = (nativeFallback = false) => {
+const fixture = (nativeFallback = false, precomputed?: OverlapRequest['precomputed']) => {
   let state = idleHatchingState()
   let coverage: string | null = null
   const sent: OverlapRequest[] = []
@@ -73,8 +74,9 @@ const fixture = (nativeFallback = false) => {
       restarts: 0,
     },
     resources,
-    archiveUrl: 'archive',
+    archiveUrl: 'https://atlas.test/data/archive.pmtiles',
     sourceLayer: 'areas',
+    ...(precomputed ? { precomputed } : {}),
     onChange: (next) => {
       state = next
     },
@@ -655,4 +657,45 @@ test('initial fallback and composition share a committed native scope, including
   f.finish()
   f.publish()
   assert.equal(required(f.state.snapshots[required(f.state.activeBuffer)]).maxzoom, 5)
+})
+
+test('an exact prepared first view publishes once; other selections keep early fallback', async (context) => {
+  const signature = required(await branchCoverageSignature({ variantIds: ['A', 'B'] }))
+  const precomputed = { directory: 'prepared/', maxZoom: 2, signatures: [signature] }
+  const f = fixture(true, precomputed)
+  context.after(() => f.controller.dispose())
+  f.controller.refresh([coordinate(0), coordinate(1)])
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(f.registered.size, 0, 'prepared coverage waits instead of staging fallback')
+  f.receive(tile(0))
+  await new Promise((resolve) => setTimeout(resolve, 280))
+  assert.equal(f.registered.size, 0, 'a prepared prefix cannot cause a second publication')
+  f.receive(tile(1))
+  f.finish()
+  assert.equal(f.registered.size, 1)
+  assert.ok([...required(f.registered.values().next().value).values()].every((t) => !t.fallback))
+  f.publish()
+  assert.equal(f.state.status, 'ready')
+
+  const other = fixture(true, precomputed)
+  context.after(() => other.controller.dispose())
+  other.controller.configure('["A"]', true)
+  other.controller.refresh([coordinate(0)])
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(other.registered.size, 1, 'unprepared selections retain immediate fallback')
+
+  const missing = fixture(true, precomputed)
+  context.after(() => missing.controller.dispose())
+  missing.controller.refresh([coordinate(0)])
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(missing.registered.size, 0)
+  missing.controller.receive({
+    requestId: required(missing.sent.at(-1)).requestId,
+    preparedUnavailable: true,
+    durationMs: 1,
+  })
+  assert.ok(
+    [...required(missing.registered.values().next().value).values()].every((t) => t.fallback),
+    'a missing prepared tile restores early fallback while live work continues',
+  )
 })

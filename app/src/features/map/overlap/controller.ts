@@ -5,6 +5,7 @@ import type { CoverageSnapshot } from './deliveryProtocol.ts'
 import type { overlapDiagnostics } from './diagnostics.ts'
 import { MAX_COVERAGE_VERTICES } from './limits.ts'
 import { OverlapPatternError } from './patterns.ts'
+import { prepareBranchCoverage } from './precomputed.ts'
 import { coverageTilesKey, retainCoverageTiles } from './tiles.ts'
 import type { OverlapRequest, OverlapResponse, TileCoordinate } from './types.ts'
 import { parseOverlapSelection } from './types.ts'
@@ -45,6 +46,8 @@ interface Request {
   version: number
   error: string
   publicationBlocked: boolean
+  /** Hold the first publication for a complete prepared view. Null means matching is pending. */
+  preparedFirst: boolean | null
 }
 
 export const idleHatchingState = (): HatchingState => ({
@@ -172,6 +175,7 @@ export const createOverlapController = (options: {
     batch = undefined
     if (!request || request.publicationBlocked || staging || !results.size) return
     if (active?.version === request.version) return
+    if (!active && request.phase === 'computing' && request.preparedFirst !== false) return
     // A prefix at a new detail level can replace previously striped areas with
     // solid fallback. Keep the old snapshot until the whole replacement succeeds;
     // a failed prefix stays cached for Retry without degrading the current view.
@@ -306,6 +310,7 @@ export const createOverlapController = (options: {
         startedAt: performance.now(),
         error: '',
         publicationBlocked: false,
+        preparedFirst: options.nativeFallback && options.precomputed && !active ? null : false,
       }
       diagnostics?.start(request.id, tiles.length, variantIds.length)
       deadline = setTimeout(
@@ -333,7 +338,7 @@ export const createOverlapController = (options: {
               features: 0,
             })
         }
-      worker.postMessage({
+      const job: OverlapRequest = {
         requestId: request.id,
         archiveUrl:
           typeof options.archiveUrl === 'function' ? options.archiveUrl() : options.archiveUrl,
@@ -346,11 +351,33 @@ export const createOverlapController = (options: {
         tiles,
         knownTiles: [...results].filter(([, tile]) => !tile.fallback).map(([key]) => key),
         ...(diagnostics ? { profile: true } : {}),
-      })
-      if (options.nativeFallback) stage()
+      }
+      worker.postMessage(job)
+      if (request.preparedFirst === null) {
+        // A matching prepared branch can replace all initial fallback tiles in
+        // one source. Keep the ordinary early fallback for other selections.
+        void prepareBranchCoverage(job)
+          .then((prepared) => {
+            if (request?.id !== job.requestId || request.preparedFirst !== null) return
+            request.preparedFirst = Boolean(prepared && tiles.every((tile) => prepared(tile)))
+            if (!request.preparedFirst) stage()
+          })
+          .catch(() => {
+            if (request?.id !== job.requestId || request.preparedFirst !== null) return
+            request.preparedFirst = false
+            stage()
+          })
+      } else if (options.nativeFallback) stage()
     },
     receive(response: OverlapResponse) {
       if (disposed || response.requestId !== request?.id || request.phase !== 'computing') return
+      if ('preparedUnavailable' in response) {
+        if (request.preparedFirst !== false) {
+          request.preparedFirst = false
+          stage()
+        }
+        return
+      }
       if ('tile' in response) {
         const key = tileKey(response.tile.tile)
         if (!retained.some((tile) => tileKey(tile) === key)) return

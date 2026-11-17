@@ -76,6 +76,7 @@ self.onmessage = async ({ data }: MessageEvent<GeometryInput>) => {
           }
         : undefined
       const known = new Set(request.knownTiles)
+      let reportedPreparedFailure = false
       for await (const tile of computer.computeTiles(
         sources.archive(request.archiveUrl),
         {
@@ -85,6 +86,21 @@ self.onmessage = async ({ data }: MessageEvent<GeometryInput>) => {
         () => !signal.aborted,
         metrics,
         signal,
+        () => {
+          if (reportedPreparedFailure) return
+          reportedPreparedFailure = true
+          respond(
+            {
+              kind: 'coverage',
+              response: {
+                requestId: request.requestId,
+                preparedUnavailable: true,
+                durationMs: performance.now() - started,
+              },
+            },
+            false,
+          )
+        },
       )) {
         signal.throwIfAborted()
         let result = encoded.get(tile.features)

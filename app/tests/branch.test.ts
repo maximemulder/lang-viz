@@ -225,7 +225,18 @@ test('exact prepared views bypass Boolean computation, cache geometry, and missi
   await Array.fromAsync(computer.computeTiles(archive, { ...request, refinements: {} }, () => true))
   assert.equal(archiveReads, 1, 'A changed policy must use live geometry')
   t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 404 }))
-  await Array.fromAsync(new OverlapComputer().computeTiles(archive, request, () => true))
+  let unavailable = 0
+  await Array.fromAsync(
+    new OverlapComputer().computeTiles(
+      archive,
+      request,
+      () => true,
+      undefined,
+      undefined,
+      () => unavailable++,
+    ),
+  )
+  assert.equal(unavailable, 1)
   assert.equal(archiveReads, 2, 'Optional missing prepared assets must use live geometry')
   const cancellation = new AbortController()
   t.mock.method(globalThis, 'fetch', async (_url, options) => {

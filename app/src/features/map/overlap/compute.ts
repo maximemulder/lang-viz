@@ -180,6 +180,7 @@ export class OverlapComputer {
     isCurrent: () => boolean,
     metrics?: OverlapMetrics,
     signal?: AbortSignal,
+    onPreparedUnavailable?: () => void,
   ): AsyncGenerator<CoverageTile> {
     const selected = new Set(request.variantIds)
     const prepared = await prepareBranchCoverage(request)
@@ -222,7 +223,7 @@ export class OverlapComputer {
           if (decoded) {
             result = { features: decoded.features, vertices: decoded.vertices }
             this.cacheResult(preparedKey, result)
-          }
+          } else onPreparedUnavailable?.()
         } else {
           if (metrics) metrics.partitionCacheHits++
           this.results.delete(preparedKey)

@@ -114,8 +114,12 @@ preserving the existing precision and resource policy.
 Exact full branch tiles remain the first choice. Reusable parts handle partial
 branches, independently selected entries and aggregates from one dataset/period.
 The first Geography view pins the complete Asher Contemporary branch, so its
-prepared tiles start in a four-request window to keep initial coverage within
-the normal interactive deadline.
+prepared tiles start in a four-request window. When all initial tiles match an
+exact prepared branch, the controller waits for the complete result and publishes
+one source rather than first loading a fallback source. Other selections still
+show fallback coverage while their geometry is prepared. A missing or malformed
+prepared tile immediately releases the wait so fallback coverage can load while
+parts or live geometry take over.
 Mixed selections, unprepared zooms and missing/malformed optional assets fall back
 live. Shared geometry boundaries, fallback clipping, inspection, render modes,
 cancellation and output/pattern/publication limits still apply. Prepared parts
