@@ -85,13 +85,14 @@ h1 {
 }
 
 .atlas-workspace {
+  --sidebar-width: 22rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+  grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
   min-height: 0;
 }
 
 .atlas-workspace:has(> .geography-inspector) {
-  grid-template-columns: minmax(0, 1fr) minmax(21rem, 23rem) minmax(19rem, 21rem);
+  grid-template-columns: minmax(0, 1fr) repeat(2, var(--sidebar-width));
 }
 
 .geography-inspector {
@@ -153,7 +154,7 @@ h1 {
 }
 
 .atlas-workspace:has(> .geography-inspector--cover) {
-  grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+  grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
 }
 
 .atlas-workspace:has(> .geography-inspector--cover) > .map-shell {
@@ -1230,7 +1231,7 @@ h2 {
     grid-row: 2;
   }
 
-  .atlas-workspace:has(> .geography-inspector--map-docked) {
+  .atlas-workspace:has(> .geography-inspector--language-beside) {
     grid-template-rows: minmax(16rem, 38dvh) minmax(36rem, 62dvh) minmax(36rem, 62dvh);
   }
 

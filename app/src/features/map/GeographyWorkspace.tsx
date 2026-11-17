@@ -6,7 +6,10 @@ import { atlasDataAtom } from '../../state/atlasState.ts'
 import { explorerSessionAtom } from '../../state/explorerState.ts'
 import { languagePanelAtom } from '../../state/languageControls.ts'
 import { setLanguageSummarySectionAtom } from '../../state/languageSummary.ts'
-import { administrativeSessionAtom } from '../administrative/state.ts'
+import {
+  administrativeLanguagePlacementAtom,
+  administrativeSessionAtom,
+} from '../administrative/state.ts'
 import { LanguageDetails } from '../languages/LanguageDetails.tsx'
 import { LanguageFinder, LanguageFinderFallback } from '../languages/LanguageFinder.tsx'
 import { WalsStandaloneInspection } from '../wals/LanguageFeatures.tsx'
@@ -42,6 +45,7 @@ export default function GeographyWorkspace({
   const setSummarySection = useSetAtom(setLanguageSummarySectionAtom)
   const languagePanel = useAtomValue(languagePanelAtom)
   const administrativeSelection = useAtomValue(administrativeSessionAtom).selection
+  const administrativeLanguagePlacement = useAtomValue(administrativeLanguagePlacementAtom)
   const wals = useAtomValue(walsSessionAtom)
   const lexical = useAtomValue(explorerSessionAtom).overlay.enabled
   const hasLanguageDetails = Boolean(
@@ -51,13 +55,15 @@ export default function GeographyWorkspace({
       lexical,
   )
   const hasDetails = administrative ? Boolean(administrativeSelection) : hasLanguageDetails
-  const coverLanguageControls =
-    !administrative && Boolean(languagePanel.detailId) && languagePanel.detailPlacement === 'cover'
-  const dockMapDetails =
-    !administrative &&
-    Boolean(languagePanel.detailId) &&
-    languagePanel.detailOrigin === 'map' &&
-    languagePanel.detailPlacement === 'beside'
+  const languageDetailsPlacement = administrative
+    ? administrativeSelection?.kind === 'language'
+      ? administrativeLanguagePlacement
+      : null
+    : languagePanel.detailId
+      ? languagePanel.detailPlacement
+      : null
+  const coverLanguageControls = languageDetailsPlacement === 'cover'
+  const besideLanguageDetails = languageDetailsPlacement === 'beside'
   const [administrativeVisited, setAdministrativeVisited] = useState(false)
   useEffect(() => {
     if (administrative) setAdministrativeVisited(true)
@@ -92,7 +98,7 @@ export default function GeographyWorkspace({
       </WorkspaceBoundary>
       {hasDetails && (
         <aside
-          className={`geography-inspector${coverLanguageControls ? ' geography-inspector--cover' : ''}${dockMapDetails ? ' geography-inspector--map-docked' : ''}`}
+          className={`geography-inspector${coverLanguageControls ? ' geography-inspector--cover' : ''}${besideLanguageDetails ? ' geography-inspector--language-beside' : ''}`}
           aria-label="Details"
         >
           {administrative && administrativeSelection?.kind === 'language' ? (

@@ -48,6 +48,7 @@ export const languagePanelAtom = atom<{
   readonly detailEntryId: string | null
   readonly detailOrigin: LanguageDetailOrigin
   readonly detailPlacement: LanguageDetailPlacement
+  readonly detailPlacementChosen: boolean
 }>({
   view: 'explore',
   detailId: null,
@@ -55,6 +56,7 @@ export const languagePanelAtom = atom<{
   detailEntryId: null,
   detailOrigin: 'sidebar',
   detailPlacement: 'beside',
+  detailPlacementChosen: false,
 })
 
 export const openLanguageDetailsAtom = atom(
@@ -63,20 +65,20 @@ export const openLanguageDetailsAtom = atom(
     if (get(mapCameraIntentAtom) === get(languageMapNavigationAtom)) set(mapCameraIntentAtom, null)
     set(languageMapNavigationAtom, null)
     const panel = get(languagePanelAtom)
-    const keepMapPlacement =
-      origin === 'map' && panel.detailOrigin === 'map' && panel.detailId !== null
     set(languagePanelAtom, {
       ...panel,
       detailId: typeof target === 'string' ? target : target.languageId,
       detailGroupId: typeof target === 'string' ? null : (target.groupId ?? null),
       detailEntryId: typeof target === 'string' ? null : (target.entryId ?? null),
       detailOrigin: origin ?? panel.detailOrigin,
+      // Entry points set defaults; an explicit move remains in force while inspecting languages.
       detailPlacement:
-        origin === 'sidebar'
-          ? 'beside'
-          : origin === 'map' && !keepMapPlacement
+        panel.detailId && panel.detailPlacementChosen
+          ? panel.detailPlacement
+          : (origin ?? panel.detailOrigin) === 'map'
             ? 'cover'
-            : panel.detailPlacement,
+            : 'beside',
+      detailPlacementChosen: Boolean(panel.detailId && panel.detailPlacementChosen),
     })
   },
 )
@@ -96,10 +98,11 @@ export const inspectLanguageFromMapAtom = atom(null, (_get, set, target: Languag
 
 export const toggleLanguageDetailPlacementAtom = atom(null, (get, set) => {
   const panel = get(languagePanelAtom)
-  if (!panel.detailId || panel.detailOrigin !== 'map') return
+  if (!panel.detailId) return
   set(languagePanelAtom, {
     ...panel,
     detailPlacement: panel.detailPlacement === 'cover' ? 'beside' : 'cover',
+    detailPlacementChosen: true,
   })
 })
 
@@ -113,6 +116,7 @@ export const closeLanguageDetailsAtom = atom(null, (get, set) => {
     detailEntryId: null,
     detailOrigin: 'sidebar',
     detailPlacement: 'beside',
+    detailPlacementChosen: false,
   })
 })
 
@@ -125,5 +129,6 @@ export const revealLanguageAtom = atom(null, (get, set, languageId: string) => {
     view: 'explore',
     detailOrigin: 'sidebar',
     detailPlacement: 'beside',
+    detailPlacementChosen: false,
   })
 })

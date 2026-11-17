@@ -1,4 +1,5 @@
 import { atom } from 'jotai'
+import type { LanguageDetailPlacement } from '../../state/languageControls.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import type { BoundaryIndex } from './boundaryRepository.ts'
 import type { AdministrativeRepository } from './model.ts'
@@ -59,6 +60,14 @@ export const administrativeSessionAtom = atom<AdministrativeSession>({
   selection: null,
   metric: null,
 })
+export const administrativeLanguagePlacementAtom = atom<LanguageDetailPlacement>('beside')
+export const toggleAdministrativeLanguagePlacementAtom = atom(null, (get, set) => {
+  if (get(administrativeSessionAtom).selection?.kind !== 'language') return
+  set(
+    administrativeLanguagePlacementAtom,
+    get(administrativeLanguagePlacementAtom) === 'cover' ? 'beside' : 'cover',
+  )
+})
 
 /** Languages mode remembers its optional borders across mode switches. */
 export const languageBordersAtom = atom(false)
@@ -93,6 +102,8 @@ export const selectAdministrativeAtom = atom(
           return false
       }
     }
+    if (get(administrativeSessionAtom).selection?.kind !== 'language')
+      set(administrativeLanguagePlacementAtom, 'beside')
     set(administrativeSessionAtom, { ...get(administrativeSessionAtom), selection })
     return true
   },

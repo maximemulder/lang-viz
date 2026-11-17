@@ -34,8 +34,19 @@ def main():
             const details = document.querySelector('.finder-detail');
             const controls = document.querySelector('.geography-sidebar');
             return pane?.contains(details) && !controls.contains(details) &&
-                document.querySelector('.language-list').clientHeight >= 88;
+                document.querySelector('.language-list').clientHeight >= 88 &&
+                Math.abs(pane.getBoundingClientRect().width - controls.getBoundingClientRect().width) < 1;
         """)
+        assert browser.js("return !!document.querySelector('[aria-label=\"Show details over language controls\"]')")
+        browser.js("document.querySelector('[aria-label=\"Show details over language controls\"]').click()")
+        assert browser.js("""
+            const pane = document.querySelector('.geography-inspector').getBoundingClientRect();
+            const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+            return document.querySelector('.geography-sidebar').inert &&
+                Math.abs(pane.left - controls.left) < 1 &&
+                Math.abs(pane.width - controls.width) < 1;
+        """), "Search summary can cover the same-width sidebar"
+        browser.js("document.querySelector('[aria-label=\"Show language controls beside details\"]').click()")
 
         def header_style(selector):
             return browser.js("""
@@ -134,6 +145,10 @@ def main():
                 .find(button => button.querySelector('.administrative-code')?.textContent === 'ps').click();
         """)
         wait_for(lambda: browser.js("return !!document.querySelector('.geography-inspector .finder-detail')"), 10, "shared language panel")
+        assert browser.js("return !!document.querySelector('[aria-label=\"Show details over region controls\"]')")
+        browser.js("document.querySelector('[aria-label=\"Show details over region controls\"]').click()")
+        assert browser.js("return document.querySelector('.geography-sidebar').inert"), "CLDR summary can cover the region sidebar"
+        browser.js("document.querySelector('[aria-label=\"Show region controls beside details\"]').click()")
         assert browser.js("""
             const sections = [...document.querySelectorAll('.finder-detail .language-summary-section')];
             return sections.length === 5 &&

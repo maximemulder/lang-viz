@@ -30,7 +30,12 @@ import {
 } from '../../state/languageControls'
 import { searchCoverageAtom } from '../../state/searchSelection'
 import { LanguageRegions } from '../administrative/LanguageRegions.tsx'
-import { administrativeRepositoryAtom, selectAdministrativeAtom } from '../administrative/state.ts'
+import {
+  administrativeLanguagePlacementAtom,
+  administrativeRepositoryAtom,
+  selectAdministrativeAtom,
+  toggleAdministrativeLanguagePlacementAtom,
+} from '../administrative/state.ts'
 import { LanguageFeatures } from '../wals/LanguageFeatures.tsx'
 import { GeometrySourceRecords } from './GeometrySourceRecords'
 import { useLanguagePreview } from './LanguagePreview'
@@ -39,6 +44,7 @@ import { PinnedMapEntries } from './PinnedMapEntries'
 
 export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }) => {
   const panel = useAtomValue(languagePanelAtom)
+  const administrativePlacement = useAtomValue(administrativeLanguagePlacementAtom)
   const data = useAtomValue(atlasDataAtom)
   const administrativeRepository = useAtomValue(administrativeRepositoryAtom)
   const selectAdministrative = useSetAtom(selectAdministrativeAtom)
@@ -53,6 +59,7 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const closeDetails = useSetAtom(closeLanguageDetailsAtom)
   const togglePlacement = useSetAtom(toggleLanguageDetailPlacementAtom)
+  const toggleAdministrativePlacement = useSetAtom(toggleAdministrativeLanguagePlacementAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const groups = useAtomValue(mapGroupsAtom)
   const removeEntry = useSetAtom(removeMapEntryAtom)
@@ -95,10 +102,11 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
   }
   if (!detail && !sourceLanguage) return null
   const classification = detail?.classification
+  const placement = sourceCode ? administrativePlacement : panel.detailPlacement
   const placementLabel =
-    panel.detailPlacement === 'cover'
-      ? 'Show language controls beside details'
-      : 'Show details over language controls'
+    placement === 'cover'
+      ? `Show ${sourceCode ? 'region' : 'language'} controls beside details`
+      : `Show details over ${sourceCode ? 'region' : 'language'} controls`
   return (
     <section
       {...preview}
@@ -119,30 +127,23 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
           </>
         }
         action={
-          !sourceCode &&
-          panel.detailOrigin === 'map' && (
-            <button
-              type="button"
-              className="details-header__icon"
-              aria-label={placementLabel}
-              title={placementLabel}
-              onClick={togglePlacement}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d={
-                    panel.detailPlacement === 'cover'
-                      ? 'M12 8H4m0 0 3-3M4 8l3 3'
-                      : 'M4 8h8m0 0-3-3M12 8l-3 3'
-                  }
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          )
+          <button
+            type="button"
+            className="details-header__icon"
+            aria-label={placementLabel}
+            title={placementLabel}
+            onClick={sourceCode ? toggleAdministrativePlacement : togglePlacement}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d={placement === 'cover' ? 'M12 8H4m0 0 3-3M4 8l3 3' : 'M4 8h8m0 0-3-3M12 8l-3 3'}
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         }
         closeLabel="Close language details"
         onClose={() => {
