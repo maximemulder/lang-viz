@@ -38,7 +38,7 @@ export class OverlapBudgetError extends Error {
   readonly reason: string
 
   constructor(reason = 'geometry-budget') {
-    super('This area is too complex for live hatching. Zoom in or select fewer languages.')
+    super('These language areas are too complex to draw. Zoom in or select fewer languages.')
     this.reason = reason
   }
 }

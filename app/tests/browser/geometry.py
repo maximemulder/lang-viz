@@ -19,9 +19,11 @@ def main():
                            'areaModes': {'abkh1242': 'descendants'},
                            'center': [40.8144, 43.2759], 'zoom': 4.4}, [40.8144, 43.2759]),
         ]:
-            browser.js('window.overlapTest.configure(arguments[0])', config)
+            browser.js('window.overlapTest.configure(arguments[0])', {**config, 'center': center})
             browser.settled(60, fail_on_error=True)
-            move(browser, center, click=True)
+            # Keep the pointer over the same location through both zooms. A
+            # single-language click opens the details pane and resizes the map.
+            move(browser, center)
             wait_for(lambda: browser.js('return window.overlapTest.inspectionHighlight().variantIds.length > 0'), 20, 'outline')
             initial = browser.js('return window.overlapTest.inspectionHighlight()')
             assert initial['boundaryFeatures'] > 0, initial
@@ -39,7 +41,6 @@ def main():
             assert not any(f['mismatch'] for f in frames), frames
             assert not state['errors'], state['errors']
             reports.append({'case': name, 'frames': frames})
-            browser.js("document.querySelector('.language-inspector .maplibregl-popup-close-button')?.click()")
         (output / 'report.json').write_text(json.dumps(reports, indent=2) + '\n')
         print('Direct and aggregate outlines share the displayed fill source through fast zooms', flush=True)
 

@@ -16,6 +16,7 @@ import { mapContextOpacityAtom } from '../../../state/mapInteraction'
 import { geometryDisplay } from '../geometry/display'
 import { GeometryCoverageClient } from '../geometry/geometryService'
 import { CoverageLayers } from './CoverageLayers'
+import { CoverageStatus } from './CoverageStatus'
 import { createOverlapController, type HatchingState, idleHatchingState } from './controller'
 import { createPartsResolver } from './coverageParts'
 import { diagnosticsEnabled, overlapDiagnostics } from './diagnostics'
@@ -197,20 +198,12 @@ export const OverlapHatching = ({
           <OverlapTestControls map={map} refreshRef={refreshRef} />
         </Suspense>
       )}
-      {(state.status === 'loading' || state.status === 'error') && (
-        <div className="overlap-feedback" data-status={state.status} role="status">
-          <span>
-            {mode === 'blending' && state.status === 'loading'
-              ? 'Updating combined areas…'
-              : state.message}
-          </span>
-          {state.status === 'error' && (
-            <button type="button" onClick={() => retryRef.current?.()}>
-              Retry
-            </button>
-          )}
-        </div>
-      )}
+      <CoverageStatus
+        update={state.update}
+        error={state.status === 'error' ? state.message : ''}
+        showingCoverage={coverageReady && state.activeBuffer !== null}
+        onRetry={() => retryRef.current?.()}
+      />
       <CoverageLayers
         snapshots={state.snapshots}
         activeBuffer={state.activeBuffer}

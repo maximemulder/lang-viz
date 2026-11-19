@@ -209,6 +209,21 @@ test('selection supersession cancels only that coverage consumer and cannot publ
   client.postMessage(request(10))
   client.postMessage(request(20))
   client.postMessage(request(30))
+  const original = required(f.workers[0])
+  assert.deepEqual(
+    original.requests.filter((message) => 'job' in message).map(({ id }) => id),
+    [1],
+    'Replacement requests stay queued while the old job still occupies its slot',
+  )
+  original.send({
+    id: 1,
+    result: {
+      kind: 'coverage',
+      response: { requestId: 10, preparedUnavailable: true, durationMs: 1 },
+    },
+    complete: false,
+  })
+  assert.deepEqual(responses, [], 'Late progress cannot reach the old consumer')
   context.mock.timers.tick(CANCELLATION_GRACE_MS)
   const replay = required(f.workers[1]).requests.filter((r) => 'job' in r)
   assert.equal(replay.length, 1)
@@ -216,9 +231,40 @@ test('selection supersession cancels only that coverage consumer and cannot publ
     kind: 'coverage' as const,
     response: { requestId: 30, complete: true as const, tileCount: 1, durationMs: 1 },
   }
-  required(f.workers[0]).send({ id: 3, result, complete: true })
+  original.send({ id: 3, result, complete: true })
   assert.deepEqual(responses, [])
   required(f.workers[1]).send({ id: 3, result, complete: true })
   assert.deepEqual(responses, [30])
   client.terminate()
+})
+
+test('delivery has its own capacity and drops aborted queued work before dispatch', async (context) => {
+  const f = fixture()
+  context.after(() => f.service.dispose())
+  const first = f.request()
+  const second = f.request()
+  const controller = new AbortController()
+  const cancelled = assert.rejects(f.request(controller.signal), { name: 'AbortError' })
+  const fourth = f.request()
+  const worker = required(f.workers[0])
+  assert.deepEqual(
+    worker.requests.map((request) => 'id' in request && request.id),
+    [1, 2],
+  )
+  controller.abort()
+  await cancelled
+  assert.equal(worker.requests.length, 2, 'A queued abort sends no message to the worker')
+  const source = f.service.request(
+    { kind: 'source', archiveUrl: 'archive', tile: coord, coverage: [] },
+    AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  )
+  const sourceRequest = assert.rejects(source, /stopped/)
+  assert.ok(worker.requests.some((message) => 'id' in message && message.id === 5))
+  worker.send({ id: 1, result: deliveryResult(1), complete: true })
+  assert.ok(worker.requests.some((message) => 'id' in message && message.id === 4))
+  worker.send({ id: 2, result: deliveryResult(2), complete: true })
+  worker.send({ id: 4, result: deliveryResult(4), complete: true })
+  assert.deepEqual(await Promise.all([first, second, fourth]), [1, 2, 4].map(deliveryResult))
+  f.service.dispose()
+  await sourceRequest
 })

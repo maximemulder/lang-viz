@@ -197,7 +197,7 @@ def check_state(state, require_stripes=False, expected_errors=()):
     report = state["reports"][-1]
     services = state.get("tileServices", {})
     receiver = services.get("receiver", {})
-    assert receiver.get("snapshots", 0) <= 2, "Unused coverage snapshots accumulated"
+    assert receiver.get("snapshots", 0) <= 2, f"Unused coverage snapshots accumulated ({receiver})"
     assert receiver.get("tiles", 0) <= 96, "Snapshot tile retention exceeded two buffers"
     delivery = services.get("delivery", {})
     assert delivery.get("parentBytes", 0) <= 8 * 1024**2
@@ -285,7 +285,7 @@ def check_failure_recovery(browser, origin, args):
         )
         browser.screenshot(args.output / f"{service}-failure.png")
         after = len(failed["reports"])
-        browser.js("document.querySelector('.overlap-feedback button').click()")
+        browser.js("document.querySelector('.map-coverage-status[data-status=error] button').click()")
         recovered = browser.terminal(after, args.timeout)
         check_state(recovered, require_stripes=True, expected_errors=expected)
         missing = (
@@ -303,19 +303,9 @@ def check_failure_recovery(browser, origin, args):
 
 
 def check_inspection(browser):
-    """Real pointer clicks must explain the membership of the displayed MVT face."""
-    results = []
-    for center, expected in (
-        ([-1.5, 52.5], ["stan1293"]),
-        ([-4, 52.3], ["stan1293", "wels1247"]),
-        ([2, 52.5], []),
-    ):
-        hit = browser.js("return window.overlapTest.inspect(arguments[0])", center)
-        members = sorted(variant.split(":")[-1] for variant in hit["variantIds"])
-        assert members == sorted(expected), (
-            f"Unexpected displayed membership at {center}: {members}"
-        )
-        x, y = hit["point"]
+    """Pointer inspection must explain the membership of the displayed MVT face."""
+
+    def pointer(actions):
         browser.call(
             "POST",
             "/actions",
@@ -325,34 +315,52 @@ def check_inspection(browser):
                         "type": "pointer",
                         "id": "inspection-mouse",
                         "parameters": {"pointerType": "mouse"},
-                        "actions": [
-                            {
-                                "type": "pointerMove",
-                                "duration": 0,
-                                "origin": "viewport",
-                                "x": x,
-                                "y": y,
-                            },
-                            {"type": "pointerDown", "button": 0},
-                            {"type": "pointerUp", "button": 0},
-                        ],
+                        "actions": actions,
                     }
                 ]
             },
         )
+
+    results = []
+    for center, expected in (
+        ([-1.5, 52.5], {"stan1293": "English"}),
+        ([-4, 52.3], {"stan1293": "English", "wels1247": "Welsh"}),
+        ([2, 52.5], {}),
+    ):
+        hit = browser.js("return window.overlapTest.inspect(arguments[0])", center)
+        members = sorted(variant.split(":")[-1] for variant in hit["variantIds"])
+        assert members == sorted(expected), (
+            f"Unexpected displayed membership at {center}: {members}"
+        )
+        x, y = hit["point"]
+        actions = [
+            {"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y},
+        ]
+        pinned = len(expected) > 1
+        if pinned:
+            actions += [
+                {"type": "pointerDown", "button": 0},
+                {"type": "pointerUp", "button": 0},
+            ]
+        pointer(actions)
         wait_for(
-            lambda expected=expected: browser.js(
-                "return document.querySelectorAll('.language-inspector__entry').length===arguments[0]",
-                len(expected),
+            lambda expected=expected, pinned=pinned: browser.js(
+                """const popup = document.querySelector('.language-inspector');
+                const entries = [...(popup?.querySelectorAll('.language-inspector__entry strong')
+                    ?? [])].map((entry) => entry.textContent).sort();
+                return !!popup?.classList.contains('language-inspector--pinned') === arguments[0]
+                    && JSON.stringify(entries) === JSON.stringify(arguments[1]);""",
+                pinned,
+                sorted(expected.values()),
             ),
             10,
             "inspection popup membership",
         )
-        text = browser.js("return document.querySelector('.language-inspector')?.textContent || ''")
-        assert all(language in text for language in expected), (
-            f"Popup disagrees with coverage: {text}"
-        )
+        if pinned:
+            browser.js("document.querySelector('.language-inspector .maplibregl-popup-close-button').click()")
         results.append({"center": center, "variantIds": hit["variantIds"]})
+    # Move into the page header so later camera tests do not also load hover previews.
+    pointer([{"type": "pointerMove", "origin": "viewport", "x": 5, "y": 5}])
     browser.call("DELETE", "/actions")
     return results
 

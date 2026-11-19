@@ -15,6 +15,10 @@ export interface HatchingState {
   readonly activeBuffer: 0 | 1 | null
   readonly status: 'idle' | 'loading' | 'ready' | 'error'
   readonly message: string
+  readonly update: {
+    readonly phase: 'preparing' | 'drawing' | 'ready'
+    readonly startedAt: number
+  } | null
 }
 
 export interface CoverageResources {
@@ -55,6 +59,7 @@ export const idleHatchingState = (): HatchingState => ({
   activeBuffer: null,
   status: 'idle',
   message: '',
+  update: null,
 })
 
 /** Own computation and publication transitions, independent of React and MapLibre. */
@@ -83,6 +88,8 @@ export const createOverlapController = (options: {
   let active: Publication | null = null
   let staging: Publication | null = null
   let viewportSuspended = false
+  // A visible update can span several viewport requests and their dispatch delays.
+  let updateStartedAt: number | null = null
   let scheduled: (() => void) | undefined
   let dispatchTimer: ReturnType<typeof setTimeout> | undefined
   let batch: ReturnType<typeof setTimeout> | undefined
@@ -107,19 +114,25 @@ export const createOverlapController = (options: {
         : request || scheduled
           ? 'loading'
           : 'idle'
+    const startedAt = updateStartedAt
+    if (status !== 'loading') updateStartedAt = null
     options.onChange({
       snapshots,
       activeBuffer: active?.buffer ?? null,
       status,
-      message:
-        request?.error ||
-        (status === 'ready'
-          ? [...results.values()].some((tile) => tile.patterns.some((p) => p.variantIds.length > 1))
-            ? 'Shared areas alternate language colors'
-            : 'No overlaps in this view'
-          : status === 'loading'
-            ? 'Updating stripes; solid areas may still contain overlaps.'
-            : ''),
+      message: request?.error ?? '',
+      update:
+        startedAt !== null && (status === 'loading' || status === 'ready')
+          ? {
+              phase:
+                status === 'ready'
+                  ? 'ready'
+                  : request?.phase === 'complete'
+                    ? 'drawing'
+                    : 'preparing',
+              startedAt,
+            }
+          : null,
     })
   }
   const cancelTimers = () => {
@@ -226,7 +239,7 @@ export const createOverlapController = (options: {
       }
       fail(
         error instanceof OverlapPatternError ? error.reason : 'render-error',
-        error instanceof Error ? error.message : 'Could not draw overlap stripes.',
+        error instanceof Error ? error.message : 'Could not draw the language areas.',
         true,
       )
     }
@@ -297,14 +310,10 @@ export const createOverlapController = (options: {
       publicationBlocked: false,
       preparedFirst: options.nativeFallback && options.precomputed && !active ? null : false,
     }
+    updateStartedAt ??= request.startedAt
     diagnostics?.start(request.id, tiles.length, variantIds.length)
     deadline = setTimeout(
-      () =>
-        fail(
-          'publication-deadline',
-          'Stripes took too long to load. Keeping available coverage. Try again.',
-          true,
-        ),
+      () => fail('publication-deadline', 'Language areas took too long to load.', true),
       PUBLICATION_TIMEOUT_MS,
     )
     emit()
@@ -446,7 +455,7 @@ export const createOverlapController = (options: {
       diagnostics?.response(response)
       update({ workerRestarts: worker.restarts })
       if ('error' in response) {
-        fail(response.failure, `${response.error} Keeping available coverage.`, false)
+        fail(response.failure, response.error || 'Could not prepare the language areas.', false)
         // Publish a valid prefix even if the batch timer already ran while empty.
         stage()
         return
@@ -462,14 +471,17 @@ export const createOverlapController = (options: {
         // Mark that publication current without rebuilding its sources or images.
         active = { ...active, version: request.version }
       }
+      const previousStaging = staging
       stage()
-      if (!staging && active?.version === request.version && !request.error) {
-        clearTimeout(deadline)
-        update({
-          outcome: 'ready',
-          totalMs: performance.now() - request.startedAt,
-          buffer: active.buffer,
-        })
+      if (staging === previousStaging && !request.error) {
+        if (!staging && active?.version === request.version) {
+          clearTimeout(deadline)
+          update({
+            outcome: 'ready',
+            totalMs: performance.now() - request.startedAt,
+            buffer: active.buffer,
+          })
+        }
         emit()
       }
     },
@@ -485,13 +497,13 @@ export const createOverlapController = (options: {
       fail(
         'source-error',
         active
-          ? 'New stripes could not load. Keeping the previous view. Try again.'
-          : 'Map geometry could not load. Try again.',
+          ? 'Could not load the updated language areas.'
+          : 'Could not load the language areas.',
         true,
       )
     },
     workerFailed() {
-      fail('worker-error', 'Could not calculate stripes. Try again.', false)
+      fail('worker-error', 'Could not prepare the language areas.', false)
       stage()
     },
     publish,
