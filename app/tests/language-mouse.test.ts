@@ -61,3 +61,36 @@ test('matching emphasis preserves the independent WALS origin', () => {
   store.set(walsActionAtom, { type: 'clear-overlay' })
   assert.equal(store.get(mapContextOpacityAtom), 1)
 })
+
+test('isolated language picking only uses the retained original language fill', () => {
+  const calls: string[][] = []
+  const isolated = {
+    ...map(),
+    getLayer: () => ({}),
+    queryRenderedFeatures: (_point: unknown, options: { layers: string[] }) => {
+      calls.push(options.layers)
+      return [{ properties: { variant_id: 'area' } }]
+    },
+  }
+  assert.deepEqual(
+    pickLanguageVariants(isolated as never, [0, 0], {
+      ...context,
+      isolation: { kind: 'language', id: language.id, label: language.name, color: '#123456' },
+    }),
+    ['area'],
+  )
+  assert.deepEqual(calls, [['isolated-language-fill']])
+  assert.deepEqual(
+    pickLanguageVariants(isolated as never, [0, 0], {
+      ...context,
+      isolation: {
+        kind: 'region',
+        id: 'AB',
+        label: 'Region',
+        color: '#123456',
+        featureIds: ['original'],
+      },
+    }),
+    ['area'],
+  )
+})

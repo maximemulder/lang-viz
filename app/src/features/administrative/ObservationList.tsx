@@ -37,14 +37,9 @@ export const ObservationList = ({
   readonly onSelect: (selection: AdministrativeSelection) => void
   readonly names: Intl.DisplayNames
 }) => {
-  const max = Math.max(...rows.map((row) => row.estimatedSpeakers), 1)
   return (
     <section className="administrative-observations" aria-label={heading}>
       <h4>{heading}</h4>
-      <p className="administrative-observations__definition">
-        Approximate functional speakers, including later-language speakers. Each count is derived
-        from territory population and the reported percentage; rows may overlap.
-      </p>
       <ol>
         {rows.map((row) => {
           const id =
@@ -62,13 +57,23 @@ export const ObservationList = ({
               </div>
               <div
                 className="administrative-observation__bar"
-                aria-hidden="true"
+                role="progressbar"
+                aria-label={`${title} population share`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.max(
+                  0,
+                  Math.min(100, Number(row.observation.populationPercent)),
+                )}
+                aria-valuetext={percent(row.observation.populationPercent)}
                 style={
-                  { '--bar-width': `${(row.estimatedSpeakers / max) * 100}%` } as CSSProperties
+                  {
+                    '--bar-width': `${Math.max(0, Math.min(100, Number(row.observation.populationPercent)))}%`,
+                  } as CSSProperties
                 }
               />
               <p>
-                {percent(row.observation.populationPercent)} of reported territory population
+                {percent(row.observation.populationPercent)} of population
                 {row.observation.officialStatus !== 'unspecified' &&
                   ` · ${statusLabel[row.observation.officialStatus]}`}
               </p>

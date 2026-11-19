@@ -6,6 +6,8 @@ import { groupMapEntries, type MapCoverage } from './mapGroups.ts'
 
 export interface LanguageMapTarget {
   readonly languageId: string
+  /** Clicked location for a closer local view; isolation still uses every supplied area. */
+  readonly point?: readonly [longitude: number, latitude: number]
   readonly entryId?: string
   readonly groupId?: string
 }

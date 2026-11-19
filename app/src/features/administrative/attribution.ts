@@ -8,4 +8,6 @@ export const ADMINISTRATIVE_ATTRIBUTION = `
     not speaker locations. With borders and
     map color on, teal fill compares the selected estimate with the largest matched value; no
     fill means no reported value or reviewed match.
+    State/district lines and city/town labels: <a href="https://openfreemap.org/">OpenFreeMap</a>,
+    <a href="https://openmaptiles.org/">OpenMapTiles</a>, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.
   </span>`

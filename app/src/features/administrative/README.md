@@ -75,10 +75,80 @@ documented source view; it must never silently reassign CLDR observations.
 `GeographyExplorations` owns the optional layer and supplies a small generic
 interaction adapter to `WorldMap`. The map host chooses exactly one pointer
 picker at a time. Regions mode shows borders, uses a transparent polygon hit layer,
-and outlines the region under the pointer. Click opens sidebar details and double-click
-also fits the shape on the map, following the same rule as Languages mode.
+and outlines the region under the pointer. Hover previews the region; click opens
+its dedicated sidebar without moving the map. Double-click zooms to its supplied
+administrative boundary, following the same interaction pattern
+as Languages mode (which uses language polygons instead).
 Languages mode inspects language polygons;
 its border button optionally shows the administrative boundary network. The border
 button stays selected and disabled in Regions mode. The
 Languages / Regions control sits beside map settings, with Languages selected by
 default. Switching modes preserves the camera, searches, and selections.
+
+## Selection and isolation
+
+`navigation.ts` owns explicit sidebar navigation. Choosing a region opens its details without moving the camera.
+Double-clicking zooms to its reviewed administrative boundary. Choosing a language follows the validated CLDR
+Glottocode link, switches to Languages, opens language details without moving the camera or changing
+the displayed language colours. An unlinked CLDR record stays in its source
+sidebar; it is never turned into a guessed atlas language or country fill.
+
+`mapInteraction.ts` stores temporary language/region isolation separately from
+pinned map groups. The map's colour picker edits only the isolated fill; Show all
+again or Escape restores the previous fills. Existing WALS and word-trail overlays
+are hidden during isolation and restored afterwards. Geography source and period
+filters still apply. No extra geography build or replacement boundary is used.
+
+Regions uses a light casing with a dark border and an orange selection outline.
+These styles do not change the optional administrative lines in Languages mode,
+nor the atlas language outlines. Language details has no Map controls section;
+map settings, selection controls and isolation controls remain on the map/browser.
+
+## Country clipping and progressive detail
+
+Country isolation retains the original language-colour layer and masks its exterior
+with the exact supplied administrative boundary. The mask is computed in a small
+worker using the existing GEOS dependency. Islands, enclaves and date-line cuts
+remain intact; language polygons are neither guessed nor rebuilt. A new mask must
+finish loading before language colours are restored, preventing outside-colour flashes.
+Hovering within the selected country uses the same language tooltip as Languages.
+Overlapping languages are listed; the most specific first hover entry is the
+consistent direct click/double-click target in Languages mode.
+
+At closer zooms, the existing OpenFreeMap/OpenMapTiles source adds state/province
+lines and names, then cities, towns and district detail. Country geometry continues
+to come from the reviewed Natural Earth package. These extra layers are Regions-only.
+
+A persistent Clear colours / Show all button lives beside the Languages/Regions
+control. The active mode uses a dark treatment and the alternative is muted grey.
+Search checkboxes prepare a set; Show selected on map displays and frames that set
+instead of invisibly adding duplicate entries to the already-full initial map. The
+advanced Add options disclosure has been removed. Data Sources is below Search.
+
+## Selected-country gesture routing
+
+The initial Regions click selects a country. Once selected, hits on language areas
+inside that country use the same language click and double-click path as Languages:
+single-click opens language details and double-click zooms into that language.
+Country and language identities use the same gestures. Isolation is an explicit
+language-details action, separate from all pointer zoom gestures. Family isolation uses the mapped descendants rather than requiring an unavailable
+family polygon. Normal language-colour
+layers are unmounted during language isolation, rather than only faded.
+
+Region checkboxes persist across searches; Show selected on map masks the exterior
+of their combined original country shapes. Speaker bars use the recorded population
+percentage directly (41 means 41% of the track), independent of the largest row.
+The primary sidebar contains facts and language rows, with sources in a disclosure.
+
+
+### Current pointer interactions
+
+Hover shows the floating summary. Single click opens details without moving the
+camera. Double click zooms into the clicked language or country without isolating
+or changing map colours. The language details panel has an explicit **Isolate
+language** action and **Show all languages** to restore colours. Focus on map is
+removed. Selecting a CLDR language opens the language details without automatically
+isolating or zooming. World-scale labels show the catalog's existing family names without a subtitle. Zooming past 2.6 switches to individual language names.
+Labels use recorded member-language coordinates and adapt to available screen space;
+no family boundary, homeland or administrative affiliation is inferred. All original
+language polygons stay visible and interactive.

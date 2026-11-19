@@ -133,7 +133,7 @@ export const LanguageMapPreview = ({
   )
 }
 
-/** A request is an explicit click/Enter, so filters, hover, and manual pans never recenter. */
+/** Only an explicit zoom request moves the camera; inspecting details never recenters. */
 export const LanguageMapCamera = () => {
   const { current } = useMap()
   const map = current?.getMap()
@@ -150,6 +150,15 @@ export const LanguageMapCamera = () => {
     map.on('moveend', settled)
     const current = () => !cancelled && store.get(mapCameraIntentAtom) === request
     map.stop()
+    if (request.target.point) {
+      map.resize()
+      map.flyTo({
+        center: [...request.target.point],
+        zoom: Math.min(12, Math.max(3, map.getZoom() + 1.2)),
+        duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450,
+      })
+      return () => map.off('moveend', settled)
+    }
     const navigate = async () => {
       const data = await store.get(atlasDataAtom)
       if (!current()) return

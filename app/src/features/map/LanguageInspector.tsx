@@ -15,7 +15,9 @@ export interface MapInspection {
 export const LanguageInspector = ({
   inspection,
   onClose,
+  regionView = false,
 }: {
+  readonly regionView?: boolean
   readonly inspection: MapInspection
   readonly onClose: () => void
 }) => {
@@ -117,7 +119,11 @@ export const LanguageInspector = ({
                     </details>
                   </>
                 ) : (
-                  <small>Click for details · double-click to focus</small>
+                  <small>
+                    {regionView
+                      ? 'Click for language details · double-click to zoom in'
+                      : 'Click for details · double-click to zoom in'}
+                  </small>
                 )}
               </div>
             </article>

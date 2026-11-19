@@ -243,3 +243,45 @@
     border-left: 0;
   }
 }
+
+.administrative-result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.85rem;
+}
+.administrative-results .administrative-result-row button {
+  flex: 1;
+  min-width: 0;
+}
+.administrative-result-row input {
+  flex: none;
+  accent-color: #c46b48;
+  cursor: pointer;
+}
+.administrative-selection-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  padding: 0.4rem 0.85rem;
+}
+.administrative-selection-actions button {
+  border: 0;
+  background: none;
+  color: #345a48;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.administrative-selection-actions button:disabled {
+  color: #929a94;
+  cursor: default;
+}
+.administrative-selection-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  border-top: 1px solid #d8ddd7;
+  font-size: 0.75rem;
+}

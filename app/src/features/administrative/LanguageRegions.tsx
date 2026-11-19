@@ -1,13 +1,13 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useMemo } from 'react'
 import { explorerActionAtom } from '../../state/explorerState.ts'
+import { navigateAdministrativeAtom } from './navigation.ts'
 import { ObservationList } from './ObservationList.tsx'
 import { selectLanguage } from './selectors.ts'
 import {
   administrativeLoadStateAtom,
   administrativeRepositoryAtom,
   loadAdministrativeAtom,
-  selectAdministrativeAtom,
 } from './state.ts'
 import './administrative.css'
 
@@ -22,7 +22,7 @@ export function LanguageRegions({
   const repository = useAtomValue(administrativeRepositoryAtom)
   const loadState = useAtomValue(administrativeLoadStateAtom)
   const load = useSetAtom(loadAdministrativeAtom)
-  const select = useSetAtom(selectAdministrativeAtom)
+  const select = useSetAtom(navigateAdministrativeAtom)
   const dispatch = useSetAtom(explorerActionAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
   useEffect(() => {
@@ -48,13 +48,9 @@ export function LanguageRegions({
     : sourceCode && repository.languageByCode.has(sourceCode)
       ? [sourceCode]
       : []
-  if (!codes.length) return <p>No CLDR region estimates are linked to this language.</p>
+  if (!codes.length) return <p>No regional estimates available.</p>
   return (
     <div className="language-cldr-regions">
-      <p className="administrative-muted">
-        CLDR territory estimates describe reported language use, not atlas speaker polygons. Script
-        variants may overlap; their estimates are shown separately.
-      </p>
       {codes.map((code) => {
         const detail = selectLanguage(repository, code)
         if (!detail) return null
@@ -69,7 +65,7 @@ export function LanguageRegions({
               }
               destination="territory"
               onSelect={(selection) => {
-                select(selection)
+                void select(selection)
                 dispatch({ type: 'map-mode', mode: 'region' })
               }}
               names={names}

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { SidebarPane, SidebarSection } from '../../components/SidebarPane'
+import { SidebarSection } from '../../components/SidebarPane'
 import { searchCatalog } from '../../domain/catalog'
 import { prepareExploreResults } from '../../domain/exploration'
 import {
@@ -24,16 +24,16 @@ import {
 } from '../../state/atlasState'
 
 import {
+  focusLanguageOnMapAtom,
   inspectLanguageFromSidebarAtom,
   languagePanelAtom,
   revealLanguageIdAtom,
 } from '../../state/languageControls'
 import {
-  addSearchSelectionToMapAtom,
-  searchColoringAtom,
   searchCoverageAtom,
   searchSelectionAtom,
   selectSearchResultsAtom,
+  showSearchSelectionOnMapAtom,
   toggleSearchSelectionAtom,
 } from '../../state/searchSelection'
 import { GeographyFilters } from './GeographyFilters'
@@ -44,6 +44,7 @@ interface LanguageRowProps {
   readonly expanded: boolean
   readonly active: boolean
   readonly context: string | null
+  readonly onZoom: () => void
   readonly onDetails: () => void
   readonly onExpand: () => void
   readonly onFocus: () => void
@@ -56,6 +57,7 @@ const LanguageRow = ({
   active,
   context,
   onDetails,
+  onZoom,
   onExpand,
   onFocus,
   onKeyDown,
@@ -128,6 +130,10 @@ const LanguageRow = ({
           event.stopPropagation()
           onDetails()
         }}
+        onDoubleClick={(event) => {
+          event.stopPropagation()
+          onZoom()
+        }}
         className="language-row__identity"
       >
         <span className="language-row__name">
@@ -162,9 +168,8 @@ export const ExploreLanguages = () => {
   const [query, setQuery] = useAtom(languageQueryAtom)
   const selectResults = useSetAtom(selectSearchResultsAtom)
   const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
-  const addSelection = useSetAtom(addSearchSelectionToMapAtom)
-  const [coverage, setCoverage] = useAtom(searchCoverageAtom)
-  const [coloring, setColoring] = useAtom(searchColoringAtom)
+  const addSelection = useSetAtom(showSearchSelectionOnMapAtom)
+  const coverage = useAtomValue(searchCoverageAtom)
   const [searchExpanded, setSearchExpanded] = useState(true)
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set())
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
@@ -172,6 +177,7 @@ export const ExploreLanguages = () => {
   const pendingFocus = useRef<string | null>(null)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
+  const zoomLanguage = useSetAtom(focusLanguageOnMapAtom)
   const inspectLanguage = useSetAtom(inspectLanguageFromSidebarAtom)
   const [revealId, setRevealId] = useAtom(revealLanguageIdAtom)
   const panel = useAtomValue(languagePanelAtom)
@@ -313,9 +319,6 @@ export const ExploreLanguages = () => {
   }, [panel.view, revealId, data, hierarchy, expandedKeys, setQuery, setRevealId])
   return (
     <div className="explore-view">
-      <div className="explore-controls">
-        <GeographyFilters />
-      </div>
       <SidebarSection
         id="explore-search"
         className="explore-search"
@@ -411,6 +414,7 @@ export const ExploreLanguages = () => {
                       setFocusedKey(row.key)
                     }}
                     onDetails={() => inspectLanguage(row.language.id)}
+                    onZoom={() => zoomLanguage({ languageId: row.language.id })}
                     onKeyDown={(event) => handleTreeKey(event, row, virtualRow.index)}
                   />
                 </div>
@@ -432,47 +436,14 @@ export const ExploreLanguages = () => {
               disabled={!mappableSelected}
               onClick={() => addSelection()}
             >
-              Add to map
+              Show selected on map
             </button>
-            <SidebarPane
-              className="finder-bulk__coverage"
-              title="Add options"
-              summary={`${coverage === 'own' ? 'Own area' : 'Entry + descendants'} · ${coloring === 'uniform' ? 'One color' : 'Hierarchy colors'}`}
-            >
-              <label>
-                Coloring
-                <select
-                  aria-label="Coloring for selected entries"
-                  value={coloring}
-                  onChange={(event) => {
-                    setColoring(event.currentTarget.value === 'uniform' ? 'uniform' : 'hierarchy')
-                  }}
-                >
-                  <option value="hierarchy">Color by hierarchy</option>
-                  <option value="uniform">One color per group</option>
-                </select>
-              </label>
-              <label>
-                Include
-                <select
-                  aria-label="Coverage for selected entries"
-                  value={coverage}
-                  onChange={(event) => {
-                    setCoverage(event.currentTarget.value === 'own' ? 'own' : 'branch')
-                  }}
-                >
-                  <option value="branch">This entry and its descendants</option>
-                  <option value="own">Only this entry’s area</option>
-                </select>
-              </label>
-              <p>
-                Descendants take precedence where they overlap ancestors; broader coverage remains
-                elsewhere.
-              </p>
-            </SidebarPane>
           </div>
         </footer>
       </SidebarSection>
+      <div className="explore-controls">
+        <GeographyFilters />
+      </div>
     </div>
   )
 }

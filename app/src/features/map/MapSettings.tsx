@@ -1,7 +1,9 @@
-import { useAtom } from 'jotai'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useId, useRef, useState } from 'react'
 import { languageOpacityAtom, overlapModeAtom, stripeThicknessAtom } from '../../state/atlasState'
 
+import { mapColorsVisibleAtom, mapIsolationAtom } from '../../state/mapInteraction.ts'
+import { clearMapColorsAtom, showAllMapColorsAtom } from '../../state/searchSelection.ts'
 import { BIOMES } from './biomes'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
 import { globeLandPath, mercatorLandPath } from './projectionIcons'
@@ -70,6 +72,10 @@ export const MapSettings = ({
   readonly onProjectionChange: (mode: ProjectionMode) => void
   readonly regionInteraction: RegionInteraction
 }) => {
+  const colorsVisible = useAtomValue(mapColorsVisibleAtom)
+  const isolation = useAtomValue(mapIsolationAtom)
+  const clearColors = useSetAtom(clearMapColorsAtom)
+  const showAll = useSetAtom(showAllMapColorsAtom)
   const tooltipId = useId()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -178,6 +184,14 @@ export const MapSettings = ({
                 Regions
               </button>
             </fieldset>
+            <button
+              className="map-colors-toggle"
+              type="button"
+              onClick={() => (colorsVisible && !isolation ? clearColors() : showAll())}
+              aria-label={colorsVisible && !isolation ? 'Clear map colours' : 'Show all languages'}
+            >
+              {colorsVisible && !isolation ? 'Clear colours' : 'Show all'}
+            </button>
           </div>
         )}
       </div>

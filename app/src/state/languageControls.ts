@@ -83,12 +83,11 @@ export const openLanguageDetailsAtom = atom(
   },
 )
 
-/** Sidebar identity activation inspects and frames the same representation. */
+/** Inspecting details never moves the camera; zoom is an explicit double-click. */
 export const inspectLanguageFromSidebarAtom = atom(
   null,
   (_get, set, target: string | LanguageMapTarget) => {
     set(openLanguageDetailsAtom, target, 'sidebar')
-    set(focusLanguageOnMapAtom, typeof target === 'string' ? { languageId: target } : target)
   },
 )
 

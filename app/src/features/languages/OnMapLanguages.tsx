@@ -17,7 +17,11 @@ import {
   selectedMapAreasAtom,
   setMapGroupStyleAtom,
 } from '../../state/atlasState'
-import { inspectLanguageFromSidebarAtom, languagePanelAtom } from '../../state/languageControls'
+import {
+  focusLanguageOnMapAtom,
+  inspectLanguageFromSidebarAtom,
+  languagePanelAtom,
+} from '../../state/languageControls'
 import { LanguagePreviewItem } from './LanguagePreview'
 
 type MapRow =
@@ -47,6 +51,7 @@ export const OnMapLanguages = () => {
   const removeGroup = useSetAtom(removeMapGroupAtom)
   const setGroupStyle = useSetAtom(setMapGroupStyleAtom)
   const clear = useSetAtom(clearMapSelectionAtom)
+  const zoomLanguage = useSetAtom(focusLanguageOnMapAtom)
   const inspectLanguage = useSetAtom(inspectLanguageFromSidebarAtom)
   const panel = useAtomValue(languagePanelAtom)
   const [query, setQuery] = useState('')
@@ -208,6 +213,9 @@ export const OnMapLanguages = () => {
                     )}
                     <button
                       type="button"
+                      onDoubleClick={() =>
+                        zoomLanguage({ languageId: group.rootId, groupId: group.id })
+                      }
                       className="on-map-group__identity on-map-row__identity"
                       title={`${name} · ${row.description}`}
                       onClick={() =>
@@ -303,6 +311,9 @@ export const OnMapLanguages = () => {
                 />
                 <button
                   type="button"
+                  onDoubleClick={() =>
+                    zoomLanguage({ languageId: entry.languageId, entryId: entry.id })
+                  }
                   className="on-map-row__identity"
                   aria-label={`Details for ${name}`}
                   aria-current={panel.detailEntryId === entry.id ? 'true' : undefined}

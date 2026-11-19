@@ -3,6 +3,7 @@ import type { GeographicBounds } from '../../domain/languageFocus.ts'
 
 /** Both map modes frame the selected geometry with the same breathing room. */
 export function focusBounds(map: MapLibreMap, bounds: GeographicBounds): boolean {
+  map.resize()
   const areaBounds: [[number, number], [number, number]] = [
     [bounds[0], bounds[1]],
     [bounds[2], bounds[3]],

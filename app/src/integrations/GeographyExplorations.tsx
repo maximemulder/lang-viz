@@ -7,6 +7,9 @@ import {
   REGION_POLYGON_LAYER,
 } from '../features/administrative/boundaryLayers.ts'
 import {
+  administrativeHoverAtom,
+  administrativeSessionAtom,
+  boundaryIndexAtom,
   focusAdministrativeShapeAtom,
   hoveredAdministrativeRegionAtom,
   languageBordersAtom,
@@ -15,6 +18,11 @@ import {
 import GeographyWorkspace from '../features/map/GeographyWorkspace.tsx'
 import { walsSessionAtom } from '../features/wals/state.ts'
 import { explorerActionAtom, explorerSessionAtom } from '../state/explorerState.ts'
+import {
+  clearMapIsolationAtom,
+  mapColorsVisibleAtom,
+  mapIsolationAtom,
+} from '../state/mapInteraction.ts'
 import { wordTrailVisibleAtom } from './etymology/visibility.ts'
 import './geographyExplorations.css'
 
@@ -32,11 +40,17 @@ export default function GeographyExplorations({
   readonly visible: boolean
   readonly administrative: boolean
 }) {
+  const colorsVisible = useAtomValue(mapColorsVisibleAtom)
+  const regionSelection = useAtomValue(administrativeSessionAtom).selection
+  const isolation = useAtomValue(mapIsolationAtom)
+  const boundaryIndex = useAtomValue(boundaryIndexAtom)
+  const clearIsolation = useSetAtom(clearMapIsolationAtom)
   const lexical = useAtomValue(explorerSessionAtom).overlay.enabled
   const wordVisible = useAtomValue(wordTrailVisibleAtom)
   const wals = useAtomValue(walsSessionAtom).overlay
   const [languageBorders, setLanguageBorders] = useAtom(languageBordersAtom)
   const dispatch = useSetAtom(explorerActionAtom)
+  const setRegionHover = useSetAtom(administrativeHoverAtom)
   const setHoveredRegion = useSetAtom(hoveredAdministrativeRegionAtom)
   const selectRegion = useSetAtom(selectAdministrativeAtom)
   const focusShape = useSetAtom(focusAdministrativeShapeAtom)
@@ -50,14 +64,29 @@ export default function GeographyExplorations({
         borders: administrative || languageBorders,
         onBordersChange: (borders) => {
           setHoveredRegion(null)
+          setRegionHover(null)
           setLanguageBorders(borders)
         },
         onHoverModeChange: (mode) => {
           setHoveredRegion(null)
+          setRegionHover(null)
+          clearIsolation()
           dispatch({ type: 'map-mode', mode })
         },
+        languageHoverFeatureIds:
+          isolation?.kind === 'region'
+            ? isolation.featureIds
+            : regionSelection?.kind === 'territory'
+              ? (boundaryIndex?.associations.get(regionSelection.id)?.featureIds ?? [])
+              : regionSelection?.kind === 'source-shape'
+                ? [regionSelection.id]
+                : [],
         hitLayers: [...REGION_LABEL_LAYERS, REGION_POINT_LAYER, REGION_POLYGON_LAYER],
-        onHover: (region) => setHoveredRegion(region?.featureId ?? null),
+        onHover: (region) => {
+          setHoveredRegion(region?.featureId ?? null)
+          setRegionHover(region)
+        },
+        onLanguageSelect: () => dispatch({ type: 'map-mode', mode: 'language' }),
         onSelect: (region) => {
           if (region)
             selectRegion(
@@ -77,12 +106,12 @@ export default function GeographyExplorations({
               <BoundaryLayer administrative={administrative} />
             </Suspense>
           )}
-          {lexical && wordVisible && !administrative && (
+          {lexical && wordVisible && !administrative && !isolation && colorsVisible && (
             <Suspense fallback={null}>
               <WordTrailLayer />
             </Suspense>
           )}
-          {wals?.visible && visible && !administrative && (
+          {wals?.visible && visible && !administrative && !isolation && colorsVisible && (
             <Suspense fallback={null}>
               <WalsLayer key={`${wals.sourceId}:${wals.featureId}`} />
             </Suspense>

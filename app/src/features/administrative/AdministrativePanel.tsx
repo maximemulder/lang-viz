@@ -1,9 +1,13 @@
-import { useAtomValue, useSetAtom } from 'jotai'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useMemo } from 'react'
 import { DetailsHeader } from '../../components/DetailsHeader.tsx'
-import { DetailsMapAction } from '../../components/DetailsMapAction.tsx'
 import { SidebarTabs } from '../../components/SidebarTabs.tsx'
 import type { AdministrativeRepository } from './model.ts'
+import {
+  navigateAdministrativeAtom,
+  showCheckedTerritoriesAtom,
+  zoomAdministrativeAtom,
+} from './navigation.ts'
 import { number, ObservationList, percent, regionLabel } from './ObservationList.tsx'
 import {
   searchFamilies,
@@ -18,13 +22,14 @@ import {
   administrativeRepositoryAtom,
   administrativeSessionAtom,
   boundaryIndexAtom,
-  focusAdministrativeShapeAtom,
-  focusAdministrativeTerritoryAtom,
+  checkedTerritoriesAtom,
   loadAdministrativeAtom,
   selectAdministrativeAtom,
+  selectCheckedTerritoriesAtom,
   setAdministrativeMetricAtom,
   setAdministrativeQueryAtom,
   setAdministrativeSearchKindAtom,
+  toggleCheckedTerritoryAtom,
 } from './state.ts'
 import './administrative.css'
 
@@ -44,9 +49,6 @@ const Details = ({
     if (!detail) return null
     return (
       <section className="administrative-detail" aria-label="Territory details">
-        <p className="administrative-muted">
-          CLDR statistical region. This code is independent of any displayed polygon.
-        </p>
         <dl className="administrative-facts">
           <div>
             <dt>Reported population</dt>
@@ -61,12 +63,6 @@ const Details = ({
             <dd>{number(detail.observations.length)}</dd>
           </div>
         </dl>
-        {detail.overlappingPercentages && (
-          <p className="administrative-note">
-            Reported language percentages total more than 100% here. They overlap and must not be
-            read as exclusive population shares.
-          </p>
-        )}
         <ObservationList
           rows={detail.observations}
           heading="Reported language estimates"
@@ -82,9 +78,6 @@ const Details = ({
   if (!detail) return null
   return (
     <section className="administrative-detail" aria-label="Family details">
-      <p className="administrative-muted">
-        Glottolog family assigned to source language associations.
-      </p>
       <dl className="administrative-facts">
         <div>
           <dt>Observed languages</dt>
@@ -99,10 +92,6 @@ const Details = ({
           <dd>{number(detail.sumOfReportedEstimates)}</dd>
         </div>
       </dl>
-      <p className="administrative-note">
-        This is a sum of reported estimates, not unique speakers. Rows can overlap within a
-        territory and across script variants.
-      </p>
       <h4>Languages in this supplement</h4>
       <ul className="administrative-family-languages">
         {detail.languages.map((language) => (
@@ -126,8 +115,7 @@ export const AdministrativeDetails = () => {
   const session = useAtomValue(administrativeSessionAtom)
   const boundaryIndex = useAtomValue(boundaryIndexAtom)
   const select = useSetAtom(selectAdministrativeAtom)
-  const focus = useSetAtom(focusAdministrativeTerritoryAtom)
-  const focusShape = useSetAtom(focusAdministrativeShapeAtom)
+  const navigate = useSetAtom(navigateAdministrativeAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
   if (!session.selection) return null
   const selection = session.selection
@@ -143,8 +131,7 @@ export const AdministrativeDetails = () => {
           closeLabel={`Close ${shape.sourceName} details`}
           onClose={() => select(null)}
         />
-        <DetailsMapAction disabled={false} onFocus={() => focusShape(shape.featureId)} />
-        <p className="administrative-note">No CLDR data is linked to this region.</p>
+        <p className="administrative-note">No language estimates available.</p>
       </div>
     )
   }
@@ -154,9 +141,7 @@ export const AdministrativeDetails = () => {
       ? regionLabel(selection.id, names)
       : repository.familyById.get(selection.id)?.name
   if (!title) return null
-  const canFocusMap = boundaryIndex?.associations.get(selection.id)?.status === 'matched'
-  const boundaryAssociation =
-    selection.kind === 'territory' ? boundaryIndex?.associations.get(selection.id) : undefined
+
   return (
     <div className="administrative-detail-scroll">
       <DetailsHeader
@@ -179,22 +164,10 @@ export const AdministrativeDetails = () => {
           restoreFocus?.focus({ preventScroll: true })
         }}
       />
-      {selection.kind === 'territory' && (
-        <DetailsMapAction disabled={!canFocusMap} onFocus={() => focus(selection.id)} />
-      )}
-      {selection.kind === 'territory' && boundaryIndex && !canFocusMap && (
-        <p className="administrative-note">
-          No matched polygon or representative point in this boundary view. The CLDR observations
-          remain available below.
-        </p>
-      )}
-      {boundaryAssociation?.viewpointSensitive && boundaryAssociation.note && (
-        <p className="administrative-note">{boundaryAssociation.note}</p>
-      )}
       <Details
         repository={repository}
         selection={session.selection}
-        onSelect={select}
+        onSelect={(selection) => void navigate(selection)}
         names={names}
       />
     </div>
@@ -202,13 +175,19 @@ export const AdministrativeDetails = () => {
 }
 
 export default function AdministrativePanel() {
+  const [checked, setChecked] = useAtom(checkedTerritoriesAtom)
+  const toggleChecked = useSetAtom(toggleCheckedTerritoryAtom)
+  const selectChecked = useSetAtom(selectCheckedTerritoriesAtom)
+  const showChecked = useSetAtom(showCheckedTerritoriesAtom)
+  const zoomRegion = useSetAtom(zoomAdministrativeAtom)
+  const boundaries = useAtomValue(boundaryIndexAtom)
   const repository = useAtomValue(administrativeRepositoryAtom)
   const loadState = useAtomValue(administrativeLoadStateAtom)
   const session = useAtomValue(administrativeSessionAtom)
   const load = useSetAtom(loadAdministrativeAtom)
   const setQuery = useSetAtom(setAdministrativeQueryAtom)
   const setKind = useSetAtom(setAdministrativeSearchKindAtom)
-  const select = useSetAtom(selectAdministrativeAtom)
+  const navigate = useSetAtom(navigateAdministrativeAtom)
   const setMetric = useSetAtom(setAdministrativeMetricAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
   useEffect(() => {
@@ -241,7 +220,7 @@ export default function AdministrativePanel() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => ({ kind: 'family' as const, id: item.id, label: item.name }))
   }, [repository, session.searchKind, session.query, names])
-  const visibleResults = results.slice(0, 60)
+  const visibleResults = session.searchKind === 'territory' ? results : results.slice(0, 60)
 
   return (
     <aside className="administrative-panel" aria-label="Administrative language statistics">
@@ -347,9 +326,6 @@ export default function AdministrativePanel() {
                   Selected family estimate sum
                 </label>
               )}
-              <p>
-                Color appears only for matched polygons when Borders is on. No value means no fill.
-              </p>
             </fieldset>
             <label className="administrative-search-field">
               Find {session.searchKind === 'territory' ? 'a region' : `a ${session.searchKind}`}
@@ -360,6 +336,16 @@ export default function AdministrativePanel() {
                 placeholder="Name or source code"
               />
             </label>
+            {session.searchKind === 'territory' && (
+              <div className="administrative-selection-actions">
+                <button type="button" onClick={() => selectChecked(results.map(({ id }) => id))}>
+                  Select all
+                </button>
+                <button type="button" disabled={!checked.length} onClick={() => setChecked([])}>
+                  Clear selection
+                </button>
+              </div>
+            )}
             <section className="administrative-results" aria-label="Search results">
               <p>
                 {number(results.length)}{' '}
@@ -371,7 +357,7 @@ export default function AdministrativePanel() {
               {results.length === 0 && <p>No matches.</p>}
               <ul>
                 {visibleResults.map((item) => (
-                  <li key={`${item.kind}:${item.id}`}>
+                  <li className="administrative-result-row" key={`${item.kind}:${item.id}`}>
                     <button
                       type="button"
                       aria-current={
@@ -379,41 +365,50 @@ export default function AdministrativePanel() {
                           ? 'true'
                           : undefined
                       }
-                      onClick={() => select({ kind: item.kind, id: item.id })}
+                      onDoubleClick={() => {
+                        void zoomRegion({ kind: item.kind, id: item.id })
+                      }}
+                      onClick={() => void navigate({ kind: item.kind, id: item.id })}
                     >
                       {item.label} <span className="administrative-code">{item.id}</span>
                     </button>
+                    {item.kind === 'territory' && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${item.label}`}
+                        checked={checked.includes(item.id)}
+                        disabled={boundaries?.associations.get(item.id)?.status !== 'matched'}
+                        onChange={() => toggleChecked(item.id)}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
             </section>
+            {session.searchKind === 'territory' && (
+              <footer className="administrative-selection-footer">
+                <strong>{checked.length} selected</strong>
+                <button
+                  type="button"
+                  className="finder-add"
+                  disabled={!checked.length}
+                  onClick={() => showChecked()}
+                >
+                  Show selected on map
+                </button>
+              </footer>
+            )}
             <details className="administrative-source">
-              <summary>About these estimates</summary>
+              <summary>Sources</summary>
               <p>
-                Approximate functional speaker estimates may include first and later-language
-                speakers. The source count is derived from territory population and reported
-                percentage. Coverage is incomplete.
-              </p>
-              <p>
-                The joined file’s original CLDR release and preprocessing are unverified. Its source
-                codes are independent of map borders; browser-localized region names are display
-                labels only.
-              </p>
-              <p>
-                Snapshot: {number(repository.data.manifest.coverage.territoryCount)} regions,{' '}
-                {number(repository.data.manifest.coverage.observationCount)} observations. CLDR
-                release: {repository.data.manifest.cldrRelease ?? 'unknown'}.
-              </p>
-              <p>
-                Sources:{' '}
+                CLDR {repository.data.manifest.cldrRelease} ·{' '}
                 <a href="https://cldr.unicode.org/" target="_blank" rel="noreferrer">
                   Unicode CLDR
                 </a>{' '}
-                and{' '}
+                ·{' '}
                 <a href="https://glottolog.org/" target="_blank" rel="noreferrer">
                   Glottolog
                 </a>
-                .
               </p>
             </details>
           </section>

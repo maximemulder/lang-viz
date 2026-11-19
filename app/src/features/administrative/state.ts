@@ -71,6 +71,13 @@ export const toggleAdministrativeLanguagePlacementAtom = atom(null, (get, set) =
 
 /** Languages mode remembers its optional borders across mode switches. */
 export const languageBordersAtom = atom(false)
+export const administrativeHoverAtom = atom<{
+  readonly featureId: string
+  readonly sourceName: string
+  readonly territoryCode: string | null
+  readonly longitude: number
+  readonly latitude: number
+} | null>(null)
 export const hoveredAdministrativeRegionAtom = atom<string | null>(null)
 export const boundaryIndexAtom = atom<BoundaryIndex | null>(null)
 
@@ -154,4 +161,20 @@ export const focusAdministrativeShapeAtom = atom(null, (get, set, featureId: str
   set(administrativeCameraRequestAtom, request)
   set(mapCameraIntentAtom, request)
   return true
+})
+
+export const checkedTerritoriesAtom = atom<readonly string[]>([])
+export const toggleCheckedTerritoryAtom = atom(null, (get, set, code: string) => {
+  if (get(boundaryIndexAtom)?.associations.get(code)?.status !== 'matched') return
+  const checked = get(checkedTerritoriesAtom)
+  set(
+    checkedTerritoriesAtom,
+    checked.includes(code) ? checked.filter((id) => id !== code) : [...checked, code],
+  )
+})
+export const selectCheckedTerritoriesAtom = atom(null, (get, set, codes: readonly string[]) => {
+  const mapped = codes.filter(
+    (code) => get(boundaryIndexAtom)?.associations.get(code)?.status === 'matched',
+  )
+  set(checkedTerritoriesAtom, [...new Set([...get(checkedTerritoriesAtom), ...mapped])])
 })
