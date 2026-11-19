@@ -274,8 +274,10 @@ encoded with boundary layers at runtime.
 
 ## Responsiveness and limits
 
-- Requests are debounced by 120 ms after navigation; unchanged tile sets skip
-  requests. Retain recently visited tiles at the current integer zoom, up to 48,
+- New viewport targets retire superseded staging immediately. While the camera
+  moves, publication and pending dispatch pause. Computation starts 120 ms after
+  a changed target settles, and unchanged tile sets reuse their work.
+  Retain recently visited tiles at the current integer zoom, up to 48,
   prioritizing the viewport. Returning inside that coverage needs no source update.
   The main thread retains encoded tiles and tells the worker which ones are
   already present. Extending coverage computes/transfers only additions; forced
@@ -337,18 +339,23 @@ encoded with boundary layers at runtime.
   Fallback colors use source order until disjoint coverage is ready. Areas outside
   the committed scope wait for a new snapshot instead of introducing another LOD.
 - `geometry/serviceClient.ts` supervises one multiplexed module worker for coverage,
-  source/fallback geometry and parent delivery. Consumers cancel independently.
+  source/fallback geometry and parent delivery. Separate dispatch limits allow
+  two coverage, six source, and two parent-delivery jobs in flight. A coverage
+  consumer replaces its waiting request and holds at most one worker slot.
+  Aborting a waiting job removes it before dispatch. Running jobs keep their
+  slot until they stop. Consumers cancel independently.
   The shared `GeometryTileStore` deduplicates in-flight archive/profile reads and
   prepared-resource fetches; the last consumer aborts the underlying read.
   Its byte cache is bounded to 96 entries/32 MiB; encoded fallback is bounded to
   96 entries/16 MiB. Derived partition and delivery caches retain their own bounds.
-- Cancellation has a 150 ms acknowledgement grace period. A blocked worker is
+- Cancellation has a 150 ms grace period for the job to exit. A blocked worker is
   replaced and only live jobs replay, within their original 8-second deadlines.
   Snapshot registrations replay before delivery jobs. Responsive cancellation
-  preserves caches, and obsolete consumers cannot publish or cancel another
-  consumer's work. Initialization failure replaces the module registry. Publication
-  has a separate 12-second deadline. Browser timer throttling still applies, and
-  individual native geometry calls remain synchronous.
+  preserves caches. Coverage checks cancellation between tiles, including
+  runs of cached or empty tiles, and fallback checks between source tiles,
+  feature batches, and contributor groups. Initialization failure replaces the
+  module registry. Publication has a separate 12-second deadline. Browser timer
+  throttling still applies, and individual native geometry calls remain synchronous.
 - Selection changes invalidate pending publications; presentation changes reuse
   geometry. Failures retain available committed geometry and expose Retry.
   Publication deadlines remain armed for valid prefixes after computation fails.

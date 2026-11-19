@@ -119,8 +119,12 @@ export const OverlapHatching = ({
       ...(diagnosticsEnabled ? { diagnostics: overlapDiagnostics } : {}),
     })
     controllerRef.current = controller
-    const refresh = () => {
-      if (map.isMoving() || !map.getLayer('language-area-hit-targets')) return
+    const refresh = (delay = 0) => {
+      if (map.isMoving()) {
+        controller.suspendViewport()
+        return
+      }
+      if (!map.getLayer('language-area-hit-targets')) return
       const bounds = map.getBounds()
       const tiles = tilesForBounds(
         {
@@ -132,16 +136,12 @@ export const OverlapHatching = ({
         Math.min(map.getZoom(), data.manifest.geometryMaxZoom ?? 8),
       )
       display.target(tiles)
-      controller.refresh(tiles)
+      controller.refresh(tiles, delay)
     }
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const schedule = () => {
-      clearTimeout(timer)
-      timer = setTimeout(refresh, 120)
-    }
+    const updateViewport = () => refresh(120)
     refreshRef.current = () => {
       controller.recompute()
-      schedule()
+      updateViewport()
     }
     retryRef.current = () => {
       controller.retry()
@@ -149,18 +149,21 @@ export const OverlapHatching = ({
     }
     worker.onmessage = ({ data }) => controller.receive(data)
     worker.onerror = () => controller.workerFailed()
-    for (const event of ['load', 'moveend', 'resize', 'idle'] as const) map.on(event, schedule)
+    map.on('movestart', controller.suspendViewport)
+    for (const event of ['load', 'moveend', 'resize', 'idle'] as const)
+      map.on(event, updateViewport)
     map.on('idle', resources.prune)
     map.on('sourcedata', controller.publish)
     map.on('idle', controller.publish)
     controller.configure(configRef.current.selectionKey, true)
-    schedule()
+    updateViewport()
     return () => {
-      clearTimeout(timer)
       refreshRef.current = null
       retryRef.current = null
       controllerRef.current = null
-      for (const event of ['load', 'moveend', 'resize', 'idle'] as const) map.off(event, schedule)
+      map.off('movestart', controller.suspendViewport)
+      for (const event of ['load', 'moveend', 'resize', 'idle'] as const)
+        map.off(event, updateViewport)
       map.off('idle', resources.prune)
       map.off('sourcedata', controller.publish)
       map.off('idle', controller.publish)

@@ -10,10 +10,14 @@ export interface GeometryWorker {
 }
 interface Pending {
   readonly job: GeometryJob
+  readonly owner: object | undefined
   readonly receive: (result: GeometryResult) => void
   readonly fail: (error: Error) => void
   readonly cleanup: () => void
 }
+
+// Keep delivery and source reads moving even when both coverage slots are busy.
+const MAX_DISPATCHED = { coverage: 2, delivery: 2, source: 6 } as const
 
 /** Shared ownership, cancellation and restart for every geometry consumer.
  * A blocked native call restarts the worker and replays only still-useful work,
@@ -24,6 +28,10 @@ export class GeometryService {
   private worker: GeometryWorker | undefined
   private nextId = 0
   private readonly pending = new Map<number, Pending>()
+  private readonly dispatched = new Map<
+    number,
+    { kind: GeometryJob['kind']; owner: object | undefined }
+  >()
   private readonly cancellations = new Map<number, ReturnType<typeof setTimeout>>()
   private readonly snapshots = new Map<number, readonly DeliveryTile[]>()
   private readonly tileIds = new WeakMap<DeliveryTile, number>()
@@ -43,19 +51,25 @@ export class GeometryService {
     for (const [register, tiles] of this.snapshots) this.postRegistration(register, tiles)
     worker.onmessage = ({ data }) => {
       if (this.worker !== worker) return
-      clearTimeout(this.cancellations.get(data.id))
-      this.cancellations.delete(data.id)
-      if ('cancelled' in data) return
+      const terminal = 'cancelled' in data || 'error' in data || data.complete
+      if (terminal) {
+        clearTimeout(this.cancellations.get(data.id))
+        this.cancellations.delete(data.id)
+        this.dispatched.delete(data.id)
+      }
       const request = this.pending.get(data.id)
-      if (!request) return
-      if ('error' in data || data.complete) {
+      if (request && terminal) {
         this.pending.delete(data.id)
         request.cleanup()
       }
       if ('error' in data) {
-        request.fail(new Error(data.error))
-        if (data.initialization) this.restart()
-      } else request.receive(data.result)
+        request?.fail(new Error(data.error))
+        if (data.initialization) {
+          this.restart()
+          return
+        }
+      } else if (!('cancelled' in data)) request?.receive(data.result)
+      if (terminal) this.dispatch()
     }
     worker.onerror = () => {
       if (this.worker !== worker) return
@@ -65,18 +79,46 @@ export class GeometryService {
     return worker
   }
 
-  private restart() {
+  private stop() {
     this.worker?.terminate()
     this.worker = undefined
-    this.restarts++
     for (const timer of this.cancellations.values()) clearTimeout(timer)
     this.cancellations.clear()
-    if (!this.pending.size) return
-    try {
-      const worker = this.start()
-      for (const [id, request] of this.pending) worker.postMessage({ id, job: request.job })
-    } catch {
-      this.dispose(new Error('Could not restart map geometry. Try again.'))
+    this.dispatched.clear()
+  }
+
+  private restart() {
+    this.stop()
+    this.restarts++
+    this.dispatch()
+  }
+
+  private dispatch() {
+    for (const [id, { job, owner, cleanup, fail }] of this.pending) {
+      if (this.dispatched.has(id)) continue
+      let used = 0
+      let ownerBusy = false
+      for (const active of this.dispatched.values()) {
+        if (active.kind === job.kind) used++
+        if (owner && active.owner === owner) ownerBusy = true
+      }
+      if (ownerBusy || used >= MAX_DISPATCHED[job.kind]) continue
+      let worker: GeometryWorker
+      try {
+        worker = this.start()
+      } catch {
+        this.dispose(new Error('Could not start map geometry. Try again.'))
+        return
+      }
+      this.dispatched.set(id, { kind: job.kind, owner })
+      try {
+        worker.postMessage({ id, job })
+      } catch (error) {
+        this.dispatched.delete(id)
+        this.pending.delete(id)
+        cleanup()
+        fail(error instanceof Error ? error : new Error(String(error)))
+      }
     }
   }
 
@@ -85,20 +127,22 @@ export class GeometryService {
     signal: AbortSignal,
     receive: Pending['receive'],
     fail: Pending['fail'],
+    owner?: object,
   ) {
     signal.throwIfAborted()
     const id = ++this.nextId
-    const worker = this.start()
     const cancel = () => {
       const request = this.pending.get(id)
       if (!request) return
       this.pending.delete(id)
       request.cleanup()
-      this.cancellations.set(
-        id,
-        setTimeout(() => this.restart(), CANCELLATION_GRACE_MS),
-      )
-      this.worker?.postMessage({ cancel: id })
+      if (this.dispatched.has(id)) {
+        this.cancellations.set(
+          id,
+          setTimeout(() => this.restart(), CANCELLATION_GRACE_MS),
+        )
+        this.worker?.postMessage({ cancel: id })
+      }
       request.fail(new DOMException('Geometry request aborted', 'AbortError'))
     }
     const deadline = setTimeout(() => {
@@ -109,10 +153,11 @@ export class GeometryService {
       request.fail(
         new Error('Map geometry exceeded its time budget. Zoom in or select fewer languages.'),
       )
-      this.restart()
+      if (this.dispatched.has(id)) this.restart()
     }, REQUEST_TIMEOUT_MS)
     this.pending.set(id, {
       job,
+      owner,
       receive,
       fail,
       cleanup: () => {
@@ -121,13 +166,7 @@ export class GeometryService {
       },
     })
     signal.addEventListener('abort', cancel, { once: true })
-    try {
-      worker.postMessage({ id, job })
-    } catch (error) {
-      this.pending.get(id)?.cleanup()
-      this.pending.delete(id)
-      fail(error instanceof Error ? error : new Error(String(error)))
-    }
+    this.dispatch()
   }
 
   request(
@@ -166,14 +205,12 @@ export class GeometryService {
     for (const id of this.sent) if (!used.has(id)) this.sent.delete(id)
   }
   dispose(error = new Error('Map geometry stopped.')) {
-    this.worker?.terminate()
-    this.worker = undefined
-    for (const timer of this.cancellations.values()) clearTimeout(timer)
-    this.cancellations.clear()
-    for (const request of this.pending.values()) {
+    this.stop()
+    const pending = [...this.pending.values()]
+    this.pending.clear()
+    for (const request of pending) {
       request.cleanup()
       request.fail(error)
     }
-    this.pending.clear()
   }
 }

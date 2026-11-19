@@ -40,6 +40,7 @@ export class GeometryCoverageClient {
           },
         } as MessageEvent<OverlapResponse>)
       },
+      this,
     )
   }
   cancel() {

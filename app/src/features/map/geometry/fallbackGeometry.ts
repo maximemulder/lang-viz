@@ -10,6 +10,7 @@ import { lazyResource } from '../overlap/lazyResource.ts'
 import { bufferTileEdges } from '../overlap/tileBuffer.ts'
 import { quantizeTilePolygon } from '../overlap/tileGeometry.ts'
 import type { OverlapSelection, TileCoordinate } from '../overlap/types.ts'
+import { geometryCheckpoint } from './checkpoint.ts'
 import type { GeometryTileStore } from './tileStore.ts'
 
 export interface FallbackGeometry {
@@ -60,9 +61,14 @@ const sourceBoundaries = async (
     : undefined
   if (!layer) return { extent: 8192, features: [] as Feature[], source: new Uint8Array() }
   const selected = new Set(config.selection.variantIds)
+  const checkpoint = geometryCheckpoint(signal)
   const sourceFeatures: Feature[] = []
   const groups = new Map<string, { geometry: MultiPolygon; sources: Set<string> }>()
   for (let i = 0; i < layer.length; i++) {
+    if (i % 64 === 0) {
+      const pause = checkpoint()
+      if (pause) await pause
+    }
     const feature = layer.feature(i),
       id = feature.properties.variant_id
     if (feature.type !== 3 || typeof id !== 'string' || !selected.has(id)) continue
@@ -95,7 +101,8 @@ const sourceBoundaries = async (
       else subtractions.set(id, [...child.geometry])
     }
   for (const [id, group] of groups) {
-    signal.throwIfAborted()
+    const pause = checkpoint()
+    if (pause) await pause
     const subtract = subtractions.get(id) ?? []
     const union = group.sources.size > 1 || subtract.length ? await loadUnion() : undefined
     signal.throwIfAborted()
@@ -165,9 +172,11 @@ export const fallbackGeometry = async (
   const fills: Feature[] = [],
     boundaries: Feature[] = []
   const extent = 8192
+  const checkpoint = geometryCheckpoint(signal)
   for (const tile of missing) {
     const scale = 2 ** (tile.z - target.z)
-    signal.throwIfAborted()
+    const pause = checkpoint()
+    if (pause) await pause
     const fetchStarted = performance.now()
     const bytes = await store.read(archiveUrl, tile, signal)
     if (metrics) metrics.fetchMs += performance.now() - fetchStarted

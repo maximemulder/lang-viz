@@ -7,7 +7,7 @@ import { MAX_COVERAGE_VERTICES } from './limits.ts'
 import { OverlapPatternError } from './patterns.ts'
 import { prepareBranchCoverage } from './precomputed.ts'
 import { coverageTilesKey, retainCoverageTiles } from './tiles.ts'
-import type { OverlapRequest, OverlapResponse, TileCoordinate } from './types.ts'
+import type { OverlapRequest, OverlapResponse, OverlapSelection, TileCoordinate } from './types.ts'
 import { parseOverlapSelection } from './types.ts'
 
 export interface HatchingState {
@@ -72,15 +72,19 @@ export const createOverlapController = (options: {
 }) => {
   const { worker, resources, diagnostics } = options
   let selectionKey = '[]'
+  let selection: OverlapSelection = { variantIds: [] }
   let enabled = false
   let nextRequestId = 0
-  let previousKey = ''
+  let targetKey: string | undefined
   let retained: TileCoordinate[] = []
   let viewportKeys = new Set<string>()
   const results = new Map<string, DeliveryTile>()
   let request: Request | null = null
   let active: Publication | null = null
   let staging: Publication | null = null
+  let viewportSuspended = false
+  let scheduled: (() => void) | undefined
+  let dispatchTimer: ReturnType<typeof setTimeout> | undefined
   let batch: ReturnType<typeof setTimeout> | undefined
   let deadline: ReturnType<typeof setTimeout> | undefined
   let disposed = false
@@ -100,7 +104,7 @@ export const createOverlapController = (options: {
       ? 'error'
       : request?.phase === 'complete' && !staging && active?.version === request.version
         ? 'ready'
-        : request
+        : request || scheduled
           ? 'loading'
           : 'idle'
     options.onChange({
@@ -129,6 +133,10 @@ export const createOverlapController = (options: {
   }
   const supersede = () => {
     if (report()?.outcome === 'pending') update({ outcome: 'superseded' })
+    if (request?.phase === 'computing') worker.cancel()
+    clearTimeout(dispatchTimer)
+    dispatchTimer = undefined
+    scheduled = undefined
     cancelTimers()
     discardStaging()
   }
@@ -162,10 +170,7 @@ export const createOverlapController = (options: {
     }
     if (changed) {
       retained = retained.filter((tile) => viewportKeys.has(tileKey(tile)))
-      previousKey = JSON.stringify([
-        parseOverlapSelection(selectionKey).variantIds,
-        coverageTilesKey(retained),
-      ])
+      targetKey = coverageTilesKey(retained)
       if (request) request.version++
     }
     return changed
@@ -173,7 +178,8 @@ export const createOverlapController = (options: {
   const stage = () => {
     clearTimeout(batch)
     batch = undefined
-    if (!request || request.publicationBlocked || staging || !results.size) return
+    if (viewportSuspended || !request || request.publicationBlocked || staging || !results.size)
+      return
     if (active?.version === request.version) return
     if (!active && request.phase === 'computing' && request.preparedFirst !== false) return
     // A prefix at a new detail level can replace previously striped areas with
@@ -226,7 +232,7 @@ export const createOverlapController = (options: {
     }
   }
   const publish = () => {
-    if (!request || !staging || request.publicationBlocked) return
+    if (viewportSuspended || !request || !staging || request.publicationBlocked) return
     const elapsed = performance.now() - staging.stagedAt
     if (!resources.isReady(staging.snapshot, staging.buffer)) return
     const previous = active
@@ -253,121 +259,150 @@ export const createOverlapController = (options: {
     forceReplacement = false
     failedSource = false
     supersede()
-    worker.cancel()
     if (active) resources.release(active.snapshot)
     active = null
     request = null
     retained = []
-    previousKey = ''
+    targetKey = undefined
     results.clear()
     options.onCoverageReady(null)
     emit()
   }
+  const startRequest = (tiles: TileCoordinate[]) => {
+    retained = tiles
+    const { variantIds } = selection
+    const desired = new Set(tiles.map(tileKey))
+    for (const [key, tile] of results) if (!desired.has(key) || tile.fallback) results.delete(key)
+    // Reversing a zoom can return to the still-visible snapshot before its
+    // replacement finishes. Reuse those native tiles instead of fetching them again.
+    let vertices = [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0)
+    for (const [key, tile] of (forceReplacement ? [] : active?.tiles) ?? []) {
+      if (
+        !desired.has(key) ||
+        tile.fallback ||
+        results.has(key) ||
+        vertices + tile.vertices > MAX_COVERAGE_VERTICES
+      )
+        continue
+      results.set(key, tile)
+      vertices += tile.vertices
+    }
+    request = {
+      id: ++nextRequestId,
+      selectionKey,
+      phase: 'computing',
+      version: (active?.version ?? 0) + 1,
+      startedAt: performance.now(),
+      error: '',
+      publicationBlocked: false,
+      preparedFirst: options.nativeFallback && options.precomputed && !active ? null : false,
+    }
+    diagnostics?.start(request.id, tiles.length, variantIds.length)
+    deadline = setTimeout(
+      () =>
+        fail(
+          'publication-deadline',
+          'Stripes took too long to load. Keeping available coverage. Try again.',
+          true,
+        ),
+      PUBLICATION_TIMEOUT_MS,
+    )
+    emit()
+    const parts = options.parts?.(variantIds)
+    if (options.nativeFallback)
+      for (const tile of tiles) {
+        const key = tileKey(tile)
+        if (!results.has(key))
+          results.set(key, {
+            tile,
+            fallback: true,
+            data: new Uint8Array(),
+            renderData: new Uint8Array(),
+            patterns: [],
+            vertices: 0,
+            features: 0,
+          })
+      }
+    const job: OverlapRequest = {
+      requestId: request.id,
+      archiveUrl:
+        typeof options.archiveUrl === 'function' ? options.archiveUrl() : options.archiveUrl,
+      sourceLayer: options.sourceLayer,
+      variantIds,
+      ...(selection.variantGroups ? { variantGroups: selection.variantGroups } : {}),
+      ...(selection.refinements ? { refinements: selection.refinements } : {}),
+      ...(options.precomputed ? { precomputed: options.precomputed } : {}),
+      ...(parts ? { parts } : {}),
+      tiles,
+      knownTiles: [...results].filter(([, tile]) => !tile.fallback).map(([key]) => key),
+      ...(diagnostics ? { profile: true } : {}),
+    }
+    worker.postMessage(job)
+    if (request.preparedFirst === null) {
+      // A matching prepared branch can replace all initial fallback tiles in
+      // one source. Keep the ordinary early fallback for other selections.
+      void prepareBranchCoverage(job)
+        .then((prepared) => {
+          if (request?.id !== job.requestId || request.preparedFirst !== null) return
+          request.preparedFirst = Boolean(prepared && tiles.every((tile) => prepared(tile)))
+          if (!request.preparedFirst) stage()
+        })
+        .catch(() => {
+          if (request?.id !== job.requestId || request.preparedFirst !== null) return
+          request.preparedFirst = false
+          stage()
+        })
+    } else if (options.nativeFallback) stage()
+  }
+  const dispatchAfter = (delay: number) => {
+    const dispatch = () => {
+      dispatchTimer = undefined
+      const start = scheduled
+      scheduled = undefined
+      start?.()
+    }
+    if (delay > 0) dispatchTimer = setTimeout(dispatch, delay)
+    else dispatch()
+  }
   return {
-    configure(key: string, hatching: boolean) {
-      if (selectionKey === key && enabled === hatching) return
+    configure(key: string, coverageEnabled: boolean) {
+      if (selectionKey === key && enabled === coverageEnabled) return
       reset()
       selectionKey = key
-      enabled = hatching
+      selection = coverageEnabled ? parseOverlapSelection(key) : { variantIds: [] }
+      enabled = coverageEnabled
     },
-    refresh(viewport: readonly TileCoordinate[]) {
+    suspendViewport() {
+      viewportSuspended = true
+      clearTimeout(dispatchTimer)
+      dispatchTimer = undefined
+    },
+    refresh(viewport: readonly TileCoordinate[], delay = 0) {
       if (disposed) return
+      const wasSuspended = viewportSuspended
+      viewportSuspended = false
       viewportKeys = new Set(viewport.map(tileKey))
-      const selection = enabled ? parseOverlapSelection(selectionKey) : { variantIds: [] }
-      const { variantIds } = selection
-      const tiles = retainCoverageTiles(variantIds.length ? viewport : [], retained)
-      const key = JSON.stringify([variantIds, coverageTilesKey(tiles)])
-      retained = tiles
-      if (key === previousKey) return
-      supersede()
-      previousKey = key
-      if (!tiles.length) {
-        reset()
-        previousKey = key
+      const tiles = retainCoverageTiles(selection.variantIds.length ? viewport : [], retained)
+      const key = coverageTilesKey(tiles)
+      if (key === targetKey) {
+        if (scheduled && dispatchTimer === undefined) dispatchAfter(delay)
+        else if (wasSuspended) {
+          if (batch === undefined) stage()
+          publish()
+        }
         return
       }
-      const desired = new Set(tiles.map(tileKey))
-      for (const [key, tile] of results) if (!desired.has(key) || tile.fallback) results.delete(key)
-      // Reversing a zoom can return to the still-visible snapshot before its
-      // replacement finishes. Reuse those native tiles instead of fetching them again.
-      let vertices = [...results.values()].reduce((sum, tile) => sum + tile.vertices, 0)
-      for (const [key, tile] of (forceReplacement ? [] : active?.tiles) ?? []) {
-        if (
-          !desired.has(key) ||
-          tile.fallback ||
-          results.has(key) ||
-          vertices + tile.vertices > MAX_COVERAGE_VERTICES
-        )
-          continue
-        results.set(key, tile)
-        vertices += tile.vertices
+      if (!tiles.length) {
+        reset()
+        targetKey = key
+        return
       }
-      request = {
-        id: ++nextRequestId,
-        selectionKey,
-        phase: 'computing',
-        version: (active?.version ?? 0) + 1,
-        startedAt: performance.now(),
-        error: '',
-        publicationBlocked: false,
-        preparedFirst: options.nativeFallback && options.precomputed && !active ? null : false,
-      }
-      diagnostics?.start(request.id, tiles.length, variantIds.length)
-      deadline = setTimeout(
-        () =>
-          fail(
-            'publication-deadline',
-            'Stripes took too long to load. Keeping available coverage. Try again.',
-            true,
-          ),
-        PUBLICATION_TIMEOUT_MS,
-      )
-      emit()
-      const parts = options.parts?.(variantIds)
-      if (options.nativeFallback)
-        for (const tile of tiles) {
-          const key = tileKey(tile)
-          if (!results.has(key))
-            results.set(key, {
-              tile,
-              fallback: true,
-              data: new Uint8Array(),
-              renderData: new Uint8Array(),
-              patterns: [],
-              vertices: 0,
-              features: 0,
-            })
-        }
-      const job: OverlapRequest = {
-        requestId: request.id,
-        archiveUrl:
-          typeof options.archiveUrl === 'function' ? options.archiveUrl() : options.archiveUrl,
-        sourceLayer: options.sourceLayer,
-        variantIds,
-        ...(selection.variantGroups ? { variantGroups: selection.variantGroups } : {}),
-        ...(selection.refinements ? { refinements: selection.refinements } : {}),
-        ...(options.precomputed ? { precomputed: options.precomputed } : {}),
-        ...(parts ? { parts } : {}),
-        tiles,
-        knownTiles: [...results].filter(([, tile]) => !tile.fallback).map(([key]) => key),
-        ...(diagnostics ? { profile: true } : {}),
-      }
-      worker.postMessage(job)
-      if (request.preparedFirst === null) {
-        // A matching prepared branch can replace all initial fallback tiles in
-        // one source. Keep the ordinary early fallback for other selections.
-        void prepareBranchCoverage(job)
-          .then((prepared) => {
-            if (request?.id !== job.requestId || request.preparedFirst !== null) return
-            request.preparedFirst = Boolean(prepared && tiles.every((tile) => prepared(tile)))
-            if (!request.preparedFirst) stage()
-          })
-          .catch(() => {
-            if (request?.id !== job.requestId || request.preparedFirst !== null) return
-            request.preparedFirst = false
-            stage()
-          })
-      } else if (options.nativeFallback) stage()
+      supersede()
+      request = null
+      targetKey = key
+      scheduled = () => startRequest(tiles)
+      if (delay > 0) emit()
+      dispatchAfter(delay)
     },
     receive(response: OverlapResponse) {
       if (disposed || response.requestId !== request?.id || request.phase !== 'computing') return
@@ -445,6 +480,7 @@ export const createOverlapController = (options: {
         // Loaded tiles remain a coherent geometry revision. Retry replaces the
         // source atomically instead of exposing independently loaded originals.
         failedSource = true
+        if (scheduled || staging || request?.phase === 'computing') return
       }
       fail(
         'source-error',
@@ -460,13 +496,12 @@ export const createOverlapController = (options: {
     },
     publish,
     retry() {
-      previousKey = ''
+      targetKey = undefined
     },
     recompute() {
       supersede()
-      worker.cancel()
       request = null
-      previousKey = ''
+      targetKey = undefined
       results.clear()
       // Force fresh worker output while the displayed revision stays coherent.
       // Unlike a selection reset, recomputation must not expose blank/fallback frames.

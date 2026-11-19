@@ -25,8 +25,9 @@ self.onmessage = async ({ data }: MessageEvent<GeometryInput>) => {
     return
   }
   if ('cancel' in data) {
-    controllers.get(data.cancel)?.abort()
-    self.postMessage({ id: data.cancel, cancelled: true } satisfies GeometryOutput)
+    const running = controllers.get(data.cancel)
+    if (running) running.abort()
+    else self.postMessage({ id: data.cancel, cancelled: true } satisfies GeometryOutput)
     return
   }
   const { id, job } = data
@@ -156,5 +157,6 @@ self.onmessage = async ({ data }: MessageEvent<GeometryInput>) => {
       } satisfies GeometryOutput)
   } finally {
     controllers.delete(id)
+    if (signal.aborted) self.postMessage({ id, cancelled: true } satisfies GeometryOutput)
   }
 }

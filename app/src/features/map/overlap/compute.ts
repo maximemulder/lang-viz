@@ -2,6 +2,7 @@ import type { VectorTileFeature, VectorTileLayer } from '@mapbox/vector-tile'
 import { classifyRings, VectorTile } from '@mapbox/vector-tile'
 import { PbfReader } from 'pbf'
 import type { PMTiles } from 'pmtiles'
+import { geometryCheckpoint } from '../geometry/checkpoint.ts'
 import { CoverageParts } from './coverageParts.ts'
 import {
   type CoverageInput,
@@ -209,8 +210,14 @@ export class OverlapComputer {
         ])
       : null
     let outputVertices = 0
+    const checkpoint = geometryCheckpoint(signal)
     for (const [index, tile] of request.tiles.entries()) {
       if (!isCurrent()) return
+      const pause = checkpoint()
+      if (pause) {
+        await pause
+        if (!isCurrent()) return
+      }
       prefetchPrepared(index)
       const preparedKey = prepared?.(tile)
       if (preparedKey) {
@@ -268,7 +275,6 @@ export class OverlapComputer {
           metrics.outputVertices += composed.vertices
         }
         yield { tile, extent: 8192, ...composed }
-        await new Promise<void>((resolve) => setTimeout(resolve, 0))
         continue
       }
       const key = JSON.stringify([request.archiveUrl, request.sourceLayer, tile.z, tile.x, tile.y])
@@ -400,8 +406,6 @@ export class OverlapComputer {
         metrics.completedTiles++
       }
       yield { tile, extent: layer.extent, ...result }
-      // Allow newer selections to cancel between tiles instead of queueing jobs.
-      await new Promise<void>((resolve) => setTimeout(resolve, 0))
     }
   }
 
