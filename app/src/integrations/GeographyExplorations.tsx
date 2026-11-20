@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { ADMINISTRATIVE_ATTRIBUTION } from '../features/administrative/attribution.ts'
 import {
   REGION_LABEL_LAYERS,
@@ -8,13 +8,16 @@ import {
 } from '../features/administrative/boundaryLayers.ts'
 import {
   focusAdministrativeShapeAtom,
+  focusAdministrativeTerritoryAtom,
   hoveredAdministrativeRegionAtom,
   languageBordersAtom,
   selectAdministrativeAtom,
+  selectedAdministrativeFeaturesAtom,
 } from '../features/administrative/state.ts'
 import GeographyWorkspace from '../features/map/GeographyWorkspace.tsx'
 import { walsSessionAtom } from '../features/wals/state.ts'
 import { explorerActionAtom, explorerSessionAtom } from '../state/explorerState.ts'
+import { mapIsolationAtom } from '../state/mapInteraction.ts'
 import { wordTrailVisibleAtom } from './etymology/visibility.ts'
 import './geographyExplorations.css'
 
@@ -35,11 +38,17 @@ export default function GeographyExplorations({
   const lexical = useAtomValue(explorerSessionAtom).overlay.enabled
   const wordVisible = useAtomValue(wordTrailVisibleAtom)
   const wals = useAtomValue(walsSessionAtom).overlay
+  const isolation = useAtomValue(mapIsolationAtom)
+  const selectedFeatures = useAtomValue(selectedAdministrativeFeaturesAtom)
   const [languageBorders, setLanguageBorders] = useAtom(languageBordersAtom)
   const dispatch = useSetAtom(explorerActionAtom)
   const setHoveredRegion = useSetAtom(hoveredAdministrativeRegionAtom)
   const selectRegion = useSetAtom(selectAdministrativeAtom)
   const focusShape = useSetAtom(focusAdministrativeShapeAtom)
+  const focusTerritory = useSetAtom(focusAdministrativeTerritoryAtom)
+  useEffect(() => {
+    if (!administrative) setHoveredRegion(null)
+  }, [administrative, setHoveredRegion])
   return (
     <GeographyWorkspace
       visible={visible}
@@ -53,11 +62,11 @@ export default function GeographyExplorations({
           setLanguageBorders(borders)
         },
         onHoverModeChange: (mode) => {
-          setHoveredRegion(null)
           dispatch({ type: 'map-mode', mode })
         },
         hitLayers: [...REGION_LABEL_LAYERS, REGION_POINT_LAYER, REGION_POLYGON_LAYER],
-        onHover: (region) => setHoveredRegion(region?.featureId ?? null),
+        languageFeatureIds: isolation?.kind === 'region' ? isolation.featureIds : selectedFeatures,
+        onHover: setHoveredRegion,
         onSelect: (region) => {
           if (region)
             selectRegion(
@@ -67,8 +76,10 @@ export default function GeographyExplorations({
             )
         },
         onFocus: (region) => {
-          focusShape(region.featureId)
+          if (region.territoryCode) focusTerritory(region.territoryCode)
+          else focusShape(region.featureId)
         },
+        onLanguageSelect: () => dispatch({ type: 'map-mode', mode: 'language' }),
       }}
       mapLayers={
         <>
@@ -77,12 +88,12 @@ export default function GeographyExplorations({
               <BoundaryLayer administrative={administrative} />
             </Suspense>
           )}
-          {lexical && wordVisible && !administrative && (
+          {lexical && wordVisible && !administrative && !isolation && (
             <Suspense fallback={null}>
               <WordTrailLayer />
             </Suspense>
           )}
-          {wals?.visible && visible && !administrative && (
+          {wals?.visible && visible && !administrative && !isolation && (
             <Suspense fallback={null}>
               <WalsLayer key={`${wals.sourceId}:${wals.featureId}`} />
             </Suspense>

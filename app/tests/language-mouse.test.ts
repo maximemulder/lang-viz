@@ -3,8 +3,11 @@ import { test } from 'node:test'
 import { createStore } from 'jotai/vanilla'
 import type { GeometryVariant } from '../src/domain/atlas.ts'
 import { pickLanguageVariants } from '../src/features/map/languagePicking.ts'
-import { walsActionAtom, walsSessionAtom } from '../src/features/wals/state.ts'
-import { mapContextOpacityAtom } from '../src/state/mapInteraction.ts'
+import {
+  walsActionAtom,
+  walsContextOpacityAtom,
+  walsSessionAtom,
+} from '../src/features/wals/state.ts'
 import { catalogLanguage } from './fixtures/wals.ts'
 
 const language = catalogLanguage('language'),
@@ -53,11 +56,11 @@ test('highlighted areas take precedence and do not duplicate a language hit', ()
 })
 test('matching emphasis preserves the independent WALS origin', () => {
   const store = createStore()
-  assert.equal(store.get(mapContextOpacityAtom), 1)
+  assert.equal(store.get(walsContextOpacityAtom), 1)
   store.set(walsActionAtom, { type: 'show-examples', sourceId: 'iri', featureId: '81A' })
   const overlay = store.get(walsSessionAtom).overlay
-  assert.equal(store.get(mapContextOpacityAtom), 0.16)
+  assert.equal(store.get(walsContextOpacityAtom), 0.16)
   assert.strictEqual(store.get(walsSessionAtom).overlay, overlay)
   store.set(walsActionAtom, { type: 'clear-overlay' })
-  assert.equal(store.get(mapContextOpacityAtom), 1)
+  assert.equal(store.get(walsContextOpacityAtom), 1)
 })

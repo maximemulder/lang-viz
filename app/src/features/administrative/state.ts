@@ -1,6 +1,7 @@
 import { atom } from 'jotai'
 import type { LanguageDetailPlacement } from '../../state/languageControls.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
+import type { RegionHit } from '../../state/mapInteraction.ts'
 import type { BoundaryIndex } from './boundaryRepository.ts'
 import type { AdministrativeRepository } from './model.ts'
 import { loadAdministrative } from './repository.ts'
@@ -71,8 +72,26 @@ export const toggleAdministrativeLanguagePlacementAtom = atom(null, (get, set) =
 
 /** Languages mode remembers its optional borders across mode switches. */
 export const languageBordersAtom = atom(false)
-export const hoveredAdministrativeRegionAtom = atom<string | null>(null)
+export const hoveredAdministrativeRegionAtom = atom<RegionHit | null>(null)
 export const boundaryIndexAtom = atom<BoundaryIndex | null>(null)
+export const selectedAdministrativeFeaturesAtom = atom((get): readonly string[] => {
+  const selection = get(administrativeSessionAtom).selection
+  if (selection?.kind === 'source-shape') return [selection.id]
+  if (selection?.kind !== 'territory') return []
+  return get(boundaryIndexAtom)?.associations.get(selection.id)?.featureIds ?? []
+})
+
+export const checkedTerritoriesAtom = atom<readonly string[]>([])
+export const toggleCheckedTerritoryAtom = atom(null, (get, set, code: string) => {
+  const checked = get(checkedTerritoriesAtom)
+  if (checked.includes(code))
+    set(
+      checkedTerritoriesAtom,
+      checked.filter((item) => item !== code),
+    )
+  else if (get(boundaryIndexAtom)?.associations.get(code)?.status === 'matched')
+    set(checkedTerritoriesAtom, [...checked, code])
+})
 
 export const setAdministrativeQueryAtom = atom(null, (get, set, query: string) =>
   set(administrativeSessionAtom, { ...get(administrativeSessionAtom), query }),
@@ -130,28 +149,30 @@ export interface AdministrativeCameraRequest {
   readonly requestId: number
 }
 export const administrativeCameraRequestAtom = atom<AdministrativeCameraRequest | null>(null)
+export const focusAdministrativeFeaturesAtom = atom(
+  null,
+  (get, set, featureIds: readonly string[]) => {
+    const request = {
+      featureIds,
+      requestId: (get(administrativeCameraRequestAtom)?.requestId ?? 0) + 1,
+    }
+    set(administrativeCameraRequestAtom, request)
+    set(mapCameraIntentAtom, request)
+    return request
+  },
+)
 /** Selecting and loading do not move the map. Only this explicit action requests focus. */
 export const focusAdministrativeTerritoryAtom = atom(null, (get, set, territoryCode: string) => {
   const featureIds = get(boundaryIndexAtom)?.associations.get(territoryCode)?.featureIds
   if (!featureIds?.length || !get(administrativeRepositoryAtom)?.territoryByCode.has(territoryCode))
     return false
-  const request = {
-    featureIds,
-    requestId: (get(administrativeCameraRequestAtom)?.requestId ?? 0) + 1,
-  }
-  set(administrativeCameraRequestAtom, request)
-  set(mapCameraIntentAtom, request)
+  set(focusAdministrativeFeaturesAtom, featureIds)
   return true
 })
 
 export const focusAdministrativeShapeAtom = atom(null, (get, set, featureId: string) => {
   if (!get(boundaryIndexAtom)?.features.some((feature) => feature.featureId === featureId))
     return false
-  const request = {
-    featureIds: [featureId],
-    requestId: (get(administrativeCameraRequestAtom)?.requestId ?? 0) + 1,
-  }
-  set(administrativeCameraRequestAtom, request)
-  set(mapCameraIntentAtom, request)
+  set(focusAdministrativeFeaturesAtom, [featureId])
   return true
 })

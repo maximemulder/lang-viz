@@ -1,9 +1,10 @@
 import type { FeatureCollection } from 'geojson'
 import { useAtomValue, useSetAtom, useStore } from 'jotai'
 import { useEffect, useMemo, useState } from 'react'
-import { Layer, Source, useMap } from 'react-map-gl/maplibre'
+import { Layer, Popup, Source, useMap } from 'react-map-gl/maplibre'
 import { combinedBounds } from '../../domain/languageFocus.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
+import { mapColorsVisibleAtom, mapIsolationAtom } from '../../state/mapInteraction.ts'
 import { focusBounds } from '../map/focusBounds.ts'
 import {
   INSPECTION_LINE_COLOR,
@@ -16,6 +17,7 @@ import {
   loadBoundaryGeometry,
   loadBoundaryIndex,
 } from './boundaryRepository.ts'
+import { CountryIsolationMask } from './CountryIsolationMask.tsx'
 import { selectTerritoryMetric } from './selectors.ts'
 import {
   administrativeCameraRequestAtom,
@@ -24,6 +26,7 @@ import {
   boundaryIndexAtom,
   hoveredAdministrativeRegionAtom,
   languageBordersAtom,
+  selectedAdministrativeFeaturesAtom,
 } from './state.ts'
 
 const LABEL_ANCHOR = 'administrative-label-anchor'
@@ -31,6 +34,10 @@ const LABEL_ANCHOR = 'administrative-label-anchor'
 export default function BoundaryLayer({ administrative }: { readonly administrative: boolean }) {
   const languageBorders = useAtomValue(languageBordersAtom)
   const session = useAtomValue(administrativeSessionAtom)
+  const colorsVisible = useAtomValue(mapColorsVisibleAtom)
+  const isolation = useAtomValue(mapIsolationAtom)
+  const regionIsolation = isolation?.kind === 'region' ? isolation : null
+  const selectionFeatures = useAtomValue(selectedAdministrativeFeaturesAtom)
   const repository = useAtomValue(administrativeRepositoryAtom)
   const hovered = useAtomValue(hoveredAdministrativeRegionAtom)
   const request = useAtomValue(administrativeCameraRequestAtom)
@@ -98,12 +105,11 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
     }
   }, [request, intent, index, current, store])
 
-  const selectedCode = session.selection?.kind === 'territory' ? session.selection.id : null
-  const selectedShape = session.selection?.kind === 'source-shape' ? session.selection.id : null
-  const hoveredFeatureId = regionMode ? hovered : null
-  const selectedFeatureIds = selectedShape
-    ? [selectedShape]
-    : (index?.associations.get(selectedCode ?? '')?.featureIds ?? [])
+  const hoveredFeatureId = regionMode ? hovered?.featureId : null
+  const selectedFeatureIds = regionIsolation?.featureIds ?? selectionFeatures
+  const hoverRecordCount = hovered?.territoryCode
+    ? repository?.observationsByTerritory.get(hovered.territoryCode)?.length
+    : undefined
   const values = useMemo(() => {
     const result: Record<string, number> = {}
     if (!repository || !session.metric || !index) return result
@@ -140,7 +146,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
       <Layer id={LABEL_ANCHOR} type="background" paint={{ 'background-opacity': 0 }} />
       {showGeometry && filledGeometry && (
         <Source id="administrative-boundaries" type="geojson" data={filledGeometry}>
-          {session.metric && (
+          {regionMode && colorsVisible && !regionIsolation && session.metric && (
             <Layer
               id="administrative-metric-fill"
               type="fill"
@@ -160,23 +166,37 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               }}
             />
           )}
+          {regionMode && (
+            <Layer
+              id="administrative-boundary-halo"
+              type="line"
+              beforeId={LABEL_ANCHOR}
+              paint={{
+                'line-color': '#fffdf6',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 0, 2, 5, 3.5],
+                'line-opacity': 0.78,
+              }}
+            />
+          )}
           <Layer
             id="administrative-boundary-lines"
             type="line"
             beforeId={LABEL_ANCHOR}
             paint={{
-              'line-color': '#566b66',
-              'line-width': 0.8,
-              'line-opacity': 0.78,
+              'line-color': regionMode ? '#344b4c' : '#566b66',
+              'line-width': regionMode
+                ? ['interpolate', ['linear'], ['zoom'], 0, 0.8, 5, 1.5]
+                : 0.8,
+              'line-opacity': regionMode ? 0.95 : 0.78,
             }}
           />
-          {regionMode && hoveredFeatureId && (
+          {regionMode && (
             <Layer
               id="administrative-hover-outline"
               source="administrative-boundaries"
               type="line"
               beforeId={LABEL_ANCHOR}
-              filter={['==', ['get', 'featureId'], hoveredFeatureId]}
+              filter={['==', ['get', 'featureId'], hoveredFeatureId ?? '']}
               paint={{
                 'line-color': INSPECTION_LINE_COLOR,
                 'line-width': INSPECTION_LINE_WIDTH,
@@ -192,7 +212,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
               beforeId={LABEL_ANCHOR}
               filter={['in', ['get', 'featureId'], ['literal', selectedFeatureIds]]}
               paint={{
-                'line-color': INSPECTION_LINE_COLOR,
+                'line-color': '#e77920',
                 'line-width': INSPECTION_LINE_WIDTH,
                 'line-opacity': INSPECTION_LINE_OPACITY,
                 'line-opacity-transition': { duration: 0 },
@@ -208,6 +228,13 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             />
           )}
         </Source>
+      )}
+      {regionMode && regionIsolation && geometry && (
+        <CountryIsolationMask
+          key={JSON.stringify(regionIsolation.featureIds)}
+          featureIds={regionIsolation.featureIds}
+          geometry={geometry}
+        />
       )}
       {regionMode && index && (
         <Source id="administrative-points" type="geojson" data={index.points}>
@@ -253,6 +280,34 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
             />
           ))}
         </Source>
+      )}
+      {regionMode && hovered && (
+        <Popup
+          longitude={hovered.longitude}
+          latitude={hovered.latitude}
+          anchor="bottom"
+          offset={12}
+          closeButton={false}
+          closeOnClick={false}
+          className="language-inspector"
+        >
+          <section aria-label="Region preview" className="language-inspector__entry">
+            <span
+              className="language-inspector__swatch"
+              style={{ backgroundColor: '#344b4c' }}
+              aria-hidden="true"
+            />
+            <div>
+              <strong>{hovered.sourceName}</strong>
+              {hoverRecordCount !== undefined && (
+                <p className="language-inspector__context">
+                  {hoverRecordCount.toLocaleString()} reported language records
+                </p>
+              )}
+              <small>Click for details · double-click to focus</small>
+            </div>
+          </section>
+        </Popup>
       )}
       {showGeometry && error ? (
         <div className="administrative-map-status" role="alert">

@@ -59,7 +59,9 @@ def main():
             browser.call("POST", f"/element/{element}/value", {"text": "\ue007"})
 
         def type_query(value):
-            js("document.querySelector('.administrative-search-field input').focus()")
+            js("""const input = document.querySelector('.administrative-search-field input');
+                input.focus();
+                input.select();""")
             element = browser.call(
                 "POST",
                 "/element",
@@ -151,7 +153,9 @@ window.fetch = (...args) => {
             assert (outline["color"], outline["width"], outline["opacity"]) == ("#111111", 3, 0.95)
             assert js("return Math.min(...[2,3,4,5,6,7].map(z=>window.overlapTest.layerState('administrative-labels-'+z).order)) > window.overlapTest.layerState('administrative-hover-outline').order")
             assert not js("return window.overlapTest.layerState('administrative-hover-halo')")
-            assert not js("return !!document.querySelector('.maplibregl-popup')")
+            wait_for(lambda: js(
+                "return document.querySelector('[aria-label=\"Region preview\"]')?.textContent.includes('Netherlands')"
+            ), 10, "Netherlands hover preview")
             browser.screenshot(args.output / "region-hover.png")
             report["checks"].append("Regions mode shows borders and outlines hovered polygons")
             click_geo([6.2, 53.1])
@@ -161,7 +165,7 @@ window.fetch = (...args) => {
             wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-hover-outline')")) and s['filter'][-1] == be_feature else None), 10, "second region hover")
             selected_outline = js("return window.overlapTest.layerState('administrative-selection-outline')")
             assert nl_feature in selected_outline['filter'][-1][-1]
-            assert (selected_outline['color'], selected_outline['width'], selected_outline['opacity']) == ('#111111', 3, 0.95)
+            assert (selected_outline['color'], selected_outline['width'], selected_outline['opacity']) == ('#e77920', 3, 0.95)
             assert selected_outline['order'] > js("return window.overlapTest.layerState('administrative-hover-outline').order")
             assert not js("return window.overlapTest.layerState('administrative-selection-halo')")
             assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-selection-outline').order")
@@ -175,6 +179,7 @@ window.fetch = (...args) => {
             """)
             report["checks"].append("polygon picker selects the CLDR region")
             assert not js("return window.overlapTest.snapshot().moving")
+            js("document.querySelector('.administrative-inspector-header button').click()")
             js("window.overlapTest.camera([5.3,52.1],4)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "region double-click setup")
             double_click_geo([6.2, 53.1])
@@ -187,6 +192,10 @@ window.fetch = (...args) => {
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='NL'&&h.properties.metricValue>0)"), 15, "matched metric fill")
             assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-metric-fill').order")
+            button("Clear colours", ".map-settings__toolbar")
+            assert not js("return window.overlapTest.layerState('administrative-metric-fill')")
+            button("Show colours", ".map-settings__toolbar")
+            wait_for(lambda: js("return !!window.overlapTest.layerState('administrative-metric-fill')"), 10, "restored metric")
             report["checks"].append("Region borders and metric control")
 
             js("window.overlapTest.camera(arguments[0],4)", ly_point)
@@ -208,12 +217,15 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return window.overlapTest.queryLayers(arguments[0],['administrative-polygon-hits']).some(h=>h.properties.featureId==='country-SOL')", somaliland_point), 20, "Somaliland polygon")
             assert not js("return window.overlapTest.queryLayers(arguments[0],['administrative-metric-fill']).some(h=>h.properties.featureId==='country-SOL')", somaliland_point)
             hover_geo(somaliland_point)
-            assert not js("return !!document.querySelector('.maplibregl-popup')")
+            wait_for(lambda: js(
+                "return document.querySelector('[aria-label=\"Region preview\"]')?.textContent.includes('Somaliland')"
+            ), 10, "unmatched shape hover")
             click_geo(somaliland_point)
             wait_for(lambda: js("return document.querySelector('.administrative-inspector-header')?.textContent.includes('Somaliland')"), 10, "Somaliland sidebar")
             wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-selection-outline')")) and 'country-SOL' in s['filter'][-1][-1] else None), 10, "Somaliland selected outline")
             assert "No CLDR data is linked to this region" in js("return document.querySelector('.administrative-detail-scroll').textContent")
             assert not js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
+            js("document.querySelector('.administrative-inspector-header button').click()")
             double_click_geo(somaliland_point)
             wait_for(lambda: js("return window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "Somaliland double-click focus")
             report["checks"].append("Somaliland opens source-shape details without invented data")
@@ -237,12 +249,17 @@ window.fetch = (...args) => {
                 10,
                 "NL search",
             )
+            js("window.overlapTest.camera([5.3,52.1],3)")
             select_code("NL")
+            wait_for(lambda: js("return !window.overlapTest.snapshot().moving && window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "keyboard region fit")
             assert "more than 100%" in js("return document.querySelector('.administrative-detail').textContent")
             assert "independent of any displayed polygon" in js(
                 "return document.querySelector('.administrative-detail').textContent"
             )
             assert not js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
+            assert js("""return [...document.querySelectorAll('.administrative-observation__bar')].every(bar =>
+                Math.abs(parseFloat(bar.style.getPropertyValue('--bar-width')) -
+                parseFloat(bar.nextElementSibling.textContent.replace(',', '.'))) < 0.0051)""")
             report["checks"].append("territory search, selection, and overlap caveat")
 
             button("Languages", ".administrative-search-kind")
@@ -256,8 +273,9 @@ window.fetch = (...args) => {
                 "language search",
             )
             select_code("ku_Cyrl")
-            assert js("return !!document.querySelector('.finder-detail .administrative-observations')")
+            wait_for(lambda: js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Kurdish' && document.querySelector('.geography-sidebar__administrative').hidden"), 10, "linked Kurdish profile")
             assert js("return document.querySelectorAll('.finder-detail .language-summary-section').length === 5")
+            button("Regions", ".map-region-controls__inspect")
             button("Families", ".administrative-search-kind")
             type_query("Indo-European")
             wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='indo1319')"), 10, "family search")
@@ -347,6 +365,42 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return !window.overlapTest.layerState('administrative-boundary-lines')"), 10, "Geography borders off")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
             report["checks"].append("map information stays folded and unchanged across Languages border states")
+
+            browser.call("POST", "/window/rect", {"width": 1440, "height": 1000})
+            js("window.overlapTest.configure({languageIds:['dutc1256'],center:[5.3,52.1],zoom:5})")
+            pins = js("return window.overlapTest.mapEntryState()")
+            assert pins and all(pin["languageId"] == "dutc1256" for pin in pins)
+            button("Regions", ".map-region-controls__inspect")
+            button("Regions", ".administrative-search-kind")
+            type_query("Netherlands")
+            wait_for(lambda: js("return document.querySelector('input[aria-label=\"Select Netherlands\"]')?.disabled === false"), 15, "selectable Netherlands boundary")
+            js("document.querySelector('input[aria-label=\"Select Netherlands\"]').click()")
+            button("Show selected on map", ".administrative-selection-footer")
+            wait_for(lambda: js("return window.overlapTest.layerState('country-outside-mask-fill')?.sourceLoaded && !window.overlapTest.snapshot().moving"), 30, "region mask")
+            assert js("return window.overlapTest.mapEntryState()") == pins
+            wait_for(lambda: js("return window.overlapTest.snapshot().activeBuffers.length"), 20, "pinned fills under the ready mask")
+            assert js("""const id = window.overlapTest.snapshot().activeBuffers[0];
+                return window.overlapTest.layerState('language-overlap-solids-'+id).order <
+                    window.overlapTest.layerState('country-outside-mask-fill').order;""")
+            assert js("return window.overlapTest.queryLayers([7.05,52.0],['country-outside-mask-fill']).length")
+            assert not js("return window.overlapTest.queryLayers([4.9,52.37],['country-outside-mask-fill']).length")
+            assert not js("return window.overlapTest.layerState('administrative-metric-fill')")
+            type_query("Belgium")
+            wait_for(lambda: js("return document.querySelector('input[aria-label=\"Select Belgium\"]')?.disabled === false"), 10, "selectable Belgium boundary")
+            js("document.querySelector('input[aria-label=\"Select Belgium\"]').click()")
+            button("Show selected on map", ".administrative-selection-footer")
+            wait_for(lambda: js("return window.overlapTest.layerState('country-outside-mask-fill')?.sourceLoaded && !window.overlapTest.snapshot().moving && !window.overlapTest.queryLayers([4.35,50.85],['country-outside-mask-fill']).length"), 20, "both countries inside the combined mask")
+            assert not js("return window.overlapTest.queryLayers([4.9,52.37],['country-outside-mask-fill']).length")
+            hover_geo([4.9, 52.37])
+            wait_for(lambda: js(
+                "return document.querySelector('[aria-label=\"Languages at this location\"]')?.textContent.includes('Dutch')"
+            ), 15, "language preview inside a checked country")
+            click_geo([4.9, 52.37])
+            wait_for(lambda: js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Dutch' && document.querySelector('.geography-sidebar__administrative').hidden"), 15, "language inspection from region")
+            assert not js("return !!document.querySelector('.map-isolation')")
+            assert not js("return window.overlapTest.layerState('country-outside-mask-fill')")
+            assert js("return window.overlapTest.mapEntryState()") == pins
+            report["checks"].append("country masks preserve pins and clear when opening a language from the map")
             report["passed"] = True
         except Exception as error:
             report["error"] = str(error)

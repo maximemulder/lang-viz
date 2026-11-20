@@ -33,6 +33,7 @@ export const OverlapHatching = ({
   sourcePriorities,
   selectionKey,
   coverageReady,
+  emphasisOpacity,
   onCoverageReady,
 }: {
   readonly variants: readonly Pick<GeometryVariant, 'id' | 'color'>[]
@@ -41,6 +42,7 @@ export const OverlapHatching = ({
   readonly sourcePriorities: Readonly<Record<string, number>>
   readonly selectionKey: string
   readonly coverageReady: boolean
+  readonly emphasisOpacity: number
   readonly onCoverageReady: (key: string | null) => void
 }) => {
   const { current } = useMap()
@@ -51,7 +53,8 @@ export const OverlapHatching = ({
   ).replace(/^pmtiles:\/\//, '')
   const languageColors = useAtomValue(languageColorsAtom)
   const mode = useAtomValue(overlapModeAtom)
-  const opacity = useAtomValue(languageOpacityAtom) * useAtomValue(mapContextOpacityAtom)
+  const opacity =
+    useAtomValue(languageOpacityAtom) * useAtomValue(mapContextOpacityAtom) * emphasisOpacity
   const stripeThickness = useAtomValue(stripeThicknessAtom)
   const thicknessRef = useRef(stripeThickness)
   const setOverlapStatus = useSetAtom(overlapStatusAtom)

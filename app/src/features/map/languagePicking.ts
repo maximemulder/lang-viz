@@ -12,11 +12,21 @@ export const pickLanguageVariants = (
     readonly refinements: Refinements
     readonly memberships: Readonly<Record<string, readonly string[]>>
     readonly matching: boolean
+    readonly isolated?: boolean
   },
 ): string[] => {
   const { data, areas, refinements, memberships, matching } = context
   const languageId = (id: string) =>
     areas.find((area) => area.id === id)?.languageId ?? data.variantById.get(id)?.languageId
+  if (context.isolated) {
+    if (!map.getLayer('isolated-language-fill')) return []
+    const ids = map
+      .queryRenderedFeatures(point, { layers: ['isolated-language-fill'] })
+      .flatMap(({ properties }) =>
+        typeof properties.variant_id === 'string' ? [properties.variant_id] : [],
+      )
+    return [...new Set(ids)]
+  }
   if (matching && map.getLayer('wals-language-areas')) {
     const hits = map
       .queryRenderedFeatures(point, { layers: ['wals-language-areas'] })

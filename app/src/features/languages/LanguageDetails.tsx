@@ -23,11 +23,13 @@ import {
 import { explorerActionAtom } from '../../state/explorerState.ts'
 import {
   closeLanguageDetailsAtom,
+  focusLanguageOnMapAtom,
   languagePanelAtom,
   openLanguageDetailsAtom,
   revealLanguageAtom,
   toggleLanguageDetailPlacementAtom,
 } from '../../state/languageControls'
+import { clearMapIsolationAtom, mapIsolationAtom } from '../../state/mapInteraction.ts'
 import { searchCoverageAtom } from '../../state/searchSelection'
 import { LanguageRegions } from '../administrative/LanguageRegions.tsx'
 import {
@@ -41,6 +43,7 @@ import { GeometrySourceRecords } from './GeometrySourceRecords'
 import { useLanguagePreview } from './LanguagePreview'
 import { LanguageWordsButton } from './LanguageWordsButton.tsx'
 import { PinnedMapEntries } from './PinnedMapEntries'
+import '../../components/detailsMapAction.css'
 
 export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }) => {
   const panel = useAtomValue(languagePanelAtom)
@@ -58,6 +61,10 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
   const closeDetails = useSetAtom(closeLanguageDetailsAtom)
+  const focusLanguage = useSetAtom(focusLanguageOnMapAtom)
+  const isolation = useAtomValue(mapIsolationAtom)
+  const setIsolation = useSetAtom(mapIsolationAtom)
+  const clearIsolation = useSetAtom(clearMapIsolationAtom)
   const togglePlacement = useSetAtom(toggleLanguageDetailPlacementAtom)
   const toggleAdministrativePlacement = useSetAtom(toggleAdministrativeLanguagePlacementAtom)
   const entries = useAtomValue(mapEntriesAtom)
@@ -73,11 +80,14 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
       ? sourceLanguage.glottocode
       : null
     : panel.detailId
-  const profileTarget = {
-    languageId: detailId ?? '',
-    ...(!sourceCode && panel.detailEntryId ? { entryId: panel.detailEntryId } : {}),
-    ...(!sourceCode && panel.detailGroupId ? { groupId: panel.detailGroupId } : {}),
-  }
+  const profileTarget = useMemo(
+    () => ({
+      languageId: detailId ?? '',
+      ...(!sourceCode && panel.detailEntryId ? { entryId: panel.detailEntryId } : {}),
+      ...(!sourceCode && panel.detailGroupId ? { groupId: panel.detailGroupId } : {}),
+    }),
+    [detailId, sourceCode, panel.detailEntryId, panel.detailGroupId],
+  )
   const preview = useLanguagePreview(profileTarget, Boolean(detailId))
   const detail = detailId ? data.languageById.get(detailId) : undefined
   const detailAvailability = detail ? availability.get(detail.id) : undefined
@@ -96,6 +106,22 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
     : groups.find(({ group }) => group.id === panel.detailGroupId)
   const canFocusMap =
     targetGeometry(profileTarget, data, availability, coverage, hierarchy, entries).length > 0
+  const isolationVariantIds = useMemo(
+    () =>
+      targetGeometry(
+        profileTarget,
+        data,
+        availability,
+        detail?.level === 'family' || !detailAvailability?.own ? 'branch' : 'own',
+        hierarchy,
+        entries,
+      ).map(({ id }) => id),
+    [profileTarget, data, availability, detail?.level, detailAvailability, hierarchy, entries],
+  )
+  const isIsolated =
+    isolation?.kind === 'language' &&
+    isolation.variantIds.length === isolationVariantIds.length &&
+    isolation.variantIds.every((id, index) => id === isolationVariantIds[index])
   const inspectAtlas = (languageId: string) => {
     openDetails(languageId, sourceCode ? 'sidebar' : undefined)
     if (sourceCode) dispatch({ type: 'map-mode', mode: 'language' })
@@ -165,6 +191,32 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
           restoreFocus?.focus({ preventScroll: true })
         }}
       />
+      {detail && !sourceCode && (
+        <div className="details-map-action">
+          <button
+            type="button"
+            className="details-map-action__button"
+            disabled={!isolationVariantIds.length}
+            onClick={() => {
+              if (isIsolated) {
+                clearIsolation()
+                return
+              }
+              const cameraRequest = focusLanguage(profileTarget, isolationVariantIds)
+              setIsolation({
+                kind: 'language',
+                label: detail.name,
+                variantIds: isolationVariantIds,
+                color: '#df7546',
+                colorsVisible: true,
+                cameraRequest,
+              })
+            }}
+          >
+            {isIsolated ? 'End isolation' : 'Isolate language'}
+          </button>
+        </div>
+      )}
       <div
         id="focused-language-body"
         className="finder-detail__body"

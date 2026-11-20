@@ -153,31 +153,22 @@ export const LanguageMapCamera = () => {
     const navigate = async () => {
       const data = await store.get(atlasDataAtom)
       if (!current()) return
-      const variants = targetGeometry(
-        request.target,
-        data,
-        store.get(geographyAvailabilityAtom),
-        store.get(searchCoverageAtom),
-        store.get(languageHierarchyAtom),
-        store.get(mapEntriesAtom),
-      )
-      if (!variants.length) return
+      const currentVariantIds = () =>
+        request.variantIds ??
+        targetGeometry(
+          request.target,
+          data,
+          store.get(geographyAvailabilityAtom),
+          store.get(searchCoverageAtom),
+          store.get(languageHierarchyAtom),
+          store.get(mapEntriesAtom),
+        ).map(({ id }) => id)
+      const variantIds = currentVariantIds()
+      if (!variantIds.length) return
       const index = await loadGeometryBounds(data.manifest)
       if (!current()) return
-      const currentVariants = targetGeometry(
-        request.target,
-        data,
-        store.get(geographyAvailabilityAtom),
-        store.get(searchCoverageAtom),
-        store.get(languageHierarchyAtom),
-        store.get(mapEntriesAtom),
-      )
-      if (
-        JSON.stringify(variants.map(({ id }) => id)) !==
-        JSON.stringify(currentVariants.map(({ id }) => id))
-      )
-        return
-      const bounds = variants.map(({ id }) => index[id])
+      if (JSON.stringify(variantIds) !== JSON.stringify(currentVariantIds())) return
+      const bounds = variantIds.map((id) => index[id])
       if (bounds.some((bound) => !bound)) return
       const extent = combinedBounds(bounds.filter((bound) => bound !== undefined))
       if (!extent) return

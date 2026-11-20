@@ -4,16 +4,22 @@ import { mapCameraIntentAtom } from './mapCameraIntent.ts'
 
 export const languageMapNavigationAtom = atom<{
   readonly target: LanguageMapTarget
+  readonly variantIds?: readonly string[]
   readonly requestId: number
 } | null>(null)
-export const focusLanguageOnMapAtom = atom(null, (get, set, target: LanguageMapTarget) => {
-  const request = {
-    target,
-    requestId: (get(languageMapNavigationAtom)?.requestId ?? 0) + 1,
-  }
-  set(languageMapNavigationAtom, request)
-  set(mapCameraIntentAtom, request)
-})
+export const focusLanguageOnMapAtom = atom(
+  null,
+  (get, set, target: LanguageMapTarget, variantIds?: readonly string[]) => {
+    const request = {
+      target,
+      ...(variantIds ? { variantIds } : {}),
+      requestId: (get(languageMapNavigationAtom)?.requestId ?? 0) + 1,
+    }
+    set(languageMapNavigationAtom, request)
+    set(mapCameraIntentAtom, request)
+    return request
+  },
+)
 
 type Preview = { readonly owner: string; readonly target: LanguageMapTarget }
 export const languagePointerPreviewAtom = atom<Preview | null>(null)

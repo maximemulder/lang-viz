@@ -72,13 +72,27 @@ its host. The app must not request browser geolocation or treat browser language
 as a reliable country location. A missing or unsupported signal uses the
 documented source view; it must never silently reassign CLDR observations.
 
-`GeographyExplorations` owns the optional layer and supplies a small generic
-interaction adapter to `WorldMap`. The map host chooses exactly one pointer
-picker at a time. Regions mode shows borders, uses a transparent polygon hit layer,
-and outlines the region under the pointer. Click opens sidebar details and double-click
-also fits the shape on the map, following the same rule as Languages mode.
-Languages mode inspects language polygons;
-its border button optionally shows the administrative boundary network. The border
-button stays selected and disabled in Regions mode. The
-Languages / Regions control sits beside map settings, with Languages selected by
-default. Switching modes preserves the camera, searches, and selections.
+`GeographyExplorations` supplies the optional boundaries and their pointer
+handlers to `WorldMap`. Regions shows borders and a country preview on hover.
+Click a region on the map to open its details, or double-click to fit its geometry.
+Activating a region in the results opens its details and fits its geometry.
+**Focus on map** also fits a previously selected region.
+
+Within a selected country, hovering over a language area shows its language
+preview. Clicking it opens the atlas profile, with a chooser where languages
+overlap. Reviewed CLDR language links open the atlas profile from the sidebar.
+Unlinked rows open the original CLDR record. The displayed percentages use the
+reported population share as their scale and may overlap.
+
+Check countries in the result list and choose **Show selected on map** to fit the
+combined geometry and mask language colours outside the checked countries. The
+mask uses the original Natural Earth polygons, including islands and enclaves.
+**End isolation**, Escape or switching map modes restores the previous display.
+Pinned comparisons keep their geometry and colours throughout.
+
+The Languages border button shows the administrative boundary network. The
+border button stays selected and disabled in Regions, where the statistical
+metric fills are available. The Languages/Regions control sits beside map
+settings, with Languages selected by default. **Clear colours** and **Show
+colours** toggle language and region metric fills while keeping the basemap and
+the current map selections.

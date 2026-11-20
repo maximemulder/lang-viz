@@ -36,6 +36,9 @@ export const loadWalsAtom = atom(
 )
 const sessionAtom = atom(createWalsSession())
 export const walsSessionAtom = atom((get) => get(sessionAtom))
+export const walsContextOpacityAtom = atom((get) =>
+  get(walsSessionAtom).overlay?.visible ? 0.16 : 1,
+)
 /** Integration validates user actions against ready data and associations before dispatch. */
 export const walsActionAtom = atom(null, (get, set, action: WalsAction) =>
   set(sessionAtom, reduceWalsSession(get(sessionAtom), action)),

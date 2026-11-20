@@ -80,7 +80,8 @@ def check_focus(browser, output):
     outlined([dutch], selected=True)
     wait_for(lambda: browser.snapshot()['camera'] != focused['camera'], 15, 'sidebar language focus')
     ready()
-    assert not browser.js("return !!document.querySelector('.finder-detail .details-map-action')")
+    assert browser.js("return document.querySelector('.finder-detail .details-map-action__button')?.disabled === false")
+    assert not browser.js("return !!document.querySelector('.map-isolation')")
 
     # Reopening the same sidebar identity refocuses it after a pan.
     browser.js('window.overlapTest.camera([80,20],3)')
@@ -101,7 +102,7 @@ def check_focus(browser, output):
     search(browser, 'shan1293', 'shan1293')
     old_camera = browser.snapshot()['camera']
     open_details(browser, expand=False)
-    assert not browser.js("return !!document.querySelector('.finder-detail .details-map-action')")
+    assert browser.js("return document.querySelector('.finder-detail .details-map-action__button')?.disabled === true")
     browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(3) .sidebar-section__toggle').click()")
     assert 'No mapped area' in browser.js("return document.querySelector('.finder-detail').textContent")
     outlined([], selected=True)
@@ -236,7 +237,7 @@ def check_focus(browser, output):
     map_action(double=True)
     wait_for(lambda: browser.snapshot()['camera']['zoom'] > 3.5, 15, 'map double-click language focus')
     assert browser.js("return document.querySelector('#focused-language-name')?.textContent.includes('German')")
-    assert not browser.js("return !!document.querySelector('.map-isolation-control')")
+    assert not browser.js("return !!document.querySelector('.map-isolation')")
     browser.js('document.querySelector(".finder-detail button[aria-label=\\"Close language details\\"]").click()')
     assert browser.js("return document.activeElement?.matches('.map-shell .maplibregl-canvas')"), 'Closing map inspection restores map focus'
     browser.js('window.overlapTest.camera([10,51],3)')

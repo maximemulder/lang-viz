@@ -5,7 +5,7 @@ export const ADMINISTRATIVE_ATTRIBUTION = `
     Admin-0 countries (50m; Natural Earth release 5.1.2). Borders reflect this source's
     political viewpoint. All source shapes can be inspected; shapes without a reviewed CLDR match
     remain uncolored. Region names appear as you zoom in and identify source geometries,
-    not speaker locations. With borders and
-    map color on, teal fill compares the selected estimate with the largest matched value; no
+    not speaker locations. In Regions mode with map colour on, teal fill compares the selected
+    estimate with the largest matched value; no
     fill means no reported value or reviewed match.
   </span>`

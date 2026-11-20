@@ -37,7 +37,6 @@ export const ObservationList = ({
   readonly onSelect: (selection: AdministrativeSelection) => void
   readonly names: Intl.DisplayNames
 }) => {
-  const max = Math.max(...rows.map((row) => row.estimatedSpeakers), 1)
   return (
     <section className="administrative-observations" aria-label={heading}>
       <h4>{heading}</h4>
@@ -52,6 +51,7 @@ export const ObservationList = ({
               ? row.observation.sourceLanguageCode
               : row.observation.territoryCode
           const title = destination === 'language' ? row.language.name : regionLabel(id, names)
+          const share = Math.max(0, Math.min(100, Number(row.observation.populationPercent)))
           return (
             <li key={`${row.observation.territoryCode}:${row.observation.sourceLanguageCode}`}>
               <div className="administrative-observation__top">
@@ -63,9 +63,7 @@ export const ObservationList = ({
               <div
                 className="administrative-observation__bar"
                 aria-hidden="true"
-                style={
-                  { '--bar-width': `${(row.estimatedSpeakers / max) * 100}%` } as CSSProperties
-                }
+                style={{ '--bar-width': `${share}%` } as CSSProperties}
               />
               <p>
                 {percent(row.observation.populationPercent)} of reported territory population

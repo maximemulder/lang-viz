@@ -178,7 +178,8 @@ export const CoverageLayers = ({
                           ),
                         ],
                       ],
-                      'fill-layer-opacity': coverageReady && activeBuffer === buffer ? 1 : 0,
+                      'fill-layer-opacity':
+                        coverageReady && activeBuffer === buffer && opacity > 0 ? 1 : 0,
                       'fill-layer-opacity-transition': { duration: 0 },
                       'fill-opacity-transition': { duration: 0 },
                       'fill-antialias': false,

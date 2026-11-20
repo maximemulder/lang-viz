@@ -73,7 +73,7 @@ def main():
                 !header.querySelector('.details-header__eyebrow') &&
                 !header.querySelector('.details-header__title button') &&
                 !header.querySelector('button[aria-expanded]') &&
-                !document.querySelector('.finder-detail .details-map-action') &&
+                document.querySelector('.finder-detail .details-map-action__button')?.textContent.trim() === 'Isolate language' &&
                 !document.querySelector('.finder-detail .detail-selection') &&
                 !document.querySelector('.finder-detail__context') &&
                 !document.querySelector('.finder-detail [aria-label="Change sources and period"]') &&
@@ -98,6 +98,35 @@ def main():
         )
         assert header_style('.wals-map-summary .details-header') == language_style
         assert browser.js("return !document.querySelector('.geography-inspector .details-header button[aria-expanded]')")
+        browser.js("window.overlapTest.configure({languageIds:['dutc1256'],center:[5.3,52.1],zoom:5})")
+        pins = browser.js("return window.overlapTest.mapEntryState()")
+        assert pins and all(pin["languageId"] == "dutc1256" for pin in pins)
+        browser.js("document.querySelector('.map-colors-toggle').click()")
+        assert browser.js("return document.querySelector('.map-colors-toggle').textContent.trim() === 'Show colours' && !!window.overlapTest.layerState('wals-language-areas')")
+        browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
+        wait_for(
+            lambda: browser.js("return window.overlapTest.layerState('isolated-language-fill')?.sourceLoaded && window.overlapTest.snapshot().camera.zoom < 3 && !window.overlapTest.snapshot().moving"),
+            20,
+            "language isolation frames the exact geometry",
+        )
+        isolated = browser.js("return window.overlapTest.layerState('isolated-language-fill')")
+        assert isolated["filter"][-1][-1] == ["asher2007world:contemporary:stan1293"]
+        assert browser.js("return document.querySelector('.map-colors-toggle').textContent.trim() === 'Clear colours'")
+        assert not browser.js("return !!window.overlapTest.layerState('wals-language-areas')")
+        browser.js("""
+            const picker = document.querySelector('.map-isolation input[type=color]');
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(picker, '#405671');
+            picker.dispatchEvent(new Event('input', {bubbles: true}));
+            picker.dispatchEvent(new Event('change', {bubbles: true}));
+        """)
+        wait_for(lambda: browser.js("return window.overlapTest.layerState('isolated-language-fill')?.color === '#405671'"), 10, "isolation recolour")
+        browser.js("document.querySelector('.map-isolation button').click()")
+        wait_for(lambda: browser.js("return !window.overlapTest.layerState('isolated-language-fill') && !!window.overlapTest.layerState('wals-language-areas')"), 15, "isolation restores WALS")
+        assert browser.js("return window.overlapTest.mapEntryState()") == pins
+        assert browser.js("return document.querySelector('.map-colors-toggle').textContent.trim() === 'Show colours'")
+        assert browser.js("return !!window.overlapTest.layerState('wals-language-areas')")
+        browser.js("document.querySelector('.map-colors-toggle').click()")
+        assert browser.js("return window.overlapTest.mapEntryState()") == pins
         browser.screenshot(output / "feature-details.png")
         browser.js("document.querySelector('.finder-detail__close').click()")
         assert browser.js("return !!document.querySelector('.wals-map-summary')")
@@ -139,16 +168,18 @@ def main():
         browser.screenshot(output / "region-details.png")
         assert browser.js("return document.querySelector('.administrative-results').clientHeight >= 80")
 
-        # CLDR language selection uses the same panel and atlas content.
+        # A reviewed CLDR link opens the language's atlas profile.
         browser.js("""
             [...document.querySelectorAll('.administrative-observation__top button')]
                 .find(button => button.querySelector('.administrative-code')?.textContent === 'ps').click();
         """)
-        wait_for(lambda: browser.js("return !!document.querySelector('.geography-inspector .finder-detail')"), 10, "shared language panel")
-        assert browser.js("return !!document.querySelector('[aria-label=\"Show details over region controls\"]')")
-        browser.js("document.querySelector('[aria-label=\"Show details over region controls\"]').click()")
-        assert browser.js("return document.querySelector('.geography-sidebar').inert"), "CLDR summary can cover the region sidebar"
-        browser.js("document.querySelector('[aria-label=\"Show region controls beside details\"]').click()")
+        wait_for(
+            lambda: browser.js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Nuclear Pashto' && document.querySelector('.geography-sidebar__administrative').hidden"),
+            10,
+            "linked Pashto atlas profile",
+        )
+        assert browser.js("return document.querySelector('.geography-sidebar').inert"), "The linked language opens like a map inspection"
+        browser.js("document.querySelector('[aria-label=\"Show language controls beside details\"]').click()")
         assert browser.js("""
             const sections = [...document.querySelectorAll('.finder-detail .language-summary-section')];
             return sections.length === 5 &&
@@ -160,7 +191,6 @@ def main():
         assert browser.js("return !!document.querySelector('.finder-detail .language-word-entries')")
         browser.screenshot(output / "administrative-language-details.png")
         browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
-        browser.js("document.querySelectorAll('.map-region-controls__inspect button')[0].click()")
         browser.js("document.querySelectorAll('.map-region-controls__inspect button')[1].click()")
         wait_for(
             lambda: browser.js("return document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle')?.getAttribute('aria-expanded') === 'true'"),
@@ -177,6 +207,7 @@ def main():
         browser.js("[...document.querySelectorAll('.administrative-results button')].find(button => button.querySelector('.administrative-code')?.textContent === 'en').click()")
         wait_for(lambda: browser.js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'English' && !!document.querySelector('.finder-detail .wals-card')"), 30, "English atlas features from CLDR")
         assert browser.js("return !!document.querySelector('.finder-detail .language-word-entries')")
+        browser.js("document.querySelectorAll('.map-region-controls__inspect button')[1].click()")
         browser.js("document.querySelector('#administrative-tab-territory').click()")
         browser.js("document.querySelector('.administrative-results button').click()")
         browser.js("document.querySelector('.administrative-inspector-header button').click()")

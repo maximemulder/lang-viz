@@ -243,3 +243,29 @@
     border-left: 0;
   }
 }
+.administrative-result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.85rem;
+}
+
+.administrative-result-row input {
+  flex: none;
+  accent-color: #345a48;
+}
+
+.administrative-results .administrative-result-row > button {
+  flex: 1;
+  min-width: 0;
+}
+
+.administrative-selection-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.45rem 0.75rem;
+  border-top: 1px solid #d8ddd7;
+  font-size: 0.75rem;
+}

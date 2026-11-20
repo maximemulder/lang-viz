@@ -3,9 +3,13 @@ import type { GeographicBounds } from '../../domain/languageFocus.ts'
 
 /** Both map modes frame the selected geometry with the same breathing room. */
 export function focusBounds(map: MapLibreMap, bounds: GeographicBounds): boolean {
+  map.resize()
+  // A single Mercator world cannot show both parts of an unwrapped dateline interval.
+  const crossesDateline =
+    bounds[2] > 180 && map.getProjection().type === 'mercator' && !map.getRenderWorldCopies()
   const areaBounds: [[number, number], [number, number]] = [
-    [bounds[0], bounds[1]],
-    [bounds[2], bounds[3]],
+    [crossesDateline ? -180 : bounds[0], bounds[1]],
+    [crossesDateline ? 180 : bounds[2], bounds[3]],
   ]
   const canvas = map.getCanvas()
   const padding = Math.min(48, canvas.clientWidth / 8, canvas.clientHeight / 8)

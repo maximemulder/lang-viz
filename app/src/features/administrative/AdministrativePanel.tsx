@@ -4,6 +4,7 @@ import { DetailsHeader } from '../../components/DetailsHeader.tsx'
 import { DetailsMapAction } from '../../components/DetailsMapAction.tsx'
 import { SidebarTabs } from '../../components/SidebarTabs.tsx'
 import type { AdministrativeRepository } from './model.ts'
+import { inspectAdministrativeFromSidebarAtom, showCheckedTerritoriesAtom } from './navigation.ts'
 import { number, ObservationList, percent, regionLabel } from './ObservationList.tsx'
 import {
   searchFamilies,
@@ -18,6 +19,7 @@ import {
   administrativeRepositoryAtom,
   administrativeSessionAtom,
   boundaryIndexAtom,
+  checkedTerritoriesAtom,
   focusAdministrativeShapeAtom,
   focusAdministrativeTerritoryAtom,
   loadAdministrativeAtom,
@@ -25,6 +27,7 @@ import {
   setAdministrativeMetricAtom,
   setAdministrativeQueryAtom,
   setAdministrativeSearchKindAtom,
+  toggleCheckedTerritoryAtom,
 } from './state.ts'
 import './administrative.css'
 
@@ -126,6 +129,7 @@ export const AdministrativeDetails = () => {
   const session = useAtomValue(administrativeSessionAtom)
   const boundaryIndex = useAtomValue(boundaryIndexAtom)
   const select = useSetAtom(selectAdministrativeAtom)
+  const inspect = useSetAtom(inspectAdministrativeFromSidebarAtom)
   const focus = useSetAtom(focusAdministrativeTerritoryAtom)
   const focusShape = useSetAtom(focusAdministrativeShapeAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
@@ -194,7 +198,7 @@ export const AdministrativeDetails = () => {
       <Details
         repository={repository}
         selection={session.selection}
-        onSelect={select}
+        onSelect={(item) => void inspect(item)}
         names={names}
       />
     </div>
@@ -208,9 +212,13 @@ export default function AdministrativePanel() {
   const load = useSetAtom(loadAdministrativeAtom)
   const setQuery = useSetAtom(setAdministrativeQueryAtom)
   const setKind = useSetAtom(setAdministrativeSearchKindAtom)
-  const select = useSetAtom(selectAdministrativeAtom)
+  const inspect = useSetAtom(inspectAdministrativeFromSidebarAtom)
   const setMetric = useSetAtom(setAdministrativeMetricAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
+  const boundaries = useAtomValue(boundaryIndexAtom)
+  const checkedTerritories = useAtomValue(checkedTerritoriesAtom)
+  const toggleChecked = useSetAtom(toggleCheckedTerritoryAtom)
+  const showChecked = useSetAtom(showCheckedTerritoriesAtom)
   useEffect(() => {
     void load()
   }, [load])
@@ -242,6 +250,7 @@ export default function AdministrativePanel() {
       .map((item) => ({ kind: 'family' as const, id: item.id, label: item.name }))
   }, [repository, session.searchKind, session.query, names])
   const visibleResults = results.slice(0, 60)
+  const checkedName = checkedTerritories[0] ? regionLabel(checkedTerritories[0], names) : ''
 
   return (
     <aside className="administrative-panel" aria-label="Administrative language statistics">
@@ -347,9 +356,7 @@ export default function AdministrativePanel() {
                   Selected family estimate sum
                 </label>
               )}
-              <p>
-                Color appears only for matched polygons when Borders is on. No value means no fill.
-              </p>
+              <p>Colour appears on matched regions with a reported value.</p>
             </fieldset>
             <label className="administrative-search-field">
               Find {session.searchKind === 'territory' ? 'a region' : `a ${session.searchKind}`}
@@ -371,7 +378,7 @@ export default function AdministrativePanel() {
               {results.length === 0 && <p>No matches.</p>}
               <ul>
                 {visibleResults.map((item) => (
-                  <li key={`${item.kind}:${item.id}`}>
+                  <li className="administrative-result-row" key={`${item.kind}:${item.id}`}>
                     <button
                       type="button"
                       aria-current={
@@ -379,25 +386,52 @@ export default function AdministrativePanel() {
                           ? 'true'
                           : undefined
                       }
-                      onClick={() => select({ kind: item.kind, id: item.id })}
+                      onClick={() => void inspect({ kind: item.kind, id: item.id })}
                     >
                       {item.label} <span className="administrative-code">{item.id}</span>
                     </button>
+                    {item.kind === 'territory' && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${item.label}`}
+                        checked={checkedTerritories.includes(item.id)}
+                        disabled={boundaries?.associations.get(item.id)?.status !== 'matched'}
+                        onChange={() => toggleChecked(item.id)}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
             </section>
+            {session.searchKind === 'territory' && (
+              <div className="administrative-selection-footer">
+                <span>{checkedTerritories.length} selected</span>
+                <button
+                  type="button"
+                  className="finder-add"
+                  disabled={!checkedTerritories.length}
+                  onClick={() =>
+                    showChecked(
+                      checkedTerritories.length === 1
+                        ? checkedName
+                        : `${checkedTerritories.length} regions`,
+                    )
+                  }
+                >
+                  Show selected on map
+                </button>
+              </div>
+            )}
             <details className="administrative-source">
-              <summary>About these estimates</summary>
+              <summary>Sources and estimates</summary>
               <p>
                 Approximate functional speaker estimates may include first and later-language
                 speakers. The source count is derived from territory population and reported
                 percentage. Coverage is incomplete.
               </p>
               <p>
-                The joined file’s original CLDR release and preprocessing are unverified. Its source
-                codes are independent of map borders; browser-localized region names are display
-                labels only.
+                Territory codes come from CLDR. Display names follow the browser language and
+                boundaries come from Natural Earth.
               </p>
               <p>
                 Snapshot: {number(repository.data.manifest.coverage.territoryCount)} regions,{' '}

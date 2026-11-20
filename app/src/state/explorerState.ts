@@ -6,6 +6,7 @@ import {
 } from '../domain/explorerSession.ts'
 import { languageMapNavigationAtom } from './languageControls.ts'
 import { mapCameraIntentAtom } from './mapCameraIntent.ts'
+import { clearMapIsolationAtom } from './mapInteraction.ts'
 
 const sessionAtom = atom(createExplorerSession())
 /** Store-scoped session survives workspace component lifecycles. */
@@ -13,6 +14,7 @@ export const explorerSessionAtom = atom((get) => get(sessionAtom))
 export const explorerActionAtom = atom(null, (get, set, action: ExplorerAction) => {
   const previous = get(sessionAtom)
   const next = reduceExplorerSession(previous, action)
+  if (previous.mapMode !== next.mapMode) set(clearMapIsolationAtom)
   if (action.type === 'show-trail' && next !== previous) {
     set(languageMapNavigationAtom, null)
     set(mapCameraIntentAtom, next.overlay.focusRequest)

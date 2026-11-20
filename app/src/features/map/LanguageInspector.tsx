@@ -15,9 +15,11 @@ export interface MapInspection {
 export const LanguageInspector = ({
   inspection,
   onClose,
+  onSelect,
 }: {
   readonly inspection: MapInspection
   readonly onClose: () => void
+  readonly onSelect?: () => void
 }) => {
   const data = useAtomValue(atlasDataAtom),
     areas = useAtomValue(selectedMapAreasAtom),
@@ -99,6 +101,7 @@ export const LanguageInspector = ({
                       className="language-inspector__details"
                       aria-label={`Details for ${language.name}`}
                       onClick={() => {
+                        onSelect?.()
                         openDetails({
                           languageId: language.id,
                           ...(area ? { entryId: area.id } : {}),
