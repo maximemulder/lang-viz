@@ -202,6 +202,23 @@ flowchart LR
 ```
 
 The shared-coverage builder is the sole language preprocessing pipeline.
+
+Language labels are generated from the same display geometry. Each dataset and
+period has a versioned label table beside its polygon archive, keyed by geometry
+variant ID. It stores interior anchors for significant components, the geometry
+levels that support each anchor, and nominal zooms for the family, branch, and
+language names. Language anchors favor the area centroid where it has enough
+clearance, with wider interior points available as fallbacks. The pipeline also
+builds candidate anchors from each family or branch's combined footprint.
+Cohesive areas favor their centroid. Dispersed areas favor regions with both
+substantial coverage and distinct branches. The map loads the tables for the
+pinned geometry, checks active coverage and available screen space, and tries
+another anchor when a label would collide. When you zoom in, each branch gives
+way to more specific names where they fit.
+
+To add labels to a matching local atlas build with cached geometry, run
+`uv run python -m pipeline.atlas.topology_build --labels-only --output app/public/data`.
+The regular atlas build and standalone topology export also generate these files.
 Geometry size and offline cost remain active tuning work.
 The first full-data pass built all seven profiles through zoom 8 and passed the
 prepared-coverage, navigation and inspection browser suites. Decoded checks

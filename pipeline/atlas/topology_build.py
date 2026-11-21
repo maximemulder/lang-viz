@@ -30,6 +30,7 @@ import shapely as geos
 from mapbox_vector_tile.encoder import on_invalid_geometry_raise
 from shapely.geometry.base import BaseGeometry
 
+from pipeline.atlas.labels import publish_labels
 from pipeline.atlas.topology import (
     EXTENT,
     MAX_ZOOM,
@@ -628,6 +629,7 @@ def build(
     tolerance_pixels: float = 1,
     boundary_tolerance_pixels: float = 0.05,
     jobs: int | None = None,
+    label_catalog: Path | None = None,
 ) -> dict[str, Any]:
     if jobs is not None and jobs < 1:
         raise ValueError("jobs must be a positive integer")
@@ -695,6 +697,8 @@ def build(
     profiles_seconds = time.monotonic() - profiles_started
     results.sort(key=lambda result: (result[0]["datasetId"], result[0]["viewId"]))
     archives = [entry for entry, _, _ in results]
+    if label_catalog is not None:
+        archives = publish_labels(tasks, archives, output, cache, config, max_zoom, label_catalog)
     profiles = [profile for _, profile, _ in results]
     reports = {f"{entry['datasetId']}/{entry['viewId']}": report for entry, _, report in results}
     archive_keys = [
@@ -755,6 +759,25 @@ def build(
     }
 
 
+def refresh_labels(source: Path, output: Path, cache: Path) -> None:
+    """Add labels to an existing matching geometry build without rewriting its archives."""
+    path = output / "manifest.json"
+    manifest = json.loads(path.read_text())
+    report = json.loads((output / manifest["geometryBuild"]["report"]).read_text())
+    settings = report["settings"]
+    sources = source_profiles(source, cache / f"sources-{digest_file(source)[:20]}")
+    manifest["geometryProfiles"] = publish_labels(
+        list(sources.values()),
+        manifest["geometryProfiles"],
+        output,
+        cache,
+        GeometrySettings(settings["tolerancePixels"], settings["boundaryTolerancePixels"]),
+        manifest["geometryMaxZoom"],
+        output / "languages.json",
+    )
+    atomic_json(path, manifest)
+
+
 def main() -> None:
     from pipeline.atlas.build import (
         NORMALIZED_GEOMETRIES,
@@ -769,7 +792,11 @@ def main() -> None:
     parser.add_argument("--period", action="append")
     parser.add_argument("--tolerance-pixels", type=float, default=1)
     parser.add_argument("--boundary-tolerance-pixels", type=float, default=0.05)
-    parser.add_argument("--restore-parts", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--restore-parts", action="store_true")
+    mode.add_argument(
+        "--labels-only", action="store_true", help="Prepare labels for existing geometry"
+    )
     parser.add_argument("--max-zoom", type=int, choices=range(MAX_ZOOM + 1), default=MAX_ZOOM)
     parser.add_argument(
         "--jobs", type=int, help="Concurrent profiles (default: up to 2; 1 is serial)"
@@ -779,6 +806,9 @@ def main() -> None:
         parser.error("--jobs must be a positive integer")
     if args.restore_parts and args.jobs is not None:
         parser.error("--jobs applies to generation; parts restoration publishes levels serially")
+    if args.labels_only:
+        refresh_labels(NORMALIZED_GEOMETRIES, args.output, PROCESSED_DIR / "topology")
+        return
     if args.restore_parts:
         restore_parts(
             NORMALIZED_GEOMETRIES,
@@ -803,6 +833,7 @@ def main() -> None:
         tolerance_pixels=args.tolerance_pixels,
         boundary_tolerance_pixels=args.boundary_tolerance_pixels,
         jobs=args.jobs,
+        label_catalog=PUBLIC_DATA_DIR / "languages.json",
     )
     atomic_json(args.output / "geometry-manifest.json", result)
     export_catalog(PUBLIC_DATA_DIR, args.output, result)

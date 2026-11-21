@@ -44,8 +44,8 @@ export const visibleVariantIds = (
   point: PointLike,
   refinements?: Refinements,
   memberships?: Readonly<Record<string, readonly string[]>>,
+  layers = visibleColorLayers(map),
 ): string[] => {
-  const layers = visibleColorLayers(map)
   // An empty coverage hit must stay empty: original polygons can differ in detail
   // and must not refill holes or restore contributors absent from the displayed face.
   if (!layers.length) return []

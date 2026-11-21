@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -86,8 +87,27 @@ def release_files(root: Path) -> list[Path]:
         add(manifest["geometryBuild"]["report"])
     for notice in root.glob("*.md"):
         add(notice.name)
-    for profile in manifest.get("geometryProfiles", []):
+    geometry_profiles = manifest.get("geometryProfiles", [])
+    has_labels = any("labels" in profile for profile in geometry_profiles)
+    profile_variant_ids: dict[tuple[str, str], set[str]] = {}
+    language_ids = {language["id"] for language in languages} if has_labels else set()
+    if has_labels:
+        for variant in variants:
+            key = (variant["datasetId"], variant["temporalCoverage"]["viewId"])
+            profile_variant_ids.setdefault(key, set()).add(variant["id"])
+    for profile in geometry_profiles:
         add(profile["archive"])
+        if has_labels:
+            key = (profile["datasetId"], profile["viewId"])
+            if not profile.get("labels"):
+                raise ValueError(f"Missing label profile: {key}")
+            validate_labels(
+                read_json(add(profile["labels"])),
+                profile["archive"],
+                profile_variant_ids.get(key, set()),
+                language_ids,
+                manifest["geometryMaxZoom"],
+            )
     if not manifest.get("datasetMetadata"):
         raise ValueError("Run npm run precompute:colors before packaging data")
     add(manifest["datasetMetadata"])
@@ -125,6 +145,91 @@ def release_files(root: Path) -> list[Path]:
                     raise ValueError(f"Invalid tile coordinate: {xy}")
                 add(f"{parts['directory']}{profile['id']}/{z}-{xy}.pbf")
     return sorted(files, key=lambda path: path.relative_to(root).as_posix())
+
+
+def validate_labels(
+    table: dict, archive: str, variants: set[str], languages: set[str], max_zoom: int
+) -> None:
+    def number(value: object, low: float, high: float) -> bool:
+        return (
+            type(value) in {int, float} and isinstance(value, (int, float)) and low <= value <= high
+        )
+
+    def invalid() -> ValueError:
+        return ValueError(f"Invalid language labels for {archive}")
+
+    if (
+        not isinstance(table, dict)
+        or table.get("schemaVersion") not in (1, 2)
+        or table.get("archive") != archive
+        or not isinstance(table.get("variants"), dict)
+        or not isinstance(table.get("handoffZooms"), dict)
+    ):
+        raise invalid()
+
+    def validate_anchor(row: object, depth: int) -> None:
+        if not isinstance(row, list) or len(row) != 5:
+            raise invalid()
+        lng, lat, radius, mask, zooms = row
+        if (
+            not number(lng, -180, 180)
+            or not number(lat, -90, 90)
+            or not number(radius, math.ulp(0.0), 1)
+            or type(mask) is not int
+            or not 0 < mask < 1 << (max_zoom + 1)
+            or not isinstance(zooms, list)
+            or len(zooms) != depth
+            or not all(number(zoom, 0, 64) for zoom in zooms)
+        ):
+            raise invalid()
+
+    parents = set()
+    for variant, row in table["variants"].items():
+        if variant not in variants or not isinstance(row, dict):
+            raise invalid()
+        path, anchors = row.get("path"), row.get("anchors")
+        if (
+            not isinstance(path, list)
+            or not 1 <= len(path) <= 3
+            or any(not isinstance(node, str) or node not in languages for node in path)
+            or len(set(path)) != len(path)
+            or not isinstance(anchors, list)
+            or not anchors
+        ):
+            raise invalid()
+        parents.update(path[:-1])
+        for anchor in anchors:
+            validate_anchor(anchor, len(path))
+    handoffs = table["handoffZooms"]
+    if set(handoffs) != parents or not all(number(zoom, 0, 12) for zoom in handoffs.values()):
+        raise invalid()
+    if table["schemaVersion"] == 2:
+        overviews = table.get("overviews")
+        if not isinstance(overviews, dict):
+            raise invalid()
+        for group, rows in overviews.items():
+            if group not in parents or not isinstance(rows, list) or not 1 <= len(rows) <= 16:
+                raise invalid()
+            for row in rows:
+                if not isinstance(row, list) or len(row) != 2:
+                    raise invalid()
+                anchor, owners = row
+                validate_anchor(anchor, 1)
+                if (
+                    not isinstance(owners, list)
+                    or not owners
+                    or any(
+                        not isinstance(owner, str)
+                        or owner not in variants
+                        or (
+                            owner in table["variants"]
+                            and group not in table["variants"][owner]["path"]
+                        )
+                        for owner in owners
+                    )
+                    or len(set(owners)) != len(owners)
+                ):
+                    raise invalid()
 
 
 def audit(root: Path) -> dict:

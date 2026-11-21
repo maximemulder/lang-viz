@@ -277,6 +277,21 @@ export const installOverlapTestApi = (
         ],
       }
     },
+    languageLabels: () =>
+      map.getLayer('language-labels')
+        ? map.queryRenderedFeatures({ layers: ['language-labels'] }).flatMap((feature) =>
+            feature.geometry.type === 'Point'
+              ? [
+                  {
+                    labelId: feature.properties.labelId,
+                    labelName: feature.properties.labelName,
+                    variantId: feature.properties.variantId,
+                    coordinates: feature.geometry.coordinates,
+                  },
+                ]
+              : [],
+          )
+        : [],
     queryLayers: (center: [number, number], layerIds: readonly string[]) => {
       const layers = layerIds.filter((id) => map.getLayer(id))
       if (!layers.length) return []

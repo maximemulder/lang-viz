@@ -35,6 +35,12 @@ export interface OverlapTestApi {
   recompute(): void
   failNextPublication(service: TileService): void
   inspect(center: [number, number]): { variantIds: string[]; point: [number, number] }
+  languageLabels(): readonly {
+    labelId: string
+    labelName: string
+    variantId: string
+    coordinates: readonly number[]
+  }[]
   queryLayers(
     center: [number, number],
     layerIds: readonly string[],

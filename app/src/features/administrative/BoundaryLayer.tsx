@@ -11,6 +11,7 @@ import {
   INSPECTION_LINE_OPACITY,
   INSPECTION_LINE_WIDTH,
 } from '../map/geometry/boundaryInspection.ts'
+import { MapLabelLayer } from '../map/labels/MapLabelLayer.tsx'
 import { REGION_LABEL_ZOOMS, REGION_POINT_LAYER, REGION_POLYGON_LAYER } from './boundaryLayers.ts'
 import {
   type BoundaryIndex,
@@ -252,30 +253,15 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
       {regionMode && index && (
         <Source id="administrative-labels" type="geojson" data={index.labels}>
           {REGION_LABEL_ZOOMS.map((zoom) => (
-            <Layer
+            <MapLabelLayer
               key={zoom}
               id={`administrative-labels-${zoom}`}
-              type="symbol"
               minzoom={zoom}
               filter={[
                 'all',
                 ['>', ['get', 'minLabel'], zoom - 1],
                 ['<=', ['get', 'minLabel'], zoom],
               ]}
-              layout={{
-                'text-field': ['get', 'labelName'],
-                'text-font': ['Arial', 'sans-serif'],
-                'text-size': 13,
-                'text-max-width': 10,
-                'text-padding': 3,
-                'symbol-sort-key': ['get', 'labelRank'],
-              }}
-              paint={{
-                'text-color': '#182d31',
-                'text-halo-color': '#fffdf6',
-                'text-halo-width': 2.1,
-                'text-halo-blur': 0.4,
-              }}
             />
           ))}
         </Source>

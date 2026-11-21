@@ -604,6 +604,7 @@ def build(skip_tiles: bool = False, *, jobs: int | None = None) -> None:
             PROCESSED_DIR / "topology",
             binary,
             jobs=jobs,
+            label_catalog=PUBLIC_DATA_DIR / "languages.json",
         )
         previous_path = PUBLIC_DATA_DIR / "manifest.json"
         if previous_path.exists():

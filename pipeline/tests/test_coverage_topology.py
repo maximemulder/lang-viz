@@ -26,6 +26,7 @@ from pipeline.atlas.topology_build import (
     build,
     create_database,
     export_catalog,
+    refresh_labels,
     restore_parts,
     write_level,
 )
@@ -302,7 +303,7 @@ def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
     for record in records:
         properties = record["properties"]
         assert isinstance(properties, dict)
-        properties.update(dataset_id="test", temporal_view="contemporary")
+        properties.update(dataset_id="test", temporal_view="contemporary", language_id="language")
     source.write_text("\n".join(json.dumps(f) for f in records) + "\n")
     output, cache = tmp_path / "public", tmp_path / "cache"
     manifest = build(source, output, cache, binary, max_zoom=1)
@@ -315,6 +316,14 @@ def test_integrated_archive_parts_and_restore_use_the_canonical_cache(tmp_path):
     path = directory / profile["id"] / "1-0-0.pbf"
     expected = path.read_bytes()
     archive_bytes = (output / manifest["archive"]).read_bytes()
+    catalog = output / "languages.json"
+    atomic_json(catalog, [{"id": "language", "level": "language", "name": "Language"}])
+    refresh_labels(source, output, cache)
+    labeled = json.loads((output / "manifest.json").read_text())
+    profile_entry = labeled["geometryProfiles"][0]
+    table = json.loads((output / profile_entry["labels"]).read_text())
+    assert table["archive"] == profile_entry["archive"] and set(table["variants"]) == {"a", "b"}
+    assert build(source, output, cache, binary, max_zoom=1, label_catalog=catalog) == labeled
     canonical_file = next(cache.glob("canonical/*/test/contemporary.jsonl.gz"))
     canonical_file.unlink()
     path.unlink()

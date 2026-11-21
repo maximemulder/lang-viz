@@ -57,6 +57,7 @@ import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { InspectionHighlight } from './InspectionHighlight'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
 import { LanguageMapPreview } from './LanguageMapFocus'
+import { LanguageLabels } from './labels/LanguageLabels.tsx'
 import { pickLanguageVariants } from './languagePicking'
 import { MapAttribution } from './MapAttribution'
 import { MapBackground } from './MapBackground'
@@ -233,6 +234,14 @@ const LanguageLayers = memo(({ regionMode }: { readonly regionMode: boolean }) =
         emphasisOpacity={regionMode ? 1 : walsOpacity}
         onCoverageReady={setCoverageKey}
       />
+      <Layer id="language-highlight-anchor" type="background" paint={{ 'background-opacity': 0 }} />
+      {!regionMode && (isolated || walsOpacity === 1) && (
+        <LanguageLabels
+          data={data}
+          selectionKey={selectionKey}
+          isolatedIds={isolated?.variantIds}
+        />
+      )}
     </>
   )
 })
@@ -521,11 +530,6 @@ export const WorldMap = ({
       {!BASEMAP_DISABLED && <MapBackground mode={backgroundMode} />}
       <Suspense fallback={null}>
         <LanguageLayers regionMode={regionMode} />
-        <Layer
-          id="language-highlight-anchor"
-          type="background"
-          paint={{ 'background-opacity': 0 }}
-        />
         <InspectionHighlight
           variantIds={hoverInspection?.variantIds ?? inspection?.variantIds ?? NO_VARIANT_IDS}
         />

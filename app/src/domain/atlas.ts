@@ -101,7 +101,10 @@ export interface AtlasManifest {
   readonly geometryIndex?: string
   readonly geometryBounds?: string
   readonly geometryProvenance?: string
-  readonly geometryProfiles?: readonly (GeographyDatasetView & { readonly archive: string })[]
+  readonly geometryProfiles?: readonly (GeographyDatasetView & {
+    readonly archive: string
+    readonly labels?: string
+  })[]
   readonly geometryBuild?: {
     readonly kind: 'shared-coverage'
     readonly fingerprint: string
