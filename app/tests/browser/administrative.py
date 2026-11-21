@@ -95,7 +95,7 @@ def main():
             wait_for(lambda: js("return !document.querySelector('.maplibregl-ctrl-attrib').classList.contains('maplibregl-compact-show')"), 10, "folded map information")
             assert js("return document.querySelector('.maplibregl-ctrl-attrib-button').getBoundingClientRect().width > 0")
             report["checks"].append("default borders off and language hover")
-            button("On map", ".language-tabs")
+            button("Legend", ".language-tabs")
             js("window.savedAdministrativeMap = document.querySelector('.maplibregl-canvas')")
             js("""window.administrativeFetch = window.fetch;
 window.fetch = (...args) => {

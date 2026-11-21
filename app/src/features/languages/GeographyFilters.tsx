@@ -46,7 +46,7 @@ export const GeographyFilters = () => {
   return (
     <SidebarPane
       className="finder-options"
-      title="Data sources"
+      title="Datasets"
       summary={`Browsing ${activeView?.label ?? 'any dataset'}`}
     >
       <ul className="geography-sources" aria-label="Geographic dataset views">

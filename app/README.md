@@ -39,7 +39,7 @@ subtree anchors, comparison roots, categorical mode, and rendering behavior.
 
 On the first Geography visit, the map shows all available Asher Contemporary
 areas. The catalog loads together, while prepared polygons are fetched for the
-visible map tiles. These areas appear as ordinary pinned groups in **On map**.
+visible map tiles. These areas appear as ordinary pinned groups in **Legend**.
 Use **Clear map** to remove them or **Show** to load another complete view.
 
 ## WALS profile features
@@ -156,7 +156,7 @@ still incur main-thread work; mobile and slower-CPU performance remain unmeasure
 
 ## Language controls
 
-The sidebar has Explore and On map views, with a persistent, collapsible details
+The sidebar has Explore and Legend views, with a persistent, collapsible details
 pane above them. Clicking a name or pressing Enter inspects and focuses it without
 changing views or moving keyboard focus. Closing details leaves both selections
 and the map intact. More details exposes exact pinned areas, individual color overrides,
@@ -193,7 +193,7 @@ Clear selection only clears these checkboxes. The working selection survives
 queries, map moves, sources, periods, and view switches. Its count includes
 entries outside the current results.
 
-**Data sources** lists the available source and period combinations. **Show**
+**Datasets** lists the available source and period combinations. **Show**
 replaces the pinned language areas with a complete dataset view and checks its
 **Browse** box. It uses full branch coverage and hierarchy colors independently of
 the working selection and Add options. Showing a dataset ends active isolation and
@@ -201,8 +201,8 @@ uses the current map viewport. **Browse** filters Explore without changing the m
 Checking another dataset switches the filter. Unchecking it lets Explore browse
 every dataset view.
 
-Explore searches the full catalog; the On map view searches only entries already
-added to the map. Entries with usable coverage come first. Unmapped
+The **Languages** section in Explore searches the catalog. **Legend** searches
+only entries already added to the map. Entries with usable coverage come first. Unmapped
 entries remain searchable, expandable, and inspectable. The type of a languoid
 remains in details, tooltips, and accessible row labels rather than visible badges.
 
@@ -216,7 +216,7 @@ comparisons. Unavailable selections are reported and skipped; they remain select
 Overlapping selected roots become one branch group. Repeating an addition preserves
 existing identities and styles and restores any removed members of the same group.
 
-**On map** lists the resulting groups independently of Explore's settings. Groups
+**Legend** lists the resulting groups independently of Explore's settings. Groups
 keep their exact source polygons, periods, coverage, and colors. Expand a group to
 inspect or remove individual areas, or remove/recolor the whole group. Group controls
 switch uniform/hierarchy coloring, choose a base color, or restore automatic color.

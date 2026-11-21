@@ -721,7 +721,7 @@ settings/persistence features remain outside this initial prototype.
 `resolveMapEntries` applies the selected languoid's resolved color to pinned own or
 grouped descendant geometry, followed by an optional per-entry override. Details
 offers an entry color picker and a “Use languoid color” reset. Fills, stripes,
-blending, On map swatches, and inspector swatches use the entry's final color.
+blending, Legend swatches, and inspector swatches use the entry's final color.
 Explore checkboxes show the base languoid color. Geometry availability has no color dependency.
 
 Colors are excluded from coverage selection keys. `createMapResources.updateColors`

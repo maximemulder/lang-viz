@@ -33,8 +33,8 @@ export const LanguageFinder = () => {
           { value: 'explore', label: 'Explore' },
           {
             value: 'map',
-            label: 'On map',
-            ariaLabel: `On map, ${groups.length.toLocaleString()} groups, ${selected.length.toLocaleString()} areas, ${displayed.length.toLocaleString()} displayed`,
+            label: 'Legend',
+            ariaLabel: `Legend, ${groups.length.toLocaleString()} groups, ${selected.length.toLocaleString()} areas, ${displayed.length.toLocaleString()} displayed`,
             badge: groups.length.toLocaleString(),
           },
         ]}

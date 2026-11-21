@@ -319,7 +319,7 @@ export const ExploreLanguages = () => {
       <SidebarSection
         id="explore-search"
         className="explore-search"
-        title="Search"
+        title="Languages"
         expanded={searchExpanded}
         onExpandedChange={setSearchExpanded}
       >

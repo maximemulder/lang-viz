@@ -25,7 +25,7 @@ to cover the same polygon. Re-adding a removed aggregate creates a new identity.
 
 `resolveMapEntries` looks up pinned variants without consulting current filters.
 If any pinned variant is missing from the loaded catalog, the entire entry is
-unavailable; partial aggregates are never silently substituted. On map retains
+unavailable; partial aggregates are never silently substituted. Legend retains
 such entries for inspection/removal. Contexts are source/period categories, not
 arbitrary historical instants; source period labels and proxy/mixed-period
 qualifications remain visible in Details and map popups.

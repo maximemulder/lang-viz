@@ -30,6 +30,7 @@ def main():
             assert all(row["level"] == "1" for row in results["initialBrowse"]["rows"])
             assert browser.js("""
                 return document.querySelectorAll('.language-tabs [role=tab]').length === 2 &&
+                    document.querySelector('#language-tab-map').getAttribute('aria-label').startsWith('Legend,') &&
                     !document.querySelector('.finder-detail') &&
                     !document.querySelector('.language-finder__header') &&
                     !!document.querySelector('#language-panel-explore .finder-options');
@@ -47,14 +48,15 @@ def main():
                 const footer=document.querySelector('.explore-footer').getBoundingClientRect();
                 const sources=document.querySelector('.finder-options');
                 const search=document.querySelector('#explore-search-content');
-                return !sources.open && sources.querySelector('summary').textContent.includes('Data sources') &&
+                return !sources.open && sources.querySelector('summary').textContent.includes('Datasets') &&
+                    document.querySelector('#explore-search-heading').textContent.includes('Languages') &&
                     search.contains(document.querySelector('.search-field')) &&
                     !document.querySelector('.finder-scope') &&
                     document.querySelector('.search-field').getClientRects().length>0 &&
                     footer.top >= list.bottom - 1 &&
                     !document.querySelector('.map-settings__panel .color-controls') &&
                     document.querySelector('#on-map-colors-content').hidden;
-            """), 'Data sources and Colors start collapsed, and Search contains the global query and results'
+            """), 'Datasets and Colors start collapsed, and Languages contains the global query and results'
             map_section(browser, 'colors')
             assert browser.js("""
                 return !document.querySelector('#on-map-entries-content').hidden &&
@@ -170,7 +172,7 @@ def main():
                     document.querySelector('.finder-options').open &&
                     document.querySelector('.geography-sources').getClientRects().length>0 &&
                     document.querySelector('.explore-controls').getBoundingClientRect().height >= window.sourceControlsHeight-1;
-            """), 'Collapsing Search removes its rendered content while Data sources stays open at its full height'
+            """), 'Collapsing Languages removes its rendered content while Datasets stays open at its full height'
             browser.screenshot(output / 'collapsed-search.png')
             key("\ue00d")
             wait_for(lambda: browser.js("return document.querySelectorAll('.language-row[aria-level=\"2\"]').length===3"), 10, 'expanded family survives section collapse')
@@ -178,7 +180,7 @@ def main():
             assert browser.js("""
                 return document.querySelector('.search-field').getClientRects().length>0 &&
                     document.querySelector('#explore-search input[type=search]').value==='abkh1242';
-            """), 'Collapsing Data sources preserves the visible query and results in Search'
+            """), 'Collapsing Datasets preserves the visible query and results in Languages'
             browser.js("document.querySelector('.language-row').focus()")
             key("\ue014")  # Right: already expanded, enter first child.
             wait_for(
