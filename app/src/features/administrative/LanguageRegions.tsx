@@ -52,8 +52,8 @@ export function LanguageRegions({
   return (
     <div className="language-cldr-regions">
       <p className="administrative-muted">
-        CLDR territory estimates describe reported language use, not atlas speaker polygons. Script
-        variants may overlap; their estimates are shown separately.
+        CLDR region estimates describe reported language use. The atlas's language areas come from
+        separate sources. Estimates are shown separately for script variants, which may overlap.
       </p>
       {codes.map((code) => {
         const detail = selectLanguage(repository, code)

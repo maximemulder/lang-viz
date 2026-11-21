@@ -161,9 +161,9 @@ building the app. ADM-02 still owns the complete boundary crosswalk audit.
 - Maintain a versioned CLDR-code-to-boundary-feature crosswalk with explicit
   match, ambiguous, and unmatched outcomes. Keep crosswalk decisions separate
   from statistics and geometry files.
-- Use one visual style for all boundary outlines; disclose the source viewpoint
-  and relevant disputed-area notes in the legend or details. Do not silently
-  color ambiguous polygons with one territory's metric.
+- Use one visual style for all boundary outlines. Credit the boundary source
+  and include the political disclaimer in the map information control. Only
+  reviewed matches receive a statistical fill.
 - Verify the current plain, biomes, terrain, and satellite backgrounds do not
   inject political lines or labels while borders are off. Replace or constrain
   a background if that guarantee does not hold.

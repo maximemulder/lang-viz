@@ -6,7 +6,7 @@ self.onmessage = async ({ data }: MessageEvent<readonly Geometry[]>) => {
     self.postMessage({ mask: await countryOutsideMask(data) })
   } catch (error) {
     self.postMessage({
-      error: error instanceof Error ? error.message : 'Country view unavailable.',
+      error: error instanceof Error ? error.message : 'Region view unavailable.',
     })
   }
 }

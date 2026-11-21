@@ -20,7 +20,7 @@ The views of the app and how they interact. See [OVERVIEW.md](OVERVIEW.md) for t
 With ~8,600 languages, 13,000+ dialects and uneven data across datasets, users need a direct way to find a language and see what we know about it. Without one, the other views are hard to navigate.
 
 - **Search** by name, alternative names (Glottolog lists names in many languages, e.g. *Anglais*, *現代英語*), Glottocode or ISO 639-3 code. Results show name, family and macroarea, to tell apart languages with similar names.
-- **Filters:** family, macroarea, country, endangerment status, level (language / dialect), and "has data in…" (WALS, Grambank, DiACL, polygon, …).
+- **Filters:** family, macroarea, region, endangerment status, level (language / dialect), and "has data in…" (WALS, Grambank, DiACL, polygon, …).
 - **Data availability at a glance:** each row carries small badges or bars showing what exists for that language, e.g. number of WALS features, word forms in DiACL, polygon yes / no, number of sources. This is also the most honest way to show how uneven the data is.
 - **Detail panel** for the selected language: its classification path (clickable into the tree), alternative names, endangerment, the datasets it appears in, and links out (Glottolog, WALS, Wikipedia).
 - **Connected to the shared state:** selecting languages (single or multiple, or the whole filtered list) highlights them on the map and tree and adds them to the feature and word views. The reverse also works: selecting a region or a clade elsewhere filters the list.

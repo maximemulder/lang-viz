@@ -23,7 +23,6 @@ export interface BoundaryAssociation {
   readonly status: 'matched' | 'ambiguous' | 'unmatched'
   readonly featureIds: readonly string[]
   readonly viewpointSensitive?: boolean
-  readonly note?: string
   readonly reason?: string
 }
 

@@ -46,7 +46,7 @@ const Details = ({
     const detail = selectTerritory(repository, selection.id)
     if (!detail) return null
     return (
-      <section className="administrative-detail" aria-label="Territory details">
+      <section className="administrative-detail" aria-label="Region details">
         <p className="administrative-muted">
           CLDR statistical region. This code is independent of any displayed polygon.
         </p>
@@ -56,7 +56,7 @@ const Details = ({
             <dd>{number(Number(detail.territory.population))}</dd>
           </div>
           <div>
-            <dt>Territory literacy</dt>
+            <dt>Literacy rate</dt>
             <dd>{percent(detail.territory.literacyPercent)}</dd>
           </div>
           <div>
@@ -103,8 +103,8 @@ const Details = ({
         </div>
       </dl>
       <p className="administrative-note">
-        This is a sum of reported estimates, not unique speakers. Rows can overlap within a
-        territory and across script variants.
+        Reported estimates can overlap within a region and across script variants, so the sum may
+        count some speakers more than once.
       </p>
       <h4>Languages in this supplement</h4>
       <ul className="administrative-family-languages">
@@ -159,8 +159,6 @@ export const AdministrativeDetails = () => {
       : repository.familyById.get(selection.id)?.name
   if (!title) return null
   const canFocusMap = boundaryIndex?.associations.get(selection.id)?.status === 'matched'
-  const boundaryAssociation =
-    selection.kind === 'territory' ? boundaryIndex?.associations.get(selection.id) : undefined
   return (
     <div className="administrative-detail-scroll">
       <DetailsHeader
@@ -191,9 +189,6 @@ export const AdministrativeDetails = () => {
           No matched polygon or representative point in this boundary view. The CLDR observations
           remain available below.
         </p>
-      )}
-      {boundaryAssociation?.viewpointSensitive && boundaryAssociation.note && (
-        <p className="administrative-note">{boundaryAssociation.note}</p>
       )}
       <Details
         repository={repository}
@@ -317,7 +312,7 @@ export default function AdministrativePanel() {
                   checked={session.metric?.kind === 'territory-literacy'}
                   onChange={() => setMetric({ kind: 'territory-literacy' })}
                 />
-                Territory literacy
+                Literacy rate
               </label>
               {session.selection?.kind === 'language' && (
                 <label>
@@ -426,11 +421,11 @@ export default function AdministrativePanel() {
               <summary>Sources and estimates</summary>
               <p>
                 Approximate functional speaker estimates may include first and later-language
-                speakers. The source count is derived from territory population and reported
+                speakers. The source count is derived from the region's population and the reported
                 percentage. Coverage is incomplete.
               </p>
               <p>
-                Territory codes come from CLDR. Display names follow the browser language and
+                Region codes come from CLDR. Display names follow the browser language and
                 boundaries come from Natural Earth.
               </p>
               <p>

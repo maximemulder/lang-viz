@@ -14,7 +14,7 @@ export async function countryOutsideMask(
   const reader = geos.GEOSGeoJSONReader_create()
   const writer = geos.GEOSGeoJSONWriter_create()
   const own = (pointer: number) => {
-    if (!pointer) throw new Error('The selected country boundary could not be masked.')
+    if (!pointer) throw new Error('The selected region boundary could not be masked.')
     owned.push(pointer)
     return pointer
   }
@@ -30,7 +30,7 @@ export async function countryOutsideMask(
     }
   }
   try {
-    if (!geometries.length) throw new Error('No country boundary is available.')
+    if (!geometries.length) throw new Error('No region boundary is available.')
     const collection = read({ type: 'GeometryCollection', geometries: [...geometries] })
     const valid = own(geos.GEOSMakeValid(collection))
     const country = own(geos.GEOSUnaryUnion(valid))
@@ -53,7 +53,7 @@ export async function countryOutsideMask(
       })
       const difference = own(geos.GEOSDifference(world, country))
       const output = geos.GEOSGeoJSONWriter_writeGeometry(writer, difference, -1)
-      if (!output) throw new Error('Could not prepare the country view.')
+      if (!output) throw new Error('Could not prepare the region view.')
       try {
         const geometry: Geometry = JSON.parse(geos.Module.UTF8ToString(output))
         const polygons =

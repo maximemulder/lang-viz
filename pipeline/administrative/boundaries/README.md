@@ -43,8 +43,8 @@ Libya (`LY`), Oman (`OM`), and Kuwait (`KW`) now have both CLDR 49
 observations and matched shapes. The old prejoined CSV lacked these territories.
 `AU` covers Australia and Ashmore and Cartier Islands. Natural Earth also gives
 Indian Ocean Territories the Australian ISO identifier, but the reviewed
-crosswalk explicitly excludes that separate shape from Australia's fill. Viewpoint-sensitive
-associations retain their notes in the crosswalk and territory detail view.
+crosswalk explicitly excludes that separate shape from Australia's fill. The crosswalk records
+notes on viewpoint-sensitive associations for audit purposes.
 Natural Earth's Admin-0 countries file does not carry every disputed line as a
 separate segment.
 

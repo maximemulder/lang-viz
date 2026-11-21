@@ -42,7 +42,7 @@ export const ObservationList = ({
       <h4>{heading}</h4>
       <p className="administrative-observations__definition">
         Approximate functional speakers, including later-language speakers. Each count is derived
-        from territory population and the reported percentage; rows may overlap.
+        from the region's population and the reported percentage. Rows may overlap.
       </p>
       <ol>
         {rows.map((row) => {
@@ -66,7 +66,7 @@ export const ObservationList = ({
                 style={{ '--bar-width': `${share}%` } as CSSProperties}
               />
               <p>
-                {percent(row.observation.populationPercent)} of reported territory population
+                {percent(row.observation.populationPercent)} of the region's reported population
                 {row.observation.officialStatus !== 'unspecified' &&
                   ` · ${statusLabel[row.observation.officialStatus]}`}
               </p>

@@ -53,12 +53,9 @@ from the separate ADM-02 package when Regions mode is first selected.
 It fetches and validates the pinned GeoJSON when borders are visible or Regions mode is
 enabled. The boundary package never alters CLDR observations. `BoundaryLayer.tsx`
 renders zoom-dependent region names, hover outlines, borders and eligible metric fills.
-The map information control always carries boundary source credits and
-interpretation notes, including when the optional boundary sources are hidden.
-Loading and retry messages appear only while needed. Selection-specific viewpoint
-notes appear in the detail panel. Every full
-border uses the same paint, regardless of whether its association is
-viewpoint-sensitive or has no matched CLDR region.
+The map information control carries the boundary source credit and political disclaimer,
+including when the optional boundary sources are hidden. Loading and retry messages
+appear only while needed. Every full border uses the same paint.
 Every Natural Earth source shape is inspectable in Regions mode. Shapes without a
 reviewed CLDR match open a source-shape sidebar with a no-data message and can
 still be focused. Unmatched CLDR regions remain searchable without a shape. Fetch failures
@@ -73,19 +70,19 @@ as a reliable country location. A missing or unsupported signal uses the
 documented source view; it must never silently reassign CLDR observations.
 
 `GeographyExplorations` supplies the optional boundaries and their pointer
-handlers to `WorldMap`. Regions shows borders and a country preview on hover.
+handlers to `WorldMap`. Regions mode shows borders and previews regions on hover.
 Click a region on the map to open its details, or double-click to fit its geometry.
 Activating a region in the results opens its details and fits its geometry.
 **Focus on map** also fits a previously selected region.
 
-Within a selected country, hovering over a language area shows its language
+Within a selected region, hovering over a language area shows its language
 preview. Clicking it opens the atlas profile, with a chooser where languages
 overlap. Reviewed CLDR language links open the atlas profile from the sidebar.
 Unlinked rows open the original CLDR record. The displayed percentages use the
 reported population share as their scale and may overlap.
 
-Check countries in the result list and choose **Show selected on map** to fit the
-combined geometry and mask language colours outside the checked countries. The
+Check regions in the result list and choose **Show selected on map** to fit the
+combined geometry and mask language colours outside the checked regions. The
 mask uses the original Natural Earth polygons, including islands and enclaves.
 **End isolation**, Escape or switching map modes restores the previous display.
 Pinned comparisons keep their geometry and colours throughout.

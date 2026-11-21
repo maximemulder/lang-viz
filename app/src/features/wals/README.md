@@ -139,10 +139,10 @@ claims; missing areas, unresolved links and conflicts are counted in the disclos
 
 `WalsLayer` references the existing language-area vector source and original
 variant IDs, preserving language colours. There are no WALS markers, flight lines,
-country fills or generated replacement boundaries. The sidebar starts with a brief
+region fills or generated replacement boundaries. The sidebar starts with a brief
 summary; its keyboard-accessible language list renders only when expanded.
 
-Map hover outlines an existing area and previews name, family and countries without
+Map hover outlines an existing area and previews its name, family and regions without
 replacing the open profile. Click opens information. Double-click focuses the
 language's existing areas; **Show all again** or Escape restores the view. Isolation
 changes paint only and preserves pinned selections. Overlapping languages offer a

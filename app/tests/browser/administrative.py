@@ -91,6 +91,7 @@ def main():
             assert not js("return performance.getEntriesByType('resource').some(e=>e.name.endsWith('/geometry.geojson'))")
             wait_for(lambda: js("return document.querySelector('.administrative-attribution')?.textContent.includes('Natural Earth 5.1.1')"), 20, "map information with borders off")
             js("window.adminAttributionText = document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim()")
+            assert "no political position" in js("return window.adminAttributionText")
             wait_for(lambda: js("return !document.querySelector('.maplibregl-ctrl-attrib').classList.contains('maplibregl-compact-show')"), 10, "folded map information")
             assert js("return document.querySelector('.maplibregl-ctrl-attrib-button').getBoundingClientRect().width > 0")
             report["checks"].append("default borders off and language hover")
@@ -239,6 +240,15 @@ window.fetch = (...args) => {
             assert "No matched polygon" in js("return document.querySelector('.administrative-detail-scroll').textContent")
             report["checks"].append("ambiguous territory remains searchable without a polygon")
             button("Regions", ".administrative-search-kind")
+
+            type_query("PS")
+            wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='PS')"), 10, "PS search")
+            select_code("PS")
+            wait_for(lambda: js(
+                "return document.querySelector('.administrative-inspector-header .administrative-code')?.textContent==='PS'"
+            ), 10, "PS region details")
+            assert not js("return !!document.querySelector('.administrative-detail-scroll > .administrative-note')")
+            report["checks"].append("region details omit the crosswalk's political note")
 
             type_query("NL")
             wait_for(
@@ -395,6 +405,9 @@ window.fetch = (...args) => {
             wait_for(lambda: js(
                 "return document.querySelector('[aria-label=\"Languages at this location\"]')?.textContent.includes('Dutch')"
             ), 15, "language preview inside a checked country")
+            assert js("""return [...document.querySelectorAll(
+                '[aria-label="Languages at this location"] .language-inspector__context'
+            )].some(e => e.textContent.startsWith('Regions:'))""")
             click_geo([4.9, 52.37])
             wait_for(lambda: js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Dutch' && document.querySelector('.geography-sidebar__administrative').hidden"), 15, "language inspection from region")
             assert not js("return !!document.querySelector('.map-isolation')")

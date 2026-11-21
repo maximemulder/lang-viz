@@ -227,7 +227,7 @@ Target: a first load of a few MB; everything else loaded when needed.
 One central store holds:
 
 - selected entries (catalog IDs)
-- active filters (family, macroarea, country, endangerment, "has data in…")
+- active filters (family, macroarea, region, endangerment, "has data in…")
 - active feature (and second feature for the heatmap)
 - time / map layer
 - hovered language (for cross-view highlighting)
