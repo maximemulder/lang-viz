@@ -11,6 +11,11 @@ export type TemporalViewId = 'contemporary' | 'time-of-contact' | 'year-1750' | 
 export type TemporalViewSelection = 'all' | TemporalViewId
 export type TemporalQuality = 'direct' | 'approximate' | 'proxy' | 'mixed'
 
+export interface GeographyDatasetView {
+  readonly datasetId: GeographyDatasetId
+  readonly viewId: TemporalViewId
+}
+
 export type TemporalCoverage =
   | {
       readonly kind: 'named-period'
@@ -95,11 +100,7 @@ export interface AtlasManifest {
   readonly geometryIndex?: string
   readonly geometryBounds?: string
   readonly geometryProvenance?: string
-  readonly geometryProfiles?: readonly {
-    readonly datasetId: GeographyDatasetId
-    readonly viewId: TemporalViewId
-    readonly archive: string
-  }[]
+  readonly geometryProfiles?: readonly (GeographyDatasetView & { readonly archive: string })[]
   readonly geometryBuild?: {
     readonly kind: 'shared-coverage'
     readonly fingerprint: string

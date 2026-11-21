@@ -168,7 +168,7 @@ def main():
                     document.querySelector('.search-field').getClientRects().length===0 &&
                     document.querySelector('.language-list').getClientRects().length===0 &&
                     document.querySelector('.finder-options').open &&
-                    document.querySelector('.finder-filters__period select').getClientRects().length>0 &&
+                    document.querySelector('.geography-sources').getClientRects().length>0 &&
                     document.querySelector('.explore-controls').getBoundingClientRect().height >= window.sourceControlsHeight-1;
             """), 'Collapsing Search removes its rendered content while Data sources stays open at its full height'
             browser.screenshot(output / 'collapsed-search.png')

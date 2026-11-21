@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from .run import APP, browser_session, open_atlas, wait_for
-from .sidebar import add_selected, clear_selection, open_details, search, view
+from .sidebar import add_selected, clear_selection, open_details, search, sources, view
 
 
 def main():
@@ -19,25 +19,7 @@ def main():
     with browser_session(output) as (browser, origin):
         open_atlas(browser, origin)
         try:
-            wait_for(
-                lambda: browser.js("return !!document.querySelector('.source-filter__trigger')"),
-                15,
-                "catalog controls",
-            )
-            browser.js("""
-                document.querySelector('.finder-options').open = true;
-                document.querySelector('.source-filter__trigger').click();
-            """)
-            browser.js("""
-                [...document.querySelectorAll('.source-filter__actions button')]
-                    .find(button => button.textContent === 'Clear').click();
-            """)
-            browser.js("""
-                [...document.querySelectorAll('.source-filter__option')]
-                    .find(label => label.querySelector('strong').textContent === 'DLAC')
-                    .querySelector('input').click();
-                document.querySelector('.source-filter__trigger').click();
-            """)
+            sources(browser, 'DLAC')
             for slug, label, center, zoom in cases:
                 view(browser, 'explore')
                 clear_selection(browser)
@@ -127,23 +109,17 @@ def main():
                         ]
                     },
                 )
-                popup = wait_for(
-                    lambda: browser.js(
-                        "return document.querySelector('.language-inspector')?.textContent"
-                    ),
-                    10,
-                    "source map inspection",
-                )
-                assert "Source-defined entry" in popup and "no matched Glottocode" in popup
                 browser.call("DELETE", "/actions")
-                browser.js("document.querySelector('.language-inspector__details').click()")
                 wait_for(
-                    lambda: browser.js(
-                        "return !!document.querySelector('.finder-detail__classification')"
+                    lambda entry_id=entries[0]["id"]: browser.js(
+                        "return document.querySelector('.focused-map-entry')?.dataset.entryId === arguments[0]",
+                        entry_id,
                     ),
                     10,
-                    "source details from map",
+                    "exact source entry clicked on map",
                 )
+                classification = browser.js("return document.querySelector('.finder-detail__classification').textContent")
+                assert "Source-defined entry" in classification and "No matched Glottocode" in classification
                 browser.screenshot(output / f"{slug}.png")
                 browser.js(
                     "document.querySelector('.map-entry-card__actions button:last-child').click()"
@@ -160,41 +136,25 @@ def main():
             view(browser, "explore")
             clear_selection(browser)
             search(browser, "danzhou", "dlac1987china:danzhou")
-            browser.js("""
-                document.querySelector('.finder-options').open = true;
-                const select = document.querySelector('.finder-filters__period select');
-                select.value = 'year-1750';
-                select.dispatchEvent(new Event('change', {bubbles:true}));
-            """)
+            sources(browser, 'DiACL')
             wait_for(
-                lambda: browser.js("return document.querySelector('.language-row input').disabled"),
+                lambda: browser.js("return !!document.querySelector('.language-row--unavailable')"),
                 10,
-                "source hidden by period",
+                "source hidden while browsing DiACL",
             )
-            browser.js("""
-                const select = document.querySelector('.finder-filters__period select');
-                select.value = 'contemporary';
-                select.dispatchEvent(new Event('change', {bubbles:true}));
-            """)
+            sources(browser, 'DLAC')
             wait_for(
-                lambda: browser.js(
-                    "return !document.querySelector('.language-row input').disabled"
-                ),
+                lambda: browser.js("return !!document.querySelector('.language-row input[type=checkbox]')"),
                 10,
-                "source period restored",
+                "DLAC source restored",
             )
-            browser.js("document.querySelector('.source-filter__trigger').click()")
-            browser.js("""
-                [...document.querySelectorAll('.source-filter__option')]
-                    .find(label => label.querySelector('strong').textContent === 'DLAC')
-                    .querySelector('input').click();
-            """)
+            sources(browser, 'Asher', period='contemporary')
             wait_for(
-                lambda: browser.js("return document.querySelector('.language-row input').disabled"),
+                lambda: browser.js("return !!document.querySelector('.language-row--unavailable')"),
                 10,
-                "source hidden by dataset",
+                "source hidden while browsing Asher Contemporary",
             )
-            results["filters"] = "period and dataset filters passed"
+            results["filters"] = "dataset view browsing passed"
             view(browser, "explore")
         except Exception:
             results["failureSnapshot"] = browser.snapshot()

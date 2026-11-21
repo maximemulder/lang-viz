@@ -75,34 +75,7 @@ def select_branches(browser, source, center, zoom=4.5, *, settle=True, period="c
         "window.overlapTest.configure({languageIds:[],center:arguments[0],zoom:arguments[1]})",
         center, zoom,
     )
-    browser.js("""
-        document.querySelector('.finder-options').open = true;
-    """)
-    browser.js("""
-        const select = document.querySelector('.finder-filters__period select');
-        select.value = arguments[0];
-        select.dispatchEvent(new Event('change', {bubbles:true}));
-    """, period)
-    browser.js("""
-        document.querySelector('.source-filter__trigger').click();
-    """)
-    browser.js("""
-        [...document.querySelectorAll('.source-filter__actions button')]
-          .find(button => button.textContent === 'Clear').click();
-    """)
-    wait_for(
-        lambda: browser.js(
-            "return document.querySelector('.source-filter__trigger').textContent.includes('No sources')"
-        ),
-        10,
-        "cleared source filter",
-    )
-    browser.js("""
-        [...document.querySelectorAll('.source-filter__option')]
-          .find(label => label.querySelector('strong').textContent === arguments[0])
-          .querySelector('input').click();
-        document.querySelector('.source-filter__trigger').click();
-    """, source)
+    sources(browser, source, period=period)
     browser.js("[...document.querySelectorAll('.finder-actions button')].find(b=>b.textContent==='Select all').click()")
     wait_for(lambda: browser.js("return !!document.querySelector('.finder-add')"), 10, 'selected roots')
     add_selected(browser)
@@ -117,15 +90,24 @@ def select_control(browser, selector, value):
     """, selector, value)
 
 
-def sources(browser, short_name):
+def sources(browser, short_name=None, *, period=None):
     view(browser, 'explore')
-    browser.js("document.querySelector('.finder-options').open=true;document.querySelector('.source-filter__trigger').click()")
-    browser.js("[...document.querySelectorAll('.source-filter__actions button')].find(b=>b.textContent==='Clear').click()")
-    wait_for(lambda: browser.js("return document.querySelector('.source-filter__trigger').textContent.includes('No sources')"), 10, 'clear sources')
     browser.js("""
-        [...document.querySelectorAll('.source-filter__option')].find(e=>e.querySelector('strong').textContent===arguments[0]).querySelector('input').click();
-        document.querySelector('.source-filter__trigger').click();
-    """, short_name)
+        const section = document.querySelector('.finder-options');
+        const wasOpen = section.open;
+        section.open = true;
+        const selector = '.geography-sources__browse';
+        if (arguments[0] === null) {
+            section.querySelector(selector + ':checked')?.click();
+        } else {
+            const row = [...section.querySelectorAll('.geography-sources__row')].find(row =>
+                row.querySelector('strong').textContent === arguments[0] &&
+                (!arguments[1] || row.dataset.viewId === arguments[1]));
+            const checkbox = row.querySelector(selector);
+            if (!checkbox.checked) checkbox.click();
+        }
+        section.open = wasOpen;
+    """, short_name, period)
 
 
 def clear_selection(browser):

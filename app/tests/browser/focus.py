@@ -4,7 +4,7 @@
 import json
 
 from .run import APP, browser_session, open_atlas, wait_for
-from .sidebar import add_selected, open_details, search, select_result, view
+from .sidebar import add_selected, open_details, search, select_result, sources, view
 
 
 def check_focus(browser, output):
@@ -111,10 +111,7 @@ def check_focus(browser, output):
     # Pinned comparisons preview their exact geography even when Explore has no areas.
     browser.js('window.overlapTest.configure({languageIds:["stan1295"],center:[8,50],zoom:3})')
     search(browser, 'stan1295', 'stan1295')
-    browser.js("""
-        document.querySelector('.finder-options').open=true;
-        const select=document.querySelector('.finder-filters__period select');select.value='year-1750';select.dispatchEvent(new Event('change',{bubbles:true}));
-    """)
+    sources(browser, 'DLAC')
     view(browser, 'map')
     original = ready()
     move('.on-map-row__identity')
@@ -134,9 +131,7 @@ def check_focus(browser, output):
     outlined([german], selected=True)
     browser.screenshot(output/'pinned-focus.png')
     view(browser, 'explore')
-    browser.js("""
-        const select=document.querySelector('.finder-filters__period select');select.value='contemporary';select.dispatchEvent(new Event('change',{bubbles:true}));
-    """)
+    sources(browser, 'Asher', period='contemporary')
     view(browser, 'map')
     before_remove = ready()['camera']
     browser.js("document.querySelector('.focused-map-entry button').click()")
@@ -160,10 +155,7 @@ def check_focus(browser, output):
     outlined(expected, selected=True)
     browser.screenshot(output/'family-focus.png')
     # A group's profile uses pinned members even when the search year has no areas.
-    browser.js("document.querySelector('.finder-options').open=true")
-    browser.js("""
-        const select=document.querySelector('.finder-filters__period select');select.value='year-1750';select.dispatchEvent(new Event('change',{bubbles:true}));
-    """)
+    sources(browser, 'DLAC')
     view(browser, 'map')
     move('.on-map-group__identity')
     outlined(expected)

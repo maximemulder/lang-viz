@@ -7,7 +7,7 @@ from typing import Any
 
 from .color_evaluation import distance, evaluate_colors, lab
 from .run import APP, browser_session, check_state, open_atlas, wait_for
-from .sidebar import map_section, open_details, search, select_branches, view
+from .sidebar import map_section, open_details, search, select_branches, sources, view
 
 
 def color_controls(browser):
@@ -195,16 +195,10 @@ def main():
             browser.js("window.overlapTest.camera([115,27],4.5)")
             browser.settled(100)
             assert color_state(browser, ids)["colors"] == first["colors"], "Navigation recolored entries"
-            browser.js("""
-                const period=document.querySelector('.finder-filters__period select');
-                period.value='time-of-contact'; period.dispatchEvent(new Event('change',{bubbles:true}));
-            """)
+            sources(browser, 'Asher', period='time-of-contact')
             assert color_state(browser, ids)["colors"] == first["colors"], "A period filter changed pinned colors"
-            browser.js("""
-                const period=document.querySelector('.finder-filters__period select');
-                period.value='contemporary'; period.dispatchEvent(new Event('change',{bubbles:true}));
-                window.overlapTest.camera([108,32],3);
-            """)
+            sources(browser, 'DLAC')
+            browser.js("window.overlapTest.camera([108,32],3)")
             browser.settled(100)
 
             # Both levels of exact custom colors survive a view optimization.

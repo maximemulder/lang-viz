@@ -39,9 +39,8 @@ subtree anchors, comparison roots, categorical mode, and rendering behavior.
 
 On the first Geography visit, the map shows all available Asher Contemporary
 areas. The catalog loads together, while prepared polygons are fetched for the
-visible map tiles. These areas appear as ordinary pinned groups in **On map**:
-Clear map removes them for the rest of the session, and changing source or
-period filters does not alter areas already on the map.
+visible map tiles. These areas appear as ordinary pinned groups in **On map**.
+Use **Clear map** to remove them or **Show** to load another complete view.
 
 ## WALS profile features
 
@@ -194,6 +193,14 @@ Clear selection only clears these checkboxes. The working selection survives
 queries, map moves, sources, periods, and view switches. Its count includes
 entries outside the current results.
 
+**Data sources** lists the available source and period combinations. **Show**
+replaces the pinned language areas with a complete dataset view and checks its
+**Browse** box. It uses full branch coverage and hierarchy colors independently of
+the working selection and Add options. Showing a dataset ends active isolation and
+uses the current map viewport. **Browse** filters Explore without changing the map.
+Checking another dataset switches the filter. Unchecking it lets Explore browse
+every dataset view.
+
 Explore searches the full catalog; the On map view searches only entries already
 added to the map. Entries with usable coverage come first. Unmapped
 entries remain searchable, expandable, and inspectable. The type of a languoid
@@ -217,12 +224,12 @@ Individual overrides take precedence and can be reset in details. Searching by a
 member automatically reveals matching areas in collapsed groups. Clear map removes
 all groups, even those hidden by its search, without clearing Explore's selection.
 
-To compare sources or periods, keep the working selection, change the geography
-filters or a source-variant picker, and add again. Different pinned geometries form
-independent groups. An own-area group and a whole-branch group can coexist. Shared
-polygons in different groups have independent entry identities, colors, inspection,
-and refinement; groups never suppress one another. Identical repeated additions
-reuse the existing group, retaining its original context and styling.
+To compare sources or periods, keep the working selection, check **Browse** for
+another view or change the source-variant picker, and add again. Different
+pinned geometries form independent groups. An own-area group and a whole-branch
+group can coexist. Shared polygons in different groups have independent entry
+identities, colors, inspection, and refinement. Identical repeated additions reuse
+the existing group, retaining its original context and styling.
 
 Both browsing views retain their queries, expansion, and scroll positions.
 Navigation state lives in `src/state/languageControls.ts`; the working selection

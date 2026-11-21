@@ -11,7 +11,7 @@ from typing import Any
 from .etymology import controlled_server
 from .inspection import move, render_frames
 from .run import APP, SCENARIOS, browser_session, wait_for
-from .sidebar import search, select_control
+from .sidebar import search, select_control, sources
 
 
 def main():
@@ -230,8 +230,7 @@ def main():
                 "normal area pinning preserves existing entries, reports actual additions and deduplicates repeats"
             )
             # Unsupported source/period must not remove pinned comparisons or invent matches.
-            browser.js("document.querySelector('.finder-options').open=true")
-            select_control(browser, ".finder-filters__period select", "year-1750")
+            sources(browser, "Matsumae")
             button("Add matched language areas")
             wait_for(
                 lambda: "currently unavailable" in text(".word-map-summary [role=status]"),
@@ -243,7 +242,7 @@ def main():
             check(
                 "current source/period availability is respected while earlier comparisons stay pinned"
             )
-            select_control(browser, ".finder-filters__period select", "contemporary")
+            sources(browser, "Asher", period="contemporary")
             browser.settled(60, fail_on_error=True)
             before_clear = browser.snapshot()
             browser.js("document.querySelector('button[aria-label=\"Clear word overlay\"]').click()")
@@ -284,7 +283,9 @@ def main():
             browser.settled(60, fail_on_error=True)
             move(browser, [-0.1, 51.5], click=True)
             wait_for(
-                lambda: bool(text(".language-inspector--pinned")), 10, "pinned polygon inspector"
+                lambda: "stan1293" in text(".geography-inspector .finder-detail"),
+                10,
+                "English details from the pinned polygon",
             )
             browser.js(
                 """

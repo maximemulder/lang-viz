@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 
 from .colors import button, color_controls, color_state, optimize
 from .run import APP, browser_session, open_atlas, wait_for
-from .sidebar import add_selected, select_branches
+from .sidebar import add_selected, select_branches, sources
 
 out=APP/'test-results/prepared-colors'
 manifest=json.loads((APP/'public/data/manifest.json').read_text())
@@ -150,9 +150,7 @@ with metadata_session() as (browser,origin):
     browser.settled(100)
     assert color_state(browser,ids)['colors']==expected
     # Browse another source without removing pinned DLAC entries.
-    browser.js("document.querySelector('.source-filter__trigger').click()")
-    browser.js("[...document.querySelectorAll('.source-filter__actions button')].find(b=>b.textContent==='Clear').click()")
-    browser.js("[...document.querySelectorAll('.source-filter__option')].find(l=>l.querySelector('strong').textContent==='Asher').querySelector('input').click();document.querySelector('.source-filter__trigger').click()")
+    sources(browser, 'Asher', period='contemporary')
     assert color_state(browser,ids)['colors']==expected
     # Pin the new source as well: mixed-source comparisons cannot use one dataset table.
     add_selected(browser)

@@ -20,7 +20,7 @@ def main():
         open_atlas(browser, origin)
         try:
             wait_for(
-                lambda: browser.js("return !!document.querySelector('.source-filter__trigger')"),
+                lambda: browser.js("return !!document.querySelector('.geography-sources')"),
                 20,
                 "catalog",
             )

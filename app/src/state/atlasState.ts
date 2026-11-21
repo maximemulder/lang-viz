@@ -1,4 +1,4 @@
-import { atom } from 'jotai'
+import { atom, type Getter } from 'jotai'
 import { atomWithRefresh, selectAtom, unwrap } from 'jotai/utils'
 import { loadAtlasData } from '../data/atlasRepository'
 import {
@@ -8,6 +8,7 @@ import {
 } from '../domain/aggregation'
 import type {
   GeographyDatasetSelection,
+  GeographyDatasetView,
   GeometryVariantId,
   LanguageId,
   TemporalViewSelection,
@@ -42,6 +43,7 @@ import {
   mapGroupId,
 } from '../domain/mapGroups'
 import { selectGlobalColorProfile } from '../domain/preparedColors'
+import { clearMapIsolationAtom } from './mapInteraction'
 
 export const atlasDataAtom = atomWithRefresh(async () => loadAtlasData())
 
@@ -65,18 +67,7 @@ export const initializeDefaultMapAtom = atom(null, (get, set) => {
     sources[0] !== 'asher2007world'
   )
     return
-  set(
-    mapEntriesAtom,
-    buildMapGroupEntries(
-      get(languageHierarchyAtom).roots.map(({ id }) => id),
-      get(languageHierarchyAtom),
-      get(geographyAvailabilityAtom),
-      get(geographyContextAtom),
-      'branch',
-      'hierarchy',
-      get(colorTopologyAtom),
-    ),
-  )
+  set(mapEntriesAtom, buildCompleteGeographyMap(get, get(geographyContextAtom)))
 })
 /** Languoid identities for genealogy/presentation, never map-entry identities. */
 export const visibleLanguageIdsAtom = selectAtom(
@@ -281,6 +272,40 @@ export const geographyContextAtom = atom<GeographyContext>((get) => ({
   sources: get(geographyDatasetFilterAtom),
   period: get(temporalViewAtom),
 }))
+
+export const browseGeographyViewAtom = atom(
+  null,
+  (_get, set, view: GeographyDatasetView | null) => {
+    set(geographyDatasetFilterAtom, view ? [view.datasetId] : 'all')
+    set(temporalViewAtom, view?.viewId ?? 'all')
+  },
+)
+
+const buildCompleteGeographyMap = (get: Getter, context: GeographyContext) => {
+  const data = get(resolvedAtlasDataAtom)
+  if (!data) return []
+  const hierarchy = get(languageHierarchyAtom)
+  return buildMapGroupEntries(
+    hierarchy.roots.map(({ id }) => id),
+    hierarchy,
+    buildGeographyAvailability(data, hierarchy, context.period, context.sources, {}),
+    context,
+    'branch',
+    'hierarchy',
+    get(colorTopologyAtom),
+  )
+}
+
+export const showOnlyGeographyViewAtom = atom(null, (get, set, view: GeographyDatasetView) => {
+  const entries = buildCompleteGeographyMap(get, {
+    sources: [view.datasetId],
+    period: view.viewId,
+  })
+  if (!entries.length) return
+  set(mapEntriesAtom, entries)
+  set(browseGeographyViewAtom, view)
+  set(clearMapIsolationAtom)
+})
 
 /** Checkboxes refer to the draft being browsed, not every representation of this languoid. */
 export const selectedDraftLanguageIdsAtom = atom((get) => {

@@ -52,7 +52,7 @@ npm run test:coverage-browser
 npm run test:branch-browser
 npm run test:parts-browser
 npm run test:inspection-browser -- --dev
-npm run build && uv run python -m tests.browser.dropdowns
+npm run build && uv run python -m tests.browser.geography_sources
 npm run build && uv run python -m tests.browser.stripes
 ```
 
@@ -484,9 +484,9 @@ All browser suites share `browser_session()` and `open_atlas()` from `run.py` fo
 server/Firefox lifecycle and navigation. Sidebar actions live in `sidebar.py`;
 each suite keeps its scenario assertions and reports.
 
-`dropdowns.py` checks real pointer selection over the next sidebar section, viewport
-bounds at desktop, short and narrow sizes, Escape dismissal, and section collapse.
-Screenshots go to `test-results/dropdowns/`.
+`geography_sources.py` checks real pointer access at desktop, short and narrow
+sizes, verifies complete dataset views, and exercises switching and clearing Browse.
+Screenshots go to `test-results/geography-sources/`.
 
 `stripes.py` measures stripe frequency in rendered pixels at finer, intermediate,
 default and thicker settings,

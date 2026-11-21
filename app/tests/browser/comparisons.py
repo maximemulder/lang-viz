@@ -16,10 +16,6 @@ def check_comparisons(browser, output):
     def state():
         return browser.js('return window.overlapTest.mapEntryState()')
 
-    def period(value):
-        view(browser, 'explore')
-        select_control(browser, '.finder-filters__period select', value)
-
     def color(entry_id, value):
         browser.js("""
             const card=[...document.querySelectorAll('.map-entry-card')].find(e=>e.dataset.entryId===arguments[0]);
@@ -39,14 +35,13 @@ def check_comparisons(browser, output):
     wait_for(lambda: not browser.snapshot()['moving'], 10, 'profile framing')
     browser.js('window.overlapTest.camera([10.5,51],5)')
     contemporary = state()[0]
-    period('all')
+    sources(browser)
     select_control(browser, '.language-row__variant', 'asher2007world:traditional:stan1295')
     assert len(state()) == 1
     add_selected(browser)
     assert len(state()) == 2
     traditional = next(e for e in state() if 'traditional' in e['variantIds'][0])
     sources(browser, 'DiACL')
-    period('year-1750')
     add_selected(browser)
     wait_for(lambda: len(state()) == 3, 10, 'three German representations')
     entries_before = state()
