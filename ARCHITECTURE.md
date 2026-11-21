@@ -26,7 +26,7 @@ The key rule: **the front end only knows the internal schema, never the original
 The datasets share a format (CLDF) and a key (Glottocode), so format conversion is easy (see [DATASETS.md](DATASETS.md#5-how-the-datasets-link)). The real work is deciding what counts as the same thing. These are the rules to agree on:
 
 1. **Features with similar meaning are not directly comparable.** WALS and Grambank ask similar but not identical questions, with different value sets. We use one main source per topic and do not merge them.
-2. **Level mismatches.** Datasets record dialects, languages or groups of varieties. WALS observations remain attached to their exact source varieties; an atlas association is separate and must not roll a value up to a parent language or family. Conflicting variety values remain distinct. See the [WALS contracts](WALS_PORT_PLAN.md#architecture-and-behavior-contracts).
+2. **Level mismatches.** Datasets record dialects, languages or groups of varieties. WALS observations remain attached to their exact source varieties; an atlas association is separate and must not roll a value up to a parent language or family. Conflicting variety values remain distinct. See the [WALS association contracts](app/src/features/wals/README.md#associations-and-profile-selection).
 3. **Disagreeing sources.** A language may have several polygons or coordinates. We pick a default (Glottolog coordinates; asher2007world polygons where available) and keep the alternatives for the "compare sources" view. Never merge them silently.
 4. **Entries outside Glottolog.** Reviewed equivalents keep Glottocodes. Entries without equivalents use stable dataset-namespaced IDs and explicit source classification provenance. The atlas registry is `pipeline/atlas/source_languoids.json`; reviewed parent links place Tibeto-Burman under Sino-Tibetan and Shaozhou Tuhua/Danzhou under Sinitic. Family and parent-language metadata follow the combined ancestry. Existing Glottolog branches keep their parents; only entries with unresolved broader affiliations remain roots.
 5. **Time.** Each dataset has its own notion of time (DiACL date ranges, Glottography map years, *contemporary* / *traditional*). We keep a simple model: every geometry or variety gets an optional start / end year and a layer label. A finer time axis only if a view needs it.
@@ -93,26 +93,19 @@ component lifetimes. Loading cannot write navigation. Explicit show/focus action
 share the map camera intent with atlas and lexical navigation; inspection opens
 associated profiles without moving the map and retains unmatched source evidence
 separately. The profile UI publishes the complete ready atlas catalog, independent
-of map filters, before resolving associations. Cards retain unknown word-order and
-regional comparison slots, select one observed extra deterministically, and reveal
-the exact inspected feature. Broader scope and source variety identity remain visible;
-citations, version and source errata are available in native disclosures. Recorded
+of map filters, before resolving associations. Profiles prioritize recorded word
+order in the three-card summary and expose source citations in disclosures. Recorded
 cards expose explicit map exploration. `integrations/GeographyExplorations.tsx`
 composes independently visible WALS and word-trail overlays through the map/sidebar
 slots without remounting Geography. `integrations/map/overlayCamera.ts` supplies
-the shared guarded camera controller; neither overlay imports the other. WALS
-inspection preserves exact evidence without moving the camera or replacing its
-origin. Colocated markers open a source chooser, and the list supplies keyboard
-inspection. Single-world Mercator uses world-width bounds for dateline selections
-while globe uses the shortest arc, retaining the user's chosen projection. `domain/walsExamples.ts` selects at most
-12 exact-category source observations with deterministic spherical spacing,
-independently of catalog matches. Derived integration atoms build static point
-geometry once per selection; colocated points retain each exact source ID. The
-[exploration design](app/src/features/wals/EXPLORATION_DESIGN.md) documents count
-meanings and the choice of points over relationship-like arcs. The separate
-browser/source release inventories include checksums,
-schema/adapter/source versions, producer identity, license and errata. Deployment
-restores the verified browser asset without compiling or copying raw sources,
+the shared guarded camera controller. The WALS integration matches the recorded
+category against eligible language and dialect associations, then highlights
+existing language areas in the active source and period. It excludes conflicting
+variety values from whole-area highlights. Inspection retains the original WALS
+selection without moving the camera. The separate browser and source release
+inventories include checksums, schema/adapter/source versions, producer identity,
+license and errata. Deployment restores the verified browser asset without
+compiling or copying raw sources,
 then checks the seven-feature snapshot and current catalog associations together.
 See [WALS frontend contracts](app/src/features/wals/README.md) and the
 [association review](app/src/integrations/wals/ASSOCIATION_REVIEW.md).
@@ -121,10 +114,8 @@ WALS preparation stays on the main thread with one shared successful repository.
 The loader emits local User Timing entries `wals:receive`, `wals:parse`,
 `wals:validate`, `wals:index` and a `wals:prepared` mark once per successful load;
 cache hits add no preparation work. These timings do not transmit telemetry or
-change session/navigation. Explicit domain and browser measurement commands are
-documented in the [frontend guide](app/README.md#wals-profile-features).
-Workers or sharding require evidence from slower devices; the local acceptance
-measurements and their limits are in [the handoff](WALS_PORT_PLAN.md).
+change session/navigation. Workers or sharding require evidence from slower
+devices. See the [WALS measurement commands and limits](app/src/features/wals/README.md#measurements).
 
 Administrative language statistics use a separate CLDR supplement rather than
 the atlas catalog schema. `pipeline/administrative/` restores pinned CLDR 49
@@ -147,8 +138,7 @@ with them; Language / Area picks one interaction owner. The map settings offer
 only physical backgrounds without political labels. This release has one
 boundary viewpoint and no client-country signal; a future alternate view needs
 its own reviewed geometry/crosswalk and a passive host-supplied country code.
-See [the administrative feature contract](app/src/features/administrative/README.md)
-and [the port handoff](ADMINISTRATIVE_LANGUAGE_PORT_PLAN.md).
+See the [administrative feature contract](app/src/features/administrative/README.md).
 
 Word histories use an independent lexical schema and release pin
 (`etymology-release.json`). The geographic catalog IDs and lexical numeric IDs

@@ -26,23 +26,15 @@ See [frontend interactions and checks](app/README.md#word-histories) and
 [lexical source and release contracts](pipeline/etymology/README.md).
 The offline build below is for changing geographic data.
 
-The WALS port provides published data delivery, a reproducible offline adapter,
-a validated lazy repository, conservative catalog associations and source-aware
-session/navigation contracts. Open a language profile and choose **Load WALS features**
-to see recorded varieties, feature cards and citations. Variety choices survive profile
-and workspace navigation for the session. **Show recorded examples on map** on a
-recorded card opens static points and an inspection list for up to 12 exact-category
-examples, independently of word-history overlays and pinned comparisons.
-WALS uses an independent pinned snapshot and does not rebuild geographic or lexical data.
-See [source/build commands](pipeline/wals/README.md),
-[frontend contracts](app/src/features/wals/README.md) and the [port roadmap](WALS_PORT_PLAN.md).
+Opening a language profile loads WALS feature cards with the recorded variety
+and citations. **Find languages like this** highlights eligible areas that share
+the recorded category. Variety choices survive profile and workspace navigation
+for the session. The highlights describe a shared feature without implying
+ancestry. See the [WALS frontend contracts](app/src/features/wals/README.md).
 
-The roadmap records final acceptance and remaining limitations. All three data
-pins restore independently; the [deployment preparation commands](pipeline/wals/README.md#deployment-and-snapshot-checks)
-build a fresh checkout without raw source datasets. WALS choices are session-only.
-The map examples are a bounded illustration of one recorded category, with no
-inferred linguistic relationship. `npm run measure:wals` and
-`npm run measure:wals-browser` in `app/` reproduce domain and browser measurements.
+All three data pins restore independently. A fresh checkout can build from
+the pinned browser datasets without fetching the raw sources. See the
+[deployment preparation commands](pipeline/wals/README.md#deployment-and-snapshot-checks).
 
 ## Build the proof of concept
 
@@ -60,6 +52,8 @@ npm run dev
 
 Generated browser artifacts are written to `app/public/data/` and are not
 committed. The normalized intermediate geometry is written to `data/processed/`.
+CI builds Tippecanoe and `tile-join` on Linux. The bootstrap still needs
+verification with the macOS SDK and Bash 3.2 for macOS support.
 External datasets and Tippecanoe are fetched at the exact revisions recorded in
 `pipeline/atlas/sources.lock.tsv`; DLAC's Dataverse files are pinned by file ID and
 SHA-256 in `pipeline/dlac/fetch.sh` and fetched by the same source-fetch command.
@@ -401,9 +395,7 @@ and available coverage remains visible. Loading and errors appear on the map;
 **Retry** reuses completed tiles. Single-language regions use native solid fills,
 and shared regions use stripe textures. Pattern spacing follows
 MapLibre's map-anchored image fills. See the
-[implementation notes](app/src/features/map/overlap/README.md) for details.
-The [overlap roadmap](OVERLAP_ROADMAP.md) tracks limitations, priorities, and
-completion criteria for future sessions.
+[implementation notes and open questions](app/src/features/map/overlap/README.md).
 
 Run the overlap checks with Node 24 or newer:
 

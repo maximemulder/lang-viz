@@ -218,7 +218,7 @@ previous manual-loading and point-marker UI. Their UI expectations require updat
 before use as acceptance gates for this revision. Current checks include the unit
 suite, full snapshot integration test, build, and manual browser interaction checks.
 
-## Measurements and handoff
+## Measurements
 
 `npm run measure:wals` explicitly reads the restored full snapshot and atlas
 catalog, fingerprints both, and measures parsing/UTF-8 decoding, validation,
@@ -242,8 +242,3 @@ successful load. These are local User Timing entries with no reporting service.
 Cache hits add no timings. Firefox's 10ms timer-gap probe includes scheduling,
 garbage collection and map work; it is not a Long Tasks API measurement. The
 desktop software-WebGL scenario does not establish slower-device CPU performance.
-
-The [roadmap handoff](../../../../WALS_PORT_PLAN.md) records the environment,
-results, clean-restoration evidence, remaining limits and separate publication,
-integration and deployment statuses. URL/reload persistence and a profile
-ergonomics redesign remain outside this port.

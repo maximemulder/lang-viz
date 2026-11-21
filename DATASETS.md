@@ -584,10 +584,13 @@ raw datasets in Git does not prevent publication of derived geometry by the
 website. Commercial reuse requires resolving the conflicting terms or obtaining
 an appropriate separate grant.
 
-See [the compatibility assessment](DLAC_ASSESSMENT.md) for the initial source
-audit, measured boundary agreement, and reproducible exploratory analysis. Its
-17 candidate-node count includes the four initially withheld scope-review
-mappings now enabled by the production importer.
+The pre-integration audit compared full, unclipped DLAC and contemporary Asher
+geometries in the EPSG:6933 equal-area projection. Intersection over union was
+54.27% for Yue, 46.26% for Gan, 43.11% for Hakka, 27.90% for Wu, and 6.18% for
+Xiang. The sources differ in dates, geographic scope, and classification, and
+these figures measure agreement. The audit code and candidate table remain in
+[`pipeline/dlac/`](pipeline/dlac/) for reproducing the comparison with the
+pre-integration catalog and raw sources.
 
 ## 5. How the datasets link
 

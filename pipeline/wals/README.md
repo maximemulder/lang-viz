@@ -258,10 +258,8 @@ GITHUB_PAGES=true npm run preview
 ```
 
 Open the preview's `/lang-viz/` path. `dist/` includes all three verified browser
-datasets and notices; raw/recovery archives are not copied there. Building and
-previewing do not publish code, replace any release pin, merge main or deploy
-Pages. Actual release publication, main integration and site deployment are
-separate outcomes recorded in the [port handoff](../../WALS_PORT_PLAN.md).
+datasets and notices for the local preview. The `publish` command above publishes
+data releases. The Pages workflow deploys the site.
 
 From `app/`, after restoring WALS and atlas data:
 

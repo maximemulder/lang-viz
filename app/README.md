@@ -45,52 +45,22 @@ period filters does not alter areas already on the map.
 
 ## WALS profile features
 
-Open a language profile in Geography, then choose **Load WALS features**. Data loads
-on this first action and is reused for the session; failures offer a local retry.
-Cards keep missing values explicit and show the recorded variety, source region,
-and any broader catalog association. Select among recorded varieties or inspect a
-particular observation; these choices survive profile closure and workspace trips.
+Opening a language profile loads WALS features and offers a retry if loading fails.
+Cards show values for the recorded variety. **What this means & sources** expands
+definitions and citations. Variety and feature choices persist for the current
+session.
 
-Definitions, observation references, chapter citations, supplied examples, dataset
-version and source errata are available in disclosures. The card shortlist and its
-regional comparison policy are editorial choices, not a uniqueness ranking.
-
-Use **Show recorded examples on map** on a recorded card to show up to 12
-examples sharing its exact category. The WALS summary provides focus, hide/show,
-clear and an inspection list. Shared-location markers offer a record chooser.
-Inspection preserves the overlay origin and does not move the camera. WALS and
-word-history overlays can coexist with separate visibility and clear controls;
-pinned comparisons and the chosen projection are preserved.
+On a recorded card, **Find languages like this** highlights eligible language
+areas with the same category in the active geographic source and period. Hover
+to preview, click to inspect, and double-click to isolate a language. **Show all
+again** or Escape restores the highlights. Pinned comparisons remain available.
 
 Restore the independent browser release from the repository root with
-`uv run python -m pipeline.wals.data_release restore`. Run `npm run test:wals-snapshot`
-for the full release/catalog checks and `npm run test:wals-profile-browser` for
-Firefox acceptance with fixtures and published data, including exact 320/390px
-layouts. The browser command builds its own production artifacts and requires all
-three installed browser datasets. Run `npm run test:wals-map-browser` for WALS
-map/coexistence/camera acceptance with published data and coordinate fixtures.
-The representation/count policy is in the
-[exploration design](src/features/wals/EXPLORATION_DESIGN.md); run
-`npm run review:wals-examples` to generate the offline points/arcs comparison with
-restored WALS/atlas data and the source Git object present. See
+`uv run python -m pipeline.wals.data_release restore`. From `app/`, run
+`npm run test:wals-snapshot` for the full release and catalog checks. The
+older WALS profile, map, and performance browser checks still exercise the
+point-marker UI and need updates for area highlights. See the
 [WALS frontend contracts](src/features/wals/README.md).
-
-Variety choices, inspected features and overlays last for the current session;
-they reset on reload and add no URL fields. Globe uses the shortest longitude
-arc for focus; dateline selections use a wider view in the existing single-world
-Mercator projection. Sampling is illustrative and broader associations do not
-assert values for a family or its descendants. The current profile layout is
-retained; an ergonomics redesign remains separate work.
-
-After restoring the WALS/atlas datasets, `npm run measure:wals` records offline
-parsing, validation, indexing, full-catalog association, card-policy and selection
-timings. `npm run measure:wals-browser` builds the production app and measures
-actual cold gzip delivery, first cards, cached profile/variety changes and overlay
-paint in Firefox. It requires all three datasets and Firefox/geckodriver, makes
-no data downloads, and writes ignored evidence under `test-results/wals-07/`.
-Its slow-network scenario throttles only WALS to 10 Mbit/s plus 150 ms latency;
-CPU/mobile-device emulation is not applied. See the [handoff](../WALS_PORT_PLAN.md)
-for measured results and exact validation/deployment status.
 
 ## Word histories
 

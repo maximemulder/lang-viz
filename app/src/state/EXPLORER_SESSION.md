@@ -187,5 +187,4 @@ records. One overlay specification keeps its origin through inspection and
 workspace trips; clearing it leaves lexical state and pinned comparisons intact.
 `integrations/GeographyExplorations.tsx` composes both lazy layers/summaries;
 neither feature owns the other. Choices reset on reload, with no new WALS URL
-fields. See [WALS contracts](../features/wals/README.md) and the
-[final port handoff](../../../WALS_PORT_PLAN.md).
+fields. See the [WALS session and navigation contracts](../features/wals/README.md#session-and-navigation-actions).

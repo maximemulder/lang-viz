@@ -3,17 +3,18 @@
 Browser checks and their shared helpers are Python modules under `tests.browser`.
 Run checks from `app/` with `uv run python -m tests.browser.<module>` or the npm scripts.
 
-The WALS final acceptance/handoff is recorded in the
-[port roadmap](../../../WALS_PORT_PLAN.md). After restoring all three pinned
-browser datasets, `npm run measure:wals-browser` builds the production
-`/lang-viz/` app and measures cold WALS loading plus profile/variety and overlay
-paint in Firefox. Three cold origins per network scenario use actual gzip
-delivery, with WALS-only 10 Mbit/s +150 ms latency in the slow case. There is no
+After restoring all three pinned browser datasets, `npm run measure:wals-browser`
+builds the production `/lang-viz/` app and measures cold WALS loading plus
+profile/variety and overlay paint in Firefox. Three cold origins per network
+scenario use actual gzip delivery, with WALS-only 10 Mbit/s +150 ms latency in
+the slow case. There is no
 CPU throttling; software WebGL and native desktop CPU limit generalization to
 mobile devices. Input-to-paint clocks run inside the browser, exclude WebDriver
 polling and wait two frames after the matching DOM commit. Camera animation
 completion is outside overlay-paint timing. Timer gaps include unrelated map/GC
-work and are not Long Tasks API results.
+work and are not Long Tasks API results. The browser runner still assumes the
+historical manual-loading and point-marker UI. Its interaction checks need
+updating for the current area highlights.
 
 To reuse an existing production build, run
 `uv run python -m tests.browser.wals_performance --runs 3`; `--output` selects the

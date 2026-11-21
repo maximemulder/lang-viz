@@ -165,8 +165,20 @@ Worker results temporarily hold generated texture bytes in addition to resident
 image storage. `stripeTextures` browser diagnostics record pending work,
 completion, and the number of images generated before actual cancellation.
 
-See the [overlap roadmap](../../../../../OVERLAP_ROADMAP.md) for open limitations,
-proposed priorities, and completion criteria across sessions.
+## Open questions
+
+- Mixed dataset or period selections still partition live. Measure cold GEOS
+  partitioning and fallback clipping separately from encoding and MapLibre
+  source preparation. Include the transfer cost of prepared parts for small
+  selections and memory use across JavaScript, WASM, and GPU allocations.
+  `npm run benchmark:parts` includes the dense Asher cases that previously hit
+  live tile deadlines at zoom 4 in Africa (`4/8/7`) and Asia (`4/12/6`).
+- Establish display accuracy and legibility expectations for small regions,
+  tile edges, the dateline, and dense stripe patterns. Extend projection,
+  navigation, and streaming failure regressions as new cases surface.
+- The partitioner can take arbitrary IDs and geometries. Selection, styling,
+  delivery, and inspection still use language variants. Query-defined areas
+  would need their own contributor contract across those steps.
 
 ## Data flow
 
