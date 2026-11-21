@@ -1,5 +1,11 @@
 import { atom } from 'jotai'
 import type { LanguageMapTarget } from '../domain/languageFocus'
+import {
+  type DetailPanelLayout,
+  type DetailPanelOrigin,
+  moveDetailPanel,
+  openDetailPanel,
+} from './detailPanelLayout.ts'
 import { mapCameraIntentAtom } from './mapCameraIntent.ts'
 
 export const languageMapNavigationAtom = atom<{
@@ -43,8 +49,6 @@ export const setLanguagePreviewAtom = atom(
 )
 
 export type LanguagePanelView = 'explore' | 'map'
-export type LanguageDetailOrigin = 'sidebar' | 'map'
-export type LanguageDetailPlacement = 'cover' | 'beside'
 
 /** Navigation state is independent of map selection, query, and geography. */
 export const languagePanelAtom = atom<{
@@ -52,22 +56,18 @@ export const languagePanelAtom = atom<{
   readonly detailId: string | null
   readonly detailGroupId: string | null
   readonly detailEntryId: string | null
-  readonly detailOrigin: LanguageDetailOrigin
-  readonly detailPlacement: LanguageDetailPlacement
-  readonly detailPlacementChosen: boolean
+  readonly detailLayout: DetailPanelLayout | null
 }>({
   view: 'explore',
   detailId: null,
   detailGroupId: null,
   detailEntryId: null,
-  detailOrigin: 'sidebar',
-  detailPlacement: 'beside',
-  detailPlacementChosen: false,
+  detailLayout: null,
 })
 
 export const openLanguageDetailsAtom = atom(
   null,
-  (get, set, target: string | LanguageMapTarget, origin?: LanguageDetailOrigin) => {
+  (get, set, target: string | LanguageMapTarget, origin?: DetailPanelOrigin) => {
     if (get(mapCameraIntentAtom) === get(languageMapNavigationAtom)) set(mapCameraIntentAtom, null)
     set(languageMapNavigationAtom, null)
     const panel = get(languagePanelAtom)
@@ -76,15 +76,7 @@ export const openLanguageDetailsAtom = atom(
       detailId: typeof target === 'string' ? target : target.languageId,
       detailGroupId: typeof target === 'string' ? null : (target.groupId ?? null),
       detailEntryId: typeof target === 'string' ? null : (target.entryId ?? null),
-      detailOrigin: origin ?? panel.detailOrigin,
-      // Entry points set defaults; an explicit move remains in force while inspecting languages.
-      detailPlacement:
-        panel.detailId && panel.detailPlacementChosen
-          ? panel.detailPlacement
-          : (origin ?? panel.detailOrigin) === 'map'
-            ? 'cover'
-            : 'beside',
-      detailPlacementChosen: Boolean(panel.detailId && panel.detailPlacementChosen),
+      detailLayout: openDetailPanel(panel.detailLayout, origin),
     })
   },
 )
@@ -104,11 +96,10 @@ export const inspectLanguageFromMapAtom = atom(null, (_get, set, target: Languag
 
 export const toggleLanguageDetailPlacementAtom = atom(null, (get, set) => {
   const panel = get(languagePanelAtom)
-  if (!panel.detailId) return
+  if (!panel.detailLayout) return
   set(languagePanelAtom, {
     ...panel,
-    detailPlacement: panel.detailPlacement === 'cover' ? 'beside' : 'cover',
-    detailPlacementChosen: true,
+    detailLayout: moveDetailPanel(panel.detailLayout),
   })
 })
 
@@ -120,21 +111,18 @@ export const closeLanguageDetailsAtom = atom(null, (get, set) => {
     detailId: null,
     detailGroupId: null,
     detailEntryId: null,
-    detailOrigin: 'sidebar',
-    detailPlacement: 'beside',
-    detailPlacementChosen: false,
+    detailLayout: null,
   })
 })
 
 /** Explore consumes this request after becoming visible and reveals the complete ancestry. */
 export const revealLanguageIdAtom = atom<string | null>(null)
 export const revealLanguageAtom = atom(null, (get, set, languageId: string) => {
+  const panel = get(languagePanelAtom)
   set(revealLanguageIdAtom, languageId)
   set(languagePanelAtom, {
-    ...get(languagePanelAtom),
+    ...panel,
     view: 'explore',
-    detailOrigin: 'sidebar',
-    detailPlacement: 'beside',
-    detailPlacementChosen: false,
+    detailLayout: panel.detailId ? openDetailPanel(null, 'sidebar') : null,
   })
 })

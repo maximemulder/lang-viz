@@ -69,6 +69,9 @@ def main():
             )["element-6066-11e4-a52e-4f735466cecf"]
             browser.call("POST", f"/element/{element}/value", {"text": value})
 
+        def close_region_details():
+            js("document.querySelector('.administrative-inspector-header button[aria-label^=\"Close\"]').click()")
+
         def click_geo(coordinates):
             x, y = js("return window.overlapTest.inspect(arguments[0]).point", coordinates)
             browser.call("POST", "/actions", {"actions": [{"type": "pointer", "id": "administrative-map-pointer", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y}, {"type": "pointerDown", "button": 0}, {"type": "pointerUp", "button": 0}]}]})
@@ -173,14 +176,15 @@ window.fetch = (...args) => {
             report["checks"].append("selected and hovered regions keep separate outlines")
             assert js("""
                 const details = document.querySelector('.geography-inspector');
-                const controls = document.querySelector('.administrative-panel');
+                const controls = document.querySelector('.geography-sidebar');
                 return details?.contains(document.querySelector('.administrative-detail')) &&
                     !controls.contains(document.querySelector('.administrative-detail')) &&
-                    document.querySelector('.administrative-results').clientHeight >= 80;
-            """)
+                    controls.inert && !!details.querySelector('[aria-label="Show region controls beside details"]');
+            """), "A map inspection covers the Regions controls by default"
             report["checks"].append("polygon picker selects the CLDR region")
             assert not js("return window.overlapTest.snapshot().moving")
-            js("document.querySelector('.administrative-inspector-header button').click()")
+            close_region_details()
+            assert js("return document.activeElement?.matches('.map-shell .maplibregl-canvas')")
             js("window.overlapTest.camera([5.3,52.1],4)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "region double-click setup")
             double_click_geo([6.2, 53.1])
@@ -189,10 +193,12 @@ window.fetch = (...args) => {
             report["checks"].append("region double-click fits shape and retains details")
             assert "Natural Earth 5.1.1" in js("return document.querySelector('.administrative-attribution').textContent")
             assert js("return document.querySelector('.administrative-attribution').textContent.replace(/\\s+/g, ' ').trim() === window.adminAttributionText")
+            js("document.querySelector('[aria-label=\"Show region controls beside details\"]').click()")
             js("[...document.querySelectorAll('input[name=administrative-metric]')][1].click()")
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='NL'&&h.properties.metricValue>0)"), 15, "matched metric fill")
             assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-metric-fill').order")
+            js("document.querySelector('[aria-label=\"Show details over region controls\"]').click()")
             report["checks"].append("Region borders and metric control")
 
             js("window.overlapTest.camera(arguments[0],4)", ly_point)
@@ -207,6 +213,7 @@ window.fetch = (...args) => {
             wait_for(lambda: js("return !!document.querySelector('.finder-detail')"), 10, "unmatched CLDR language")
             assert "No reviewed Glottocode" in js("return document.querySelector('.finder-detail').textContent")
             assert not js("return !!document.querySelector('.finder-detail .language-word-entries')")
+            assert js("return !!document.querySelector('[aria-label=\"Show region controls beside details\"]')")
             report["checks"].append("unmatched CLDR language keeps its source identity")
 
             js("window.overlapTest.camera(arguments[0],4)", somaliland_point)
@@ -222,13 +229,14 @@ window.fetch = (...args) => {
             wait_for(lambda: (s if (s := js("return window.overlapTest.layerState('administrative-selection-outline')")) and 'country-SOL' in s['filter'][-1][-1] else None), 10, "Somaliland selected outline")
             assert "No CLDR data is linked to this region" in js("return document.querySelector('.administrative-detail-scroll').textContent")
             assert not js("return document.querySelector('.administrative-detail-scroll .details-map-action__button').disabled")
-            js("document.querySelector('.administrative-inspector-header button').click()")
+            close_region_details()
             double_click_geo(somaliland_point)
             wait_for(lambda: js("return window.overlapTest.snapshot().camera.zoom > 4.5"), 15, "Somaliland double-click focus")
             report["checks"].append("Somaliland opens source-shape details without invented data")
             js("window.overlapTest.camera([5.3,52.1],5)")
             wait_for(lambda: js("return !window.overlapTest.snapshot().moving"), 15, "Netherlands camera restored")
 
+            close_region_details()
             type_query("XK")
             wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='XK')"), 10, "unmatched region search")
             select_code("XK")
@@ -279,9 +287,8 @@ window.fetch = (...args) => {
                 "language search",
             )
             select_code("ku_Cyrl")
-            wait_for(lambda: js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Kurdish' && document.querySelector('.geography-sidebar__administrative').hidden"), 10, "linked Kurdish profile")
+            wait_for(lambda: js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Kurdish' && !document.querySelector('.geography-sidebar__administrative').hidden"), 10, "linked Kurdish profile in Regions")
             assert js("return document.querySelectorAll('.finder-detail .language-summary-section').length === 5")
-            button("Regions", ".map-region-controls__inspect")
             button("Families", ".administrative-search-kind")
             type_query("Indo-European")
             wait_for(lambda: js("return [...document.querySelectorAll('.administrative-results .administrative-code')].some(e=>e.textContent==='indo1319')"), 10, "family search")
@@ -377,6 +384,7 @@ window.fetch = (...args) => {
             pins = js("return window.overlapTest.mapEntryState()")
             assert pins and all(pin["languageId"] == "dutc1256" for pin in pins)
             button("Regions", ".map-region-controls__inspect")
+            close_region_details()
             button("Regions", ".administrative-search-kind")
             type_query("Netherlands")
             wait_for(lambda: js("return document.querySelector('input[aria-label=\"Select Netherlands\"]')?.disabled === false"), 15, "selectable Netherlands boundary")

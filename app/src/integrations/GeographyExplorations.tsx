@@ -73,6 +73,7 @@ export default function GeographyExplorations({
               region.territoryCode
                 ? { kind: 'territory', id: region.territoryCode }
                 : { kind: 'source-shape', id: region.featureId },
+              'map',
             )
         },
         onFocus: (region) => {

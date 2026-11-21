@@ -9,23 +9,23 @@ import {
   selectedMapAreasAtom,
   setMapEntryColorAtom,
 } from '../../state/atlasState'
-import { openLanguageDetailsAtom } from '../../state/languageControls'
 import { LanguagePreviewArticle } from './LanguagePreview'
 
 /** Inspect and style pinned geometry without changing the draft being browsed. */
 export const PinnedMapEntries = ({
   languageId,
   focusedEntryId,
+  onInspect,
 }: {
   readonly languageId: string
   readonly focusedEntryId: string | null
+  readonly onInspect: (languageId: string) => void
 }) => {
   const data = useAtomValue(atlasDataAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const areas = useAtomValue(selectedMapAreasAtom)
   const remove = useSetAtom(removeMapEntryAtom)
   const setColor = useSetAtom(setMapEntryColorAtom)
-  const openDetails = useSetAtom(openLanguageDetailsAtom)
   const selected = useMemo(
     () => entries.filter((entry) => entry.languageId === languageId),
     [entries, languageId],
@@ -96,7 +96,7 @@ export const PinnedMapEntries = ({
                   const contributor = data.languageById.get(variant.languageId)
                   return (
                     <li key={id}>
-                      <button type="button" onClick={() => openDetails(variant.languageId)}>
+                      <button type="button" onClick={() => onInspect(variant.languageId)}>
                         {contributor?.name ?? variant.languageId}
                       </button>
                       <small>
@@ -113,7 +113,7 @@ export const PinnedMapEntries = ({
                   <ul>
                     {entry.uncoveredBranchIds.map((id) => (
                       <li key={id}>
-                        <button type="button" onClick={() => openDetails(id)}>
+                        <button type="button" onClick={() => onInspect(id)}>
                           {data.languageById.get(id)?.name ?? id}
                         </button>
                       </li>

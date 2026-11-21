@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useEffect, useMemo } from 'react'
-import { DetailsHeader } from '../../components/DetailsHeader.tsx'
+import { DetailsHeader, type DetailsPanelControls } from '../../components/DetailsHeader.tsx'
 import { DetailsMapAction } from '../../components/DetailsMapAction.tsx'
 import { SidebarTabs } from '../../components/SidebarTabs.tsx'
 import type { AdministrativeRepository } from './model.ts'
@@ -124,12 +124,15 @@ const Details = ({
   )
 }
 
-export const AdministrativeDetails = () => {
+export const AdministrativeDetails = ({
+  controls,
+}: {
+  readonly controls: DetailsPanelControls
+}) => {
   const repository = useAtomValue(administrativeRepositoryAtom)
   const session = useAtomValue(administrativeSessionAtom)
   const boundaryIndex = useAtomValue(boundaryIndexAtom)
   const select = useSetAtom(selectAdministrativeAtom)
-  const inspect = useSetAtom(inspectAdministrativeFromSidebarAtom)
   const focus = useSetAtom(focusAdministrativeTerritoryAtom)
   const focusShape = useSetAtom(focusAdministrativeShapeAtom)
   const names = useMemo(() => new Intl.DisplayNames(undefined, { type: 'region' }), [])
@@ -145,7 +148,7 @@ export const AdministrativeDetails = () => {
           title={shape.sourceName}
           subtitle="Natural Earth administrative shape"
           closeLabel={`Close ${shape.sourceName} details`}
-          onClose={() => select(null)}
+          {...controls}
         />
         <DetailsMapAction disabled={false} onFocus={() => focusShape(shape.featureId)} />
         <p className="administrative-note">No CLDR data is linked to this region.</p>
@@ -171,15 +174,7 @@ export const AdministrativeDetails = () => {
           </>
         }
         closeLabel={`Close ${title} details`}
-        onClose={() => {
-          const origin = document.querySelector<HTMLElement>(
-            '.administrative-results button[aria-current="true"]',
-          )
-          const restoreFocus =
-            origin ?? document.querySelector<HTMLElement>('.administrative-search-field input')
-          select(null)
-          restoreFocus?.focus({ preventScroll: true })
-        }}
+        {...controls}
       />
       {selection.kind === 'territory' && (
         <DetailsMapAction disabled={!canFocusMap} onFocus={() => focus(selection.id)} />
@@ -193,7 +188,7 @@ export const AdministrativeDetails = () => {
       <Details
         repository={repository}
         selection={session.selection}
-        onSelect={(item) => void inspect(item)}
+        onSelect={(item) => select(item)}
         names={names}
       />
     </div>

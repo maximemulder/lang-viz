@@ -1,13 +1,10 @@
 import { atom } from 'jotai'
-import { atlasDataAtom } from '../../state/atlasState.ts'
-import { explorerActionAtom, explorerSessionAtom } from '../../state/explorerState.ts'
-import { openLanguageDetailsAtom } from '../../state/languageControls.ts'
+import { explorerSessionAtom } from '../../state/explorerState.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { mapIsolationAtom } from '../../state/mapInteraction.ts'
 import { loadBoundaryIndex } from './boundaryRepository.ts'
 import {
   type AdministrativeSelection,
-  administrativeRepositoryAtom,
   administrativeSessionAtom,
   boundaryIndexAtom,
   checkedTerritoriesAtom,
@@ -19,38 +16,28 @@ import {
 export const inspectAdministrativeFromSidebarAtom = atom(
   null,
   async (get, set, selection: AdministrativeSelection) => {
-    if (!set(selectAdministrativeAtom, selection)) return
+    if (!set(selectAdministrativeAtom, selection, 'sidebar') || selection.kind !== 'territory')
+      return
     const stillSelected = () =>
       get(administrativeSessionAtom).selection === selection &&
       get(explorerSessionAtom).workspace === 'map' &&
       get(explorerSessionAtom).mapMode === 'region'
-    if (selection.kind === 'territory') {
-      if (get(boundaryIndexAtom)) {
+    if (get(boundaryIndexAtom)) {
+      set(focusAdministrativeTerritoryAtom, selection.id)
+      return
+    }
+    const intent = {}
+    set(mapCameraIntentAtom, intent)
+    try {
+      const index = await loadBoundaryIndex()
+      if (stillSelected() && get(mapCameraIntentAtom) === intent) {
+        set(boundaryIndexAtom, index)
         set(focusAdministrativeTerritoryAtom, selection.id)
-        return
       }
-      const intent = {}
-      set(mapCameraIntentAtom, intent)
-      try {
-        const index = await loadBoundaryIndex()
-        if (stillSelected() && get(mapCameraIntentAtom) === intent) {
-          set(boundaryIndexAtom, index)
-          set(focusAdministrativeTerritoryAtom, selection.id)
-        }
-      } catch {
-        // BoundaryLayer reports load failures and allows retry.
-      } finally {
-        if (get(mapCameraIntentAtom) === intent) set(mapCameraIntentAtom, null)
-      }
-    } else if (selection.kind === 'language') {
-      const glottocode = get(administrativeRepositoryAtom)?.languageByCode.get(
-        selection.id,
-      )?.glottocode
-      if (!glottocode) return
-      const atlas = await get(atlasDataAtom).catch(() => null)
-      if (!atlas?.languageById.has(glottocode) || !stillSelected()) return
-      set(explorerActionAtom, { type: 'map-mode', mode: 'language' })
-      set(openLanguageDetailsAtom, glottocode, 'map')
+    } catch {
+      // BoundaryLayer reports load failures and allows retry.
+    } finally {
+      if (get(mapCameraIntentAtom) === intent) set(mapCameraIntentAtom, null)
     }
   },
 )

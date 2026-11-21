@@ -1,14 +1,20 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, type ReactNode, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMap } from 'react-map-gl/maplibre'
+import type { DetailsPanelControls } from '../../components/DetailsHeader.tsx'
 import { WorkspaceBoundary } from '../../components/WorkspaceBoundary.tsx'
 import { atlasDataAtom } from '../../state/atlasState.ts'
 import { explorerSessionAtom } from '../../state/explorerState.ts'
-import { languagePanelAtom } from '../../state/languageControls.ts'
+import {
+  closeLanguageDetailsAtom,
+  languagePanelAtom,
+  toggleLanguageDetailPlacementAtom,
+} from '../../state/languageControls.ts'
 import { setLanguageSummarySectionAtom } from '../../state/languageSummary.ts'
 import {
-  administrativeLanguagePlacementAtom,
   administrativeSessionAtom,
+  selectAdministrativeAtom,
+  toggleAdministrativeDetailPlacementAtom,
 } from '../administrative/state.ts'
 import { LanguageDetails } from '../languages/LanguageDetails.tsx'
 import { LanguageFinder, LanguageFinderFallback } from '../languages/LanguageFinder.tsx'
@@ -41,11 +47,17 @@ export default function GeographyWorkspace({
 }) {
   const maps = useMap()
   const mapShell = useRef<HTMLElement>(null)
+  const sidebar = useRef<HTMLDivElement>(null)
+  const focusOnClose = useRef<HTMLElement | null>(null)
   const retry = useSetAtom(atlasDataAtom)
   const setSummarySection = useSetAtom(setLanguageSummarySectionAtom)
   const languagePanel = useAtomValue(languagePanelAtom)
-  const administrativeSelection = useAtomValue(administrativeSessionAtom).selection
-  const administrativeLanguagePlacement = useAtomValue(administrativeLanguagePlacementAtom)
+  const { selection: administrativeSelection, detailLayout: administrativeLayout } =
+    useAtomValue(administrativeSessionAtom)
+  const selectAdministrative = useSetAtom(selectAdministrativeAtom)
+  const toggleAdministrativePlacement = useSetAtom(toggleAdministrativeDetailPlacementAtom)
+  const closeLanguage = useSetAtom(closeLanguageDetailsAtom)
+  const toggleLanguagePlacement = useSetAtom(toggleLanguageDetailPlacementAtom)
   const wals = useAtomValue(walsSessionAtom)
   const lexical = useAtomValue(explorerSessionAtom).overlay.enabled
   const hasLanguageDetails = Boolean(
@@ -55,15 +67,44 @@ export default function GeographyWorkspace({
       lexical,
   )
   const hasDetails = administrative ? Boolean(administrativeSelection) : hasLanguageDetails
-  const languageDetailsPlacement = administrative
-    ? administrativeSelection?.kind === 'language'
-      ? administrativeLanguagePlacement
-      : null
-    : languagePanel.detailId
-      ? languagePanel.detailPlacement
-      : null
-  const coverLanguageControls = languageDetailsPlacement === 'cover'
-  const besideLanguageDetails = languageDetailsPlacement === 'beside'
+  const detailLayout = administrative ? administrativeLayout : languagePanel.detailLayout
+  const coversSidebar = detailLayout?.placement === 'cover'
+  const detailControls: DetailsPanelControls | null = detailLayout && {
+    layout: {
+      placement: detailLayout.placement,
+      sidebarLabel: administrative ? 'region controls' : 'language controls',
+      onToggle: administrative ? toggleAdministrativePlacement : toggleLanguagePlacement,
+    },
+    onClose: () => {
+      const controls = sidebar.current
+      if (detailLayout.origin === 'map') {
+        focusOnClose.current =
+          mapShell.current?.querySelector<HTMLElement>('.maplibregl-canvas') ?? null
+      } else if (administrative) {
+        focusOnClose.current =
+          controls?.querySelector<HTMLElement>(
+            '.administrative-results button[aria-current="true"]',
+          ) ??
+          controls?.querySelector<HTMLElement>('.administrative-search-field input') ??
+          null
+      } else {
+        focusOnClose.current =
+          controls?.querySelector<HTMLElement>(
+            `#language-panel-${languagePanel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
+          ) ??
+          controls?.querySelector<HTMLElement>(`#language-tab-${languagePanel.view}`) ??
+          null
+      }
+      if (administrative) selectAdministrative(null)
+      else closeLanguage()
+    },
+  }
+  useLayoutEffect(() => {
+    // The covered sidebar can receive focus again once React removes inert.
+    if (detailLayout) return
+    focusOnClose.current?.focus({ preventScroll: true })
+    focusOnClose.current = null
+  }, [detailLayout])
   const [administrativeVisited, setAdministrativeVisited] = useState(false)
   useEffect(() => {
     if (administrative) setAdministrativeVisited(true)
@@ -98,25 +139,30 @@ export default function GeographyWorkspace({
       </WorkspaceBoundary>
       {hasDetails && (
         <aside
-          className={`geography-inspector${coverLanguageControls ? ' geography-inspector--cover' : ''}${besideLanguageDetails ? ' geography-inspector--language-beside' : ''}`}
+          className={`geography-inspector${detailLayout ? ` geography-inspector--${detailLayout.placement}` : ''}`}
           aria-label="Details"
         >
-          {administrative && administrativeSelection?.kind === 'language' ? (
+          {administrative && administrativeSelection?.kind === 'language' && detailControls ? (
             <WorkspaceBoundary name="language details" onRetry={retry}>
               <Suspense fallback={<p className="workspace-loading">Loading details…</p>}>
-                <LanguageDetails sourceCode={administrativeSelection.id} />
+                <LanguageDetails
+                  sourceCode={administrativeSelection.id}
+                  controls={detailControls}
+                />
               </Suspense>
             </WorkspaceBoundary>
           ) : administrative ? (
             <Suspense fallback={<p className="workspace-loading">Loading details…</p>}>
-              <AdministrativeDetails />
+              {detailControls && <AdministrativeDetails controls={detailControls} />}
             </Suspense>
           ) : (
             <>
               {sidebarHeader}
               <WorkspaceBoundary name="language details" onRetry={retry}>
                 <Suspense fallback={<p className="workspace-loading">Loading details…</p>}>
-                  {languagePanel.detailId && <LanguageDetails />}
+                  {languagePanel.detailId && detailControls && (
+                    <LanguageDetails controls={detailControls} />
+                  )}
                   <WalsStandaloneInspection />
                 </Suspense>
               </WorkspaceBoundary>
@@ -124,7 +170,7 @@ export default function GeographyWorkspace({
           )}
         </aside>
       )}
-      <div className="geography-sidebar" inert={coverLanguageControls}>
+      <div ref={sidebar} className="geography-sidebar" inert={coversSidebar}>
         <div className="geography-sidebar__language" hidden={administrative}>
           <WorkspaceBoundary name="language catalog" onRetry={retry}>
             <Suspense fallback={<LanguageFinderFallback />}>

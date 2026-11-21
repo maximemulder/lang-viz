@@ -20,9 +20,8 @@ and script variants can overlap. A territory's language percentages can exceed
 100%; the selector exposes that condition for the panel to disclose. No selector
 maps a territory to a polygon or a language to an atlas geometry.
 
-`state.ts` stores repository load state separately from a small session of query,
-selection IDs, and metric choice. A selection or load completion never changes
-the map camera. An explicit territory focus creates a request in the shared
+`state.ts` stores repository load state separately from the query, selection,
+panel placement, and metric choice. An explicit territory focus creates a request in the shared
 `mapCameraIntentAtom`; `BoundaryLayer` fits precomputed geometry bounds for
 that request. Map mode changes keep the current map camera
 position.
@@ -74,12 +73,15 @@ handlers to `WorldMap`. Regions mode shows borders and previews regions on hover
 Click a region on the map to open its details, or double-click to fit its geometry.
 Activating a region in the results opens its details and fits its geometry.
 **Focus on map** also fits a previously selected region.
+Details from the map cover the sidebar by default. Search results open beside
+it, and a manual placement stays in effect until the panel closes.
 
 Within a selected region, hovering over a language area shows its language
 preview. Clicking it opens the atlas profile, with a chooser where languages
-overlap. Reviewed CLDR language links open the atlas profile from the sidebar.
-Unlinked rows open the original CLDR record. The displayed percentages use the
-reported population share as their scale and may overlap.
+overlap. CLDR language links open details in Regions mode and include atlas
+content when a reviewed match exists. **Show in classification** opens the atlas
+profile in Languages mode. The displayed percentages use the reported
+population share as their scale and may overlap.
 
 Check regions in the result list and choose **Show selected on map** to fit the
 combined geometry and mask language colours outside the checked regions. The

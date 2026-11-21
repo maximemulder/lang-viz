@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useMemo } from 'react'
-import { DetailsHeader } from '../../components/DetailsHeader'
+import { DetailsHeader, type DetailsPanelControls } from '../../components/DetailsHeader'
 import { LanguageSummarySection } from '../../components/LanguageSummarySection'
 import { mappedBranchForLanguage } from '../../domain/aggregation'
 import { languageAncestors } from '../../domain/hierarchy'
@@ -22,22 +22,15 @@ import {
 } from '../../state/atlasState'
 import { explorerActionAtom } from '../../state/explorerState.ts'
 import {
-  closeLanguageDetailsAtom,
   focusLanguageOnMapAtom,
   languagePanelAtom,
   openLanguageDetailsAtom,
   revealLanguageAtom,
-  toggleLanguageDetailPlacementAtom,
 } from '../../state/languageControls'
 import { clearMapIsolationAtom, mapIsolationAtom } from '../../state/mapInteraction.ts'
 import { searchCoverageAtom } from '../../state/searchSelection'
 import { LanguageRegions } from '../administrative/LanguageRegions.tsx'
-import {
-  administrativeLanguagePlacementAtom,
-  administrativeRepositoryAtom,
-  selectAdministrativeAtom,
-  toggleAdministrativeLanguagePlacementAtom,
-} from '../administrative/state.ts'
+import { administrativeRepositoryAtom } from '../administrative/state.ts'
 import { LanguageFeatures } from '../wals/LanguageFeatures.tsx'
 import { GeometrySourceRecords } from './GeometrySourceRecords'
 import { useLanguagePreview } from './LanguagePreview'
@@ -45,12 +38,16 @@ import { LanguageWordsButton } from './LanguageWordsButton.tsx'
 import { PinnedMapEntries } from './PinnedMapEntries'
 import '../../components/detailsMapAction.css'
 
-export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }) => {
+export const LanguageDetails = ({
+  sourceCode,
+  controls,
+}: {
+  readonly sourceCode?: string
+  readonly controls: DetailsPanelControls
+}) => {
   const panel = useAtomValue(languagePanelAtom)
-  const administrativePlacement = useAtomValue(administrativeLanguagePlacementAtom)
   const data = useAtomValue(atlasDataAtom)
   const administrativeRepository = useAtomValue(administrativeRepositoryAtom)
-  const selectAdministrative = useSetAtom(selectAdministrativeAtom)
   const dispatch = useSetAtom(explorerActionAtom)
   const hierarchy = useAtomValue(languageHierarchyAtom)
   const availability = useAtomValue(geographyAvailabilityAtom)
@@ -60,13 +57,10 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
   const areas = useAtomValue(selectedMapAreasAtom)
   const setGeometryOverride = useSetAtom(setGeometryOverrideAtom)
   const openDetails = useSetAtom(openLanguageDetailsAtom)
-  const closeDetails = useSetAtom(closeLanguageDetailsAtom)
   const focusLanguage = useSetAtom(focusLanguageOnMapAtom)
   const isolation = useAtomValue(mapIsolationAtom)
   const setIsolation = useSetAtom(mapIsolationAtom)
   const clearIsolation = useSetAtom(clearMapIsolationAtom)
-  const togglePlacement = useSetAtom(toggleLanguageDetailPlacementAtom)
-  const toggleAdministrativePlacement = useSetAtom(toggleAdministrativeLanguagePlacementAtom)
   const entries = useAtomValue(mapEntriesAtom)
   const groups = useAtomValue(mapGroupsAtom)
   const removeEntry = useSetAtom(removeMapEntryAtom)
@@ -128,11 +122,6 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
   }
   if (!detail && !sourceLanguage) return null
   const classification = detail?.classification
-  const placement = sourceCode ? administrativePlacement : panel.detailPlacement
-  const placementLabel =
-    placement === 'cover'
-      ? `Show ${sourceCode ? 'region' : 'language'} controls beside details`
-      : `Show details over ${sourceCode ? 'region' : 'language'} controls`
   return (
     <section
       {...preview}
@@ -152,46 +141,10 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
             {detail?.iso6393 ? ` · ${detail.iso6393}` : ''}
           </>
         }
-        action={
-          <button
-            type="button"
-            className="details-header__icon"
-            aria-label={placementLabel}
-            title={placementLabel}
-            onClick={sourceCode ? toggleAdministrativePlacement : togglePlacement}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path
-                d={placement === 'cover' ? 'M12 8H4m0 0 3-3M4 8l3 3' : 'M4 8h8m0 0-3-3M12 8l-3 3'}
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        }
         closeLabel="Close language details"
-        onClose={() => {
-          if (sourceCode) {
-            const restoreFocus = document.querySelector<HTMLElement>(
-              '.administrative-results button[aria-current="true"]',
-            )
-            selectAdministrative(null)
-            restoreFocus?.focus({ preventScroll: true })
-            return
-          }
-          const restoreFocus =
-            panel.detailOrigin === 'map'
-              ? document.querySelector<HTMLElement>('.map-shell .maplibregl-canvas')
-              : (document.querySelector<HTMLElement>(
-                  `#language-panel-${panel.view} [data-inspected="true"] :is(.language-row__identity, .on-map-row__identity)`,
-                ) ?? document.getElementById(`language-tab-${panel.view}`))
-          closeDetails()
-          restoreFocus?.focus({ preventScroll: true })
-        }}
+        {...controls}
       />
-      {detail && !sourceCode && (
+      {detail && (
         <div className="details-map-action">
           <button
             type="button"
@@ -202,6 +155,7 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
                 clearIsolation()
                 return
               }
+              if (sourceCode) inspectAtlas(detail.id)
               const cameraRequest = focusLanguage(profileTarget, isolationVariantIds)
               setIsolation({
                 kind: 'language',
@@ -247,8 +201,8 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
                 type="button"
                 className="finder-detail__reveal"
                 onClick={() => {
+                  if (sourceCode) inspectAtlas(detail.id)
                   reveal(detail.id)
-                  if (sourceCode) dispatch({ type: 'map-mode', mode: 'language' })
                 }}
               >
                 Show in classification
@@ -319,6 +273,7 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
               <PinnedMapEntries
                 languageId={detail.id}
                 focusedEntryId={sourceCode ? null : panel.detailEntryId}
+                onInspect={inspectAtlas}
               />
               {mappedBranch && mappedBranch.languageIds.length > 0 && (
                 <details className="finder-detail__aggregation">

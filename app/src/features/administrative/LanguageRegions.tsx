@@ -69,7 +69,7 @@ export function LanguageRegions({
               }
               destination="territory"
               onSelect={(selection) => {
-                select(selection)
+                select(selection, sourceCode ? undefined : 'sidebar')
                 dispatch({ type: 'map-mode', mode: 'region' })
               }}
               names={names}

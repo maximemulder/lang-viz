@@ -1,5 +1,10 @@
 import { atom } from 'jotai'
-import type { LanguageDetailPlacement } from '../../state/languageControls.ts'
+import {
+  type DetailPanelLayout,
+  type DetailPanelOrigin,
+  moveDetailPanel,
+  openDetailPanel,
+} from '../../state/detailPanelLayout.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import type { RegionHit } from '../../state/mapInteraction.ts'
 import type { BoundaryIndex } from './boundaryRepository.ts'
@@ -52,6 +57,7 @@ export interface AdministrativeSession {
   readonly query: string
   readonly searchKind: AdministrativeSearchKind
   readonly selection: AdministrativeSelection | null
+  readonly detailLayout: DetailPanelLayout | null
   readonly metric: AdministrativeMetric | null
 }
 
@@ -59,15 +65,16 @@ export const administrativeSessionAtom = atom<AdministrativeSession>({
   query: '',
   searchKind: 'territory',
   selection: null,
+  detailLayout: null,
   metric: null,
 })
-export const administrativeLanguagePlacementAtom = atom<LanguageDetailPlacement>('beside')
-export const toggleAdministrativeLanguagePlacementAtom = atom(null, (get, set) => {
-  if (get(administrativeSessionAtom).selection?.kind !== 'language') return
-  set(
-    administrativeLanguagePlacementAtom,
-    get(administrativeLanguagePlacementAtom) === 'cover' ? 'beside' : 'cover',
-  )
+export const toggleAdministrativeDetailPlacementAtom = atom(null, (get, set) => {
+  const session = get(administrativeSessionAtom)
+  if (!session.detailLayout) return
+  set(administrativeSessionAtom, {
+    ...session,
+    detailLayout: moveDetailPanel(session.detailLayout),
+  })
 })
 
 /** Languages mode remembers its optional borders across mode switches. */
@@ -103,7 +110,7 @@ export const setAdministrativeSearchKindAtom = atom(
 )
 export const selectAdministrativeAtom = atom(
   null,
-  (get, set, selection: AdministrativeSelection | null) => {
+  (get, set, selection: AdministrativeSelection | null, origin?: DetailPanelOrigin) => {
     if (selection) {
       if (selection.kind === 'source-shape') {
         if (!get(boundaryIndexAtom)?.features.some((feature) => feature.featureId === selection.id))
@@ -121,9 +128,12 @@ export const selectAdministrativeAtom = atom(
           return false
       }
     }
-    if (get(administrativeSessionAtom).selection?.kind !== 'language')
-      set(administrativeLanguagePlacementAtom, 'beside')
-    set(administrativeSessionAtom, { ...get(administrativeSessionAtom), selection })
+    const session = get(administrativeSessionAtom)
+    set(administrativeSessionAtom, {
+      ...session,
+      selection,
+      detailLayout: selection ? openDetailPanel(session.detailLayout, origin) : null,
+    })
     return true
   },
 )

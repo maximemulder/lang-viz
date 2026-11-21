@@ -1241,7 +1241,7 @@ h2 {
     grid-row: 2;
   }
 
-  .atlas-workspace:has(> .geography-inspector--language-beside) {
+  .atlas-workspace:has(> .geography-inspector--beside) {
     grid-template-rows: minmax(16rem, 38dvh) minmax(36rem, 62dvh) minmax(36rem, 62dvh);
   }
 

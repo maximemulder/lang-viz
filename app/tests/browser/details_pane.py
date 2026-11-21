@@ -162,18 +162,22 @@ def main():
         browser.screenshot(output / "region-details.png")
         assert browser.js("return document.querySelector('.administrative-results').clientHeight >= 80")
 
-        # A reviewed CLDR link opens the language's atlas profile.
+        browser.js("document.querySelector('[aria-label=\"Show details over region controls\"]').click()")
         browser.js("""
             [...document.querySelectorAll('.administrative-observation__top button')]
                 .find(button => button.querySelector('.administrative-code')?.textContent === 'ps').click();
         """)
         wait_for(
-            lambda: browser.js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Nuclear Pashto' && document.querySelector('.geography-sidebar__administrative').hidden"),
+            lambda: browser.js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'Nuclear Pashto'"),
             10,
             "linked Pashto atlas profile",
         )
-        assert browser.js("return document.querySelector('.geography-sidebar').inert"), "The linked language opens like a map inspection"
-        browser.js("document.querySelector('[aria-label=\"Show language controls beside details\"]').click()")
+        assert browser.js("""
+            return !document.querySelector('.geography-sidebar__administrative').hidden &&
+                document.querySelector('.geography-sidebar').inert &&
+                !!document.querySelector('[aria-label="Show region controls beside details"]');
+        """), "Following a region's language link keeps the same sidebar and placement"
+        browser.js("document.querySelector('[aria-label=\"Show region controls beside details\"]').click()")
         assert browser.js("""
             const sections = [...document.querySelectorAll('.finder-detail .language-summary-section')];
             return sections.length === 5 &&
@@ -184,13 +188,6 @@ def main():
         browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(5) .sidebar-section__toggle').click()")
         assert browser.js("return !!document.querySelector('.finder-detail .language-word-entries')")
         browser.screenshot(output / "administrative-language-details.png")
-        browser.js("document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle').click()")
-        browser.js("document.querySelectorAll('.map-region-controls__inspect button')[1].click()")
-        wait_for(
-            lambda: browser.js("return document.querySelector('.finder-detail .language-summary-section:nth-child(2) .sidebar-section__toggle')?.getAttribute('aria-expanded') === 'true'"),
-            10,
-            "Regions reopens on entering the administrative view",
-        )
         browser.js("document.querySelector('#administrative-tab-language').click()")
         browser.js("""
             const input = document.querySelector('.administrative-search-field input');
@@ -201,10 +198,59 @@ def main():
         browser.js("[...document.querySelectorAll('.administrative-results button')].find(button => button.querySelector('.administrative-code')?.textContent === 'en').click()")
         wait_for(lambda: browser.js("return document.querySelector('.finder-detail .details-header__title')?.textContent === 'English' && !!document.querySelector('.finder-detail .wals-card')"), 30, "English atlas features from CLDR")
         assert browser.js("return !!document.querySelector('.finder-detail .language-word-entries')")
+        assert browser.js("""
+            const sidebar = document.querySelector('.geography-sidebar');
+            const detail = document.querySelector('.geography-inspector').getBoundingClientRect();
+            return !sidebar.inert && !sidebar.querySelector('.geography-sidebar__administrative').hidden &&
+                detail.right <= sidebar.getBoundingClientRect().left + 1 &&
+                [...sidebar.querySelectorAll('.administrative-metrics label')].some(label => label.textContent.includes('Selected language estimate'));
+        """), "A linked search result opens beside the Regions sidebar and its map controls"
+        browser.js("document.querySelector('[aria-label=\"Show details over region controls\"]').click()")
+        assert browser.js("""
+            const sidebar = document.querySelector('.geography-sidebar');
+            const detail = document.querySelector('.geography-inspector').getBoundingClientRect();
+            const controls = sidebar.getBoundingClientRect();
+            return sidebar.inert && Math.abs(detail.left - controls.left) < 1 &&
+                Math.abs(detail.width - controls.width) < 1;
+        """)
+        browser.js("document.querySelector('.finder-detail__close').click()")
+        assert browser.js("""
+            return !document.querySelector('.geography-inspector') &&
+                !document.querySelector('.geography-sidebar').inert &&
+                document.activeElement?.querySelector('.administrative-code')?.textContent === 'en';
+        """), "Closing a covering panel restores focus to the language result"
+        browser.js("[...document.querySelectorAll('.administrative-results button')].find(button => button.querySelector('.administrative-code')?.textContent === 'en').click()")
+        browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
+        wait_for(lambda: browser.js("""
+            return document.querySelector('.geography-sidebar__administrative').hidden &&
+                document.querySelector('#focused-language-name')?.textContent === 'English' &&
+                !!window.overlapTest.layerState('isolated-language-fill');
+        """), 15, "linked language can still be isolated on the language map")
         browser.js("document.querySelectorAll('.map-region-controls__inspect button')[1].click()")
-        browser.js("document.querySelector('#administrative-tab-territory').click()")
+        browser.js("document.querySelector('.finder-detail__reveal').click()")
+        wait_for(lambda: browser.js("""
+            return document.querySelector('.geography-sidebar__administrative').hidden &&
+                !document.querySelector('#language-panel-explore').hidden &&
+                document.querySelector('#focused-language-name')?.textContent === 'English';
+        """), 10, "explicit navigation to the atlas classification")
+        browser.js("document.querySelectorAll('.map-region-controls__inspect button')[1].click()")
+        browser.js("document.querySelector('#administrative-tab-family').click()")
         browser.js("document.querySelector('.administrative-results button').click()")
-        browser.js("document.querySelector('.administrative-inspector-header button').click()")
+        assert browser.js("return !!document.querySelector('.administrative-detail[aria-label=\"Family details\"]')")
+        browser.call('POST', '/window/rect', {'width': 520, 'height': 844})
+        assert browser.js("""
+            const pane = document.querySelector('.geography-inspector').getBoundingClientRect();
+            const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+            return pane.bottom <= controls.top + 1 && pane.height >= 500 &&
+                document.documentElement.scrollWidth <= innerWidth;
+        """), "Narrow family details and search each have a full-height section"
+        browser.js("document.querySelector('[aria-label=\"Show details over region controls\"]').click()")
+        assert browser.js("""
+            const pane = document.querySelector('.geography-inspector').getBoundingClientRect();
+            const controls = document.querySelector('.geography-sidebar').getBoundingClientRect();
+            return Math.abs(pane.top - controls.top) < 1 && Math.abs(pane.bottom - controls.bottom) < 1;
+        """)
+        browser.js("document.querySelector('.administrative-inspector-header button[aria-label^=\"Close\"]').click()")
         wait_for(
             lambda: browser.js("return !document.querySelector('.geography-inspector')"),
             10,
