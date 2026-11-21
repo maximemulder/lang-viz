@@ -37,7 +37,11 @@ export const buildGlobalColorInput = async (
   profile: GlobalColorProfile,
   readTile: (path: string, tile: TileCoordinate) => Promise<Uint8Array>,
   model = buildGlobalColorModel(data),
-): Promise<{ input: ColorOptimizationInput; coverageSignature: string }> => {
+): Promise<{
+  input: ColorOptimizationInput
+  coverageSignature: string
+  variantIds: readonly string[]
+}> => {
   const coverage = data.manifest.branchCoverage
   if (!coverage || coverage.maxZoom < 3) throw new Error('Full-dataset geometry is unavailable.')
   const { hierarchy, topology, reference } = model
@@ -56,9 +60,10 @@ export const buildGlobalColorInput = async (
     context,
     topology,
   )
-  const signature = await branchCoverageSignature(
-    parseOverlapSelection(mapAreaSelectionKey(resolveMapEntries(entries, data, new Map()))),
+  const selection = parseOverlapSelection(
+    mapAreaSelectionKey(resolveMapEntries(entries, data, new Map())),
   )
+  const signature = await branchCoverageSignature(selection)
   if (!signature || !coverage.signatures.includes(signature))
     throw new Error('Full-dataset geometry does not match this catalog.')
 
@@ -118,6 +123,7 @@ export const buildGlobalColorInput = async (
     rows = y1 - y0 + 1
   return {
     coverageSignature: signature,
+    variantIds: selection.variantIds,
     input: {
       topology,
       reference,

@@ -89,3 +89,16 @@ export const combinedBounds = (bounds: readonly GeographicBounds[]): GeographicB
     Math.max(-85, Math.min(85, north)),
   ]
 }
+
+export const boundsForVariants = (
+  variantIds: readonly string[],
+  index: Readonly<Record<string, GeographicBounds>>,
+): GeographicBounds | null => {
+  const bounds: GeographicBounds[] = []
+  for (const id of variantIds) {
+    const bound = index[id]
+    if (!bound) return null
+    bounds.push(bound)
+  }
+  return combinedBounds(bounds)
+}

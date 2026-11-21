@@ -1,4 +1,4 @@
-/** Build geometry-64 defaults from prepared branch tiles, without browser captures. */
+/** Build default palettes and focus bounds for each dataset view. */
 import assert from 'node:assert/strict'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { buildLanguageSearchIndex } from '../src/domain/catalog.ts'
@@ -8,6 +8,7 @@ import {
   buildGlobalColorModel,
   optimizeGlobalColors,
 } from '../src/domain/globalColors.ts'
+import { boundsForVariants } from '../src/domain/languageFocus.ts'
 import { colorCatalogHash, PREPARED_COLOR_POLICY, sha256 } from '../src/domain/preparedColors.ts'
 
 const check = process.argv.includes('--check')
@@ -17,6 +18,7 @@ const manifest = await read('manifest.json')
 assert.ok(manifest.branchCoverage?.maxZoom >= 3, 'Run precompute:branches first')
 const languages = await read('languages.json'),
   variants = await read(manifest.geometryIndex ?? 'geometry-variants.json')
+const geometryBounds = manifest.geometryBounds ? await read(manifest.geometryBounds) : null
 const catalogHash = await colorCatalogHash(languages, variants)
 const data = {
   manifest,
@@ -47,7 +49,11 @@ const contexts = new Map(
 )
 for (const [id, context] of [...contexts].sort(([a], [b]) => a.localeCompare(b))) {
   const started = performance.now()
-  const { input, coverageSignature: signature } = await buildGlobalColorInput(
+  const {
+    input,
+    coverageSignature: signature,
+    variantIds,
+  } = await buildGlobalColorInput(
     data,
     context,
     (path) => readFile(new URL(path, directory)),
@@ -56,9 +62,12 @@ for (const [id, context] of [...contexts].sort(([a], [b]) => a.localeCompare(b))
   const result = optimizeGlobalColors(input, context)
   const dataset = metadata.datasets.find((dataset) => dataset.id === context.datasetId)
   assert.ok(dataset, `Missing dataset description: ${context.datasetId}`)
+  const bounds = geometryBounds ? boundsForVariants(variantIds, geometryBounds) : undefined
+  if (geometryBounds) assert.ok(bounds, `Missing dataset bounds: ${id}`)
   dataset.profiles.push({
     viewId: context.viewId,
     coverageSignature: signature,
+    ...(bounds ? { bounds } : {}),
     colors: languages.map(({ id }) => {
       const color = result.colors.get(id)
       assert.ok(color, `Missing color: ${id}`)
@@ -87,4 +96,4 @@ delete manifest.preparedColors
 manifest.datasetMetadata = file
 await writeFile(new URL('manifest.colors.tmp', directory), JSON.stringify(manifest))
 await rename(new URL('manifest.colors.tmp', directory), new URL('manifest.json', directory))
-console.log(`Published dataset descriptions and palettes: ${Buffer.byteLength(text)} bytes`)
+console.log(`Published dataset metadata: ${Buffer.byteLength(text)} bytes`)

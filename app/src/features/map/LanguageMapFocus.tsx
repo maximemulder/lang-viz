@@ -1,9 +1,5 @@
-import { useAtomValue, useStore } from 'jotai'
-import { useEffect } from 'react'
-import { useMap } from 'react-map-gl/maplibre'
-import { loadGeometryBounds } from '../../data/atlasRepository'
-import type { LanguageMapTarget } from '../../domain/languageFocus'
-import { combinedBounds, targetGeometry } from '../../domain/languageFocus'
+import { useAtomValue } from 'jotai'
+import { type LanguageMapTarget, targetGeometry } from '../../domain/languageFocus'
 import {
   atlasDataAtom,
   geographyAvailabilityAtom,
@@ -13,13 +9,10 @@ import {
 } from '../../state/atlasState'
 import {
   languageKeyboardPreviewAtom,
-  languageMapNavigationAtom,
   languagePanelAtom,
   languagePointerPreviewAtom,
 } from '../../state/languageControls'
-import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import { searchCoverageAtom } from '../../state/searchSelection'
-import { focusBounds } from './focusBounds.ts'
 import { GeometryHighlight } from './GeometryHighlight'
 import { useGeometryDisplay } from './geometry/display'
 import { GeometryPreview } from './geometry/GeometryPreview'
@@ -131,58 +124,4 @@ export const LanguageMapPreview = ({
       )}
     </>
   )
-}
-
-/** A request is an explicit click/Enter, so filters, hover, and manual pans never recenter. */
-export const LanguageMapCamera = () => {
-  const { current } = useMap()
-  const map = current?.getMap()
-  const request = useAtomValue(languageMapNavigationAtom)
-  const store = useStore()
-  const intent = useAtomValue(mapCameraIntentAtom)
-  useEffect(() => {
-    if (!map || !request || intent !== request) return
-    let cancelled = false
-    let moved = false
-    const settled = () => {
-      moved = false
-    }
-    map.on('moveend', settled)
-    const current = () => !cancelled && store.get(mapCameraIntentAtom) === request
-    map.stop()
-    const navigate = async () => {
-      const data = await store.get(atlasDataAtom)
-      if (!current()) return
-      const currentVariantIds = () =>
-        request.variantIds ??
-        targetGeometry(
-          request.target,
-          data,
-          store.get(geographyAvailabilityAtom),
-          store.get(searchCoverageAtom),
-          store.get(languageHierarchyAtom),
-          store.get(mapEntriesAtom),
-        ).map(({ id }) => id)
-      const variantIds = currentVariantIds()
-      if (!variantIds.length) return
-      const index = await loadGeometryBounds(data.manifest)
-      if (!current()) return
-      if (JSON.stringify(variantIds) !== JSON.stringify(currentVariantIds())) return
-      const bounds = variantIds.map((id) => index[id])
-      if (bounds.some((bound) => !bound)) return
-      const extent = combinedBounds(bounds.filter((bound) => bound !== undefined))
-      if (!extent) return
-      if (!current()) return
-      moved = focusBounds(map, extent)
-    }
-    // A failed optional camera index must not interrupt inspecting or selecting languages.
-    void navigate().catch(() => {})
-    return () => {
-      cancelled = true
-      map.off('moveend', settled)
-      if (moved && (!store.get(mapCameraIntentAtom) || store.get(mapCameraIntentAtom) === request))
-        map.stop()
-    }
-  }, [map, request, store, intent])
-  return null
 }

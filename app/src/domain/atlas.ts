@@ -1,4 +1,5 @@
 import type { LanguageSearchIndex } from './catalog.ts'
+import type { GeographicBounds } from './languageFocus.ts'
 import type { PreparedPalette } from './preparedColors.ts'
 
 /** Opaque catalog key: a Glottocode or a stable dataset-namespaced ID. */
@@ -132,6 +133,7 @@ export interface AtlasData {
   readonly languages: readonly Language[]
   readonly variants: readonly GeometryVariant[]
   readonly datasets: readonly GeographyDataset[]
+  readonly datasetViewBounds?: ReadonlyMap<string, GeographicBounds>
   readonly palettes: ReadonlyMap<string, PreparedPalette>
   readonly languageById: ReadonlyMap<LanguageId, Language>
   readonly variantById: ReadonlyMap<GeometryVariantId, GeometryVariant>

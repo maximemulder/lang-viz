@@ -52,10 +52,11 @@ import {
   type RegionHit,
 } from '../../state/mapInteraction.ts'
 import { walsContextOpacityAtom } from '../wals/state.ts'
+import { AtlasMapCamera } from './AtlasMapCamera'
 import { type BackgroundMode, GEOGRAPHIC_BASEMAP } from './geographicBasemap'
 import { InspectionHighlight } from './InspectionHighlight'
 import { LanguageInspector, type MapInspection } from './LanguageInspector'
-import { LanguageMapCamera, LanguageMapPreview } from './LanguageMapFocus'
+import { LanguageMapPreview } from './LanguageMapFocus'
 import { pickLanguageVariants } from './languagePicking'
 import { MapAttribution } from './MapAttribution'
 import { MapBackground } from './MapBackground'
@@ -541,8 +542,8 @@ export const WorldMap = ({
           active={!regionMode && !isolation}
           mapInspectionActive={Boolean(hoverInspection || inspection)}
         />
-        <LanguageMapCamera />
       </Suspense>
+      <AtlasMapCamera />
       {children}
       <NavigationControl position="top-right" showCompass={false} />
       <ScaleControl position="bottom-right" unit="metric" />

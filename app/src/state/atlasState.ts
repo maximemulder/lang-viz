@@ -25,6 +25,7 @@ import {
   validateColorConfiguration,
 } from '../domain/colors'
 import { buildLanguageHierarchy } from '../domain/hierarchy'
+import type { GeographicBounds } from '../domain/languageFocus'
 import {
   addMapEntries,
   draftRepresentationKey,
@@ -43,6 +44,7 @@ import {
   mapGroupId,
 } from '../domain/mapGroups'
 import { selectGlobalColorProfile } from '../domain/preparedColors'
+import { mapCameraIntentAtom } from './mapCameraIntent'
 import { clearMapIsolationAtom } from './mapInteraction'
 
 export const atlasDataAtom = atomWithRefresh(async () => loadAtlasData())
@@ -296,6 +298,12 @@ const buildCompleteGeographyMap = (get: Getter, context: GeographyContext) => {
   )
 }
 
+export const datasetMapNavigationAtom = atom<
+  | { readonly bounds: GeographicBounds }
+  | { readonly variantIds: readonly GeometryVariantId[] }
+  | null
+>(null)
+
 export const showOnlyGeographyViewAtom = atom(null, (get, set, view: GeographyDatasetView) => {
   const entries = buildCompleteGeographyMap(get, {
     sources: [view.datasetId],
@@ -305,6 +313,14 @@ export const showOnlyGeographyViewAtom = atom(null, (get, set, view: GeographyDa
   set(mapEntriesAtom, entries)
   set(browseGeographyViewAtom, view)
   set(clearMapIsolationAtom)
+  const bounds = get(resolvedAtlasDataAtom)?.datasetViewBounds?.get(
+    `${view.datasetId}/${view.viewId}`,
+  )
+  const request = bounds
+    ? { bounds }
+    : { variantIds: [...new Set(entries.flatMap(({ variantIds }) => variantIds))] }
+  set(datasetMapNavigationAtom, request)
+  set(mapCameraIntentAtom, request)
 })
 
 /** Checkboxes refer to the draft being browsed, not every representation of this languoid. */
@@ -331,7 +347,10 @@ export const overlapStatusAtom = atom<{
   readonly message: string
 }>({ status: 'idle', message: '' })
 
-export const clearMapSelectionAtom = atom(null, (_get, set) => {
+export const clearMapSelectionAtom = atom(null, (get, set) => {
+  const request = get(datasetMapNavigationAtom)
+  if (request && get(mapCameraIntentAtom) === request) set(mapCameraIntentAtom, null)
+  set(datasetMapNavigationAtom, null)
   set(mapEntriesAtom, [])
 })
 

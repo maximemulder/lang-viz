@@ -5,6 +5,7 @@ import type {
   Language,
   TemporalViewId,
 } from './atlas.ts'
+import type { GeographicBounds } from './languageFocus.ts'
 import { colorCatalogHash, PREPARED_COLOR_POLICY, type PreparedPalette } from './preparedColors.ts'
 
 /** Initial dataset metadata. Colors use the order of languages.json, bound by catalogHash. */
@@ -17,6 +18,7 @@ export interface DatasetMetadata {
       readonly viewId: TemporalViewId
       readonly coverageSignature: string
       readonly colors: readonly string[]
+      readonly bounds?: GeographicBounds
     }[]
   })[]
 }
@@ -29,6 +31,7 @@ export const decodeDatasetMetadata = async (
   manifest: AtlasManifest,
 ): Promise<{
   datasets: readonly GeographyDataset[]
+  datasetViewBounds: ReadonlyMap<string, GeographicBounds>
   palettes: ReadonlyMap<string, PreparedPalette>
 }> => {
   const validate = (condition: unknown, message: string) => {
@@ -46,6 +49,7 @@ export const decodeDatasetMetadata = async (
   validate(Array.isArray(metadata.datasets), 'missing datasets')
   const expected = new Set(variants.map((v) => `${v.datasetId}/${v.temporalCoverage.viewId}`))
   const datasets: GeographyDataset[] = []
+  const datasetViewBounds = new Map<string, GeographicBounds>()
   const datasetIds = new Set<string>()
   const palettes = new Map<string, PreparedPalette>()
   for (const dataset of metadata.datasets) {
@@ -76,6 +80,23 @@ export const decodeDatasetMetadata = async (
           ),
         `incomplete or invalid colors for ${id}`,
       )
+      const { bounds } = profile
+      if (bounds !== undefined) {
+        validate(
+          Array.isArray(bounds) &&
+            bounds.length === 4 &&
+            bounds.every(Number.isFinite) &&
+            bounds[0] >= -180 &&
+            bounds[0] <= 180 &&
+            bounds[2] >= bounds[0] &&
+            bounds[2] <= bounds[0] + 360 &&
+            bounds[1] >= -90 &&
+            bounds[3] >= bounds[1] &&
+            bounds[3] <= 90,
+          `invalid bounds for ${id}`,
+        )
+        datasetViewBounds.set(id, bounds)
+      }
       palettes.set(id, {
         profile: id,
         colors: new Map(languages.map((language, i) => [language.id, profile.colors[i] as string])),
@@ -83,5 +104,5 @@ export const decodeDatasetMetadata = async (
     }
   }
   validate(palettes.size === expected.size, 'missing dataset palettes')
-  return { datasets, palettes }
+  return { datasets, datasetViewBounds, palettes }
 }

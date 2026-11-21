@@ -36,18 +36,12 @@ export const loadAtlasData = (): Promise<AtlasData> => {
         throw new Error('Geometry catalog does not match its manifest')
       }
 
-      const { datasets, palettes } = await decodeDatasetMetadata(
-        metadata,
-        languages,
-        variants,
-        manifest,
-      )
+      const metadataByDataset = await decodeDatasetMetadata(metadata, languages, variants, manifest)
       return {
         manifest,
         languages,
         variants,
-        datasets,
-        palettes,
+        ...metadataByDataset,
         languageById: new Map(languages.map((language) => [language.id, language])),
         variantById: new Map(variants.map((variant) => [variant.id, variant])),
         languageSearchIndex: buildLanguageSearchIndex(languages),

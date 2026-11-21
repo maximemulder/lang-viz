@@ -1,4 +1,4 @@
-"""Check dataset view browsing and full coverage through the sidebar."""
+"""Check dataset view browsing, full coverage, and camera focus through the sidebar."""
 
 import json
 from types import SimpleNamespace
@@ -169,6 +169,7 @@ def main():
                             return target.matches(':hover') &&
                                 getComputedStyle(target).backgroundColor !== 'rgba(0, 0, 0, 0)';
                         """, dataset_selector), f"{dataset_selector} should highlight at both edges"
+            camera_before_browsing = browser.snapshot()["camera"]
             click(browser, dlac_browse)
             assert checked_views() == [["dlac1987china", "contemporary"]]
             assert entries() == previous
@@ -178,6 +179,7 @@ def main():
             click(browser, asher_browse)
             assert checked_views() == [["asher2007world", "contemporary"]]
             assert entries() == previous
+            assert browser.snapshot()["camera"] == camera_before_browsing
             browser.screenshot(output / f"sources-{width}-{height}.png")
 
         def show(dataset, period):
@@ -188,8 +190,15 @@ def main():
             assert all(entry["group"]["coverage"] == "branch" and entry["group"]["coloring"] == "hierarchy" for entry in shown)
             assert checked_views() == [[dataset, period]]
 
-        show("dlac1987china", "contemporary")
-        show("dlac1987china", "contemporary")
+        def china_framed():
+            state = browser.snapshot()
+            longitude, latitude = state["camera"]["center"]
+            return not state["moving"] and 90 < longitude < 120 and 25 < latitude < 45
+
+        for _ in range(2):
+            browser.js("window.overlapTest.camera([-100, 40], 4)")
+            show("dlac1987china", "contemporary")
+            wait_for(china_framed, 15, "dataset camera focuses China")
         browser.settled(60, fail_on_error=True)
         assert browser.js("return window.overlapTest.inspect([108,32]).variantIds.length > 0")
         assert browser.js("""
@@ -203,9 +212,19 @@ def main():
         open_details(browser, expand=False)
         browser.js("document.querySelector('.details-map-action__button').click()")
         wait_for(lambda: browser.js("return !!document.querySelector('.map-isolation')"), 10, "language isolation")
+        browser.js("window.overlapTest.camera([10, 50], 4)")
         show("asher2007world", "time-of-contact")
         assert not browser.js("return !!document.querySelector('.map-isolation')")
-    print("Geographic dataset rows, full coverage, and browsing passed", flush=True)
+
+        def world_framed():
+            state = browser.snapshot()
+            return not state["moving"] and abs(state["camera"]["center"][0]) < 1 and state["camera"]["zoom"] < 2
+
+        wait_for(world_framed, 15, "global dataset camera pulls back")
+        browser.js("window.overlapTest.camera([150, -15], 4)")
+        show("wurm1981pacific", "contemporary")
+        wait_for(world_framed, 15, "Mercator fits both sides of the antimeridian")
+    print("Geographic dataset rows, full coverage, browsing, and camera focus passed", flush=True)
 
 
 if __name__ == "__main__":

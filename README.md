@@ -132,15 +132,15 @@ resumes completed tiles. Missing parts must be restored before preparing branche
 The browser uses these tiles only for an exact geometry/refinement match.
 
 `npm run precompute:colors` builds the geometry-based semantic palette for every
-dataset/period and embeds compact tables with dataset descriptions in the initial
-metadata. Run it before serving or packaging the app: the catalog is ready only
-once this metadata has loaded and validated. Selection and dataset switches then
+dataset/period and stores it with the dataset description and map focus bounds
+in the initial metadata. Run it before serving or packaging the app. The catalog
+is ready once this metadata has loaded and validated. Selection and dataset switches then
 choose colors synchronously, without palette requests. Mixed datasets/periods and
 custom roots use catalog defaults; explicit regional optimization remains available.
 Regenerate metadata after rebuilding catalogs, branch tiles, or the color policy.
 The builder publishes `dataset-metadata/<hash>.json` and updates the manifest locally
 under `public/data/`. `node scripts/precompute-colors.mjs --check` verifies every
-embedded color against a fresh canonical solve.
+embedded color and focus extent against a fresh build.
 
 The atlas build generates reusable disjoint coverage at all source zooms for
 every dataset/period (currently 0–8). Each piece retains every original contributor,

@@ -24,6 +24,7 @@ const fixture = async () => {
     viewId,
     coverageSignature: 'signature',
     colors: ['#123456', '#abcdef'],
+    ...(viewId === 'time-of-contact' ? { bounds: [170, -10, 190, 15] as const } : {}),
   })
   const metadata: DatasetMetadata = {
     colorPolicy: PREPARED_COLOR_POLICY,
@@ -72,6 +73,7 @@ test('dataset metadata supplies every profile and catalog color before publicati
     decoded.datasets.map((d) => d.id),
     ['a', 'b'],
   )
+  assert.deepEqual([...decoded.datasetViewBounds], [['a/time-of-contact', [170, -10, 190, 15]]])
   assert.ok(
     decoded.datasets.every((d) => !('profiles' in d)),
     'Runtime descriptions do not duplicate encoded palettes',
@@ -93,6 +95,7 @@ test('incomplete, incompatible or corrupt metadata fails the entire catalog load
     { colors: ['red', '#abcdef'] },
     { coverageSignature: 'old' },
     { viewId: 'unknown' },
+    { bounds: [170, -10, -170, 15] },
   ]) {
     const changed = structuredClone(metadata)
     const profile = changed.datasets[0]?.profiles[0]
