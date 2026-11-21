@@ -193,10 +193,6 @@ window.fetch = (...args) => {
             assert js("return [...document.querySelectorAll('input[name=administrative-metric]')][1].checked")
             wait_for(lambda: js("return window.overlapTest.queryLayers([6.2,53.1],['administrative-metric-fill']).some(h=>h.properties.territoryCode==='NL'&&h.properties.metricValue>0)"), 15, "matched metric fill")
             assert js("return window.overlapTest.layerState('administrative-labels-2').order > window.overlapTest.layerState('administrative-metric-fill').order")
-            button("Clear colours", ".map-settings__toolbar")
-            assert not js("return window.overlapTest.layerState('administrative-metric-fill')")
-            button("Show colours", ".map-settings__toolbar")
-            wait_for(lambda: js("return !!window.overlapTest.layerState('administrative-metric-fill')"), 10, "restored metric")
             report["checks"].append("Region borders and metric control")
 
             js("window.overlapTest.camera(arguments[0],4)", ly_point)

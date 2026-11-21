@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Layer, Popup, Source, useMap } from 'react-map-gl/maplibre'
 import { combinedBounds } from '../../domain/languageFocus.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
-import { mapColorsVisibleAtom, mapIsolationAtom } from '../../state/mapInteraction.ts'
+import { mapIsolationAtom } from '../../state/mapInteraction.ts'
 import { focusBounds } from '../map/focusBounds.ts'
 import {
   INSPECTION_LINE_COLOR,
@@ -34,7 +34,6 @@ const LABEL_ANCHOR = 'administrative-label-anchor'
 export default function BoundaryLayer({ administrative }: { readonly administrative: boolean }) {
   const languageBorders = useAtomValue(languageBordersAtom)
   const session = useAtomValue(administrativeSessionAtom)
-  const colorsVisible = useAtomValue(mapColorsVisibleAtom)
   const isolation = useAtomValue(mapIsolationAtom)
   const regionIsolation = isolation?.kind === 'region' ? isolation : null
   const selectionFeatures = useAtomValue(selectedAdministrativeFeaturesAtom)
@@ -146,7 +145,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
       <Layer id={LABEL_ANCHOR} type="background" paint={{ 'background-opacity': 0 }} />
       {showGeometry && filledGeometry && (
         <Source id="administrative-boundaries" type="geojson" data={filledGeometry}>
-          {regionMode && colorsVisible && !regionIsolation && session.metric && (
+          {regionMode && !regionIsolation && session.metric && (
             <Layer
               id="administrative-metric-fill"
               type="fill"

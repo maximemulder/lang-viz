@@ -90,6 +90,4 @@ Pinned comparisons keep their geometry and colours throughout.
 The Languages border button shows the administrative boundary network. The
 border button stays selected and disabled in Regions, where the statistical
 metric fills are available. The Languages/Regions control sits beside map
-settings, with Languages selected by default. **Clear colours** and **Show
-colours** toggle language and region metric fills while keeping the basemap and
-the current map selections.
+settings, with Languages selected by default.

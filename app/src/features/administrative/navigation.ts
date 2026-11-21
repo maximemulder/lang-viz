@@ -67,5 +67,5 @@ export const showCheckedTerritoriesAtom = atom(null, (get, set, label: string) =
   ]
   if (!featureIds.length) return
   const cameraRequest = set(focusAdministrativeFeaturesAtom, featureIds)
-  set(mapIsolationAtom, { kind: 'region', featureIds, label, cameraRequest, colorsVisible: true })
+  set(mapIsolationAtom, { kind: 'region', featureIds, label, cameraRequest })
 })

@@ -208,7 +208,6 @@ export const LanguageDetails = ({ sourceCode }: { readonly sourceCode?: string }
                 label: detail.name,
                 variantIds: isolationVariantIds,
                 color: '#df7546',
-                colorsVisible: true,
                 cameraRequest,
               })
             }}

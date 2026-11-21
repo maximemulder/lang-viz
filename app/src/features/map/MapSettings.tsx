@@ -1,7 +1,6 @@
 import { useAtom } from 'jotai'
 import { useEffect, useId, useRef, useState } from 'react'
 import { languageOpacityAtom, overlapModeAtom, stripeThicknessAtom } from '../../state/atlasState'
-import { mapColorsVisibleAtom } from '../../state/mapInteraction.ts'
 
 import { BIOMES } from './biomes'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
@@ -77,7 +76,6 @@ export const MapSettings = ({
   const toggleRef = useRef<HTMLButtonElement>(null)
   const [mode, setMode] = useAtom(overlapModeAtom)
   const [opacity, setOpacity] = useAtom(languageOpacityAtom)
-  const [colorsVisible, setColorsVisible] = useAtom(mapColorsVisibleAtom)
   const [stripeThickness, setStripeThickness] = useAtom(stripeThicknessAtom)
   const thicknessPercent = Math.round(stripeThickness * 100)
 
@@ -182,13 +180,6 @@ export const MapSettings = ({
             </fieldset>
           </div>
         )}
-        <button
-          className="map-settings__toggle map-colors-toggle"
-          type="button"
-          onClick={() => setColorsVisible(!colorsVisible)}
-        >
-          {colorsVisible ? 'Clear colours' : 'Show colours'}
-        </button>
       </div>
       <section
         id="map-settings-panel"

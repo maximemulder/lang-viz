@@ -101,8 +101,7 @@ def main():
         browser.js("window.overlapTest.configure({languageIds:['dutc1256'],center:[5.3,52.1],zoom:5})")
         pins = browser.js("return window.overlapTest.mapEntryState()")
         assert pins and all(pin["languageId"] == "dutc1256" for pin in pins)
-        browser.js("document.querySelector('.map-colors-toggle').click()")
-        assert browser.js("return document.querySelector('.map-colors-toggle').textContent.trim() === 'Show colours' && !!window.overlapTest.layerState('wals-language-areas')")
+        assert browser.js("return !!window.overlapTest.layerState('wals-language-areas')")
         browser.js("document.querySelector('.finder-detail .details-map-action__button').click()")
         wait_for(
             lambda: browser.js("return window.overlapTest.layerState('isolated-language-fill')?.sourceLoaded && window.overlapTest.snapshot().camera.zoom < 3 && !window.overlapTest.snapshot().moving"),
@@ -111,7 +110,6 @@ def main():
         )
         isolated = browser.js("return window.overlapTest.layerState('isolated-language-fill')")
         assert isolated["filter"][-1][-1] == ["asher2007world:contemporary:stan1293"]
-        assert browser.js("return document.querySelector('.map-colors-toggle').textContent.trim() === 'Clear colours'")
         assert not browser.js("return !!window.overlapTest.layerState('wals-language-areas')")
         browser.js("""
             const picker = document.querySelector('.map-isolation input[type=color]');
@@ -122,10 +120,6 @@ def main():
         wait_for(lambda: browser.js("return window.overlapTest.layerState('isolated-language-fill')?.color === '#405671'"), 10, "isolation recolour")
         browser.js("document.querySelector('.map-isolation button').click()")
         wait_for(lambda: browser.js("return !window.overlapTest.layerState('isolated-language-fill') && !!window.overlapTest.layerState('wals-language-areas')"), 15, "isolation restores WALS")
-        assert browser.js("return window.overlapTest.mapEntryState()") == pins
-        assert browser.js("return document.querySelector('.map-colors-toggle').textContent.trim() === 'Show colours'")
-        assert browser.js("return !!window.overlapTest.layerState('wals-language-areas')")
-        browser.js("document.querySelector('.map-colors-toggle').click()")
         assert browser.js("return window.overlapTest.mapEntryState()") == pins
         browser.screenshot(output / "feature-details.png")
         browser.js("document.querySelector('.finder-detail__close').click()")

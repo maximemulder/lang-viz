@@ -48,7 +48,6 @@ import {
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import {
   clearMapIsolationAtom,
-  mapColorsVisibleAtom,
   mapIsolationAtom,
   type RegionHit,
 } from '../../state/mapInteraction.ts'
@@ -158,7 +157,6 @@ const LanguageLayers = memo(({ regionMode }: { readonly regionMode: boolean }) =
   const data = useAtomValue(atlasDataAtom)
   const walsOpacity = useAtomValue(walsContextOpacityAtom)
   const isolation = useAtomValue(mapIsolationAtom)
-  const colorsVisible = useAtomValue(mapColorsVisibleAtom)
   const isolated = isolation?.kind === 'language' ? isolation : null
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
@@ -218,7 +216,7 @@ const LanguageLayers = memo(({ regionMode }: { readonly regionMode: boolean }) =
             filter={['in', ['get', 'variant_id'], ['literal', isolated.variantIds]]}
             paint={{
               'fill-color': isolated.color,
-              'fill-opacity': colorsVisible ? 0.82 : 0,
+              'fill-opacity': 0.82,
               'fill-outline-color': isolated.color,
             }}
           />
