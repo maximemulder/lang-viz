@@ -43,6 +43,16 @@ def main() -> None:
         assert -10 < lng < 30 and 40 < lat < 55
         browser.settled(35, fail_on_error=True)
         browser.screenshot(output / "world.png")
+        assert browser.js(
+            "const button = document.querySelector('.map-region-controls__borders').nextElementSibling;"
+            "return button.getAttribute('aria-label') === 'Map labels' &&"
+            "button.getAttribute('aria-pressed') === 'true'"
+        )
+        browser.js("""document.querySelector('button[aria-label="Map labels"]').click()""")
+        wait_for(lambda: not labels(), 10, "hidden language labels")
+        assert supported(afro)
+        browser.js("""document.querySelector('button[aria-label="Map labels"]').click()""")
+        rendered("afro1255")
         browser.js(
             "document.querySelector('.map-settings__toggle').click();"
             "document.querySelector('input[name=map-projection][value=globe]').click()"

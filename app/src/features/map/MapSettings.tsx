@@ -1,6 +1,7 @@
 import { useAtom } from 'jotai'
 import { useEffect, useId, useRef, useState } from 'react'
 import { languageOpacityAtom, overlapModeAtom, stripeThicknessAtom } from '../../state/atlasState'
+import { mapLabelsVisibleAtom } from '../../state/mapInteraction.ts'
 
 import { BIOMES } from './biomes'
 import { BACKGROUND_OPTIONS, type BackgroundMode } from './geographicBasemap'
@@ -76,6 +77,7 @@ export const MapSettings = ({
   const toggleRef = useRef<HTMLButtonElement>(null)
   const [mode, setMode] = useAtom(overlapModeAtom)
   const [opacity, setOpacity] = useAtom(languageOpacityAtom)
+  const [labelsVisible, setLabelsVisible] = useAtom(mapLabelsVisibleAtom)
   const [stripeThickness, setStripeThickness] = useAtom(stripeThicknessAtom)
   const thicknessPercent = Math.round(stripeThickness * 100)
 
@@ -154,6 +156,18 @@ export const MapSettings = ({
                   strokeLinejoin="round"
                 />
               </svg>
+            </button>
+            <button
+              className="map-settings__toggle"
+              type="button"
+              aria-label="Map labels"
+              title={labelsVisible ? 'Hide map labels' : 'Show map labels'}
+              aria-pressed={labelsVisible}
+              onClick={() => setLabelsVisible(!labelsVisible)}
+            >
+              <span className="map-settings__label-icon" aria-hidden="true">
+                Aa
+              </span>
             </button>
             <fieldset className="map-region-controls__inspect">
               <legend className="visually-hidden">Inspect on map</legend>

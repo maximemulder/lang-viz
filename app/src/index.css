@@ -636,9 +636,15 @@ h2 {
   background: var(--paper);
 }
 
-.map-region-controls__borders[aria-pressed="true"] {
+.map-settings__toggle[aria-pressed="true"] {
   background: #dce9df;
   color: #214e3a;
+}
+
+.map-settings__label-icon {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .map-region-controls__borders:disabled {

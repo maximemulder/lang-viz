@@ -22,6 +22,7 @@ export type MapIsolation = {
   | { readonly kind: 'region'; readonly featureIds: readonly string[] }
 )
 
+export const mapLabelsVisibleAtom = atom(true)
 export const mapIsolationAtom = atom<MapIsolation | null>(null)
 export const readyRegionMaskAtom = atom<readonly string[] | null>(null)
 export const clearMapIsolationAtom = atom(null, (get, set) => {

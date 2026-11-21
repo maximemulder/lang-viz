@@ -49,6 +49,7 @@ import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
 import {
   clearMapIsolationAtom,
   mapIsolationAtom,
+  mapLabelsVisibleAtom,
   type RegionHit,
 } from '../../state/mapInteraction.ts'
 import { walsContextOpacityAtom } from '../wals/state.ts'
@@ -159,6 +160,7 @@ const LanguageLayers = memo(({ regionMode }: { readonly regionMode: boolean }) =
   const data = useAtomValue(atlasDataAtom)
   const walsOpacity = useAtomValue(walsContextOpacityAtom)
   const isolation = useAtomValue(mapIsolationAtom)
+  const labelsVisible = useAtomValue(mapLabelsVisibleAtom)
   const isolated = isolation?.kind === 'language' ? isolation : null
   const temporalSelection = useAtomValue(temporalViewAtom)
   const datasetSelection = useAtomValue(geographyDatasetFilterAtom)
@@ -235,7 +237,7 @@ const LanguageLayers = memo(({ regionMode }: { readonly regionMode: boolean }) =
         onCoverageReady={setCoverageKey}
       />
       <Layer id="language-highlight-anchor" type="background" paint={{ 'background-opacity': 0 }} />
-      {!regionMode && (isolated || walsOpacity === 1) && (
+      {labelsVisible && !regionMode && (isolated || walsOpacity === 1) && (
         <LanguageLabels
           data={data}
           areas={areas}

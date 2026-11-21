@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Layer, Popup, Source, useMap } from 'react-map-gl/maplibre'
 import { combinedBounds } from '../../domain/languageFocus.ts'
 import { mapCameraIntentAtom } from '../../state/mapCameraIntent.ts'
-import { mapIsolationAtom } from '../../state/mapInteraction.ts'
+import { mapIsolationAtom, mapLabelsVisibleAtom } from '../../state/mapInteraction.ts'
 import { focusBounds } from '../map/focusBounds.ts'
 import {
   INSPECTION_LINE_COLOR,
@@ -35,6 +35,7 @@ const LABEL_ANCHOR = 'administrative-label-anchor'
 export default function BoundaryLayer({ administrative }: { readonly administrative: boolean }) {
   const languageBorders = useAtomValue(languageBordersAtom)
   const session = useAtomValue(administrativeSessionAtom)
+  const labelsVisible = useAtomValue(mapLabelsVisibleAtom)
   const isolation = useAtomValue(mapIsolationAtom)
   const regionIsolation = isolation?.kind === 'region' ? isolation : null
   const selectionFeatures = useAtomValue(selectedAdministrativeFeaturesAtom)
@@ -250,7 +251,7 @@ export default function BoundaryLayer({ administrative }: { readonly administrat
           />
         </Source>
       )}
-      {regionMode && index && (
+      {labelsVisible && regionMode && index && (
         <Source id="administrative-labels" type="geojson" data={index.labels}>
           {REGION_LABEL_ZOOMS.map((zoom) => (
             <MapLabelLayer
