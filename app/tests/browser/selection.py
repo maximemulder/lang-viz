@@ -7,6 +7,7 @@ from .run import APP, browser_session, check_state, open_atlas, wait_for
 from .sidebar import (
     add_selected,
     clear_selection,
+    datasets_section,
     open_details,
     search,
     select_control,
@@ -59,7 +60,7 @@ def check_selection(browser, output):
     assert '3 selected' in browser.js("return document.querySelector('.finder-bulk').textContent")
     assert '0 available to add' in browser.js("return document.querySelector('.finder-bulk').textContent")
     sources(browser, 'Asher')
-    browser.js("document.querySelector('.finder-options').open=false")
+    datasets_section(browser, False)
     view(browser, 'map')
     wait_for(lambda: browser.js("return document.querySelectorAll('.on-map-group').length") == 2, 10, 'two groups')
     assert not browser.js("return !!document.querySelector('.on-map-row')"), 'Groups start collapsed'

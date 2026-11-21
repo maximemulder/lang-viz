@@ -221,11 +221,8 @@ h2 {
 }
 
 .geography-sources__row {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 0.4rem;
-  padding: 0.3rem 0.25rem 0.3rem 0.3rem;
+  padding-inline-start: 2.15rem;
   font-size: 0.72rem;
 }
 
@@ -237,6 +234,11 @@ h2 {
 }
 
 .finder-row {
+  display: grid;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding-inline-end: 1rem;
   border-bottom: 1px solid rgb(29 43 39 / 6%);
 }
 
@@ -318,21 +320,10 @@ h2 {
   background: transparent;
 }
 
-.finder-options {
-  padding: 0 0.75rem;
-  margin-bottom: 0.25rem;
-}
-
 .finder-actions :where(p) small {
   display: block;
   margin-top: 0.2rem;
   font-size: 0.6rem;
-}
-.language-list {
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 .language-list__sizer {
   position: relative;
@@ -346,12 +337,8 @@ h2 {
   height: 44px;
 }
 .language-row {
-  display: grid;
   grid-template-columns: 1.25rem minmax(2rem, 1fr) auto;
-  align-items: center;
-  gap: 0.6rem;
   height: 44px;
-  padding-right: 1rem;
   color: var(--ink);
   cursor: default;
 }
@@ -1324,21 +1311,6 @@ h2 {
   flex-direction: column;
 }
 
-.explore-controls {
-  flex: 0 1 auto;
-  min-height: 2rem;
-  max-height: min(19rem, 38dvh);
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
-
-@media (min-width: 801px) and (min-height: 800px) {
-  .explore-controls {
-    max-height: min(26rem, 44dvh);
-  }
-}
-
 .on-map-view {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
@@ -1584,8 +1556,7 @@ h2 {
 .language-row__identity:focus-visible,
 .on-map-row button:focus-visible,
 .finder-detail button:focus-visible,
-.finder-detail summary:focus-visible,
-.finder-options summary:focus-visible {
+.finder-detail summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -1735,10 +1706,6 @@ h2 {
   padding: 0.25rem 0 0.65rem 1.1rem;
 }
 
-.explore-controls .sidebar-pane__content {
-  padding-top: 0.5rem;
-}
-
 .sidebar-pane__header:focus-visible,
 .language-finder :is(button, select, input, textarea, summary):focus-visible {
   outline: 2px solid var(--accent);
@@ -1796,9 +1763,20 @@ h2 {
   text-align: left;
 }
 
+.sidebar-section > .sidebar-section__toggle:focus-visible {
+  outline-offset: -2px;
+}
+
 .sidebar-section__content {
   min-height: 0;
   min-width: 0;
+}
+
+.explore-datasets > .sidebar-section__content,
+.language-list {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 /* Section body layouts must never override the collapsed state. */
@@ -1816,6 +1794,17 @@ h2 {
 
 .language-summary-section > .sidebar-section__content > :last-child {
   margin-bottom: 0;
+}
+
+.explore-datasets {
+  flex: 0 1 auto;
+  max-height: min(19rem, 38dvh);
+}
+
+@media (min-width: 801px) and (min-height: 800px) {
+  .explore-datasets {
+    max-height: min(26rem, 44dvh);
+  }
 }
 
 .explore-search[data-expanded="true"] {

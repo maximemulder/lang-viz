@@ -4,7 +4,15 @@ import json
 from types import SimpleNamespace
 
 from .run import APP, browser_session, open_atlas, wait_for
-from .sidebar import add_selected, open_details, search, select_control, select_result, sources
+from .sidebar import (
+    add_selected,
+    datasets_section,
+    open_details,
+    search,
+    select_control,
+    select_result,
+    sources,
+)
 
 
 def move_mouse(browser, x, y):
@@ -95,7 +103,7 @@ def main():
         assert entries() == previous, "Adding the same language twice should be idempotent"
         search(browser, "stan1295", "stan1295")
         assert browser.js("return document.querySelector('[data-language-id=stan1295] input').checked")
-        browser.js("document.querySelector('.finder-options').open=true")
+        datasets_section(browser)
         rows = browser.js("""
             return [...document.querySelectorAll('.geography-sources__row')].map(row =>
                 [row.dataset.datasetId, row.dataset.viewId, row.querySelector('button').textContent.trim()]
@@ -108,7 +116,7 @@ def main():
             return f'[data-dataset-id="{dataset}"][data-view-id="{period}"] .geography-sources__{name}'
 
         move_mouse(browser, 24, 24)
-        browser.js("document.querySelector('.finder-options summary').focus()")
+        browser.js("document.querySelector('#explore-datasets-heading').focus()")
         assert browser.js("""
             return [...document.querySelectorAll('.geography-sources__show')].every(button =>
                 getComputedStyle(button).opacity === '0'
@@ -136,15 +144,37 @@ def main():
             browser.call("POST", "/window/rect", {"width": width, "height": height})
             if height == 1000:
                 assert browser.js("""
-                    const controls = document.querySelector('.explore-controls');
+                    const controls = document.querySelector('#explore-datasets-content');
                     return controls.scrollHeight <= controls.clientHeight + 1;
                 """), "All dataset rows should fit at desktop height"
+                for dataset_selector, language_selector in (
+                    ("#explore-datasets-heading", "#explore-search-heading"),
+                    (".geography-sources__row", '[data-language-id="stan1295"]'),
+                ):
+                    edges = browser.js("""
+                        const dataset = document.querySelector(arguments[0]).getBoundingClientRect();
+                        const language = document.querySelector(arguments[1]).getBoundingClientRect();
+                        if (Math.abs(dataset.left - language.left) > 1 ||
+                            Math.abs(dataset.right - language.right) > 1 ||
+                            Math.abs(dataset.height - language.height) > 1) return null;
+                        return [Math.ceil(dataset.left) + 2, Math.floor(dataset.right) - 2,
+                            Math.floor(dataset.top + dataset.height / 2)];
+                    """, dataset_selector, language_selector)
+                    assert edges, f"{dataset_selector} should align with {language_selector}"
+                    left, right, y = edges
+                    for x in (left, right):
+                        move_mouse(browser, x, y)
+                        assert browser.js("""
+                            const target = document.querySelector(arguments[0]);
+                            return target.matches(':hover') &&
+                                getComputedStyle(target).backgroundColor !== 'rgba(0, 0, 0, 0)';
+                        """, dataset_selector), f"{dataset_selector} should highlight at both edges"
             click(browser, dlac_browse)
             assert checked_views() == [["dlac1987china", "contemporary"]]
             assert entries() == previous
             click(browser, dlac_browse)
             assert not checked_views()
-            assert browser.js("return document.querySelector('.finder-options summary').textContent.includes('Browsing any dataset')")
+            assert browser.js("return document.querySelector('#explore-datasets-heading').textContent.includes('Browsing any dataset')")
             click(browser, asher_browse)
             assert checked_views() == [["asher2007world", "contemporary"]]
             assert entries() == previous

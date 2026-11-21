@@ -90,12 +90,18 @@ def select_control(browser, selector, value):
     """, selector, value)
 
 
+def datasets_section(browser, expanded=True):
+    browser.js("""
+        const toggle = document.querySelector('#explore-datasets-heading');
+        if ((toggle.getAttribute('aria-expanded') === 'true') !== arguments[0]) toggle.click();
+    """, expanded)
+    wait_for(lambda: browser.js("return document.querySelector('#explore-datasets').dataset.expanded === String(arguments[0])", expanded), 10, "Datasets section")
+
+
 def sources(browser, short_name=None, *, period=None):
     view(browser, 'explore')
     browser.js("""
-        const section = document.querySelector('.finder-options');
-        const wasOpen = section.open;
-        section.open = true;
+        const section = document.querySelector('#explore-datasets');
         const selector = '.geography-sources__browse';
         if (arguments[0] === null) {
             section.querySelector(selector + ':checked')?.click();
@@ -106,7 +112,6 @@ def sources(browser, short_name=None, *, period=None):
             const checkbox = row.querySelector(selector);
             if (!checkbox.checked) checkbox.click();
         }
-        section.open = wasOpen;
     """, short_name, period)
 
 

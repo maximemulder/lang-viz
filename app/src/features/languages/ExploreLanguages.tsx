@@ -329,9 +329,7 @@ export const ExploreLanguages = () => {
   }, [panel.view, revealId, data, hierarchy, expandedKeys, setQuery, setRevealId])
   return (
     <div className="explore-view">
-      <div className="explore-controls">
-        <GeographyFilters />
-      </div>
+      <GeographyFilters />
       <SidebarSection
         id="explore-search"
         className="explore-search"

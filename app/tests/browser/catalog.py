@@ -5,7 +5,7 @@ import json
 from .comparisons import check_comparisons
 from .run import APP, browser_session, open_atlas, wait_for
 from .selection import check_selection
-from .sidebar import map_section, open_details, search, view
+from .sidebar import datasets_section, map_section, open_details, search, view
 
 
 def main():
@@ -33,7 +33,7 @@ def main():
                     document.querySelector('#language-tab-map').getAttribute('aria-label').startsWith('Legend,') &&
                     !document.querySelector('.finder-detail') &&
                     !document.querySelector('.language-finder__header') &&
-                    !!document.querySelector('#language-panel-explore .finder-options');
+                    !!document.querySelector('#language-panel-explore #explore-datasets');
             """), "Two browsing views, with geography filters in Explore and no empty details pane"
             assert browser.js("""
                 const labels=[...document.querySelectorAll('.finder-actions button')].map(b=>b.textContent.trim());
@@ -46,9 +46,9 @@ def main():
             assert browser.js("""
                 const list=document.querySelector('.language-list').getBoundingClientRect();
                 const footer=document.querySelector('.explore-footer').getBoundingClientRect();
-                const sources=document.querySelector('.finder-options');
+                const sources=document.querySelector('#explore-datasets-content');
                 const search=document.querySelector('#explore-search-content');
-                return !sources.open && sources.querySelector('summary').textContent.includes('Datasets') &&
+                return sources.hidden && document.querySelector('#explore-datasets-heading').textContent.includes('Datasets') &&
                     document.querySelector('#explore-search-heading').textContent.includes('Languages') &&
                     search.contains(document.querySelector('.search-field')) &&
                     !document.querySelector('.finder-scope') &&
@@ -158,9 +158,9 @@ def main():
                 )
                 browser.call("DELETE", "/actions")
 
+            datasets_section(browser)
             browser.js("""
-                document.querySelector('.finder-options').open=true;
-                window.sourceControlsHeight=document.querySelector('.explore-controls').getBoundingClientRect().height;
+                window.sourceControlsHeight=document.querySelector('#explore-datasets').getBoundingClientRect().height;
                 document.querySelector('#explore-search-heading').focus();
             """)
             key("\ue00d")
@@ -169,14 +169,14 @@ def main():
                 return content.hidden && getComputedStyle(content).display==='none' &&
                     document.querySelector('.search-field').getClientRects().length===0 &&
                     document.querySelector('.language-list').getClientRects().length===0 &&
-                    document.querySelector('.finder-options').open &&
+                    !document.querySelector('#explore-datasets-content').hidden &&
                     document.querySelector('.geography-sources').getClientRects().length>0 &&
-                    document.querySelector('.explore-controls').getBoundingClientRect().height >= window.sourceControlsHeight-1;
+                    document.querySelector('#explore-datasets').getBoundingClientRect().height >= window.sourceControlsHeight-1;
             """), 'Collapsing Languages removes its rendered content while Datasets stays open at its full height'
             browser.screenshot(output / 'collapsed-search.png')
             key("\ue00d")
             wait_for(lambda: browser.js("return document.querySelectorAll('.language-row[aria-level=\"2\"]').length===3"), 10, 'expanded family survives section collapse')
-            browser.js("document.querySelector('.finder-options').open=false")
+            datasets_section(browser, False)
             assert browser.js("""
                 return document.querySelector('.search-field').getClientRects().length>0 &&
                     document.querySelector('#explore-search input[type=search]').value==='abkh1242';
@@ -249,7 +249,7 @@ def main():
             assert browser.js("""
                 return !!document.querySelector('.finder-detail') &&
                     !document.querySelector('#focused-language-body').hidden &&
-                    document.querySelector('.finder-options').getClientRects().length === 0;
+                    document.querySelector('#explore-datasets').getClientRects().length === 0;
             """), "Inspection stays expanded across views; filters belong to Explore"
             view(browser, 'explore')
             browser.js("document.querySelector('.finder-detail__close').click()")
@@ -352,7 +352,7 @@ def main():
 
             browser.call("POST", "/window/rect", {"width": 390, "height": 844})
             search(browser, "abkh1242", "abkh1242")
-            browser.js("document.querySelector('.finder-options').open = false")
+            datasets_section(browser, False)
             open_details(browser)
             narrow = browser.js("""
                 const panel = document.querySelector('.finder-detail');

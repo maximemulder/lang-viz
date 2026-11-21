@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useMemo } from 'react'
-import { SidebarPane } from '../../components/SidebarPane'
+import { SidebarSection } from '../../components/SidebarPane'
 import type { AtlasData, TemporalViewId } from '../../domain/atlas'
 import {
   atlasDataAtom,
@@ -44,10 +44,12 @@ export const GeographyFilters = () => {
       : undefined
 
   return (
-    <SidebarPane
-      className="finder-options"
+    <SidebarSection
+      id="explore-datasets"
+      className="explore-datasets"
       title="Datasets"
       summary={`Browsing ${activeView?.label ?? 'any dataset'}`}
+      defaultExpanded={false}
     >
       <ul className="geography-sources" aria-label="Geographic dataset views">
         {views.map((view) => {
@@ -85,6 +87,6 @@ export const GeographyFilters = () => {
           )
         })}
       </ul>
-    </SidebarPane>
+    </SidebarSection>
   )
 }
