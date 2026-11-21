@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from itertools import pairwise
 from pathlib import Path
 from typing import cast
 
@@ -160,7 +161,7 @@ def validate_labels(
 
     if (
         not isinstance(table, dict)
-        or table.get("schemaVersion") not in (1, 2)
+        or table.get("schemaVersion") not in (1, 2, 3)
         or table.get("archive") != archive
         or not isinstance(table.get("variants"), dict)
         or not isinstance(table.get("handoffZooms"), dict)
@@ -184,6 +185,7 @@ def validate_labels(
             raise invalid()
 
     parents = set()
+    languoids = set()
     for variant, row in table["variants"].items():
         if variant not in variants or not isinstance(row, dict):
             raise invalid()
@@ -198,12 +200,28 @@ def validate_labels(
         ):
             raise invalid()
         parents.update(path[:-1])
+        languoids.update(path)
         for anchor in anchors:
             validate_anchor(anchor, len(path))
     handoffs = table["handoffZooms"]
     if set(handoffs) != parents or not all(number(zoom, 0, 12) for zoom in handoffs.values()):
         raise invalid()
-    if table["schemaVersion"] == 2:
+    if table["schemaVersion"] == 3:
+        reveals = table.get("revealZooms")
+        if (
+            not isinstance(reveals, dict)
+            or set(reveals) != languoids
+            or not all(number(zoom, 0, 12) for zoom in reveals.values())
+        ):
+            raise invalid()
+        for row in table["variants"].values():
+            path = row["path"]
+            if reveals[path[0]] != 0 or any(
+                reveals[child] < 2 or reveals[child] <= reveals[parent]
+                for parent, child in pairwise(path)
+            ):
+                raise invalid()
+    if table["schemaVersion"] >= 2:
         overviews = table.get("overviews")
         if not isinstance(overviews, dict):
             raise invalid()

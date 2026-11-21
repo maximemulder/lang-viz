@@ -1,6 +1,6 @@
 """Exercise the generated label tables against the visible atlas in Firefox."""
 
-from math import dist
+import json
 
 from .run import APP, browser_session, open_atlas, wait_for
 from .sidebar import open_details, search
@@ -8,6 +8,8 @@ from .sidebar import open_details, search
 
 def main() -> None:
     output = APP / "test-results/language-labels"
+    catalog = json.loads((APP / "public/data/languages.json").read_text())
+    roots = {row["id"] for row in catalog if not row["parentId"]}
     with browser_session(output, dev=True) as (browser, origin):
         open_atlas(browser, origin, preserve_default=True)
 
@@ -41,7 +43,9 @@ def main() -> None:
         indo_european = rendered("indo1319")
         lng, lat = indo_european["coordinates"]
         assert -10 < lng < 30 and 40 < lat < 55
+        assert indo_european["overview"]
         browser.settled(35, fail_on_error=True)
+        assert {item["labelId"] for item in labels()} <= roots
         browser.screenshot(output / "world.png")
         assert browser.js(
             "const button = document.querySelector('.map-region-controls__borders').nextElementSibling;"
@@ -63,6 +67,10 @@ def main() -> None:
             "document.querySelector('input[name=map-projection][value=mercator]').click();"
             "document.querySelector('.map-settings__toggle').click()"
         )
+        browser.js("window.overlapTest.camera([12,18], 0.5, 0)")
+        browser.settled(35, fail_on_error=True)
+        assert rendered("indo1319")["overview"]
+        assert {item["labelId"] for item in labels()} <= roots
         for zoom in [3, 4]:
             browser.js("window.overlapTest.camera([134,-25],arguments[0],0)", zoom)
             english = rendered("stan1293")
@@ -76,29 +84,27 @@ def main() -> None:
         browser.settled(35, fail_on_error=True)
         sino = rendered("sino1245")
         lng, lat = sino["coordinates"]
-        assert 104 < lng < 117 and 30 < lat < 41
+        assert 100 < lng < 117 and 30 < lat < 41
         assert sino["overview"]
-        assert not any(item["labelId"] == "mand1415" for item in labels())
+        assert not rendered("hind1269")["overview"]
+        assert not any(
+            item["labelId"] in {"mand1415", "indo1319", "indo1320", "indo1321"} for item in labels()
+        )
         browser.screenshot(output / "sino-tibetan.png")
         browser.js("window.overlapTest.camera([111.74,35.65], 5, 0)")
         browser.settled(35, fail_on_error=True)
-        sinitic = rendered("sini1245")
-        mandarin = rendered("mand1415")
-        assert sinitic["overview"]
-        assert not mandarin["overview"]
-        assert sinitic["variantId"] != mandarin["variantId"]
-        map_points = [
-            browser.js(
-                "return window.overlapTest.inspect(arguments[0]).point", label["coordinates"]
-            )
-            for label in (sinitic, mandarin)
-        ]
-        assert dist(*map_points) > 128
-        browser.screenshot(output / "sinitic.png")
+        assert not rendered("mand1415")["overview"]
+        assert rendered("bodi1256")["overview"]
+        assert not any(item["labelId"] in {"sini1245", "sino1245"} for item in labels())
+        browser.screenshot(output / "mandarin-handoff.png")
         browser.js("window.overlapTest.camera([111.74,35.65], 6, 0)")
         assert not rendered("mand1415")["overview"]
         browser.settled(35, fail_on_error=True)
         browser.screenshot(output / "mandarin.png")
+        browser.js("window.overlapTest.camera([12,18], 1.35, 0)")
+        browser.settled(35, fail_on_error=True)
+        assert rendered("indo1319")["overview"]
+        assert {item["labelId"] for item in labels()} <= roots
 
         browser.js("window.overlapTest.configure({languageIds:['kipc1240'],center:[66,48],zoom:3})")
         browser.settled(35, fail_on_error=True)
@@ -187,7 +193,7 @@ def main() -> None:
         browser.js("window.overlapTest.configure({languageIds:[],center:[-2,53],zoom:5})")
         wait_for(lambda: not labels(), 10, "empty map has no labels")
     print(
-        "Primary area names, local family overviews, grouped coverage, globe, "
+        "Primary area names, exclusive branch overviews, grouped coverage, globe, "
         "source-specific anchors, and island fallbacks passed"
     )
 

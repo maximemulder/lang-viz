@@ -133,7 +133,8 @@ def test_dataset_metadata_follows_manifest_through_bundle_install(data, tmp_path
     assert not (output / "palettes/old.json").exists()
 
 
-def test_language_labels_follow_the_active_profile_and_reject_foreign_variants(data):
+@pytest.mark.parametrize("version", [1, 3])
+def test_language_labels_follow_the_active_profile_and_reject_foreign_variants(data, version):
     manifest = release.read_json(data / "manifest.json")
     name = "language-labels/current/dataset/now.json"
     profile = manifest["geometryProfiles"][0]
@@ -144,12 +145,20 @@ def test_language_labels_follow_the_active_profile_and_reject_foreign_variants(d
     variants[0]["id"] = "variant"
     write(data, "geometry-index.json", variants)
     table = {
-        "schemaVersion": 1,
+        "schemaVersion": version,
         "archive": profile["archive"],
         "variants": {"variant": {"path": ["language"], "anchors": [[0, 0, 0.1, 3, [0]]]}},
         "handoffZooms": {},
     }
+    if version == 3:
+        table.update(revealZooms={"language": 0}, overviews={})
     assert write(data, name, table) in release.release_files(data)
+    if version == 3:
+        table["revealZooms"] = {"language": 3}
+        write(data, name, table)
+        with pytest.raises(ValueError, match="Invalid language labels"):
+            release.release_files(data)
+        table["revealZooms"] = {"language": 0}
     table["variants"]["foreign"] = table["variants"].pop("variant")
     write(data, name, table)
     with pytest.raises(ValueError, match="Invalid language labels"):

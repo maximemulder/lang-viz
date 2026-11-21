@@ -1,7 +1,7 @@
 import shapely as geos
 from shapely.geometry import MultiPolygon, Polygon, box
 
-from pipeline.atlas.labels import candidate_points, label_table, overview_points
+from pipeline.atlas.labels import candidate_points, hierarchy_zooms, label_table, overview_points
 from pipeline.atlas.topology import partition_sources, project
 from pipeline.atlas.topology_cache import GeometrySettings, ProfileCache, ProfileSource
 from pipeline.tests.test_coverage_topology import feature
@@ -71,6 +71,7 @@ def test_asset_uses_exact_variant_footprints_and_tracks_absent_lods(tmp_path, mo
     rows = table["variants"]
     assert rows["first"]["path"] == rows["second"]["path"] == ["family", "language"]
     assert table["handoffZooms"]["family"] >= 2.5
+    assert table["revealZooms"] == {"family": 0, "language": 2}
 
     def anchor_in(row, footprint):
         return footprint.covers(geos.transform(geos.Point(*row[:2]), project))
@@ -99,3 +100,32 @@ def test_overview_assets_keep_the_owners_of_a_combined_anchor(tmp_path, monkeypa
     assert abs(anchor[0] - (0.21 * 360 - 180)) < 0.05
     assert anchor[3] == 3
     assert owners == ["west"]
+
+
+def test_reveal_zooms_follow_children_readiness_and_the_parent_reveal():
+    paths = [
+        ["root", "early", "a"],
+        ["root", "early", "b"],
+        ["root", "late", "c"],
+        ["root", "late", "d"],
+        ["isolate"],
+    ]
+    reveals, handoffs = hierarchy_zooms(
+        paths,
+        {
+            "root": {"early": 0, "late": 1},
+            "early": {"a": 0.5, "b": 1},
+            "late": {"c": 1, "d": 5},
+        },
+    )
+    assert reveals == {
+        "root": 0,
+        "isolate": 0,
+        "early": 2,
+        "late": 2,
+        "a": 2.5,
+        "b": 2.5,
+        "c": 5,
+        "d": 5,
+    }
+    assert handoffs == {"root": 2.5, "early": 4, "late": 5}

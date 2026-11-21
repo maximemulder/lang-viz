@@ -1,5 +1,9 @@
 import RBush, { type BBox } from 'rbush'
-import type { LanguageLabelAnchor, LanguageLabelProfile } from '../../../data/languageLabels.ts'
+import {
+  type LanguageLabelAnchor,
+  type LanguageLabelProfile,
+  WORLD_DETAIL_ZOOM,
+} from '../../../data/languageLabels.ts'
 import type { MapArea } from '../../../domain/aggregation.ts'
 import type { Language } from '../../../domain/atlas.ts'
 
@@ -19,6 +23,7 @@ export interface LabelChoice {
 
 interface LanguageLabelNode {
   readonly language: Language
+  readonly ancestors: ReadonlySet<string>
   readonly children: Map<string, LanguageLabelNode>
   readonly primary: LabelChoice[]
   readonly overview: LabelChoice[]
@@ -140,11 +145,35 @@ export function languageLabelTree(
 ): ReadonlyMap<string, LanguageLabelNode> {
   const roots = new Map<string, LanguageLabelNode>()
   const selected = new Set(variantIds)
+  const singleArea = areas ? areas.length === 1 : selected.size === 1
   const tables = [...profiles]
   const legacy = tables.every((profile) => !profile.overviews.size)
   const representatives = new Map<LanguageLabelNode, Map<string, LanguageLabelAnchor[]>>()
   const representations = new Map<string, LabelMember[]>()
   const ancestry = new Map<string, Set<string>>()
+  const revealZoom = (node: LanguageLabelNode, profile: LanguageLabelProfile, primary: boolean) => {
+    if (isolatedLanguageId || !node.ancestors.size) return 0
+    // A focused selection can name its drawn area once the world overview ends.
+    if (primary && singleArea) return WORLD_DETAIL_ZOOM
+    const scheduled = profile.revealZooms.get(node.language.id)
+    if (scheduled !== undefined) return Math.max(WORLD_DETAIL_ZOOM, scheduled)
+    // A drawn aggregate or dialect can be missing from the compact hierarchy.
+    if (profile.revealZooms.size) {
+      for (const id of node.ancestors) {
+        const parent = profile.revealZooms.get(id)
+        if (parent !== undefined) return Math.max(WORLD_DETAIL_ZOOM, parent + 0.5)
+      }
+    }
+    return WORLD_DETAIL_ZOOM
+  }
+  const getAncestors = (id: string) => {
+    let parents = ancestry.get(id)
+    if (!parents) {
+      parents = ancestorsOf(id, languages)
+      ancestry.set(id, parents)
+    }
+    return parents
+  }
   for (const { id: areaId, languageId, variants } of areas ?? []) {
     const member = { areaId, languageId }
     for (const { id } of variants) {
@@ -166,11 +195,7 @@ export function languageLabelTree(
         const index = path.indexOf(languageId)
         let lineage = isolatedLanguageId ? [languageId] : path.slice(0, index + 1)
         if (index < 0 && !isolatedLanguageId) {
-          let parents = ancestry.get(languageId)
-          if (!parents) {
-            parents = ancestorsOf(languageId, languages)
-            ancestry.set(languageId, parents)
-          }
+          const parents = getAncestors(languageId)
           lineage = [...path.filter((id) => parents.has(id)), languageId]
         }
         let branches = roots
@@ -181,6 +206,7 @@ export function languageLabelTree(
             if (!language) break
             node = {
               language,
+              ancestors: getAncestors(id),
               children: new Map(),
               primary: [],
               overview: [],
@@ -216,9 +242,10 @@ export function languageLabelTree(
           const depth = path.indexOf(id)
           if (!known) {
             const owners = [areaId]
+            const reveal = revealZoom(node, profile, own)
             for (const [anchorOrder, anchor] of anchors.entries()) {
               // An explicitly mapped group or dialect can be absent from the compact path.
-              const minZoom = anchor[4][depth] ?? 0
+              const minZoom = Math.max(reveal, anchor[4][depth] ?? 0)
               choices.push({ variantId, anchor, minZoom, anchorOrder, owners })
             }
           }
@@ -239,9 +266,16 @@ export function languageLabelTree(
             const owners = new Set(candidates.flatMap((id) => [...(node.members.get(id) ?? [])]))
             const primaryOwners = [...owners].filter((id) => node.ownAreaIds.has(id))
             const overviewOwners = [...owners].filter((id) => !node.ownAreaIds.has(id))
-            const choice = { variantId, anchor, minZoom, anchorOrder, combined: true }
-            if (primaryOwners.length) node.primary.push({ ...choice, owners: primaryOwners })
-            if (overviewOwners.length) node.overview.push({ ...choice, owners: overviewOwners })
+            const choice = (primary: boolean, owners: string[]): LabelChoice => ({
+              variantId,
+              anchor,
+              minZoom: Math.max(minZoom, revealZoom(node, profile, primary)),
+              anchorOrder,
+              combined: true,
+              owners,
+            })
+            if (primaryOwners.length) node.primary.push(choice(true, primaryOwners))
+            if (overviewOwners.length) node.overview.push(choice(false, overviewOwners))
           }
         }
       }
@@ -267,6 +301,7 @@ interface LocalMember extends BBox, ScreenPoint {
 
 interface PlacedBox extends LabelBox {
   readonly languageId: string
+  readonly ancestors: ReadonlySet<string>
 }
 
 interface LocalOverview {
@@ -300,7 +335,7 @@ function localFootprint(
   return Math.min(clearance, radius, (radius + clearance - distance) / 2)
 }
 
-/** Compare names of drawn areas with a local roll-up of their family or branch. */
+/** Compare names of drawn areas with branch overviews across the viewport. */
 export function selectLanguageLabels(
   roots: ReadonlyMap<string, LanguageLabelNode>,
   zoom: number,
@@ -334,7 +369,9 @@ export function selectLanguageLabels(
   ) => {
     const { language } = node
     const current = placements.get(language.id)
-    if (current && overview) return
+    if (!overview && summaries.length) {
+      for (const id of node.ancestors) if (placements.get(id)?.overview) return
+    }
     const currentBox = boxes.get(language.id)
     const prior = previous.get(language.id)
     const priorChoice = prior?.overview === overview ? prior.choice : undefined
@@ -379,7 +416,12 @@ export function selectLanguageLabels(
               (nearby(box, summary.box, summary.radius) && containsMember(summary.node, owner)),
           )
       if (sharesArea) return null
-      return { box: { ...box, languageId: language.id }, displaced, choice, owner }
+      return {
+        box: { ...box, languageId: language.id, ancestors: node.ancestors },
+        displaced,
+        choice,
+        owner,
+      }
     }
     for (const [index, choice] of choices.entries()) {
       if (current && compareLanguageChoices(choice, current.choice) >= 0) continue
@@ -438,6 +480,17 @@ export function selectLanguageLabels(
   for (const { node } of primary) tryPlace(node, node.primary, false)
   if (!overviews.length) return placements
 
+  // Compact label paths can omit intermediate groups. Use catalog ancestry
+  // so independently placed names still compete at every level they share.
+  const primaryByAncestor = new Map<string, PlacedBox[]>()
+  for (const box of boxes.values()) {
+    for (const id of box.ancestors) {
+      const descendants = primaryByAncestor.get(id)
+      if (descendants) descendants.push(box)
+      else primaryByAncestor.set(id, [box])
+    }
+  }
+
   // Native-LOD anchors also give evidence for areas whose text cannot fit.
   const points: LocalMember[] = []
   const indexed = new Set<LanguageLabelNode>()
@@ -479,8 +532,18 @@ export function selectLanguageLabels(
     node: LanguageLabelNode,
     box: LabelBox,
     collisions: readonly PlacedBox[],
+    descendantNames: ReadonlySet<PlacedBox>,
   ): readonly PlacedBox[] | null => {
     const radius = overviewRadius(box)
+    if (collisions.some((other) => !descendantNames.has(other))) return null
+    let namedWeight = 0
+    for (const other of descendantNames) {
+      const label = placements.get(other.languageId)
+      if (!label || !containsMember(node, label.variantId) || !nearby(box, other, radius)) {
+        return null
+      }
+      namedWeight += localFootprint(box, other, radius, label.choice.anchor[2] * scale)
+    }
     const bounds = {
       minX: box.x - radius,
       minY: box.y - radius,
@@ -499,21 +562,11 @@ export function selectLanguageLabels(
     ) {
       return null
     }
-    const names = new Map<PlacedBox, number>()
-    for (const other of occupied.search(bounds)) {
-      if (!nearby(box, other, radius)) continue
-      const label = placements.get(other.languageId)
-      if (label && !label.overview && containsMember(node, label.variantId)) {
-        names.set(other, localFootprint(box, other, radius, label.choice.anchor[2] * scale))
-      }
-    }
-    if (collisions.some((other) => !names.has(other))) return null
-
     const unresolved = new Map<string, [MemberEvidence, MemberEvidence?]>()
     for (const member of localMembers.search(bounds)) {
       if (!containsMember(node, member.areaId) || !nearby(box, member, radius)) continue
       const named = boxes.get(member.languageId)
-      if (named && (names.has(named) || nearby(member, named, radius))) continue
+      if (named && (descendantNames.has(named) || nearby(member, named, radius))) continue
       if (
         nearbySummaries.some(
           (summary) =>
@@ -531,12 +584,12 @@ export function selectLanguageLabels(
         unresolved.set(member.languageId, [candidate, evidence[0]])
       else if (weight > (evidence[1]?.weight ?? 0)) evidence[1] = candidate
     }
-    if (unresolved.size < 2) return null
+    const requiredCount = Math.max(2, descendantNames.size + 1)
+    if (unresolved.size < requiredCount || requiredCount > MAX_MEMBER_PROBES) return null
 
     // Verify the strongest anchor per name first. Multiple components or pinned
     // variants of the same language contribute at most one sample to the score.
     const ranked = [...unresolved.values()].sort((a, b) => b[0].weight - a[0].weight)
-    const namedWeight = [...names.values()].reduce((total, weight) => total + weight, 0)
     const coversMore = (weight: number) =>
       weight > namedWeight || (weight === namedWeight && zoom < node.handoffZoom)
     const bestPossible = ranked
@@ -558,15 +611,28 @@ export function selectLanguageLabels(
           break
         }
       }
-      if (count >= 2 && coversMore(weight)) return [...names.keys()]
+      if (count >= requiredCount && coversMore(weight)) return [...descendantNames]
     }
     return null
   }
 
   let displaced = false
   for (const node of overviews) {
+    const id = node.language.id
+    if (
+      placements.has(id) ||
+      summaries.some(
+        ({ node: other }) => node.ancestors.has(other.language.id) || other.ancestors.has(id),
+      )
+    ) {
+      continue
+    }
+    const descendantNames = new Set(
+      primaryByAncestor.get(id)?.filter((box) => boxes.get(box.languageId) === box),
+    )
+    if (descendantNames.size && zoom >= node.handoffZoom) continue
     const next = tryPlace(node, node.overview, true, (box, collisions) =>
-      compareOverview(node, box, collisions),
+      compareOverview(node, box, collisions, descendantNames),
     )
     if (next) {
       displaced ||= next.displaced.length > 0

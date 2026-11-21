@@ -206,21 +206,23 @@ The shared-coverage builder is the sole language preprocessing pipeline.
 Language labels are generated from the same display geometry. Each dataset and
 period has a versioned label table beside its polygon archive, keyed by geometry
 variant ID. It stores interior anchors for significant components, the geometry
-levels that support each anchor, and nominal zooms for the family, branch, and
+levels that support each anchor, and nominal fit zooms for the family, branch, and
 language names. Language anchors favor the area centroid where it has enough
 clearance, with wider interior points available as fallbacks. The pipeline also
 builds candidate anchors from each family or branch's combined footprint.
 Cohesive areas favor their centroid. Dispersed areas favor regions with both
 substantial coverage and distinct branches. The map loads the tables for the
 pinned geometry, checks active coverage and available screen space, and tries
-another anchor when a label would collide. The map first fits the names of
-drawn areas, including explicitly grouped areas, then compares them with quieter
-family and branch overviews in each neighborhood. An overview needs at least
-two discernible unnamed members and must add more estimated local coverage than
-the names it would replace. The estimate uses screen-space interior clearance
-at verified anchors. Nominal handoff zooms order the overview candidates and
-break ties with individual names. Separate neighborhoods can show different
-levels of the same family.
+another anchor when a label would collide. Below zoom 2, the world view labels
+classification roots. Each profile also stores reveal zooms based on when
+distinct mapped children can fit, with at least a half zoom step between
+successive levels. The map fits eligible names of drawn areas first, including
+explicitly grouped areas, then compares them with quieter family and branch
+overviews. A grey overview and its descendants are mutually exclusive across
+the viewport. Before the nominal handoff, an overview can replace nearby names
+when it represents more discernible unnamed members and adds more estimated
+local coverage. The estimate uses screen-space interior clearance at verified
+anchors.
 
 To add labels to a matching local atlas build with cached geometry, run
 `uv run python -m pipeline.atlas.topology_build --labels-only --output app/public/data`.

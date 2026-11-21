@@ -13,7 +13,12 @@ import {
 const catalog = new Map(
   ['family', 'branch', 'one', 'two', 'three'].map((id) => [
     id,
-    { id, name: id, level: ['family', 'branch'].includes(id) ? 'family' : 'language' } as Language,
+    {
+      id,
+      name: id,
+      level: ['family', 'branch'].includes(id) ? 'family' : 'language',
+      parentId: id === 'family' ? null : id === 'branch' || id === 'three' ? 'family' : 'branch',
+    } as Language,
   ]),
 )
 const profile = {
@@ -76,6 +81,52 @@ test('the asset binds its archive, hierarchy, and LOD support', () => {
   assert.throws(
     () => decodeLanguageLabels({ ...profile, handoffZooms: { family: 2 } }, profile.archive),
     /Invalid language labels/,
+  )
+})
+
+test('reveal zooms hold the family at world scale and open nested labels in order', () => {
+  const reveals = { family: 0, branch: 2.5, one: 4.5, two: 4.5 }
+  const scheduled = {
+    ...profile,
+    schemaVersion: 3,
+    overviews: {},
+    revealZooms: reveals,
+  }
+  const table = decodeLanguageLabels(scheduled, profile.archive)
+  assert.throws(
+    () =>
+      decodeLanguageLabels({ ...scheduled, revealZooms: { ...reveals, one: 2 } }, profile.archive),
+    /Invalid language labels/,
+  )
+  const roots = languageLabelTree([table], catalog, ['first', 'second'])
+  const select = (zoom: number, previous = new Map()) =>
+    selectLanguageLabels(roots, zoom, 1, () => true, previous)
+  assert.deepEqual([...select(1.35).keys()], ['family'])
+  assert.deepEqual([...select(2).keys()], ['family'])
+  assert.deepEqual([...select(2.5).keys()], ['branch'])
+  assert.deepEqual([...select(4).keys()], ['branch'])
+  const detailed = select(4.5)
+  assert.deepEqual([...detailed.keys()].sort(), ['one', 'two'])
+  assert.deepEqual([...select(1.35, detailed).keys()], ['family'])
+
+  const singleArea = languageLabelTree([table], catalog, ['first'])
+  const singleLabel = selectLanguageLabels(singleArea, 4, 1, () => true, new Map())
+  assert.deepEqual([...singleLabel.keys()], ['one'])
+
+  const dialect = { id: 'dialect', name: 'Dialect', level: 'dialect', parentId: 'one' } as Language
+  const languages = new Map(catalog).set(dialect.id, dialect)
+  const areas = [
+    { id: 'first', languageId: dialect.id, variants: [{ id: 'first' }] },
+    { id: 'second', languageId: 'two', variants: [{ id: 'second' }] },
+  ] as MapArea[]
+  const withDialect = languageLabelTree([table], languages, ['first', 'second'], { areas })
+  assert.deepEqual(
+    [...selectLanguageLabels(withDialect, 4.5, 1, () => true, new Map()).keys()],
+    ['two'],
+  )
+  assert.deepEqual(
+    [...selectLanguageLabels(withDialect, 5, 1, () => true, new Map()).keys()].sort(),
+    ['dialect', 'two'],
   )
 })
 
@@ -169,12 +220,11 @@ test('a family belongs to a local cluster with multiple unresolved languages', (
     world,
     options,
   )
-  assert.deepEqual([...sparseAndDense.keys()], ['one', 'family'])
+  assert.deepEqual([...sparseAndDense.keys()], ['one'])
   assert.equal(sparseAndDense.get('one')?.overview, false)
-  assert.equal(sparseAndDense.get('family')?.overview, true)
 })
 
-test('a local overview replaces an area name only when it adds more visible coverage', () => {
+test('a broad overview can replace an area name when it adds more visible coverage before handoff', () => {
   for (const [clearance, expected] of [
     [0.06, ['one']],
     [0.02, ['family']],
@@ -183,35 +233,43 @@ test('a local overview replaces an area name only when it adds more visible cove
       {
         ...profile,
         variants: {
-          first: { path: ['family', 'one'], anchors: [[0, 0, clearance, 3, [0, 1]]] },
+          first: {
+            path: ['family', 'one'],
+            anchors: [
+              [0, 0, clearance, 3, [0, 1]],
+              [165, 0, 0.01, 3, [0, 1]],
+            ],
+          },
           second: {
             path: ['family', 'two'],
             anchors: [
-              [10, 0, 0.014, 3, [0, 3]],
-              [11, 0, 0.014, 3, [0, 3]],
+              [10, 0, 0.014, 3, [0, 4]],
+              [11, 0, 0.014, 3, [0, 4]],
             ],
           },
-          third: { path: ['family', 'three'], anchors: [[-10, 0, 0.011, 3, [0, 3]]] },
+          third: { path: ['family', 'three'], anchors: [[-10, 0, 0.011, 3, [0, 4]]] },
         },
-        handoffZooms: { family: 2 },
+        handoffZooms: { family: 3 },
       },
       profile.archive,
     )
     const tree = languageLabelTree([table], catalog, ['first', 'second', 'third'])
-    const low = selectLanguageLabels(tree, 1, 1, () => true, new Map())
+    const low = selectLanguageLabels(tree, 2, 1, () => true, new Map())
     assert.deepEqual([...low.keys()], expected)
-    const high = selectLanguageLabels(tree, 3, 1, () => true, low)
+    const atHandoff = selectLanguageLabels(tree, 3, 1, () => true, low)
+    assert.deepEqual([...atHandoff.keys()], ['one'])
+    const high = selectLanguageLabels(tree, 4, 1, () => true, low)
     assert.deepEqual([...high.keys()].sort(), ['one', 'three', 'two'])
 
     // Two polygon anchors for the same language cannot make up for hidden coverage.
-    const refined = selectLanguageLabels(tree, 1, 1, () => true, low, {
+    const refined = selectLanguageLabels(tree, 2, 1, () => true, low, {
       visibleAt: (x) => (x === 0 ? ['first'] : x > 0 ? ['second'] : []),
     })
     assert.deepEqual([...refined.keys()], ['one'])
   }
 })
 
-test('a distant name and a family overview use distinct drawn areas', () => {
+test('a distant area name takes precedence over a family overview even before handoff', () => {
   const table = decodeLanguageLabels(
     {
       ...profile,
@@ -226,17 +284,17 @@ test('a distant name and a family overview use distinct drawn areas', () => {
         second: { path: ['family', 'two'], anchors: [[155, 0, 0.01, 3, [0, 3]]] },
         third: { path: ['family', 'three'], anchors: [[160, 0, 0.01, 3, [0, 3]]] },
       },
-      handoffZooms: { family: 2 },
+      handoffZooms: { family: 2.5 },
     },
     profile.archive,
   )
   const tree = languageLabelTree([table], catalog, ['first', 'second', 'third'])
-  const labels = selectLanguageLabels(tree, 1, 1, () => true, new Map())
+  const labels = selectLanguageLabels(tree, 2, 1, () => true, new Map())
   assert.equal(labels.get('one')?.variantId, 'first')
-  assert.equal(labels.get('family')?.variantId, 'second')
+  assert.deepEqual([...labels.keys()], ['one'])
 })
 
-test('nearby ancestor overviews follow the nominal handoff even with separate unnamed members', () => {
+test('ancestor overviews follow the nominal handoff even with separate unnamed members', () => {
   const table = decodeLanguageLabels(
     {
       ...profile,
@@ -257,6 +315,46 @@ test('nearby ancestor overviews follow the nominal handoff even with separate un
   assert.deepEqual([...low.keys()], ['family'])
   const high = selectLanguageLabels(tree, 2, 1, () => true, low)
   assert.deepEqual([...high.keys()], ['branch'])
+})
+
+test('catalog ancestry excludes distant nested overviews across compact paths and allows siblings', () => {
+  const languages = new Map(catalog)
+  for (const [id, parentId] of [
+    ['subbranch', 'branch'],
+    ['sibling', 'family'],
+    ['four', 'subbranch'],
+    ['five', 'subbranch'],
+    ['six', 'sibling'],
+    ['seven', 'sibling'],
+  ]) {
+    languages.set(id, {
+      id,
+      name: id,
+      parentId,
+      level: parentId === 'subbranch' || parentId === 'sibling' ? 'language' : 'group',
+    } as Language)
+  }
+  const variants = {
+    first: { path: ['family', 'branch', 'one'], anchors: [[-100, 0, 0.02, 3, [0, 0, 4]]] },
+    second: { path: ['family', 'branch', 'two'], anchors: [[-98, 0, 0.02, 3, [0, 0, 4]]] },
+    fourth: { path: ['family', 'subbranch', 'four'], anchors: [[0, 0, 0.02, 3, [0, 0, 4]]] },
+    fifth: { path: ['family', 'subbranch', 'five'], anchors: [[2, 0, 0.02, 3, [0, 0, 4]]] },
+    sixth: { path: ['family', 'sibling', 'six'], anchors: [[100, 0, 0.02, 3, [0, 0, 4]]] },
+    seventh: { path: ['family', 'sibling', 'seven'], anchors: [[102, 0, 0.02, 3, [0, 0, 4]]] },
+  }
+  const table = decodeLanguageLabels(
+    {
+      ...profile,
+      variants,
+      handoffZooms: { family: 1, branch: 4, subbranch: 4, sibling: 4 },
+    },
+    profile.archive,
+  )
+  const tree = languageLabelTree([table], languages, Object.keys(variants))
+  const labels = selectLanguageLabels(tree, 2, 1, () => true, new Map(), {
+    point: ([x, y]) => ({ x: x * 5, y }),
+  })
+  assert.deepEqual([...labels.keys()].sort(), ['branch', 'sibling'])
 })
 
 test('a language favors its central anchor as soon as the label fits there', () => {
@@ -349,7 +447,7 @@ test('a blocked label tries spatial alternatives before making coverage queries'
       return x === 0 ? ['first', 'second'] : ['second']
     },
   }
-  const placed = placeLabels(tree, 1, 1, layout, new Map())
+  const placed = placeLabels(tree, 2, 1, layout, new Map())
   assert.equal(placed.get('two')?.choice.anchor[0], 5)
   assert.deepEqual(probes, [0, 5])
 })
@@ -370,7 +468,7 @@ test('an explicitly drawn aggregate is a primary label even outside the compact 
     variants: [{ id: 'first' }, { id: 'second' }],
   } as MapArea
   const tree = languageLabelTree([table], languages, ['first', 'second'], { areas: [area] })
-  const labels = selectLanguageLabels(tree, 1, 1, () => true, new Map())
+  const labels = selectLanguageLabels(tree, 2, 1, () => true, new Map())
   assert.deepEqual([...labels.keys()], ['aggregate'])
   assert.equal(labels.get('aggregate')?.variantId, 'drawn-aggregate')
   assert.equal(labels.get('aggregate')?.overview, false)

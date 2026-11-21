@@ -1,5 +1,7 @@
 import type { AtlasManifest } from '../domain/atlas.ts'
 
+export const WORLD_DETAIL_ZOOM = 2
+
 export type LanguageLabelAnchor = readonly [
   longitude: number,
   latitude: number,
@@ -16,6 +18,7 @@ interface VariantLabelAnchors {
 
 export interface LanguageLabelProfile {
   readonly variants: ReadonlyMap<string, VariantLabelAnchors>
+  readonly revealZooms: ReadonlyMap<string, number>
   readonly handoffZooms: ReadonlyMap<string, number>
   readonly overviews: ReadonlyMap<string, readonly OverviewAnchor[]>
 }
@@ -46,7 +49,7 @@ export function decodeLanguageLabels(value: unknown, archive: string): LanguageL
   const invalid = () => new Error(`Invalid language labels for ${archive}`)
   if (
     !record(value) ||
-    (value.schemaVersion !== 1 && value.schemaVersion !== 2) ||
+    (value.schemaVersion !== 1 && value.schemaVersion !== 2 && value.schemaVersion !== 3) ||
     value.archive !== archive ||
     !record(value.variants) ||
     !record(value.handoffZooms)
@@ -55,6 +58,7 @@ export function decodeLanguageLabels(value: unknown, archive: string): LanguageL
 
   const variants = new Map<string, VariantLabelAnchors>()
   const parents = new Set<string>()
+  const languoids = new Set<string>()
   for (const [id, row] of Object.entries(value.variants)) {
     if (!record(row)) throw invalid()
     const { path, anchors } = row
@@ -71,6 +75,27 @@ export function decodeLanguageLabels(value: unknown, archive: string): LanguageL
       throw invalid()
     variants.set(id, { path, anchors })
     for (const node of path.slice(0, -1)) parents.add(node)
+    for (const node of path) languoids.add(node)
+  }
+
+  const revealZooms = new Map<string, number>()
+  if (value.schemaVersion === 3) {
+    if (!record(value.revealZooms)) throw invalid()
+    for (const [id, zoom] of Object.entries(value.revealZooms)) {
+      if (!languoids.delete(id) || !number(zoom, 0, 12)) throw invalid()
+      revealZooms.set(id, zoom)
+    }
+    if (languoids.size) throw invalid()
+    for (const { path } of variants.values()) {
+      let parentZoom = -1
+      for (const id of path) {
+        const zoom = revealZooms.get(id) ?? -1
+        if (parentZoom < 0 ? zoom !== 0 : zoom < WORLD_DETAIL_ZOOM || zoom <= parentZoom) {
+          throw invalid()
+        }
+        parentZoom = zoom
+      }
+    }
   }
 
   const handoffZooms = new Map<string, number>()
@@ -80,7 +105,7 @@ export function decodeLanguageLabels(value: unknown, archive: string): LanguageL
   }
   if (parents.size) throw invalid()
   const overviews = new Map<string, readonly OverviewAnchor[]>()
-  if (value.schemaVersion === 2) {
+  if (value.schemaVersion >= 2) {
     if (!record(value.overviews)) throw invalid()
     for (const [id, rows] of Object.entries(value.overviews)) {
       if (
@@ -107,7 +132,7 @@ export function decodeLanguageLabels(value: unknown, archive: string): LanguageL
       overviews.set(id, rows)
     }
   }
-  return { variants, handoffZooms, overviews }
+  return { variants, revealZooms, handoffZooms, overviews }
 }
 
 const requests = new Map<string, Promise<LanguageLabelProfile>>()

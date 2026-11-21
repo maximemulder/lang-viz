@@ -25,9 +25,10 @@ from pipeline.atlas.topology_cache import (
     fingerprint,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PLACEMENT_VERSION = 5
 MAX_LABEL_ZOOM = 12
+WORLD_DETAIL_ZOOM = 2.0
 COMPONENT_LIMIT = 12
 OVERVIEW_LIMIT = 16
 
@@ -266,6 +267,30 @@ def minimum_zoom(name: str, radius: float, overview: bool) -> float:
     return max(0, math.ceil(2 * math.log2(required / (512 * radius))) / 2)
 
 
+def hierarchy_zooms(
+    paths: list[list[str]], child_zooms: dict[str, dict[str, float]]
+) -> tuple[dict[str, float], dict[str, float]]:
+    roots = {path[0] for path in paths}
+    reveal_zooms = {root: 0.0 for root in sorted(roots)}
+    children_reveal_zooms: dict[str, float] = {}
+    handoffs: dict[str, float] = {}
+    for parent, children in sorted(child_zooms.items()):
+        zooms = sorted(children.values())
+        # A single large area cannot open a branch with multiple mapped children.
+        early_child = min(1, len(zooms) - 1)
+        children_reveal_zooms[parent] = min(9, max(WORLD_DETAIL_ZOOM, zooms[early_child]))
+        handoffs[parent] = min(
+            9, max(2.5 if parent in roots else 4, zooms[max(early_child, len(zooms) // 4)])
+        )
+
+    # Keep each intermediate level eligible for at least half a zoom step.
+    for path in sorted(paths, key=len):
+        for parent, child in pairwise(path):
+            reveal = max(children_reveal_zooms[parent], reveal_zooms[parent] + 0.5)
+            reveal_zooms[child] = max(reveal_zooms.get(child, 0), reveal)
+    return reveal_zooms, handoffs
+
+
 def label_table(store: ProfileCache, max_zoom: int, catalog: Catalog) -> dict[str, Any]:
     detailed, _ = store.get_or_build_lod(max_zoom)
     geometries = language_geometries(detailed)
@@ -334,7 +359,6 @@ def label_table(store: ProfileCache, max_zoom: int, catalog: Catalog) -> dict[st
     anchors: dict[str, list[Anchor]] = defaultdict(list)
     overviews: dict[str, list[tuple[Anchor, list[str]]]] = defaultdict(list)
     child_zooms: dict[str, dict[str, float]] = defaultdict(dict)
-    roots: set[str] = set()
     for index, ((variant, point, radius, zooms), mask) in enumerate(
         zip(candidates, masks, strict=True)
     ):
@@ -348,21 +372,16 @@ def label_table(store: ProfileCache, max_zoom: int, catalog: Catalog) -> dict[st
             continue
         anchors[variant].append(anchor)
         path = paths[variant]
-        roots.add(path[0])
         for i, (parent, child) in enumerate(pairwise(path), start=1):
             by_child = child_zooms[parent]
             by_child[child] = min(by_child.get(child, math.inf), zooms[i])
 
-    # The lower quartile gives early readable children a chance while a dense branch
-    # keeps its overview longer. The viewport can retain a parent with no usable child.
-    handoffs: dict[str, float] = {}
-    for parent, children in sorted(child_zooms.items()):
-        zooms = sorted(children.values())
-        handoffs[parent] = min(9, max(2.5 if parent in roots else 4, zooms[len(zooms) // 4]))
+    reveals, handoffs = hierarchy_zooms([paths[variant] for variant in anchors], child_zooms)
     return {
         "variants": {
             variant: {"path": paths[variant], "anchors": rows} for variant, rows in anchors.items()
         },
+        "revealZooms": reveals,
         "handoffZooms": handoffs,
         "overviews": {group: rows for group, rows in overviews.items() if group in handoffs},
     }
