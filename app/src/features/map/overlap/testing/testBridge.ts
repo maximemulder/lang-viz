@@ -286,6 +286,7 @@ export const installOverlapTestApi = (
                     labelId: feature.properties.labelId,
                     labelName: feature.properties.labelName,
                     variantId: feature.properties.variantId,
+                    overview: feature.properties.overview,
                     coordinates: feature.geometry.coordinates,
                   },
                 ]

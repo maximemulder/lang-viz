@@ -13,7 +13,12 @@ export type MapIsolation = {
   readonly label: string
   readonly cameraRequest: object
 } & (
-  | { readonly kind: 'language'; readonly variantIds: readonly string[]; readonly color: string }
+  | {
+      readonly kind: 'language'
+      readonly languageId: string
+      readonly variantIds: readonly string[]
+      readonly color: string
+    }
   | { readonly kind: 'region'; readonly featureIds: readonly string[] }
 )
 

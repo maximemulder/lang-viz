@@ -6,13 +6,13 @@ import {
   type LanguageLabelProfile,
   loadLanguageLabels,
 } from '../../../data/languageLabels.ts'
+import type { MapArea } from '../../../domain/aggregation.ts'
 import type { AtlasData } from '../../../domain/atlas.ts'
 import { type GeometryDisplayState, geometryDisplay } from '../geometry/display.ts'
 import { visibleColorLayers, visibleVariantIds } from '../inspection.ts'
 import { type OverlapSelection, parseOverlapSelection } from '../overlap/types.ts'
 import { labelViewport } from './labelViewport.ts'
 import {
-  type LanguageLabelNode,
   languageLabelTree,
   type PlacedLanguageLabel,
   selectLanguageLabels,
@@ -21,7 +21,7 @@ import { MapLabelLayer } from './MapLabelLayer.tsx'
 
 type Labels = FeatureCollection<
   Point,
-  { labelId: string; labelName: string; labelRank: number; variantId: string }
+  { labelId: string; labelName: string; labelRank: number; variantId: string; overview: boolean }
 >
 
 const ISOLATION_LAYER = 'isolated-language-fill'
@@ -74,22 +74,32 @@ function useLabelProfiles(data: AtlasData, variantIds: readonly string[]) {
 
 export function LanguageLabels({
   data,
+  areas,
   selectionKey,
-  isolatedIds,
+  isolation,
 }: {
   readonly data: AtlasData
+  readonly areas: readonly MapArea[]
   readonly selectionKey: string
-  readonly isolatedIds?: readonly string[] | undefined
+  readonly isolation: { readonly languageId: string; readonly variantIds: readonly string[] } | null
 }) {
   const map = useMap().current?.getMap()
+  const isolatedIds = isolation?.variantIds
+  const isolatedLanguageId = isolation?.languageId
   const selection = useMemo<OverlapSelection>(
     () => (isolatedIds ? { variantIds: isolatedIds } : parseOverlapSelection(selectionKey)),
     [isolatedIds, selectionKey],
   )
   const profiles = useLabelProfiles(data, selection.variantIds)
   const roots = useMemo(
-    () => languageLabelTree(profiles, data.languageById, selection.variantIds, !!isolatedIds),
-    [profiles, data, selection.variantIds, isolatedIds],
+    () =>
+      languageLabelTree(
+        profiles,
+        data.languageById,
+        selection.variantIds,
+        isolatedLanguageId ? { isolatedLanguageId } : { areas },
+      ),
+    [profiles, data, selection.variantIds, isolatedLanguageId, areas],
   )
   const previous = useRef<ReadonlyMap<string, PlacedLanguageLabel>>(new Map())
   const [placed, setPlaced] = useState<{ selection: OverlapSelection; labels: Labels } | null>(null)
@@ -134,11 +144,9 @@ export function LanguageLabels({
       // coverage and camera. Recheck when the committed tiles or their readiness change.
       if (lastLayout?.geometry === geometry && lastLayout.inputs === inputs) return
       lastLayout = { geometry, inputs }
-      const viewport = labelViewport(map, context)
+      const { screenPoint, textBox } = labelViewport(map, context)
       const probeStride = 2 * canvas.clientWidth + 1
       const ownership = new Map<number, readonly string[]>()
-      const groupOwners = new Map<LanguageLabelNode, ReadonlySet<string>>()
-      const owners = (id: string) => selection.variantGroups?.[id] ?? [id]
       const visibleAt = (x: number, y: number) => {
         const key = Math.round(x * 2) + Math.round(y * 2) * probeStride
         const cached = ownership.get(key)
@@ -161,33 +169,10 @@ export function LanguageLabels({
             zoom,
             lod,
             {
-              project: (language, { anchor }) =>
-                viewport(
-                  anchor,
-                  language.name,
-                  language.level === 'family' || language.level === 'group',
-                ),
-              owner: (node, choice, { x, y, minX, maxX }) => {
-                const visible = visibleAt(x, y)
-                const owner = (choice.owners ?? [choice.variantId]).find((id) =>
-                  owners(id).some((expected) => visible.includes(expected)),
-                )
-                if (!owner || !choice.owners) return owner
-
-                // A combined anchor uses the whole profile for its clearance.
-                // Check that selected members also support its immediate surroundings.
-                let expected = groupOwners.get(node)
-                if (!expected) {
-                  expected = new Set([...node.variants].flatMap(owners))
-                  groupOwners.set(node, expected)
-                }
-                const offset = (maxX - minX) * 0.24
-                return [x - offset, x + offset].some((sample) =>
-                  visibleAt(sample, y).some((id) => expected.has(id)),
-                )
-                  ? owner
-                  : undefined
-              },
+              point: screenPoint,
+              project: (language, { anchor }, spansAreas) =>
+                textBox(anchor, language.name, spansAreas),
+              visibleAt,
             },
             before,
           )
@@ -195,26 +180,31 @@ export function LanguageLabels({
       previous.current = next
       const unchanged =
         before.size === next.size &&
-        [...next].every(([id, { choice, variantId }]) => {
+        [...next].every(([id, { choice, variantId, overview }]) => {
           const prior = before.get(id)
-          return prior?.choice === choice && prior.variantId === variantId
+          return (
+            prior?.choice === choice && prior.variantId === variantId && prior.overview === overview
+          )
         })
       if (unchanged) return
       setPlaced({
         selection,
         labels: {
           type: 'FeatureCollection',
-          features: [...next.values()].map(({ language, choice: { anchor }, variantId }, rank) => ({
-            type: 'Feature',
-            id: language.id,
-            geometry: { type: 'Point', coordinates: [anchor[0], anchor[1]] },
-            properties: {
-              labelId: language.id,
-              labelName: language.name,
-              labelRank: rank,
-              variantId,
-            },
-          })),
+          features: [...next.values()].map(
+            ({ language, choice: { anchor }, variantId, overview }, rank) => ({
+              type: 'Feature',
+              id: language.id,
+              geometry: { type: 'Point', coordinates: [anchor[0], anchor[1]] },
+              properties: {
+                labelId: language.id,
+                labelName: language.name,
+                labelRank: rank + (overview ? next.size : 0),
+                variantId,
+                overview,
+              },
+            }),
+          ),
         },
       })
     }

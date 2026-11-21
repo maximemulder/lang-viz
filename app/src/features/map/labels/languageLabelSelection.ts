@@ -1,21 +1,30 @@
 import RBush, { type BBox } from 'rbush'
 import type { LanguageLabelAnchor, LanguageLabelProfile } from '../../../data/languageLabels.ts'
+import type { MapArea } from '../../../domain/aggregation.ts'
 import type { Language } from '../../../domain/atlas.ts'
+
+interface LabelMember {
+  readonly areaId: string
+  readonly languageId: string
+}
 
 export interface LabelChoice {
   readonly variantId: string
   readonly anchor: LanguageLabelAnchor
   readonly minZoom: number
   readonly anchorOrder: number
-  readonly owners?: readonly string[]
+  readonly owners: readonly string[]
+  readonly combined?: boolean
 }
 
-export interface LanguageLabelNode {
+interface LanguageLabelNode {
   readonly language: Language
   readonly children: Map<string, LanguageLabelNode>
-  readonly choices: LabelChoice[]
-  readonly endpoints: Set<string>
-  readonly variants: Set<string>
+  readonly primary: LabelChoice[]
+  readonly overview: LabelChoice[]
+  readonly members: Map<string, Set<string>>
+  readonly areaIds: Set<string>
+  readonly ownAreaIds: Set<string>
   handoffZoom: number
 }
 
@@ -23,16 +32,20 @@ export interface PlacedLanguageLabel {
   readonly language: Language
   readonly choice: LabelChoice
   readonly variantId: string
+  readonly overview: boolean
 }
 
-export interface LabelBox extends BBox {
+interface ScreenPoint {
   readonly x: number
   readonly y: number
 }
 
+export interface LabelBox extends BBox, ScreenPoint {}
+
 export interface LabelLayout {
-  project(language: Language, choice: LabelChoice): LabelBox | null
-  owner(node: LanguageLabelNode, choice: LabelChoice, box: LabelBox): string | undefined
+  point(anchor: LanguageLabelAnchor): ScreenPoint | null
+  project(language: Language, choice: LabelChoice, spansAreas: boolean): LabelBox | null
+  visibleAt(x: number, y: number): readonly string[]
 }
 
 type Direction = readonly [x: number, y: number, z: number]
@@ -96,22 +109,50 @@ function rankOverviewChoices(
 }
 
 const compareLanguageChoices = (a: LabelChoice, b: LabelChoice) =>
-  Number(!a.owners) - Number(!b.owners) ||
+  Number(!!b.combined) - Number(!!a.combined) ||
   a.anchorOrder - b.anchorOrder ||
   b.anchor[2] - a.anchor[2] ||
   a.variantId.localeCompare(b.variantId)
+
+function ancestorsOf(id: string, languages: ReadonlyMap<string, Language>) {
+  const ancestors = new Set<string>()
+  for (
+    let parent = languages.get(id)?.parentId;
+    parent && !ancestors.has(parent);
+    parent = languages.get(parent)?.parentId
+  ) {
+    ancestors.add(parent)
+  }
+  return ancestors
+}
 
 export function languageLabelTree(
   profiles: Iterable<LanguageLabelProfile>,
   languages: ReadonlyMap<string, Language>,
   variantIds: readonly string[],
-  isolated: boolean,
+  {
+    areas,
+    isolatedLanguageId,
+  }: {
+    readonly areas?: readonly MapArea[]
+    readonly isolatedLanguageId?: string
+  } = {},
 ): ReadonlyMap<string, LanguageLabelNode> {
   const roots = new Map<string, LanguageLabelNode>()
   const selected = new Set(variantIds)
   const tables = [...profiles]
   const legacy = tables.every((profile) => !profile.overviews.size)
-  const members = new Map<LanguageLabelNode, Map<string, LanguageLabelAnchor[]>>()
+  const representatives = new Map<LanguageLabelNode, Map<string, LanguageLabelAnchor[]>>()
+  const representations = new Map<string, LabelMember[]>()
+  const ancestry = new Map<string, Set<string>>()
+  for (const { id: areaId, languageId, variants } of areas ?? []) {
+    const member = { areaId, languageId }
+    for (const { id } of variants) {
+      const list = representations.get(id)
+      if (list) list.push(member)
+      else representations.set(id, [member])
+    }
+  }
   for (const profile of tables) {
     for (const variantId of selected) {
       const variant = profile.variants.get(variantId)
@@ -119,70 +160,147 @@ export function languageLabelTree(
       const { path, anchors } = variant
       const endpoint = path.at(-1)
       if (!endpoint) continue
-      let branches = roots
-      for (const [depth, id] of path.entries()) {
-        if (isolated && id !== endpoint) continue
-        let node = branches.get(id)
-        if (!node) {
-          const language = languages.get(id)
-          if (!language) break
-          node = {
-            language,
-            children: new Map(),
-            choices: [],
-            endpoints: new Set(),
-            variants: new Set(),
-            handoffZoom: Infinity,
+      for (const { areaId, languageId } of representations.get(variantId) ?? [
+        { areaId: variantId, languageId: isolatedLanguageId ?? endpoint },
+      ]) {
+        const index = path.indexOf(languageId)
+        let lineage = isolatedLanguageId ? [languageId] : path.slice(0, index + 1)
+        if (index < 0 && !isolatedLanguageId) {
+          let parents = ancestry.get(languageId)
+          if (!parents) {
+            parents = ancestorsOf(languageId, languages)
+            ancestry.set(languageId, parents)
           }
-          branches.set(id, node)
-          members.set(node, new Map())
+          lineage = [...path.filter((id) => parents.has(id)), languageId]
         }
-        node.endpoints.add(endpoint)
-        node.variants.add(variantId)
-        if (id !== endpoint) {
-          node.handoffZoom = Math.min(node.handoffZoom, profile.handoffZooms.get(id) ?? Infinity)
-          const representatives = legacy ? members.get(node) : undefined
-          const primary = anchors[0]
-          if (representatives && primary) {
-            const byEndpoint = representatives.get(endpoint)
-            if (byEndpoint) byEndpoint.push(primary)
-            else representatives.set(endpoint, [primary])
+        let branches = roots
+        for (const id of lineage) {
+          let node = branches.get(id)
+          if (!node) {
+            const language = languages.get(id)
+            if (!language) break
+            node = {
+              language,
+              children: new Map(),
+              primary: [],
+              overview: [],
+              members: new Map(),
+              areaIds: new Set(),
+              ownAreaIds: new Set(),
+              handoffZoom: Infinity,
+            }
+            branches.set(id, node)
+            representatives.set(node, new Map())
           }
+          const own = id === languageId
+          let areaIds = node.members.get(variantId)
+          if (!areaIds) {
+            areaIds = new Set()
+            node.members.set(variantId, areaIds)
+          }
+          const known = areaIds.has(areaId)
+          areaIds.add(areaId)
+          node.areaIds.add(areaId)
+          if (own) node.ownAreaIds.add(areaId)
+          if (!own) {
+            node.handoffZoom = Math.min(node.handoffZoom, profile.handoffZooms.get(id) ?? Infinity)
+            const byLanguage = legacy ? representatives.get(node) : undefined
+            const primary = anchors[0]
+            if (byLanguage && primary && !known) {
+              const list = byLanguage.get(languageId)
+              if (list) list.push(primary)
+              else byLanguage.set(languageId, [primary])
+            }
+          }
+          const choices = own ? node.primary : node.overview
+          const depth = path.indexOf(id)
+          if (!known) {
+            const owners = [areaId]
+            for (const [anchorOrder, anchor] of anchors.entries()) {
+              // An explicitly mapped group or dialect can be absent from the compact path.
+              const minZoom = anchor[4][depth] ?? 0
+              choices.push({ variantId, anchor, minZoom, anchorOrder, owners })
+            }
+          }
+          branches = node.children
         }
-        for (const [anchorOrder, anchor] of anchors.entries()) {
-          const minZoom = anchor[4][depth]
-          if (minZoom !== undefined) node.choices.push({ variantId, anchor, minZoom, anchorOrder })
-        }
-        branches = node.children
       }
     }
   }
-  for (const [node, representatives] of members) {
-    if (
-      !isolated &&
-      (node.children.size || node.language.level === 'family' || node.language.level === 'group')
-    ) {
+  for (const [node, byLanguage] of representatives) {
+    if (node.children.size || node.language.level === 'family' || node.language.level === 'group') {
       for (const profile of tables) {
         for (const [anchorOrder, [anchor, candidates]] of (
           profile.overviews.get(node.language.id) ?? []
         ).entries()) {
-          const owners = candidates.filter((id) => node.variants.has(id))
-          const variantId = owners[0]
+          const variantId = candidates.find((id) => node.members.has(id))
           const minZoom = anchor[4][0]
           if (variantId !== undefined && minZoom !== undefined) {
-            node.choices.push({ variantId, anchor, minZoom, anchorOrder, owners })
+            const owners = new Set(candidates.flatMap((id) => [...(node.members.get(id) ?? [])]))
+            const primaryOwners = [...owners].filter((id) => node.ownAreaIds.has(id))
+            const overviewOwners = [...owners].filter((id) => !node.ownAreaIds.has(id))
+            const choice = { variantId, anchor, minZoom, anchorOrder, combined: true }
+            if (primaryOwners.length) node.primary.push({ ...choice, owners: primaryOwners })
+            if (overviewOwners.length) node.overview.push({ ...choice, owners: overviewOwners })
           }
         }
       }
     }
-    if (representatives.size > 1) {
-      rankOverviewChoices(node.choices, representatives)
-    } else node.choices.sort(compareLanguageChoices)
+    node.primary.sort(compareLanguageChoices)
+    if (byLanguage.size > 1) rankOverviewChoices(node.overview, byLanguage)
+    else node.overview.sort(compareLanguageChoices)
   }
   return roots
 }
 
-/** Descend on schedule. A parent is a local fallback for a group of selected endpoints. */
+// An overview describes a cluster at the scale of a few label widths on screen.
+const MIN_OVERVIEW_RADIUS = 128
+const MAX_MEMBER_PROBES = 8
+// A tiny fragment can be drawn without being discernible on the map.
+const MIN_MEMBER_RADIUS_PX = 2
+
+interface LocalMember extends BBox, ScreenPoint {
+  readonly languageId: string
+  readonly areaId: string
+  readonly clearance: number
+}
+
+interface PlacedBox extends LabelBox {
+  readonly languageId: string
+}
+
+interface LocalOverview {
+  readonly box: LabelBox
+  readonly radius: number
+  readonly node: LanguageLabelNode
+  readonly owner: string
+}
+
+interface MemberEvidence {
+  readonly member: LocalMember
+  readonly weight: number
+}
+
+const nearby = (a: ScreenPoint, b: ScreenPoint, radius: number) =>
+  (a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= radius ** 2
+
+const overviewRadius = (box: LabelBox) => Math.max(MIN_OVERVIEW_RADIUS, box.maxX - box.minX)
+const containsMember = (node: LanguageLabelNode, areaId: string) =>
+  node.areaIds.has(areaId) && !node.ownAreaIds.has(areaId)
+
+function localFootprint(
+  center: ScreenPoint,
+  member: ScreenPoint,
+  radius: number,
+  clearance: number,
+) {
+  // Use the radius of the interior disk clipped to this neighborhood as a
+  // size proxy. Linear weights keep a large area from dwarfing several smaller ones.
+  const distance = Math.hypot(center.x - member.x, center.y - member.y)
+  return Math.min(clearance, radius, (radius + clearance - distance) / 2)
+}
+
+/** Compare names of drawn areas with a local roll-up of their family or branch. */
 export function selectLanguageLabels(
   roots: ReadonlyMap<string, LanguageLabelNode>,
   zoom: number,
@@ -191,65 +309,275 @@ export function selectLanguageLabels(
   previous: ReadonlyMap<string, PlacedLanguageLabel>,
 ): Map<string, PlacedLanguageLabel> {
   const placements = new Map<string, PlacedLanguageLabel>()
-  const boxes = new Map<string, LabelBox>()
-  const occupied = new RBush<LabelBox>()
-  const ordered = (nodes: ReadonlyMap<string, LanguageLabelNode>) =>
-    [...nodes.values()].sort((a, b) => b.endpoints.size - a.endpoints.size)
-  const visit = (node: LanguageLabelNode): boolean => {
-    const { choices, language } = node
-    const visitChildren = () => {
-      let placed = false
-      for (const child of ordered(node.children)) if (visit(child)) placed = true
-      return placed
-    }
+  const boxes = new Map<string, PlacedBox>()
+  const primaryNamesByArea = new Map<string, string>()
+  const occupied = new RBush<PlacedBox>()
+  const lodBit = 1 << lod
+  const scale = 512 * 2 ** zoom
+  const summaries: LocalOverview[] = []
+  const supportsLod = ({ anchor }: LabelChoice) => Boolean(anchor[3] & lodBit)
+  const project = (node: LanguageLabelNode, choice: LabelChoice, overview: boolean) => {
+    if (zoom < choice.minZoom || !supportsLod(choice)) return null
+    const level = node.language.level
+    return layout.project(
+      node.language,
+      choice,
+      overview || level === 'family' || level === 'group',
+    )
+  }
 
-    if (node.children.size && node.endpoints.size === 1) return visitChildren()
-
-    const childrenFirst = zoom >= node.handoffZoom
-    if (childrenFirst && visitChildren()) return true
-
+  const tryPlace = (
+    node: LanguageLabelNode,
+    choices: readonly LabelChoice[],
+    overview: boolean,
+    resolve?: (box: LabelBox, collisions: readonly PlacedBox[]) => readonly PlacedBox[] | null,
+  ) => {
+    const { language } = node
     const current = placements.get(language.id)
+    if (current && overview) return
     const currentBox = boxes.get(language.id)
-    const prior = previous.get(language.id)?.choice
-    const available = (choice: LabelChoice) => {
-      if (zoom < choice.minZoom || !(choice.anchor[3] & (1 << lod))) return null
-      const box = layout.project(language, choice)
-      if (!box) return null
-      const collides = currentBox
-        ? occupied.search(box).some((other) => other !== currentBox)
-        : occupied.collides(box)
-      if (collides) return null
-      return box
-    }
-    for (const [index, candidate] of choices.entries()) {
-      const box = available(candidate)
-      if (!box) continue
-      const variantId = layout.owner(node, candidate, box)
-      if (!variantId) continue
-      let placement = { language, choice: candidate, variantId }
-      let nextBox = box
+    const prior = previous.get(language.id)
+    const priorChoice = prior?.overview === overview ? prior.choice : undefined
+    const verifiedOwner = (choice: LabelChoice, { x, y, minX, maxX }: LabelBox) => {
+      const visible = layout.visibleAt(x, y)
+      const owner = choice.owners.find((id) => visible.includes(id))
+      if (!owner || !choice.combined) return owner
 
-      // Hold a nearby previous anchor when it differs by only one place in the ranking.
-      if (prior && prior !== candidate && choices[index + 1] === prior) {
-        const priorBox = available(prior)
-        if (priorBox && Math.hypot(box.x - priorBox.x, box.y - priorBox.y) <= 12) {
-          const owner = layout.owner(node, prior, priorBox)
-          if (owner) {
-            placement = { language, choice: prior, variantId: owner }
-            nextBox = priorBox
-          }
+      // A combined anchor's offline clearance may include unselected shapes.
+      const offset = (maxX - minX) * 0.24
+      const expected = overview ? node.areaIds : node.ownAreaIds
+      return [x - offset, x + offset].some((sample) =>
+        layout.visibleAt(sample, y).some((id) => expected.has(id)),
+      )
+        ? owner
+        : undefined
+    }
+    const candidate = (choice: LabelChoice) => {
+      const box = project(node, choice, overview)
+      if (!box) return null
+      let displaced: readonly PlacedBox[] = []
+      if (resolve) {
+        const resolved = resolve(box, occupied.search(box))
+        if (!resolved) return null
+        displaced = resolved
+      } else if (
+        currentBox
+          ? occupied.search(box).some((other) => other !== currentBox)
+          : occupied.collides(box)
+      ) {
+        return null
+      }
+      const owner = verifiedOwner(choice, box)
+      if (!owner) return null
+      // An overview anchored in an already named area reads as a second name for it.
+      const primaryName = primaryNamesByArea.get(owner)
+      const sharesArea = overview
+        ? primaryName !== undefined && !displaced.some((other) => other.languageId === primaryName)
+        : summaries.some(
+            (summary) =>
+              summary.owner === owner ||
+              (nearby(box, summary.box, summary.radius) && containsMember(summary.node, owner)),
+          )
+      if (sharesArea) return null
+      return { box: { ...box, languageId: language.id }, displaced, choice, owner }
+    }
+    for (const [index, choice] of choices.entries()) {
+      if (current && compareLanguageChoices(choice, current.choice) >= 0) continue
+      let next = candidate(choice)
+      if (!next) continue
+      // Retain the old anchor only when it is a near-equivalent candidate.
+      if (priorChoice && choices[index + 1] === priorChoice && !next.displaced.length) {
+        const priorCandidate = candidate(priorChoice)
+        if (
+          priorCandidate &&
+          !priorCandidate.displaced.length &&
+          nearby(next.box, priorCandidate.box, 12) &&
+          (!current || compareLanguageChoices(priorChoice, current.choice) < 0)
+        ) {
+          next = priorCandidate
         }
       }
-      if (!current || compareLanguageChoices(placement.choice, current.choice) < 0) {
-        if (currentBox) occupied.remove(currentBox)
-        occupied.insert(nextBox)
-        boxes.set(language.id, nextBox)
-        placements.set(language.id, placement)
+      if (currentBox) occupied.remove(currentBox)
+      for (const box of next.displaced) {
+        const area = placements.get(box.languageId)?.variantId
+        if (area !== undefined) primaryNamesByArea.delete(area)
+        occupied.remove(box)
+        boxes.delete(box.languageId)
+        placements.delete(box.languageId)
       }
-      return true
+      if (current) primaryNamesByArea.delete(current.variantId)
+      if (!overview) primaryNamesByArea.set(next.owner, language.id)
+      occupied.insert(next.box)
+      boxes.set(language.id, next.box)
+      placements.set(language.id, {
+        language,
+        choice: next.choice,
+        variantId: next.owner,
+        overview,
+      })
+      return next
     }
-    return !!current || (!childrenFirst && visitChildren())
   }
-  for (const root of ordered(roots)) visit(root)
+
+  const primary: { node: LanguageLabelNode; clearance: number }[] = []
+  const overviews: LanguageLabelNode[] = []
+  const collect = (node: LanguageLabelNode) => {
+    const eligible = node.primary.find((choice) => project(node, choice, false))
+    if (eligible) primary.push({ node, clearance: eligible.anchor[2] })
+    const childrenFirst = zoom >= node.handoffZoom
+    if (childrenFirst) for (const child of node.children.values()) collect(child)
+    if (node.overview.length && node.areaIds.size > 1) overviews.push(node)
+    if (!childrenFirst) for (const child of node.children.values()) collect(child)
+  }
+  for (const root of roots.values()) collect(root)
+
+  // For competing area names, give the larger interior first choice of space.
+  primary.sort(
+    (a, b) => b.clearance - a.clearance || a.node.language.id.localeCompare(b.node.language.id),
+  )
+  for (const { node } of primary) tryPlace(node, node.primary, false)
+  if (!overviews.length) return placements
+
+  // Native-LOD anchors also give evidence for areas whose text cannot fit.
+  const points: LocalMember[] = []
+  const indexed = new Set<LanguageLabelNode>()
+  const minClearance = MIN_MEMBER_RADIUS_PX / scale
+  const indexMembers = (node: LanguageLabelNode) => {
+    if (indexed.has(node)) return
+    indexed.add(node)
+    for (const choice of node.primary) {
+      if (choice.combined || !supportsLod(choice) || choice.anchor[2] < minClearance) continue
+      const point = layout.point(choice.anchor)
+      const areaId = choice.owners[0]
+      if (point && areaId !== undefined) {
+        const { x, y } = point
+        points.push({
+          x,
+          y,
+          minX: x,
+          maxX: x,
+          minY: y,
+          maxY: y,
+          areaId,
+          languageId: node.language.id,
+          clearance: choice.anchor[2] * scale,
+        })
+      }
+    }
+    for (const child of node.children.values()) indexMembers(child)
+  }
+  for (const root of overviews) indexMembers(root)
+  const localMembers = new RBush<LocalMember>().load(points)
+
+  const competingAreas = (a: LanguageLabelNode, b: LanguageLabelNode) => {
+    const [smaller, larger] = a.areaIds.size <= b.areaIds.size ? [a, b] : [b, a]
+    for (const id of smaller.areaIds) if (larger.areaIds.has(id)) return true
+    return false
+  }
+
+  const compareOverview = (
+    node: LanguageLabelNode,
+    box: LabelBox,
+    collisions: readonly PlacedBox[],
+  ): readonly PlacedBox[] | null => {
+    const radius = overviewRadius(box)
+    const bounds = {
+      minX: box.x - radius,
+      minY: box.y - radius,
+      maxX: box.x + radius,
+      maxY: box.y + radius,
+    }
+    const nearbySummaries = summaries.filter(({ box: other, radius: otherRadius }) =>
+      nearby(box, other, radius + otherRadius),
+    )
+    if (
+      nearbySummaries.some(
+        (other) =>
+          nearby(box, other.box, Math.max(radius, other.radius)) &&
+          competingAreas(node, other.node),
+      )
+    ) {
+      return null
+    }
+    const names = new Map<PlacedBox, number>()
+    for (const other of occupied.search(bounds)) {
+      if (!nearby(box, other, radius)) continue
+      const label = placements.get(other.languageId)
+      if (label && !label.overview && containsMember(node, label.variantId)) {
+        names.set(other, localFootprint(box, other, radius, label.choice.anchor[2] * scale))
+      }
+    }
+    if (collisions.some((other) => !names.has(other))) return null
+
+    const unresolved = new Map<string, [MemberEvidence, MemberEvidence?]>()
+    for (const member of localMembers.search(bounds)) {
+      if (!containsMember(node, member.areaId) || !nearby(box, member, radius)) continue
+      const named = boxes.get(member.languageId)
+      if (named && (names.has(named) || nearby(member, named, radius))) continue
+      if (
+        nearbySummaries.some(
+          (summary) =>
+            containsMember(summary.node, member.areaId) &&
+            nearby(summary.box, member, summary.radius),
+        )
+      ) {
+        continue
+      }
+      const weight = localFootprint(box, member, radius, member.clearance)
+      const evidence = unresolved.get(member.languageId)
+      const candidate = { member, weight }
+      if (!evidence) unresolved.set(member.languageId, [candidate])
+      else if (weight > evidence[0].weight)
+        unresolved.set(member.languageId, [candidate, evidence[0]])
+      else if (weight > (evidence[1]?.weight ?? 0)) evidence[1] = candidate
+    }
+    if (unresolved.size < 2) return null
+
+    // Verify the strongest anchor per name first. Multiple components or pinned
+    // variants of the same language contribute at most one sample to the score.
+    const ranked = [...unresolved.values()].sort((a, b) => b[0].weight - a[0].weight)
+    const namedWeight = [...names.values()].reduce((total, weight) => total + weight, 0)
+    const coversMore = (weight: number) =>
+      weight > namedWeight || (weight === namedWeight && zoom < node.handoffZoom)
+    const bestPossible = ranked
+      .slice(0, MAX_MEMBER_PROBES)
+      .reduce((total, [best]) => total + best.weight, 0)
+    if (!coversMore(bestPossible)) return null
+
+    let probes = 0
+    let count = 0
+    let weight = 0
+    for (const evidence of ranked) {
+      for (const candidate of evidence) {
+        if (!candidate) continue
+        if (probes++ >= MAX_MEMBER_PROBES) return null
+        const { member, weight: candidateWeight } = candidate
+        if (layout.visibleAt(member.x, member.y).includes(member.areaId)) {
+          count++
+          weight += candidateWeight
+          break
+        }
+      }
+      if (count >= 2 && coversMore(weight)) return [...names.keys()]
+    }
+    return null
+  }
+
+  let displaced = false
+  for (const node of overviews) {
+    const next = tryPlace(node, node.overview, true, (box, collisions) =>
+      compareOverview(node, box, collisions),
+    )
+    if (next) {
+      displaced ||= next.displaced.length > 0
+      summaries.push({ box: next.box, radius: overviewRadius(next.box), node, owner: next.owner })
+    }
+  }
+  if (displaced) {
+    // Freed space can take unrelated area names or a different local occurrence.
+    for (const { node } of primary) {
+      if (!placements.has(node.language.id)) tryPlace(node, node.primary, false)
+    }
+  }
   return placements
 }

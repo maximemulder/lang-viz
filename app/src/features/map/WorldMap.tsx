@@ -238,8 +238,9 @@ const LanguageLayers = memo(({ regionMode }: { readonly regionMode: boolean }) =
       {!regionMode && (isolated || walsOpacity === 1) && (
         <LanguageLabels
           data={data}
+          areas={areas}
           selectionKey={selectionKey}
-          isolatedIds={isolated?.variantIds}
+          isolation={isolated}
         />
       )}
     </>

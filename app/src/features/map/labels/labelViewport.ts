@@ -8,6 +8,7 @@ export function labelViewport(map: MapLibreMap, context: CanvasRenderingContext2
   const globe = map.getProjection().type === 'vertical-perspective'
   const flat = !globe && map.getPitch() === 0
   const bounds = flat ? map.getBounds() : undefined
+  const wrap = map.getRenderWorldCopies()
   const west = bounds?.getWest() ?? -Infinity
   const east = bounds?.getEast() ?? Infinity
   const south = bounds?.getSouth() ?? -Infinity
@@ -18,16 +19,16 @@ export function labelViewport(map: MapLibreMap, context: CanvasRenderingContext2
   const halfHeight = LABEL_SIZE / 2 + LABEL_MARGIN
   context.font = `${LABEL_SIZE}px ${LABEL_FONT.join(', ')}`
 
-  return (anchor: LanguageLabelAnchor, name: string, overview: boolean): LabelBox | null => {
+  const screenPoint = (anchor: LanguageLabelAnchor): Point | null => {
     let point = points.get(anchor)
     if (point === undefined) {
       const [lng, lat] = anchor
-      const wrapped = bounds ? lng + 360 * Math.round(((west + east) / 2 - lng) / 360) : lng
+      const wrapped = bounds && wrap ? lng + 360 * Math.round(((west + east) / 2 - lng) / 360) : lng
       if (wrapped < west || wrapped > east || lat < south || lat > north) {
         points.set(anchor, null)
         return null
       }
-      point = map.project([lng, lat])
+      point = map.project([wrapped, lat])
       if (
         point.x < 0 ||
         point.x > width ||
@@ -38,6 +39,15 @@ export function labelViewport(map: MapLibreMap, context: CanvasRenderingContext2
         point = null
       points.set(anchor, point)
     }
+    return point
+  }
+
+  const textBox = (
+    anchor: LanguageLabelAnchor,
+    name: string,
+    spansAreas: boolean,
+  ): LabelBox | null => {
+    const point = screenPoint(anchor)
     if (!point) return null
 
     let textWidth = widths.get(name)
@@ -55,8 +65,8 @@ export function labelViewport(map: MapLibreMap, context: CanvasRenderingContext2
       return null
 
     // A family name can span several areas. A language name needs room around its anchor.
-    const dx = overview ? Math.max(4, textWidth / 10) : halfWidth
-    const dy = overview ? 0 : halfHeight
+    const dx = spansAreas ? Math.max(4, textWidth / 10) : halfWidth
+    const dy = spansAreas ? 0 : halfHeight
     if (flat) {
       if (Math.hypot(dx, dy) > anchor[2] * scale) return null
     } else {
@@ -90,4 +100,5 @@ export function labelViewport(map: MapLibreMap, context: CanvasRenderingContext2
       maxY: y + LABEL_SIZE / 2 + gap,
     }
   }
+  return { screenPoint, textBox }
 }

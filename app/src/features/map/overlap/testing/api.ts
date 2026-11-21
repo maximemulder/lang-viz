@@ -39,6 +39,7 @@ export interface OverlapTestApi {
     labelId: string
     labelName: string
     variantId: string
+    overview: boolean
     coordinates: readonly number[]
   }[]
   queryLayers(

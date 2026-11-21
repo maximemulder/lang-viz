@@ -28,7 +28,7 @@ export function MapLabelLayer({
         'symbol-sort-key': ['get', 'labelRank'],
       }}
       paint={{
-        'text-color': '#182d31',
+        'text-color': ['case', ['boolean', ['get', 'overview'], false], '#465b60', '#182d31'],
         'text-halo-color': '#fffdf6',
         'text-halo-width': HALO_WIDTH,
         'text-halo-blur': 0.4,

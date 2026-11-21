@@ -114,6 +114,7 @@ export const LanguageDetails = ({
   )
   const isIsolated =
     isolation?.kind === 'language' &&
+    isolation.languageId === detailId &&
     isolation.variantIds.length === isolationVariantIds.length &&
     isolation.variantIds.every((id, index) => id === isolationVariantIds[index])
   const inspectAtlas = (languageId: string) => {
@@ -159,6 +160,7 @@ export const LanguageDetails = ({
               const cameraRequest = focusLanguage(profileTarget, isolationVariantIds)
               setIsolation({
                 kind: 'language',
+                languageId: detail.id,
                 label: detail.name,
                 variantIds: isolationVariantIds,
                 color: '#df7546',
