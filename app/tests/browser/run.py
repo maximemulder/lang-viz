@@ -103,6 +103,7 @@ class Browser:
                 "webgl.disabled": False,
                 "webgl.disable-fail-if-major-performance-caveat": True,
                 "gfx.webrender.software": not args.hardware,
+                **getattr(args, "firefox_prefs", {}),
             },
         }
         result = request(

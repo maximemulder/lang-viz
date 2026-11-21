@@ -33,12 +33,11 @@ export const selectSearchResultsAtom = atom(null, (get, set, ids: readonly Langu
   set(searchSelectionAtom, [...new Set([...get(searchSelectionAtom), ...ids])])
 })
 
-export const addSearchSelectionToMapAtom = atom(null, (get, set) => {
-  const selected = get(searchSelectionAtom)
+export const addSearchLanguagesToMapAtom = atom(null, (get, set, ids: readonly LanguageId[]) => {
   const availability = get(geographyAvailabilityAtom)
   const coverage = get(searchCoverageAtom)
   const candidates = buildMapGroupEntries(
-    selected,
+    ids,
     get(languageHierarchyAtom),
     availability,
     get(geographyContextAtom),
@@ -52,6 +51,6 @@ export const addSearchSelectionToMapAtom = atom(null, (get, set) => {
   return {
     addedGroups: groupMapEntries(next).length - groupMapEntries(current).length,
     addedAreas: next.length - current.length,
-    unavailable: selected.filter((id) => !hasCoverage(availability.get(id), coverage)).length,
+    unavailable: ids.filter((id) => !hasCoverage(availability.get(id), coverage)).length,
   }
 })

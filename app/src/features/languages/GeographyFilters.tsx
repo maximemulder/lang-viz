@@ -54,7 +54,7 @@ export const GeographyFilters = () => {
           const active = view === activeView
           return (
             <li
-              className="geography-sources__row"
+              className="geography-sources__row finder-row"
               key={`${view.datasetId}/${view.viewId}`}
               data-dataset-id={view.datasetId}
               data-view-id={view.viewId}
@@ -63,10 +63,10 @@ export const GeographyFilters = () => {
                 <strong title={view.citation}>{view.name}</strong>
                 <small>{view.periodLabel}</small>
               </div>
-              <div className="geography-sources__actions">
+              <div className="finder-row__actions">
                 <button
                   type="button"
-                  className="geography-sources__show"
+                  className="geography-sources__show finder-row__action"
                   aria-label={`Show only ${view.label}`}
                   onClick={() => showOnly(view)}
                 >
@@ -74,7 +74,7 @@ export const GeographyFilters = () => {
                 </button>
                 <input
                   type="checkbox"
-                  className="geography-sources__browse"
+                  className="geography-sources__browse finder-row__checkbox"
                   aria-label={`Browse ${view.label}`}
                   title={`Browse ${view.label}`}
                   checked={active}

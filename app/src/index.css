@@ -225,8 +225,7 @@ h2 {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 0.4rem;
-  padding: 0.3rem 0;
-  border-bottom: 1px solid rgb(29 43 39 / 10%);
+  padding: 0.3rem 0.25rem 0.3rem 0.3rem;
   font-size: 0.72rem;
 }
 
@@ -237,16 +236,26 @@ h2 {
   line-height: 1.3;
 }
 
-.geography-sources__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
+.finder-row {
+  border-bottom: 1px solid rgb(29 43 39 / 6%);
 }
 
-.geography-sources__show {
+.finder-row:is(:hover, :focus-within),
+.language-row--active {
+  background: rgb(29 43 39 / 5%);
+}
+
+.finder-row__actions {
+  display: grid;
+  grid-template-columns: 2.75rem 1.25rem;
+  align-items: center;
+  justify-items: center;
+  gap: 0.35rem;
+}
+
+.finder-row__action {
   min-height: 1.8rem;
-  padding: 0.25rem 0.45rem;
+  padding: 0.25rem 0.35rem;
   border: 0;
   border-radius: 0.35rem;
   color: #fff;
@@ -255,8 +264,15 @@ h2 {
   font-weight: 600;
 }
 
-.geography-sources__show:hover {
+.finder-row__action:hover {
   text-decoration: underline;
+}
+
+@media (hover: hover) and (not (any-pointer: coarse)) {
+  .finder-row:not(:hover, :focus-within) .finder-row__action {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 .finder-actions {
@@ -331,18 +347,13 @@ h2 {
 }
 .language-row {
   display: grid;
-  grid-template-columns: 1.25rem minmax(2rem, 1fr) 1.25rem;
+  grid-template-columns: 1.25rem minmax(2rem, 1fr) auto;
   align-items: center;
   gap: 0.6rem;
   height: 44px;
   padding-right: 1rem;
-  border-bottom: 1px solid rgb(29 43 39 / 6%);
   color: var(--ink);
   cursor: default;
-}
-.language-row:hover,
-.language-row--active {
-  background: rgb(29 43 39 / 5%);
 }
 .language-row:focus-visible {
   outline: 2px solid var(--accent);
@@ -404,9 +415,7 @@ h2 {
   font-size: 0.58rem;
   line-height: 1.5;
 }
-.language-row input,
-.geography-sources__browse {
-  justify-self: center;
+.finder-row__checkbox {
   width: 0.9rem;
   height: 0.9rem;
   margin: 0;
@@ -423,7 +432,7 @@ h2 {
   color: inherit;
 }
 
-.language-row--unavailable:hover,
+.language-row--unavailable:is(:hover, :focus-within),
 .language-row--unavailable.language-row--active {
   background: #e7e8e2;
 }
@@ -1321,6 +1330,7 @@ h2 {
   max-height: min(19rem, 38dvh);
   overflow: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 @media (min-width: 801px) and (min-height: 800px) {

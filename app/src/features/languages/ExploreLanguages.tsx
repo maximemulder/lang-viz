@@ -29,7 +29,7 @@ import {
   revealLanguageIdAtom,
 } from '../../state/languageControls'
 import {
-  addSearchSelectionToMapAtom,
+  addSearchLanguagesToMapAtom,
   searchColoringAtom,
   searchCoverageAtom,
   searchSelectionAtom,
@@ -66,6 +66,7 @@ const LanguageRow = ({
   const coverage = useAtomValue(searchCoverageAtom)
   const panel = useAtomValue(languagePanelAtom)
   const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
+  const addToMap = useSetAtom(addSearchLanguagesToMapAtom)
   const preview = useLanguagePreview({ languageId: language.id }, panel.view === 'explore')
   const available = availability.get(language.id)
   if (!available) return null
@@ -95,7 +96,7 @@ const LanguageRow = ({
       data-tree-key={row.key}
       data-language-id={language.id}
       data-inspected={panel.detailId === language.id}
-      className={`language-row${active ? ' language-row--active' : ''}${usable ? '' : ' language-row--unavailable'}`}
+      className={`finder-row language-row${active ? ' language-row--active' : ''}${usable ? '' : ' language-row--unavailable'}`}
       style={{ paddingLeft: `${16 + row.depth * 14}px`, minWidth: `${292 + row.depth * 14}px` }}
       onFocus={onFocus}
       onClick={(event) => {
@@ -144,13 +145,28 @@ const LanguageRow = ({
         {context && <small className="language-row__context">{context}</small>}
       </button>
       {usable && (
-        <input
-          type="checkbox"
-          tabIndex={-1}
-          aria-label={`Select ${language.name}`}
-          checked={isSelected}
-          onChange={() => toggleSelected(language.id)}
-        />
+        <div className="finder-row__actions">
+          <button
+            type="button"
+            className="finder-row__action"
+            tabIndex={active ? 0 : -1}
+            aria-label={`Add ${language.name} to map`}
+            onClick={(event) => {
+              event.stopPropagation()
+              addToMap([language.id])
+            }}
+          >
+            Add
+          </button>
+          <input
+            type="checkbox"
+            className="finder-row__checkbox"
+            tabIndex={-1}
+            aria-label={`Select ${language.name}`}
+            checked={isSelected}
+            onChange={() => toggleSelected(language.id)}
+          />
+        </div>
       )}
     </div>
   )
@@ -162,7 +178,7 @@ export const ExploreLanguages = () => {
   const [query, setQuery] = useAtom(languageQueryAtom)
   const selectResults = useSetAtom(selectSearchResultsAtom)
   const toggleSelected = useSetAtom(toggleSearchSelectionAtom)
-  const addSelection = useSetAtom(addSearchSelectionToMapAtom)
+  const addSelection = useSetAtom(addSearchLanguagesToMapAtom)
   const [coverage, setCoverage] = useAtom(searchCoverageAtom)
   const [coloring, setColoring] = useAtom(searchColoringAtom)
   const [searchExpanded, setSearchExpanded] = useState(true)
@@ -430,7 +446,7 @@ export const ExploreLanguages = () => {
               type="button"
               className="finder-add"
               disabled={!mappableSelected}
-              onClick={() => addSelection()}
+              onClick={() => addSelection(selectedIds)}
             >
               Add to map
             </button>

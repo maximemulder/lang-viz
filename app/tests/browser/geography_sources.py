@@ -1,9 +1,17 @@
 """Check dataset view browsing and full coverage through the sidebar."""
 
 import json
+from types import SimpleNamespace
 
 from .run import APP, browser_session, open_atlas, wait_for
 from .sidebar import add_selected, open_details, search, select_control, select_result, sources
+
+
+def move_mouse(browser, x, y):
+    browser.call("POST", "/actions", {"actions": [{
+        "type": "pointer", "id": "dataset-mouse", "parameters": {"pointerType": "mouse"},
+        "actions": [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y}],
+    }]})
 
 
 def click(browser, selector):
@@ -11,20 +19,28 @@ def click(browser, selector):
         const control = document.querySelector(arguments[0]);
         control.scrollIntoView({block: 'center'});
         const box = control.getBoundingClientRect();
-        const x = Math.round(box.left + box.width / 2);
-        const y = Math.round(box.top + box.height / 2);
-        if (document.elementFromPoint(x, y) !== control) {
-            throw new Error('Dataset action is clipped: ' + arguments[0]);
-        }
-        return [x, y];
+        return [Math.round(box.left + box.width / 2), Math.round(box.top + box.height / 2)];
     """, selector)
+    move_mouse(browser, x, y)
+    assert browser.js("""
+        const control = document.querySelector(arguments[0]);
+        return document.elementFromPoint(arguments[1], arguments[2]) === control &&
+            getComputedStyle(control).opacity === '1';
+    """, selector, x, y), f"Control should be visible and clickable after hovering: {selector}"
     browser.call("POST", "/actions", {"actions": [{
         "type": "pointer", "id": "dataset-mouse", "parameters": {"pointerType": "mouse"},
         "actions": [
-            {"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y},
             {"type": "pointerDown", "button": 0},
             {"type": "pointerUp", "button": 0},
         ],
+    }]})
+    browser.call("DELETE", "/actions")
+
+
+def press(browser, key):
+    browser.call("POST", "/actions", {"actions": [{
+        "type": "key", "id": "row-keyboard",
+        "actions": [{"type": "keyDown", "value": key}, {"type": "keyUp", "value": key}],
     }]})
     browser.call("DELETE", "/actions")
 
@@ -37,7 +53,13 @@ def main():
         key = (variant["datasetId"], variant["temporalCoverage"]["viewId"])
         expected.setdefault(key, set()).add(variant["id"])
 
-    with browser_session(output) as (browser, origin):
+    # Headless Firefox reports no pointer unless the test supplies one.
+    mouse = SimpleNamespace(
+        headed=False,
+        hardware=False,
+        firefox_prefs={"ui.primaryPointerCapabilities": 6, "ui.allPointerCapabilities": 6},
+    )
+    with browser_session(output, options=mouse) as (browser, origin):
         open_atlas(browser, origin)
         browser.js('window.overlapTest.configure({languageIds:[],center:[108,32],zoom:3})')
         search(browser, "stan1295", "stan1295")
@@ -49,8 +71,30 @@ def main():
         def entries():
             return browser.js("return window.overlapTest.mapEntryState()")
 
+        original = entries()
+        assert len(original) == 1 and original[0]["group"]["coloring"] == "uniform"
+        search(browser, "abkh1244", "abkh1244")
+        add_selector = '[data-language-id="abkh1244"] .finder-row__action'
+        assert browser.js("return getComputedStyle(document.querySelector(arguments[0])).opacity === '0'", add_selector)
+        browser.js("document.querySelector('[data-language-id=abkh1244]').focus()")
+        assert browser.js("return getComputedStyle(document.querySelector(arguments[0])).opacity === '1'", add_selector)
+        press(browser, "\ue004")  # Tab to details.
+        press(browser, "\ue004")  # Tab to Add.
+        assert browser.js("return document.activeElement.matches(arguments[0])", add_selector)
+        press(browser, "\ue007")  # Enter.
         previous = entries()
-        assert len(previous) == 1 and previous[0]["group"]["coloring"] == "uniform"
+        assert len(previous) == 2 and original[0] in previous
+        added = next(entry for entry in previous if entry["languageId"] == "abkh1244")
+        assert added["group"]["coverage"] == "own" and added["group"]["coloring"] == "uniform"
+        assert browser.js("""
+            return !document.querySelector('[data-language-id=abkh1244] input').checked &&
+                document.querySelector('.finder-bulk strong').textContent === '1 selected';
+        """)
+        browser.js("document.activeElement.blur()")
+        click(browser, add_selector)
+        assert entries() == previous, "Adding the same language twice should be idempotent"
+        search(browser, "stan1295", "stan1295")
+        assert browser.js("return document.querySelector('[data-language-id=stan1295] input').checked")
         browser.js("document.querySelector('.finder-options').open=true")
         rows = browser.js("""
             return [...document.querySelectorAll('.geography-sources__row')].map(row =>
@@ -62,6 +106,20 @@ def main():
 
         def action(dataset, period, name):
             return f'[data-dataset-id="{dataset}"][data-view-id="{period}"] .geography-sources__{name}'
+
+        move_mouse(browser, 24, 24)
+        browser.js("document.querySelector('.finder-options summary').focus()")
+        assert browser.js("""
+            return [...document.querySelectorAll('.geography-sources__show')].every(button =>
+                getComputedStyle(button).opacity === '0'
+            );
+        """)
+        press(browser, "\ue004")  # Tab into the first dataset row.
+        assert browser.js("""
+            const button = document.activeElement;
+            return button.matches('.geography-sources__show') && getComputedStyle(button).opacity === '1';
+        """)
+        assert entries() == previous
 
         def checked_views():
             return browser.js("""
